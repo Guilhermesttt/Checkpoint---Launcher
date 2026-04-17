@@ -49,11 +49,7 @@ const parseDiskSizeGb = (text) => {
   return null;
 };
 
-app.use(express.static(path.join(__dirname, "../dist")));
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
-});
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
@@ -280,6 +276,12 @@ app.get("/api/steam/app-size", async (req, res) => {
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar tamanho do jogo." });
   }
+});
+
+app.use(express.static(path.join(__dirname, "../dist")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../dist/index.html"));
 });
 
 app.listen(port, () => {
