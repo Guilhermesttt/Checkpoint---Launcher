@@ -3,6 +3,7 @@ import { motion, useMotionValue, useSpring, AnimatePresence } from "framer-motio
 
 interface DynamicBackgroundProps {
   backgroundImage?: string;
+  reducedEffects?: boolean;
 }
 
 /**
@@ -10,6 +11,7 @@ interface DynamicBackgroundProps {
  */
 const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
   backgroundImage,
+  reducedEffects = false,
 }) => {
   // ── Crossfade state ──
   const [layers, setLayers] = useState<{ src: string; key: number }[]>(
@@ -20,13 +22,14 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
 
   useEffect(() => {
     if (!backgroundImage) return;
-
-    if (layers.length > 0 && layers[layers.length - 1].src === backgroundImage) return;
-
-    layerCounter.current += 1;
-    const newLayer = { src: backgroundImage, key: layerCounter.current };
-    
-    setLayers((prev) => [...prev.slice(-1), newLayer]);
+    setLayers((prev) => {
+      if (prev.length > 0 && prev[prev.length - 1].src === backgroundImage) {
+        return prev;
+      }
+      layerCounter.current += 1;
+      const newLayer = { src: backgroundImage, key: layerCounter.current };
+      return [...prev.slice(-1), newLayer];
+    });
 
     if (trimTimerRef.current) {
       window.clearTimeout(trimTimerRef.current);
@@ -62,9 +65,10 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
   );
 
   useEffect(() => {
+    if (reducedEffects) return;
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [handleMouseMove]);
+  }, [handleMouseMove, reducedEffects]);
 
   return (
     <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#050507]">
@@ -79,14 +83,16 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
               transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-[-60px]"
               style={{
-                x: parallaxX,
-                y: parallaxY,
+                x: reducedEffects ? 0 : parallaxX,
+                y: reducedEffects ? 0 : parallaxY,
               }}
             >
               <img
                 src={layer.src}
                 alt=""
-                className="w-full h-full object-cover blur-[20px] scale-105"
+                loading="eager"
+                decoding="async"
+                className={`w-full h-full object-cover scale-105 ${reducedEffects ? "blur-[10px]" : "blur-[20px]"}`}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   // If it's a Steam asset that failed, try the reliable header.jpg
@@ -140,7 +146,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
         />
 
         {/* ── Liquid Glass Ambient Light Effects ── */}
-        <motion.div
+        {!reducedEffects && <motion.div
           animate={{
             opacity: [0.3, 0.5, 0.3],
             scale: [1, 1.1, 1],
@@ -156,9 +162,9 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
               "radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 60%)",
             filter: "blur(120px)",
           }}
-        />
+        />}
         
-        <motion.div
+        {!reducedEffects && <motion.div
           animate={{
             opacity: [0.2, 0.4, 0.2],
             scale: [1, 1.15, 1],
@@ -175,10 +181,10 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
               "radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 55%)",
             filter: "blur(100px)",
           }}
-        />
+        />}
       </div>
 
-      <div className="absolute inset-0 pointer-events-none z-20">
+      {!reducedEffects && <div className="absolute inset-0 pointer-events-none z-20">
         {PARTICLES.map((p, i) => (
           <motion.div
             key={i}
@@ -204,9 +210,9 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
             }}
           />
         ))}
-      </div>
+      </div>}
 
-      <motion.div
+      {!reducedEffects && <motion.div
         animate={{
           borderRadius: [
             "60% 40% 30% 70% / 60% 30% 70% 40%",
@@ -225,7 +231,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
           background: "linear-gradient(135deg, white 0%, transparent 50%)",
           filter: "blur(60px)",
         }}
-      />
+      />}
 
       <div
         className="absolute inset-0 opacity-[0.02] pointer-events-none mix-blend-overlay"

@@ -13,13 +13,64 @@ import {
   Clock,
   HardDrive,
 } from "lucide-react";
-import { collection, addDoc, doc, updateDoc } from "firebase/firestore";
-import { db } from "../../Firebase";
+import { addDoc, updateDoc } from "firebase/firestore";
 import type { Game } from "../types/domain";
 import { useAuth } from "../auth/AuthProvider";
 import { apiUrl } from "../services/api";
-import { fetchSteamAppSizeGB } from "../services/steam";
+import {
+  fetchSteamAppDetailsResult,
+  fetchSteamAppSizeGB,
+  type SteamAppDetails,
+} from "../services/steam";
 import { useNotification } from "./NotificationCenter";
+import { userGameDocRef, userGamesCollectionRef } from "../services/firestorePaths";
+
+type GameFormState = {
+  title: string;
+  category: string;
+  image: string;
+  backgroundImage: string;
+  cardImage: string;
+  logoImage: string;
+  description: string;
+  trailerUrl: string;
+  executablePath: string;
+  hoursPlayed: number;
+  sizeGB: number;
+  launcherType: "steam" | "local";
+  screenshots: string[];
+  aboutTheGame: string;
+  releaseDate: string;
+  developer: string;
+  publisher: string;
+  tags: string[];
+  steamAppId: string;
+};
+
+const omitUndefined = (obj: Record<string, unknown>) => {
+  const next: Record<string, unknown> = { ...obj };
+  Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
+  return next;
+};
+
+const mergeSteamStoreIntoForm = (form: GameFormState, details: SteamAppDetails) => ({
+  ...form,
+  title: details.title || form.title,
+  image: details.backgroundImage || form.image,
+  backgroundImage: details.backgroundImage || form.backgroundImage,
+  cardImage: details.cardImage || form.cardImage,
+  logoImage: details.logoImage || form.logoImage,
+  description: details.description || form.description,
+  trailerUrl: details.trailerUrl || form.trailerUrl,
+  screenshots:
+    details.screenshots && details.screenshots.length > 0 ? details.screenshots : form.screenshots,
+  aboutTheGame: details.aboutTheGame || details.description || form.aboutTheGame,
+  releaseDate: details.releaseDate || form.releaseDate,
+  developer: details.developer || form.developer,
+  publisher: details.publisher || form.publisher,
+  tags: details.tags && details.tags.length > 0 ? details.tags : form.tags,
+  steamAppId: details.appId || form.steamAppId,
+});
 
 interface AddGameModalProps {
   isOpen: boolean;
@@ -44,12 +95,22 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     title: "",
     category: "ROLEPLAYING",
     image: "",
+    backgroundImage: "",
     cardImage: "",
+    logoImage: "",
     description: "",
+    trailerUrl: "",
     executablePath: "",
     hoursPlayed: 0,
     sizeGB: 0,
     launcherType: "local" as "steam" | "local",
+    screenshots: [] as string[],
+    aboutTheGame: "",
+    releaseDate: "",
+    developer: "",
+    publisher: "",
+    tags: [] as string[],
+    steamAppId: "",
   });
   const [steamId, setSteamId] = useState("");
 
@@ -60,12 +121,22 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           title: gameToEdit.title || "",
           category: gameToEdit.category || "ROLEPLAYING",
           image: gameToEdit.image || "",
+          backgroundImage: gameToEdit.backgroundImage || gameToEdit.image || "",
           cardImage: gameToEdit.cardImage || "",
+          logoImage: gameToEdit.logoImage || "",
           description: gameToEdit.description || "",
+          trailerUrl: gameToEdit.trailerUrl || "",
           executablePath: gameToEdit.executablePath || "",
           hoursPlayed: gameToEdit.hoursPlayed || 0,
           sizeGB: gameToEdit.sizeGB || 0,
           launcherType: gameToEdit.launcherType || "local",
+          screenshots: gameToEdit.screenshots || [],
+          aboutTheGame: gameToEdit.aboutTheGame || "",
+          releaseDate: gameToEdit.releaseDate || "",
+          developer: gameToEdit.developer || "",
+          publisher: gameToEdit.publisher || "",
+          tags: gameToEdit.tags || [],
+          steamAppId: gameToEdit.steamAppId || "",
         });
         // Extract steam ID if possible from executable path
         if (gameToEdit.executablePath && /^\d+$/.test(gameToEdit.executablePath)) {
@@ -76,12 +147,22 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           title: "",
           category: "ROLEPLAYING",
           image: "",
+          backgroundImage: "",
           cardImage: "",
+          logoImage: "",
           description: "",
+          trailerUrl: "",
           executablePath: "",
           hoursPlayed: 0,
           sizeGB: 0,
           launcherType: "local" as "steam" | "local",
+          screenshots: [],
+          aboutTheGame: "",
+          releaseDate: "",
+          developer: "",
+          publisher: "",
+          tags: [],
+          steamAppId: "",
         });
         setSteamId("");
       }
@@ -94,8 +175,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const handleBrowse = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.onchange = (e: any) => {
-      const file = e.target.files[0];
+    input.onchange = (e: Event) => {
+      const target = e.target as HTMLInputElement | null;
+      const file = target?.files?.[0];
       if (file) {
         setFormData((prev) => ({ ...prev, executablePath: file.name }));
       }
@@ -112,15 +194,33 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const header = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_hero.jpg`;
     const card = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_600x900_2x.jpg`;
     
-    const sizeGB = await fetchSteamAppSizeGB(normalizedSteamId).catch(() => undefined);
+    const [sizeGB, detailsResult] = await Promise.all([
+      fetchSteamAppSizeGB(normalizedSteamId).catch(() => undefined),
+      fetchSteamAppDetailsResult(normalizedSteamId),
+    ]);
+    const details = detailsResult.ok ? detailsResult.data : null;
+    if (!detailsResult.ok) {
+      notify(detailsResult.message, "info");
+    }
 
     setFormData(prev => ({
       ...prev,
-      image: header,
-      cardImage: card,
+      image: details?.backgroundImage || header,
+      backgroundImage: details?.backgroundImage || header,
+      cardImage: details?.cardImage || card,
+      logoImage: details?.logoImage || prev.logoImage,
+      description: details?.description || prev.description,
+      trailerUrl: details?.trailerUrl || prev.trailerUrl,
       executablePath: normalizedSteamId, // Auto-fill path as Steam ID for easy launching
       launcherType: "steam",
-      sizeGB: typeof sizeGB === "number" ? sizeGB : prev.sizeGB,
+      sizeGB: typeof sizeGB === "number" ? Math.round(sizeGB) : prev.sizeGB,
+      screenshots: details?.screenshots || prev.screenshots,
+      aboutTheGame: details?.aboutTheGame || details?.description || prev.aboutTheGame,
+      releaseDate: details?.releaseDate || prev.releaseDate,
+      developer: details?.developer || prev.developer,
+      publisher: details?.publisher || prev.publisher,
+      tags: details?.tags || prev.tags,
+      steamAppId: normalizedSteamId,
     }));
   };
 
@@ -133,8 +233,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       const normalizedSteamId = steamId.trim();
       const normalizedExecutablePath = formData.executablePath.trim();
 
+      let effectiveSteamId = "";
       if (formData.launcherType === "steam") {
-        const effectiveSteamId = normalizedSteamId || normalizedExecutablePath;
+        effectiveSteamId = normalizedSteamId || normalizedExecutablePath;
         if (!/^\d+$/.test(effectiveSteamId)) {
           notify("Para jogo Steam, informe um App ID numérico válido.", "error");
           setLoading(false);
@@ -142,31 +243,50 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         }
       }
 
-      const payload = {
-        ...formData,
+      let mergedForm: GameFormState = { ...formData };
+      if (formData.launcherType === "steam") {
+        const [sizeGB, storeResult] = await Promise.all([
+          fetchSteamAppSizeGB(effectiveSteamId).catch(() => undefined),
+          fetchSteamAppDetailsResult(effectiveSteamId),
+        ]);
+        if (!storeResult.ok) {
+          notify(
+            `${storeResult.message} O jogo será salvo só com os dados do formulário.`,
+            "info",
+          );
+        } else {
+          mergedForm = mergeSteamStoreIntoForm(mergedForm, storeResult.data);
+        }
+        if (typeof sizeGB === "number") {
+          mergedForm = { ...mergedForm, sizeGB: Math.max(0, Math.round(sizeGB)) };
+        }
+      }
+
+      const payload = omitUndefined({
+        ...mergedForm,
         executablePath:
-          formData.launcherType === "steam"
-            ? normalizedSteamId || normalizedExecutablePath
-            : normalizedExecutablePath,
-      };
+          formData.launcherType === "steam" ? effectiveSteamId : normalizedExecutablePath,
+        hoursPlayed: Math.max(0, Math.round(mergedForm.hoursPlayed)),
+        sizeGB: Math.max(0, Math.round(mergedForm.sizeGB)),
+        steamAppId: formData.launcherType === "steam" ? effectiveSteamId : "",
+        updatedAt: new Date().toISOString(),
+      }) as Record<string, unknown>;
 
       // Close modal immediately for "instant" feel
       onClose();
 
       if (gameToEdit) {
-        await updateDoc(doc(db, "games", gameToEdit.id), {
-          ...payload,
-          updatedAt: new Date(),
-        });
+        if (!user?.uid) throw new Error("Sessão inválida.");
+        await updateDoc(userGameDocRef(user.uid, gameToEdit.id), payload);
       } else {
         if (!user?.uid) {
           notify("Sessão inválida. Faça login novamente.", "error");
           return;
         }
-        await addDoc(collection(db, "games"), {
+        await addDoc(userGamesCollectionRef(user.uid), {
           ...payload,
-          ownerUid: user.uid,
-          createdAt: new Date(),
+          createdAt: new Date().toISOString(),
+          source: "manual",
         });
       }
       onSaved?.();
@@ -235,17 +355,36 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const header = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_hero.jpg`;
     const card = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`;
 
-    const sizeGB = await fetchSteamAppSizeGB(appId).catch(() => undefined);
+    const [sizeGB, detailsResult] = await Promise.all([
+      fetchSteamAppSizeGB(appId).catch(() => undefined),
+      fetchSteamAppDetailsResult(appId),
+    ]);
+    const details = detailsResult.ok ? detailsResult.data : null;
+    if (!detailsResult.ok) {
+      notify(detailsResult.message, "info");
+    }
 
     setFormData({
       ...formData,
-      title: game.name,
-      image: header,
-      cardImage: card,
+      title: details?.title || game.name,
+      image: details?.backgroundImage || header,
+      backgroundImage: details?.backgroundImage || header,
+      cardImage: details?.cardImage || card,
+      logoImage: details?.logoImage || formData.logoImage,
       executablePath: appId,
-      description: `Official Steam ID: ${appId}. Experience ${game.name} in its full glory.`,
+      description:
+        details?.description ||
+        `Official Steam ID: ${appId}. Experience ${game.name} in its full glory.`,
+      trailerUrl: details?.trailerUrl || formData.trailerUrl,
       launcherType: "steam",
-      sizeGB: sizeGB ?? formData.sizeGB,
+      sizeGB: sizeGB ? Math.round(sizeGB) : formData.sizeGB,
+      screenshots: details?.screenshots || [],
+      aboutTheGame: details?.aboutTheGame || details?.description || "",
+      releaseDate: details?.releaseDate || "",
+      developer: details?.developer || "",
+      publisher: details?.publisher || "",
+      tags: details?.tags || [],
+      steamAppId: appId,
     });
     setSteamId(appId);
     setSearchResults([]);

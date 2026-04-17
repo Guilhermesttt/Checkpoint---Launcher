@@ -88,7 +88,8 @@ const GameCard: React.FC<GameCardProps> = ({
           src={image}
           alt={title}
           className="h-full w-full object-cover"
-          loading="lazy"
+          loading={isActive ? "eager" : "lazy"}
+          decoding="async"
           draggable={false}
         />
 
@@ -185,7 +186,7 @@ const GameCard: React.FC<GameCardProps> = ({
       {isActive && (
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.15 }}
+          animate={{ opacity: 0.1 }}
           className="absolute -bottom-20 left-0 right-0 h-20 pointer-events-none overflow-hidden rounded-b-2xl"
           style={{
             background: `url(${image})`,

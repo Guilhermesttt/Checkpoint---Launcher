@@ -32,6 +32,34 @@ const normalizeOpenIdBody = (query) => {
   return params;
 };
 
+/** Steam costuma exigir cabeçalho de browser; sem isto a API pode devolver 200 com success:false ou corpo vazio. */
+const steamStoreFetchHeaders = {
+  Accept: "application/json",
+  "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+};
+
+const pickSteamTrailerUrl = (movies) => {
+  if (!Array.isArray(movies) || movies.length === 0) return null;
+  const list = [...movies].sort(
+    (a, b) => Number(Boolean(b?.highlight)) - Number(Boolean(a?.highlight)),
+  );
+  for (const m of list) {
+    const mp4 = m?.mp4;
+    const webm = m?.webm;
+    if (mp4 && typeof mp4 === "object") {
+      const u = mp4.max || mp4["480"];
+      if (u) return u;
+    }
+    if (webm && typeof webm === "object") {
+      const u = webm.max || webm["480"];
+      if (u) return u;
+    }
+  }
+  return null;
+};
+
 const parseDiskSizeGb = (text) => {
   if (!text) return null;
   const plain = String(text)
@@ -218,7 +246,7 @@ const handleSteamSearch = async (req, res) => {
     url.searchParams.set("cc", "BR");
 
     const response = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
+      headers: steamStoreFetchHeaders,
     });
 
     if (!response.ok) {
@@ -256,7 +284,7 @@ app.get("/api/steam/app-size", async (req, res) => {
     url.searchParams.set("cc", "BR");
 
     const response = await fetch(url.toString(), {
-      headers: { Accept: "application/json" },
+      headers: steamStoreFetchHeaders,
     });
     if (!response.ok) {
       res
@@ -269,7 +297,11 @@ app.get("/api/steam/app-size", async (req, res) => {
 
     const payload = await response.json();
     const appEntry = payload?.[appId];
-    const data = appEntry?.data;
+    if (!appEntry?.success || !appEntry?.data) {
+      res.json({ appId, sizeGB: null });
+      return;
+    }
+    const data = appEntry.data;
     const requirements = `${data?.pc_requirements?.minimum ?? ""} ${data?.pc_requirements?.recommended ?? ""}`;
     const sizeGB = parseDiskSizeGb(requirements);
     res.json({ appId, sizeGB: sizeGB ?? null });
@@ -278,9 +310,65 @@ app.get("/api/steam/app-size", async (req, res) => {
   }
 });
 
+app.get("/api/steam/app-details", async (req, res) => {
+  const appId = String(req.query.appId ?? "").trim();
+  if (!/^\d+$/.test(appId)) {
+    res.status(400).json({ error: "appId inválido." });
+    return;
+  }
+
+  try {
+    const url = new URL("https://store.steampowered.com/api/appdetails");
+    url.searchParams.set("appids", appId);
+    url.searchParams.set("l", "brazilian");
+    url.searchParams.set("cc", "BR");
+
+    const response = await fetch(url.toString(), {
+      headers: steamStoreFetchHeaders,
+    });
+    if (!response.ok) {
+      res.status(502).json({ error: `Falha ao consultar detalhes do app (status ${response.status}).` });
+      return;
+    }
+
+    const payload = await response.json();
+    const appEntry = payload?.[appId];
+    if (!appEntry?.success || !appEntry?.data) {
+      res.status(404).json({ error: "Detalhes não encontrados para este appId." });
+      return;
+    }
+    const data = appEntry.data;
+
+    const requirements = `${data?.pc_requirements?.minimum ?? ""} ${data?.pc_requirements?.recommended ?? ""}`;
+    const trailerUrl = pickSteamTrailerUrl(data?.movies);
+
+    res.json({
+      appId,
+      title: data?.name ?? null,
+      cardImage: data?.header_image ?? null,
+      backgroundImage: data?.background_raw ?? data?.background ?? null,
+      logoImage: data?.capsule_imagev5 ?? data?.capsule_image ?? null,
+      description: data?.short_description ?? null,
+      aboutTheGame: data?.about_the_game ?? null,
+      screenshots: Array.isArray(data?.screenshots) ? data.screenshots.map(s => s.path_full) : [],
+      releaseDate: data?.release_date?.date ?? null,
+      developer: Array.isArray(data?.developers) ? data.developers.join(", ") : null,
+      publisher: Array.isArray(data?.publishers) ? data.publishers.join(", ") : null,
+      tags: [
+        ...(Array.isArray(data?.genres) ? data.genres.map(g => g.description) : []),
+        ...(Array.isArray(data?.categories) ? data.categories.map(c => c.description) : [])
+      ],
+      trailerUrl,
+      sizeGB: parseDiskSizeGb(requirements),
+    });
+  } catch {
+    res.status(500).json({ error: "Erro interno ao buscar detalhes do jogo." });
+  }
+});
+
 app.use(express.static(path.join(__dirname, "../dist")));
 
-app.get("*", (req, res) => {
+app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/index.html"));
 });
 

@@ -2,10 +2,12 @@ export type LauncherType = "steam" | "local";
 
 export interface Game {
   id: string;
-  ownerUid?: string;
   title: string;
   image: string;
+  backgroundImage?: string;
   cardImage?: string;
+  logoImage?: string;
+  trailerUrl?: string;
   category?: string;
   description?: string;
   isFavorite?: boolean;
@@ -18,6 +20,14 @@ export interface Game {
   source?: "manual" | "steam";
   lastSyncedAt?: string;
   lastPlayedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  screenshots?: string[];
+  aboutTheGame?: string;
+  releaseDate?: string;
+  developer?: string;
+  publisher?: string;
+  tags?: string[];
 }
 
 export interface UserProfile {
@@ -29,6 +39,8 @@ export interface UserProfile {
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
+  gamesMigratedAt?: string;
+  onboardingCompletedAt?: string;
 }
 
 export interface SteamOwnedGame {

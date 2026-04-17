@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, LogOut, Play, Plus, RefreshCw, Search, Unlink2, User } from "lucide-react";
+import {
+  CheckCircle2,
+  LogOut,
+  Play,
+  Plus,
+  RefreshCw,
+  Search,
+  Unlink2,
+  User,
+  MouseLeft,
+  MouseRight,
+} from "lucide-react";
 import {
   collection,
   deleteDoc,
-  doc,
   getDocs,
   onSnapshot,
   query,
@@ -35,6 +45,12 @@ import {
   syncSteamLibraryToFirestore,
 } from "../services/steam";
 import type { Game } from "../types/domain";
+import {
+  profileDocRef,
+  userDocRef,
+  userGameDocRef,
+  userGamesCollectionRef,
+} from "../services/firestorePaths";
 
 const CATEGORIES = [
   { id: "ALL", label: "TODOS" },
@@ -50,7 +66,8 @@ const CATEGORIES = [
 const normalizeCategory = (value?: string) =>
   value?.toUpperCase().replace(/[^A-Z0-9]/g, "") ?? "";
 const steamIdStorageKey = (uid: string) => `checkpoint_steam_id_${uid}`;
-const steamDisconnectedStorageKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
+const steamDisconnectedStorageKey = (uid: string) =>
+  `checkpoint_steam_disconnected_${uid}`;
 
 const Home: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
@@ -67,10 +84,16 @@ const Home: React.FC = () => {
   const [steamApiKeySaving, setSteamApiKeySaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
-  const [disconnectSteamModalOpen, setDisconnectSteamModalOpen] = useState(false);
+  const [disconnectSteamModalOpen, setDisconnectSteamModalOpen] =
+    useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; game: Game } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    game: Game;
+  } | null>(null);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const { playSound } = useSoundEffects();
   const { notify } = useNotification();
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
@@ -85,22 +108,91 @@ const Home: React.FC = () => {
       return;
     }
     setIsLoading(true);
-    const q = query(
-      collection(db, "games"),
-      where("ownerUid", "==", user.uid),
-    );
+    const q = query(userGamesCollectionRef(user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs
-        .map((gameDoc) => ({
-          id: gameDoc.id,
-          ...gameDoc.data(),
-        }) as Game)
+        .map(
+          (gameDoc) =>
+            ({
+              id: gameDoc.id,
+              ...gameDoc.data(),
+            }) as Game,
+        )
         .sort((a, b) => a.title.localeCompare(b.title));
       setGames(data);
       setIsLoading(false);
     });
     return () => unsubscribe();
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setOnboardingCompleted(false);
+      return;
+    }
+    const onboardingLocal =
+      localStorage.getItem(`checkpoint_onboarding_${user.uid}`) === "1";
+    const profileDone = Boolean(userProfile?.onboardingCompletedAt);
+    setOnboardingCompleted(onboardingLocal || profileDone);
+  }, [user?.uid, userProfile?.onboardingCompletedAt]);
+
+  useEffect(() => {
+    const migrateLegacyGames = async () => {
+      if (!user?.uid) return;
+      if (userProfile?.gamesMigratedAt) return;
+      try {
+        const legacySnap = await getDocs(
+          query(collection(db, "games"), where("ownerUid", "==", user.uid)),
+        );
+        if (legacySnap.empty) {
+          await setDoc(
+            profileDocRef(user.uid),
+            { gamesMigratedAt: new Date().toISOString() },
+            { merge: true },
+          );
+          return;
+        }
+        const batch = writeBatch(db);
+        legacySnap.docs.forEach((legacyDoc) => {
+          const payload = legacyDoc.data();
+          const rest = { ...payload };
+          delete rest.ownerUid;
+          batch.set(userGameDocRef(user.uid, legacyDoc.id), rest, {
+            merge: true,
+          });
+          batch.delete(legacyDoc.ref);
+        });
+        batch.set(
+          profileDocRef(user.uid),
+          { gamesMigratedAt: new Date().toISOString() },
+          { merge: true },
+        );
+        batch.set(
+          userDocRef(user.uid),
+          { migratedAt: new Date().toISOString() },
+          { merge: true },
+        );
+        await batch.commit();
+      } catch (error) {
+        const code = (error as { code?: string } | undefined)?.code;
+        if (code === "permission-denied") {
+          await setDoc(
+            profileDocRef(user.uid),
+            {
+              gamesMigratedAt: new Date().toISOString(),
+              migrationSkippedReason: "legacy_games_permission_denied",
+            },
+            { merge: true },
+          );
+        } else {
+          console.error("Falha na migração legacy de jogos:", error);
+        }
+      } finally {
+        await refreshProfile();
+      }
+    };
+    void migrateLegacyGames();
+  }, [refreshProfile, user?.uid, userProfile?.gamesMigratedAt]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -117,10 +209,18 @@ const Home: React.FC = () => {
       localStorage.removeItem(steamDisconnectedStorageKey(user.uid));
       localStorage.setItem(steamIdStorageKey(user.uid), steamId);
       setDoc(
-        doc(db, "profiles", user.uid),
+        profileDocRef(user.uid),
         { steamId, updatedAt: new Date().toISOString() },
         { merge: true },
-      ).finally(() => refreshProfile());
+      )
+        .catch((error) => {
+          console.error("Falha ao vincular Steam no perfil:", error);
+          notify(
+            "Conta Steam autenticada, mas não foi possível salvar o vínculo no perfil.",
+            "error",
+          );
+        })
+        .finally(() => refreshProfile());
     } else if (steamStatus !== "ok") {
       const labels: Record<string, string> = {
         invalid_state: "Estado inválido ao conectar com a Steam.",
@@ -128,11 +228,14 @@ const Home: React.FC = () => {
         missing_id: "Steam ID não retornado pela autenticação.",
         error: "Erro inesperado na autenticação Steam.",
       };
-      notify(labels[steamStatus] ?? "Não foi possível conectar com a Steam.", "error");
+      notify(
+        labels[steamStatus] ?? "Não foi possível conectar com a Steam.",
+        "error",
+      );
     }
 
     window.history.replaceState({}, document.title, window.location.pathname);
-  }, [refreshProfile, user?.uid]);
+  }, [notify, refreshProfile, user?.uid]);
 
   const displayGames = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -148,19 +251,27 @@ const Home: React.FC = () => {
           : activeCategory === "STEAM"
             ? ordered.filter((g) => g.launcherType === "steam")
             : activeCategory === "LOCAL"
-              ? ordered.filter((g) => g.launcherType === "local" || !g.launcherType)
-              : ordered.filter((g) => normalizeCategory(g.category) === normalizeCategory(activeCategory));
+              ? ordered.filter(
+                  (g) => g.launcherType === "local" || !g.launcherType,
+                )
+              : ordered.filter(
+                  (g) =>
+                    normalizeCategory(g.category) ===
+                    normalizeCategory(activeCategory),
+                );
     if (!normalizedSearch) return byCategory;
     return byCategory.filter((game) => {
       const titleMatch = game.title.toLowerCase().includes(normalizedSearch);
-      const categoryMatch = (game.category ?? "").toLowerCase().includes(normalizedSearch);
+      const categoryMatch = (game.category ?? "")
+        .toLowerCase()
+        .includes(normalizedSearch);
       return titleMatch || categoryMatch;
     });
   }, [activeCategory, games, searchTerm]);
 
   const canonicalIndex =
     displayGames.length > 0
-      ? ((selectedIndex % displayGames.length) + displayGames.length) % displayGames.length
+      ? Math.min(Math.max(selectedIndex, 0), displayGames.length - 1)
       : 0;
   const currentGame = displayGames[canonicalIndex];
   const recentGames = useMemo(
@@ -184,12 +295,28 @@ const Home: React.FC = () => {
     disconnectSteamModalOpen;
 
   useImagePreloader(
-    useMemo(() => displayGames.slice(0, 6).flatMap((g) => [g.image, g.cardImage].filter(Boolean) as string[]), [displayGames]),
+    useMemo(
+      () =>
+        displayGames
+          .slice(0, 6)
+          .flatMap((g) => [g.image, g.cardImage].filter(Boolean) as string[]),
+      [displayGames],
+    ),
   );
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [activeCategory]);
+
+  useEffect(() => {
+    if (displayGames.length === 0 && selectedIndex !== 0) {
+      setSelectedIndex(0);
+      return;
+    }
+    if (displayGames.length > 0 && selectedIndex > displayGames.length - 1) {
+      setSelectedIndex(displayGames.length - 1);
+    }
+  }, [displayGames.length, selectedIndex]);
 
   const openDetails = useCallback(
     (game: Game) => {
@@ -208,14 +335,20 @@ const Home: React.FC = () => {
     }
     const backendHealthy = await isBackendHealthy();
     if (!backendHealthy) {
-      notify("Backend Steam offline. Inicie com npm run server ou npm run dev:full.", "error");
+      notify(
+        "Backend Steam offline. Inicie com npm run server ou npm run dev:full.",
+        "error",
+      );
       return;
     }
     let hasApiKey = false;
     try {
       hasApiKey = await isSteamApiKeyConfigured();
     } catch {
-      notify("Não foi possível verificar a API key da Steam. Confira se o backend está ativo.", "error");
+      notify(
+        "Não foi possível verificar a API key da Steam. Confira se o backend está ativo.",
+        "error",
+      );
       return;
     }
     if (!hasApiKey) {
@@ -231,15 +364,29 @@ const Home: React.FC = () => {
     setIsLoading(true);
     setSteamSyncing(true);
     try {
-      const count = await syncSteamLibraryToFirestore(user.uid, resolvedSteamId);
+      const count = await syncSteamLibraryToFirestore(
+        user.uid,
+        resolvedSteamId,
+      );
       if (count === 0) {
-        notify("Nenhum jogo retornado pela Steam. Verifique se o perfil/biblioteca estao publicos.", "info");
+        notify(
+          "Nenhum jogo retornado pela Steam. Verifique se o perfil/biblioteca estao publicos.",
+          "info",
+        );
       } else {
-        notify(`Sincronização concluída: ${count} jogos importados/atualizados.`, "success");
+        notify(
+          `Sincronização concluída: ${count} jogos importados/atualizados.`,
+          "success",
+        );
       }
       await refreshProfile();
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Falha na sincronização Steam.", "error");
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Falha na sincronização Steam.",
+        "error",
+      );
     } finally {
       setSteamSyncing(false);
       setIsLoading(false);
@@ -252,7 +399,10 @@ const Home: React.FC = () => {
     setSteamConnecting(true);
     isBackendHealthy().then((healthy) => {
       if (!healthy) {
-        notify("Backend Steam offline. Inicie com npm run server ou npm run dev:full.", "error");
+        notify(
+          "Backend Steam offline. Inicie com npm run server ou npm run dev:full.",
+          "error",
+        );
         setSteamConnecting(false);
         return;
       }
@@ -279,12 +429,18 @@ const Home: React.FC = () => {
 
   const handleMenuAction = async (action: string, game: Game) => {
     if (action === "delete") {
-      const confirmed = window.confirm(`Remover "${game.title}" da biblioteca?`);
+      const confirmed = window.confirm(
+        `Remover "${game.title}" da biblioteca?`,
+      );
       if (confirmed) {
-        await deleteDoc(doc(db, "games", game.id));
+        if (!user?.uid) return;
+        await deleteDoc(userGameDocRef(user.uid, game.id));
       }
     } else if (action === "favorite") {
-      await updateDoc(doc(db, "games", game.id), { isFavorite: !game.isFavorite });
+      if (!user?.uid) return;
+      await updateDoc(userGameDocRef(user.uid, game.id), {
+        isFavorite: !game.isFavorite,
+      });
     } else if (action === "edit") {
       setEditingGame(game);
       setIsAddModalOpen(true);
@@ -306,22 +462,21 @@ const Home: React.FC = () => {
 
     try {
       // 1. Update Firestore Profile (remove steamId)
-      await updateDoc(doc(db, "profiles", user.uid), {
+      await updateDoc(profileDocRef(user.uid), {
         steamId: "", // Or use deleteField() if preferred, but "" is handled by ResolvedSteamId
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       });
 
       // 2. Fetch and delete all Steam-linked games for this user
       const ownedGamesSnap = await getDocs(
         query(
-          collection(db, "games"), 
-          where("ownerUid", "==", user.uid),
-          where("launcherType", "==", "steam") // Optimize search
-        )
+          userGamesCollectionRef(user.uid),
+          where("launcherType", "==", "steam"), // Optimize search
+        ),
       );
 
       const steamGameDocs = ownedGamesSnap.docs;
-      
+
       if (steamGameDocs.length > 0) {
         const batch = writeBatch(db);
         steamGameDocs.forEach((gameDoc) => batch.delete(gameDoc.ref));
@@ -334,14 +489,20 @@ const Home: React.FC = () => {
 
       // 4. Update local profile state via the provider
       await refreshProfile();
-      
+
       // 5. Reset selected index to prevent crashes if current game was deleted
       setSelectedIndex(0);
-      
-      notify("Steam desconectada e biblioteca sincronizada localmente.", "success");
+
+      notify(
+        "Steam desconectada e biblioteca sincronizada localmente.",
+        "success",
+      );
     } catch (error) {
       console.error("Erro ao desconectar Steam:", error);
-      notify("Erro ao desconectar conta Steam. Verifique sua conexão.", "error");
+      notify(
+        "Erro ao desconectar conta Steam. Verifique sua conexão.",
+        "error",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -366,9 +527,17 @@ const Home: React.FC = () => {
       await saveSteamApiKey(value);
       setSteamApiKeyModalOpen(false);
       setSteamApiKeyInput("");
-      notify("API key salva. Clique novamente em Sync Steam para iniciar a sincronização.", "success");
+      notify(
+        "API key salva. Clique novamente em Sync Steam para iniciar a sincronização.",
+        "success",
+      );
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Falha ao salvar a API key da Steam.", "error");
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Falha ao salvar a API key da Steam.",
+        "error",
+      );
     } finally {
       setSteamApiKeySaving(false);
     }
@@ -376,20 +545,34 @@ const Home: React.FC = () => {
 
   return (
     <div className="relative h-screen w-full text-white overflow-hidden no-scrollbar flex flex-col">
-      <DynamicBackground backgroundImage={currentGame?.image || ""} />
+      <DynamicBackground
+        backgroundImage={
+          currentGame?.backgroundImage || currentGame?.image || ""
+        }
+        reducedEffects={isAnyModalOpen}
+      />
 
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="fixed top-0 left-0 right-0 z-40 px-6 md:px-12 py-4 flex items-center justify-between"
-        style={{ background: "linear-gradient(to bottom, rgba(5,5,7,0.85), rgba(5,5,7,0.25), transparent)" }}
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(5,5,7,0.85), rgba(5,5,7,0.25), transparent)",
+        }}
       >
         <div className="flex items-center gap-4">
           <div className="h-11 px-4 rounded-2xl liquid-glass-subtle flex items-center gap-3">
             <User className="w-4 h-4 text-white/70" />
             <div className="text-xs">
-              <p className="font-semibold">{userProfile?.displayName || user?.email || "Jogador"}</p>
-              <p className="text-white/50">{resolvedSteamId ? `Steam ${resolvedSteamId}` : "Steam não conectada"}</p>
+              <p className="font-semibold">
+                {userProfile?.displayName || user?.email || "Jogador"}
+              </p>
+              <p className="text-white/50">
+                {resolvedSteamId
+                  ? `Steam ${resolvedSteamId}`
+                  : "Steam não conectada"}
+              </p>
             </div>
           </div>
           <button
@@ -399,7 +582,9 @@ const Home: React.FC = () => {
             className="h-11 px-5 rounded-2xl liquid-glass-subtle text-xs font-bold tracking-wider uppercase flex items-center gap-2
             hover:scale-[1.02] hover:bg-white/10 active:scale-[0.98] transition-all disabled:opacity-60"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${steamSyncing ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${steamSyncing ? "animate-spin" : ""}`}
+            />
             {steamSyncing ? "Sincronizando..." : "Sync Steam"}
           </button>
           {!resolvedSteamId && (
@@ -457,32 +642,89 @@ const Home: React.FC = () => {
         {isLoading ? (
           <LoadingSkeleton />
         ) : games.length === 0 ? (
-          <EmptyLibraryOnboarding
-            onConnectSteam={connectSteam}
-            onOpenAddGame={() => setIsAddModalOpen(true)}
-            playSound={playSound}
-          />
+          onboardingCompleted ? (
+            <div className="h-full flex items-center justify-center px-6 md:px-12">
+              <div className="w-full max-w-2xl liquid-glass-dark rounded-4xl border border-white/10 p-6">
+                <h3 className="text-2xl font-semibold mb-2 text-white">
+                  Biblioteca vazia
+                </h3>
+                <p className="text-white/65 text-sm mb-4">
+                  Adicione um jogo manualmente ou conecte a Steam para
+                  sincronizar sua biblioteca.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={connectSteam}
+                    className="h-11 px-5 rounded-2xl bg-blue-500/25 border border-blue-400/40 text-xs font-bold tracking-wider uppercase hover:bg-blue-500/35 transition-all"
+                  >
+                    Conectar Steam
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="h-11 px-5 rounded-2xl bg-white text-black text-xs font-bold tracking-wider uppercase hover:scale-[1.02] transition-all"
+                  >
+                    Novo Jogo
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyLibraryOnboarding
+              onConnectSteam={connectSteam}
+              onOpenAddGame={() => setIsAddModalOpen(true)}
+              onComplete={async () => {
+                if (!user?.uid) return;
+                localStorage.setItem(`checkpoint_onboarding_${user.uid}`, "1");
+                setOnboardingCompleted(true);
+                await setDoc(
+                  profileDocRef(user.uid),
+                  { onboardingCompletedAt: new Date().toISOString() },
+                  { merge: true },
+                );
+                await refreshProfile();
+              }}
+              playSound={playSound}
+            />
+          )
         ) : (
           <>
-            <section className="mb-8 px-6 md:px-12">
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.35em] text-white/25 mb-4">Recentes</h3>
+            <section className="mb-10 px-6 md:px-12">
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/30 mb-5 pl-1">
+                Recentes
+              </h3>
               {recentGames.length === 0 ? (
-                <p className="text-sm text-white/55">Nenhum jogo iniciado recentemente.</p>
+                <p className="text-[11px] text-white/40 italic ml-1">
+                  Nenhum jogo iniciado recentemente.
+                </p>
               ) : (
-                <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-4 -ml-1 pl-1">
                   {recentGames.map((game) => (
-                    <button
+                    <motion.button
                       key={game.id}
+                      whileHover={{ scale: 1.1, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => openDetails(game)}
                       onMouseEnter={() => playSound("navigate")}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setContextMenu({ x: e.clientX, y: e.clientY, game });
                       }}
-                      className="w-28 h-40 rounded-xl overflow-hidden shrink-0 ring-1 ring-white/10 hover:ring-white/30"
+                      className="group relative w-12 h-12 rounded-xl overflow-hidden shrink-0 
+                                 ring-1 ring-white/10 hover:ring-white/40 shadow-lg transition-all duration-300"
                     >
-                      <img src={game.cardImage || game.image} alt={game.title} className="w-full h-full object-cover" />
-                    </button>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
+                      <img
+                        src={game.cardImage || game.image}
+                        alt={game.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      {/* Active shadow glow */}
+                      <div className="absolute -inset-1 bg-white/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </motion.button>
                   ))}
                 </div>
               )}
@@ -510,14 +752,14 @@ const Home: React.FC = () => {
             />
 
             <div className="relative -mt-4">
-            <AnimatePresence mode="popLayout" initial={false}>
-              <motion.div 
-                key={activeCategory} 
-                initial={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }} 
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
-                exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
-                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              >
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={activeCategory}
+                  initial={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, scale: 0.98, filter: "blur(4px)" }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                >
                   {displayGames.length === 0 ? (
                     <div className="px-6 md:px-12 py-10 text-center text-white/65">
                       {searchTerm
@@ -529,8 +771,10 @@ const Home: React.FC = () => {
                       games={displayGames}
                       selectedIndex={selectedIndex}
                       onSelect={onSelectHandler}
-                      onHover={setSelectedIndex}
-                      onContextMenu={(e, game) => setContextMenu({ x: e.clientX, y: e.clientY, game })}
+                      onMouseEnter={() => playSound("navigate")}
+                      onContextMenu={(e, game) =>
+                        setContextMenu({ x: e.clientX, y: e.clientY, game })
+                      }
                       playSound={playSound}
                     />
                   )}
@@ -556,7 +800,9 @@ const Home: React.FC = () => {
         y={contextMenu?.y ?? 0}
         isOpen={Boolean(contextMenu)}
         onClose={closeContextMenu}
-        onAction={(action) => contextMenu && handleMenuAction(action, contextMenu.game)}
+        onAction={(action) =>
+          contextMenu && handleMenuAction(action, contextMenu.game)
+        }
         isFavorite={contextMenu?.game.isFavorite}
         playSound={playSound}
       />
@@ -592,9 +838,12 @@ const Home: React.FC = () => {
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               className="relative w-full max-w-xl liquid-glass-dark rounded-4xl border border-white/10 p-6"
             >
-              <h3 className="text-xl font-semibold text-white mb-2">Cole sua Steam Web API Key</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">
+                Cole sua Steam Web API Key
+              </h3>
               <p className="text-sm text-white/65 mb-4">
-                A página da Steam já foi aberta em outra aba. Depois de gerar/copiar a chave, cole aqui para atualizar o backend.
+                A página da Steam já foi aberta em outra aba. Depois de
+                gerar/copiar a chave, cole aqui para atualizar o backend.
               </p>
               <input
                 type="text"
@@ -657,21 +906,31 @@ const Home: React.FC = () => {
       />
 
       <footer
-        className="fixed bottom-0 left-0 right-0 z-40 px-6 md:px-12 py-5 flex items-center justify-between"
-        style={{ background: "linear-gradient(to top, rgba(5,5,7,0.9), rgba(5,5,7,0.35), transparent)" }}
+        className="fixed gap bottom-0 left-0 right-0 z-40 px-6 md:px-12 py-5 flex items-center justify-between"
+        style={{
+          background:
+            "linear-gradient(to top, rgba(5,5,7,0.9), rgba(5,5,7,0.35), transparent)",
+        }}
       >
         <p className="text-[10px] text-white/35 tracking-[0.2em] uppercase">
           Biblioteca {games.length} jogos
         </p>
-        <button
-          onClick={() => currentGame && openDetails(currentGame)}
-          onMouseEnter={() => playSound("navigate")}
-          className="h-11 px-6 rounded-2xl liquid-glass text-xs font-bold tracking-[0.18em] uppercase flex items-center gap-2"
-          disabled={!currentGame}
-        >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          Abrir Detalhes
-        </button>
+        <div className="flex items-center gap-10">
+          <div className="flex items-center gap-3 group">
+            <span className="text-xl font-bold text-white/70 group-hover:text-white transition-colors">← →</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Navegar</span>
+          </div>
+
+          <div className="flex items-center gap-3 group">
+            <MouseLeft className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Escolher</span>
+          </div>
+
+          <div className="flex items-center gap-3 group">
+            <MouseRight className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Opções</span>
+          </div>
+        </div>
       </footer>
 
       <AnimatePresence>
@@ -687,8 +946,12 @@ const Home: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-center"
             >
-              <p className="text-[11px] tracking-[0.35em] uppercase text-white/45 mb-3">Checkpoint</p>
-              <h3 className="text-3xl font-light text-white tracking-wide">Encerrando sessão...</h3>
+              <p className="text-[11px] tracking-[0.35em] uppercase text-white/45 mb-3">
+                Checkpoint
+              </p>
+              <h3 className="text-3xl font-light text-white tracking-wide">
+                Encerrando sessão...
+              </h3>
             </motion.div>
           </motion.div>
         )}
@@ -700,11 +963,14 @@ const Home: React.FC = () => {
 const EmptyLibraryOnboarding: React.FC<{
   onConnectSteam: () => void;
   onOpenAddGame: () => void;
+  onComplete: () => void | Promise<void>;
   playSound: (type: "select" | "back" | "navigate") => void;
-}> = ({ onConnectSteam, onOpenAddGame, playSound }) => (
+}> = ({ onConnectSteam, onOpenAddGame, onComplete, playSound }) => (
   <div className="h-full flex items-center justify-center px-6 md:px-12">
     <div className="w-full max-w-2xl liquid-glass-dark rounded-4xl border border-white/10 p-6">
-      <p className="text-[11px] tracking-[0.25em] text-white/40 uppercase mb-4">Primeiros passos</p>
+      <p className="text-[11px] tracking-[0.25em] text-white/40 uppercase mb-4">
+        Primeiros passos
+      </p>
       <Stepper
         stepCircleContainerClassName="bg-transparent border-0 shadow-none"
         stepContainerClassName="pt-2"
@@ -713,17 +979,25 @@ const EmptyLibraryOnboarding: React.FC<{
         backButtonText="Voltar"
         nextButtonText="Próximo"
         onStepChange={() => playSound("navigate")}
-        onFinalStepCompleted={() => playSound("select")}
+        onFinalStepCompleted={() => {
+          playSound("select");
+          void onComplete();
+        }}
         resetOnComplete
       >
         <Step>
-          <h3 className="text-2xl font-semibold mb-2 text-white">Sua biblioteca está vazia</h3>
+          <h3 className="text-2xl font-semibold mb-2 text-white">
+            Sua biblioteca está vazia
+          </h3>
           <p className="text-white/65 text-sm">
-            Você não tem jogos adicionados. Por favor, adicione um jogo manualmente ou conecte sua conta Steam.
+            Você não tem jogos adicionados. Por favor, adicione um jogo
+            manualmente ou conecte sua conta Steam.
           </p>
         </Step>
         <Step>
-          <h3 className="text-2xl font-semibold mb-2 text-white">1. Conecte com a Steam</h3>
+          <h3 className="text-2xl font-semibold mb-2 text-white">
+            1. Conecte com a Steam
+          </h3>
           <p className="text-white/65 text-sm mb-4">
             Vincule sua conta para importar seus jogos automaticamente.
           </p>
@@ -737,9 +1011,12 @@ const EmptyLibraryOnboarding: React.FC<{
           </button>
         </Step>
         <Step>
-          <h3 className="text-2xl font-semibold mb-2 text-white">2. Adicione manualmente</h3>
+          <h3 className="text-2xl font-semibold mb-2 text-white">
+            2. Adicione manualmente
+          </h3>
           <p className="text-white/65 text-sm mb-4">
-            Prefere começar rápido? Cadastre seu primeiro jogo manualmente agora.
+            Prefere começar rápido? Cadastre seu primeiro jogo manualmente
+            agora.
           </p>
           <button
             type="button"
@@ -769,7 +1046,15 @@ const ConfirmationModal: React.FC<{
   onClose: () => void;
   onConfirm: () => Promise<void> | void;
   playSound: (type: "select" | "back" | "navigate") => void;
-}> = ({ isOpen, title, description, confirmLabel, onClose, onConfirm, playSound }) => (
+}> = ({
+  isOpen,
+  title,
+  description,
+  confirmLabel,
+  onClose,
+  onConfirm,
+  playSound,
+}) => (
   <AnimatePresence>
     {isOpen && (
       <motion.div

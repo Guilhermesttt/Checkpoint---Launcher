@@ -33,7 +33,7 @@ const AsyncLoader: React.FC = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-[#050507] flex flex-col items-center justify-center overflow-hidden">
+    <div className="fixed inset-0 z-1000 bg-[#050507] flex flex-col items-center justify-center overflow-hidden">
       {/* Dynamic Background Glows */}
       <div className="absolute inset-0">
         <motion.div

@@ -11,4 +11,11 @@ export default defineConfig({
       "/health": "http://localhost:8787",
     },
   },
+  preview: {
+    proxy: {
+      "/api": "http://localhost:8787",
+      "/auth": "http://localhost:8787",
+      "/health": "http://localhost:8787",
+    },
+  },
 });

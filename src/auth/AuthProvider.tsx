@@ -30,6 +30,8 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   createdAt: data?.createdAt,
   updatedAt: data?.updatedAt,
   lastSteamSyncAt: data?.lastSteamSyncAt,
+  gamesMigratedAt: data?.gamesMigratedAt,
+  onboardingCompletedAt: data?.onboardingCompletedAt,
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

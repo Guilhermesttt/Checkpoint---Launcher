@@ -1,10 +1,11 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, Clock, HardDrive, Package, Users } from "lucide-react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "../../Firebase";
+import { updateDoc } from "firebase/firestore";
 import { launchGame } from "../services/launcher";
 import type { Game } from "../types/domain";
+import { useAuth } from "../auth/AuthProvider";
+import { userGameDocRef } from "../services/firestorePaths";
 
 interface GameDetailPanelProps {
   game: Game | null;
@@ -19,6 +20,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   onClose,
   playSound,
 }) => {
+  const { user } = useAuth();
   const [isLaunching, setIsLaunching] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("JOGAR");
   const [launchError, setLaunchError] = React.useState<string | null>(null);
@@ -39,11 +41,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     playSound("select");
     setTimeout(async () => {
       try {
-        await updateDoc(doc(db, "games", game.id), {
-          lastPlayedAt: new Date().toISOString(),
-        }).catch(() => {
-          return;
-        });
+        if (user?.uid) {
+          await updateDoc(userGameDocRef(user.uid, game.id), {
+            lastPlayedAt: new Date().toISOString(),
+          }).catch(() => {
+            return;
+          });
+        }
         await launchGame(game);
       } catch (error) {
         setLaunchError(error instanceof Error ? error.message : "Falha ao iniciar o jogo.");
@@ -71,9 +75,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             className="absolute inset-0"
           >
             <img
-              src={game.image}
+              src={game.backgroundImage || game.image}
               alt={game.title}
               className="w-full h-full object-cover"
+              loading="eager"
+              decoding="async"
             />
             {/* Cinematic Gradients */}
             <div className="absolute inset-0 bg-linear-to-r from-[#050507] via-[#050507]/70 to-transparent" />
@@ -162,7 +168,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 <StatItem
                   icon={<HardDrive className="w-4 h-4" />}
                   label="ESPAÇO"
-                  value={`${game.sizeGB || "---"} GB`}
+                  value={game.sizeGB && game.sizeGB > 0 ? `${game.sizeGB} GB` : "--- GB"}
                 />
                 <StatItem
                   icon={<Package className="w-4 h-4" />}
@@ -216,21 +222,38 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     exit={{ opacity: 0, y: -20 }}
                     className="max-w-xl"
                   >
-                    <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
-                      Sobre
-                    </h3>
-                    <p className="text-white/70 leading-relaxed text-sm">
-                      {game.description || "Sem descrição disponível para este jogo."}
-                    </p>
-                    <div className="mt-8 grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl liquid-glass-subtle">
-                        <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">Categoria</span>
-                        <span className="text-white text-xs">{game.category || "N/A"}</span>
+                    <div className="flex flex-col gap-6">
+                      <div>
+                        <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
+                          Sobre
+                        </h3>
+                        <div 
+                          className="text-white/70 leading-relaxed text-sm max-h-[40vh] overflow-y-auto no-scrollbar prose prose-invert prose-p:my-0 pb-2"
+                          dangerouslySetInnerHTML={{ __html: game.aboutTheGame || game.description || "Sem descrição disponível para este jogo." }}
+                        />
                       </div>
-                      <div className="p-4 rounded-xl liquid-glass-subtle">
-                        <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">Última Sync</span>
-                        <span className="text-white text-xs">{game.lastSyncedAt ? new Date(game.lastSyncedAt).toLocaleDateString() : "N/A"}</span>
+
+                      <div className="grid grid-cols-2 gap-y-6 gap-x-12 pt-6 border-t border-white/5">
+                        <TechnicalDetail label="Desenvolvedor" value={game.developer} />
+                        <TechnicalDetail label="Distribuidora" value={game.publisher} />
+                        <TechnicalDetail label="Data de Lançamento" value={game.releaseDate} />
+                        <TechnicalDetail label="Categoria" value={game.category} />
                       </div>
+
+                      {game.tags && game.tags.length > 0 && (
+                        <div>
+                          <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-3">
+                            Marcadores Populares
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {game.tags.slice(0, 10).map((tag, i) => (
+                              <span key={i} className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-[10px] text-white/60">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -245,10 +268,48 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
                       Mídia
                     </h3>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div className="aspect-16/6 rounded-xl overflow-hidden ring-1 ring-white/10">
-                        <img src={game.image} alt={game.title} className="w-full h-full object-cover" />
-                      </div>
+                    <div className="flex flex-col gap-4">
+                      {game.trailerUrl && (
+                        <div className="aspect-16/9 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-black/40">
+                          <video
+                            key={game.trailerUrl}
+                            src={game.trailerUrl}
+                            className="w-full h-full object-cover"
+                            controls
+                            preload="metadata"
+                          />
+                        </div>
+                      )}
+                      
+                      {game.screenshots && game.screenshots.length > 0 && (
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                          {game.screenshots.map((url, i) => (
+                            <motion.div
+                              key={i}
+                              whileHover={{ scale: 1.02 }}
+                              className="w-64 aspect-16/9 rounded-xl overflow-hidden ring-1 ring-white/10 shrink-0 bg-white/5"
+                            >
+                              <img
+                                src={url}
+                                alt={`Screenshot ${i}`}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!game.trailerUrl && (!game.screenshots || game.screenshots.length === 0) && (
+                        <div className="aspect-16/9 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-white/5 flex items-center justify-center">
+                          <img
+                            src={game.backgroundImage || game.image}
+                            alt={game.title}
+                            className="w-full h-full object-cover blur-sm opacity-50"
+                          />
+                          <p className="absolute text-white/30 text-xs uppercase tracking-widest font-black">Nenhuma mídia adicional</p>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -357,9 +418,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   className="relative w-full h-full"
                 >
                   <img
-                    src={game.image}
+                    src={game.backgroundImage || game.image}
                     alt={game.title}
                     className="w-full h-full object-cover scale-110 blur-sm brightness-50"
+                    loading="eager"
                   />
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <motion.div
@@ -444,6 +506,13 @@ const InfoCard: React.FC<{ label: string; value: string }> = ({ label, value }) 
   <div className="p-4 rounded-xl liquid-glass-subtle">
     <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">{label}</span>
     <span className="text-white text-xs">{value}</span>
+  </div>
+);
+
+const TechnicalDetail: React.FC<{ label: string; value?: string }> = ({ label, value }) => (
+  <div>
+    <span className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5">{label}</span>
+    <span className="text-white/80 text-sm font-medium">{value || "Não informado"}</span>
   </div>
 );
 

@@ -1,5 +1,6 @@
+/** Base vazia = mesmo origin (Vite proxy em dev em /api; Express servindo o build em prod). */
 const API_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ?? "http://localhost:8787";
+  import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "") ?? "";
 
 export const apiUrl = (path: string) =>
   `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;

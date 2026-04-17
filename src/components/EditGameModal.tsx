@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Image as ImageIcon, Tags, Type, AlignLeft } from "lucide-react";
-import { collection, addDoc } from "firebase/firestore";
-import { db } from "../../Firebase";
+import { addDoc } from "firebase/firestore";
 import { useNotification } from "./NotificationCenter";
+import { useAuth } from "../auth/AuthProvider";
+import { userGamesCollectionRef } from "../services/firestorePaths";
 
 interface AddGameModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   playSound,
 }) => {
   const { notify } = useNotification();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -34,9 +36,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     playSound("select");
 
     try {
-      await addDoc(collection(db, "games"), {
+      if (!user?.uid) {
+        notify("Sessão inválida. Faça login novamente.", "error");
+        return;
+      }
+      await addDoc(userGamesCollectionRef(user.uid), {
         ...formData,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
       });
       onClose();
       setFormData({
