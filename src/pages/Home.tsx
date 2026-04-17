@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2,
   LogOut,
-  Play,
   Plus,
   RefreshCw,
   Search,

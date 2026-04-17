@@ -1,7 +1,6 @@
 import React, {
   useEffect,
   useCallback,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -9,7 +8,6 @@ import {
   motion,
   useMotionValue,
   useSpring,
-  AnimatePresence,
 } from "framer-motion";
 import GameCard from "./GameCard";
 import { Play } from "lucide-react";
