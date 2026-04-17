@@ -187,21 +187,38 @@ const GameRow: React.FC<GameRowProps> = ({
         </motion.div>
       </div>
 
-      {/* Indicadores (Dots) Afastados */}
+      {/* Dinâmico Progress Scrollbar para Muitos Jogos */}
       <div className="flex justify-center pb-16 mt-6">
-        <div className="flex items-center gap-2.5 px-5 py-2.5 bg-black/40 backdrop-blur-xl rounded-full border border-white/10">
-          {games.map((_, i) => (
-            <motion.div
-              key={i}
-              animate={{
-                width: i === canonicalIndex ? 28 : 7,
-                backgroundColor:
-                  i === canonicalIndex ? "#fff" : "rgba(255,255,255,0.2)",
-              }}
-              className="h-1.5 rounded-full"
-            />
-          ))}
-        </div>
+        {n <= 12 ? (
+          <div className="flex items-center gap-2.5 px-5 py-2.5 bg-black/40 backdrop-blur-xl rounded-full border border-white/10">
+            {games.map((_, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  width: i === canonicalIndex ? 28 : 7,
+                  backgroundColor:
+                    i === canonicalIndex ? "#fff" : "rgba(255,255,255,0.2)",
+                }}
+                className="h-1.5 rounded-full"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-4 px-6 py-2.5 bg-black/40 backdrop-blur-xl rounded-full border border-white/10 w-full max-w-[400px]">
+             <span className="text-[10px] font-bold text-white/40 tracking-widest min-w-[30px] text-right">{canonicalIndex + 1}</span>
+             <div className="flex-1 h-1.5 bg-white/10 rounded-full relative overflow-hidden">
+               <motion.div 
+                 className="absolute top-0 bottom-0 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]"
+                 animate={{
+                   width: `${Math.max(15, 100 / n)}%`,
+                   left: `${n > 1 ? (canonicalIndex / (n - 1)) * (100 - Math.max(15, 100 / n)) : 0}%`
+                 }}
+                 transition={{ type: "spring", stiffness: 400, damping: 40 }}
+               />
+             </div>
+             <span className="text-[10px] font-bold text-white/40 tracking-widest min-w-[30px]">{n}</span>
+          </div>
+        )}
       </div>
 
       {/* Context Menu renderizado no Home.tsx via props */}
