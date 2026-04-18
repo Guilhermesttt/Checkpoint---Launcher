@@ -30,6 +30,10 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.volume = 0.5;
+      // Explicitly call play() to ensure audio starts
+      videoRef.current.play().catch(err => {
+        console.warn("Autoplay with audio blocked or failed:", err);
+      });
     }
   }, []);
 
@@ -53,13 +57,14 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
       </div>
 
       {/* Hidden video for synchronized audio track */}
+      {/* We use opacity-0 instead of display:none (hidden) to ensure the browser keeps the video "active" and playing */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         onEnded={handleFinish}
         muted={false}
-        className="hidden"
+        className="absolute opacity-0 pointer-events-none w-0 h-0"
         src="/CheckPoint Intro.mp4"
       />
     </motion.div>
