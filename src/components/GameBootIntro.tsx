@@ -19,11 +19,25 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
   const handleTimeUpdate = () => {
     if (!videoRef.current || finishedRef.current) return;
     
-    // Começa a fazer o fade-out 1 segundo antes do vídeo terminar
-    // para que a tela principal apareça de forma suave
+    // Fade visual e de áudio bem pertinho do fim (0.5s)
     const timeRemaining = videoRef.current.duration - videoRef.current.currentTime;
-    if (timeRemaining <= 1.0) {
+    if (timeRemaining <= 0.5) {
       finishedRef.current = true;
+      // Fade de áudio manual de 500ms
+      const startVolume = videoRef.current.volume;
+      const fadeInterval = setInterval(() => {
+        if (!videoRef.current) {
+          clearInterval(fadeInterval);
+          return;
+        }
+        let nextVol = videoRef.current.volume - (startVolume / 10);
+        if (nextVol <= 0) {
+          nextVol = 0;
+          clearInterval(fadeInterval);
+        }
+        videoRef.current.volume = nextVol;
+      }, 50);
+
       onFinish?.();
     }
   };
@@ -33,7 +47,7 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 1.0, ease: "easeInOut" }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
       className="fixed inset-0 z-[500] bg-black flex items-center justify-center overflow-hidden pointer-events-none"
     >
       <video
