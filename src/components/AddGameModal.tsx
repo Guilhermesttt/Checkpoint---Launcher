@@ -94,7 +94,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const { notify } = useNotification();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"info" | "media" | "advanced">("info");
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<GameFormState>({
     title: "",
     category: "ROLEPLAYING",
     image: "",
@@ -106,14 +106,16 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     executablePath: "",
     hoursPlayed: 0,
     sizeGB: 0,
-    launcherType: "local" as "steam" | "local",
-    screenshots: [] as string[],
+    launcherType: "local",
+    screenshots: [],
     aboutTheGame: "",
     releaseDate: "",
     developer: "",
     publisher: "",
-    tags: [] as string[],
+    tags: [],
     steamAppId: "",
+    totalAchievements: 0,
+    completedAchievements: 0,
   });
   const [steamId, setSteamId] = useState("");
 
