@@ -2,7 +2,6 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithPopup,
   signOut,
   type User,
 } from "firebase/auth";
@@ -15,6 +14,8 @@ interface AuthContextValue {
   userProfile: UserProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signUpWithEmail: (email: string, pass: string) => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -48,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(ref, {
         uid: authUser.uid,
         email: authUser.email,
-        displayName: authUser.displayName,
+        displayName: authUser.displayName || authUser.email?.split("@")[0] || "User",
         photoURL: authUser.photoURL,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -58,8 +59,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ref,
         {
           email: authUser.email,
-          displayName: authUser.displayName,
-          photoURL: authUser.photoURL,
           updatedAt: serverTimestamp(),
         },
         { merge: true },
@@ -82,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-    const result = await signInWithPopup(auth, provider);
+    const result = await (await import("firebase/auth")).signInWithPopup(auth, provider);
     try {
       await syncProfile(result.user);
     } catch (error) {
@@ -95,6 +94,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }),
       );
     }
+  };
+
+  const signUpWithEmail = async (email: string, pass: string) => {
+    const { createUserWithEmailAndPassword } = await import("firebase/auth");
+    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    await syncProfile(result.user);
+  };
+
+  const signInWithEmail = async (email: string, pass: string) => {
+    const { signInWithEmailAndPassword } = await import("firebase/auth");
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    await syncProfile(result.user);
   };
 
   const signOutUser = async () => {
@@ -134,6 +145,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       userProfile,
       loading,
       signInWithGoogle,
+      signUpWithEmail,
+      signInWithEmail,
       signOutUser,
       refreshProfile,
     }),
@@ -142,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);

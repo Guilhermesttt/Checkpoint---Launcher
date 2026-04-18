@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { X, Image as ImageIcon, Tags, Type, AlignLeft } from "lucide-react";
 import { addDoc } from "firebase/firestore";
 import { useNotification } from "./NotificationCenter";
 import { useAuth } from "../auth/AuthProvider";
 import { userGamesCollectionRef } from "../services/firestorePaths";
+import ModalShell from "./ui/ModalShell";
+import GlassButton from "./ui/GlassButton";
 
 interface AddGameModalProps {
   isOpen: boolean;
@@ -61,44 +62,27 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[150] flex items-center justify-center p-6"
-        >
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-xl"
+    <ModalShell isOpen={isOpen} onClose={onClose} maxWidthClassName="max-w-2xl">
+      <div className="max-h-[90vh] overflow-y-auto no-scrollbar">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-2xl font-black uppercase tracking-widest text-white">
+              Adicionar Jogo
+            </h2>
+            <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest mt-1">
+              Salvar link direto no Banco
+            </p>
+          </div>
+          <button
+            type="button"
             onClick={onClose}
-          />
-
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-2xl bg-[#0a0a0c]/90 glass-strong rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10"
+            className="p-3 liquid-glass-subtle rounded-full hover:bg-white/10 transition-colors"
           >
-            <div className="p-8 max-h-[90vh] overflow-y-auto no-scrollbar">
-              <div className="flex justify-between items-center mb-8">
-                <div>
-                  <h2 className="text-2xl font-black uppercase tracking-widest text-white">
-                    Adicionar Jogo
-                  </h2>
-                  <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest mt-1">
-                    Salvar link direto no Banco
-                  </p>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="p-3 glass rounded-full hover:bg-white/10 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
                 <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2">
                     <Type className="w-3 h-3" /> Título do Jogo
@@ -179,23 +163,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`
-                    w-full py-5 rounded-2xl flex items-center justify-center gap-3
-                    text-xs font-black uppercase tracking-[0.3em] transition-all
-                    ${loading ? "bg-white/10 text-white/20" : "bg-white text-black hover:scale-[1.02] active:scale-95 shadow-[0_0_30px_rgba(255,255,255,0.2)]"}
-                  `}
-                >
-                  {loading ? "Salvando..." : "Adicionar à Biblioteca"}
-                </button>
-              </form>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <GlassButton
+            type="submit"
+            disabled={loading}
+            variant="primary"
+            size="md"
+            className="w-full py-5"
+          >
+            {loading ? "Salvando..." : "Adicionar à Biblioteca"}
+          </GlassButton>
+        </form>
+      </div>
+    </ModalShell>
   );
 };
 

@@ -4,6 +4,8 @@ import { X, Play, Clock, HardDrive, Package, Users, Trophy, Camera } from "lucid
 import { updateDoc } from "firebase/firestore";
 import { launchGame } from "../services/launcher";
 import type { Game } from "../types/domain";
+import ModalShell from "./ui/ModalShell";
+import GlassButton from "./ui/GlassButton";
 import { useAuth } from "../auth/AuthProvider";
 import { userGameDocRef } from "../services/firestorePaths";
 
@@ -571,46 +573,75 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           </button>
 
           {/* Gallery Modal Overlay */}
-          <AnimatePresence>
-            {galleryModalOpen && game.screenshots && game.screenshots.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-xl flex flex-col items-center justify-center"
+          <ModalShell
+            isOpen={Boolean(galleryModalOpen && game.screenshots && game.screenshots.length > 0)}
+            onClose={() => {
+              setGalleryModalOpen(false);
+              playSound("back");
+            }}
+            maxWidthClassName="max-w-5xl"
+            className="p-0 bg-transparent border-0 shadow-none"
+            backdropClassName="bg-black/90 backdrop-blur-xl"
+            zIndexClassName="z-[150]"
+            reducedEffects
+          >
+            <div className="relative">
+              <div className="absolute top-4 left-6 z-10">
+                <span className="text-[10px] font-bold tracking-[0.3em] text-white/50 uppercase">
+                  GALERIA ({currentGalleryIndex + 1}/{game.screenshots?.length ?? 0})
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setGalleryModalOpen(false);
+                  playSound("back");
+                }}
+                className="absolute top-3 right-4 z-10 p-3 liquid-glass-subtle rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
               >
-                <div className="absolute top-8 left-12">
-                  <span className="text-[10px] font-bold tracking-[0.3em] text-white/50 uppercase">GALERIA ({currentGalleryIndex + 1}/{game.screenshots.length})</span>
-                </div>
-                <button
-                  onClick={() => { setGalleryModalOpen(false); playSound("back"); }}
-                  className="absolute top-8 right-8 z-20 p-4 bg-white/5 border border-white/10 rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <X className="w-5 h-5" />
+              </button>
 
-                <div className="w-full max-w-5xl aspect-video px-4 md:px-0">
-                  <AnimatePresence mode="wait">
-                    <motion.img
-                      key={currentGalleryIndex}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 1.1 }}
-                      transition={{ duration: 0.3 }}
-                      src={game.screenshots[currentGalleryIndex]}
-                      alt="Screenshot"
-                      className="w-full h-full object-contain rounded-xl overflow-hidden drop-shadow-2xl"
-                    />
-                  </AnimatePresence>
-                </div>
-                
-                <div className="flex gap-4 mt-8">
-                  <button onClick={() => { setCurrentGalleryIndex(c => (c > 0 ? c - 1 : game.screenshots!.length - 1)); playSound("navigate"); }} className="px-6 py-3 rounded-full liquid-glass text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors">◀ Anterior</button>
-                  <button onClick={() => { setCurrentGalleryIndex(c => (c < game.screenshots!.length - 1 ? c + 1 : 0)); playSound("navigate"); }} className="px-6 py-3 rounded-full liquid-glass text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors">Próximo ▶</button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <div className="w-full aspect-video px-4 md:px-0">
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={currentGalleryIndex}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.1 }}
+                    transition={{ duration: 0.3 }}
+                    src={game.screenshots?.[currentGalleryIndex]}
+                    alt="Screenshot"
+                    className="w-full h-full object-contain rounded-xl overflow-hidden drop-shadow-2xl"
+                  />
+                </AnimatePresence>
+              </div>
+
+              <div className="flex gap-4 mt-6 justify-center pb-2">
+                <GlassButton
+                  type="button"
+                  onClick={() => {
+                    setCurrentGalleryIndex((c) =>
+                      c > 0 ? c - 1 : (game.screenshots?.length ?? 1) - 1,
+                    );
+                    playSound("navigate");
+                  }}
+                >
+                  ◀ Anterior
+                </GlassButton>
+                <GlassButton
+                  type="button"
+                  onClick={() => {
+                    setCurrentGalleryIndex((c) =>
+                      c < (game.screenshots?.length ?? 1) - 1 ? c + 1 : 0,
+                    );
+                    playSound("navigate");
+                  }}
+                >
+                  Próximo ▶
+                </GlassButton>
+              </div>
+            </div>
+          </ModalShell>
 
           {/* Launching Cinematic Overlay */}
           <AnimatePresence>

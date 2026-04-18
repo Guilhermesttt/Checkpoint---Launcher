@@ -17,6 +17,8 @@ import { addDoc, updateDoc } from "firebase/firestore";
 import type { Game } from "../types/domain";
 import { useAuth } from "../auth/AuthProvider";
 import { apiUrl } from "../services/api";
+import ModalShell from "./ui/ModalShell";
+import GlassButton from "./ui/GlassButton";
 import {
   fetchSteamAppDetailsResult,
   fetchSteamAppSizeGB,
@@ -429,38 +431,22 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   ] as const;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[150] flex items-center justify-center p-6"
-        >
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/70 backdrop-blur-2xl"
-            onClick={() => {
-              playSound("back");
-              onClose();
-            }}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 30 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 30 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="relative w-full max-w-3xl liquid-glass-dark rounded-[2rem] overflow-hidden shadow-2xl"
-          >
+    <ModalShell
+      isOpen={isOpen}
+      onClose={() => {
+        playSound("back");
+        onClose();
+      }}
+      maxWidthClassName="max-w-3xl"
+      className="p-0 overflow-hidden shadow-2xl"
+      contentClassName="overflow-hidden rounded-[2rem]"
+      backdropClassName="bg-black/70 backdrop-blur-2xl"
+      zIndexClassName="z-[150]"
+    >
             {/* Header */}
             <div className="relative px-8 pt-8 pb-6 border-b border-white/5">
               {/* Decorative Element */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent rounded-full" />
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-linear-to-r from-transparent via-white/20 to-transparent rounded-full" />
               
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
@@ -477,12 +463,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => {
                     playSound("back");
                     onClose();
                   }}
                   onMouseEnter={() => playSound("navigate")}
-                  className="p-3 rounded-xl hover:bg-white/10 transition-colors group"
+                  className="p-3 rounded-xl liquid-glass-subtle hover:bg-white/10 transition-colors group"
                 >
                   <X className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" />
                 </button>
@@ -539,7 +526,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                                 setFormData({ ...formData, launcherType: "steam" });
                               }}
                               onMouseEnter={() => playSound("navigate")}
-                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-[0.1em] uppercase transition-all duration-300 ${
+                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 ${
                                 formData.launcherType === "steam"
                                   ? "liquid-glass text-white"
                                   : "bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10 border border-white/5"
@@ -554,7 +541,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                                 setFormData({ ...formData, launcherType: "local" });
                               }}
                               onMouseEnter={() => playSound("navigate")}
-                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-[0.1em] uppercase transition-all duration-300 ${
+                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 ${
                                 formData.launcherType === "local"
                                   ? "liquid-glass text-white"
                                   : "bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10 border border-white/5"
@@ -672,7 +659,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                               }}
                               onMouseEnter={() => playSound("navigate")}
                               className={`
-                                px-4 py-2.5 rounded-xl text-xs font-bold tracking-[0.1em] uppercase
+                                px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
                                 transition-all duration-300
                                 ${formData.category === cat
                                   ? 'liquid-glass text-white'
@@ -855,18 +842,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   />
                 </div>
 
-                <button
+                <GlassButton
                   type="submit"
                   disabled={loading}
                   onMouseEnter={() => playSound("navigate")}
-                  className={`
-                    px-8 py-4 rounded-2xl flex items-center gap-3
-                    text-sm font-bold tracking-[0.1em] uppercase transition-all
-                    ${loading 
-                      ? 'bg-white/10 text-white/30 cursor-not-allowed' 
-                      : 'bg-white text-black hover:scale-[1.02] active:scale-98 shadow-[0_0_40px_rgba(255,255,255,0.15)]'
-                    }
-                  `}
+                  variant="primary"
+                  size="md"
+                  className="px-8"
                 >
                   {loading ? (
                     <>
@@ -879,13 +861,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       {gameToEdit ? "Salvar Alterações" : "Adicionar Jogo"}
                     </>
                   )}
-                </button>
+                </GlassButton>
               </div>
             </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </ModalShell>
   );
 };
 

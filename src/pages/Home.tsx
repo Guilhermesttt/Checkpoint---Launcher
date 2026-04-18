@@ -32,6 +32,8 @@ import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import { useNotification } from "../components/NotificationCenter";
 import Stepper, { Step } from "../components/ReactBits/Stepper";
+import GlassButton from "../components/ui/GlassButton";
+import ModalShell from "../components/ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects } from "../hooks/useSoundEffects";
@@ -817,67 +819,52 @@ const Home: React.FC = () => {
         gameToEdit={editingGame}
       />
 
-      <AnimatePresence>
-        {steamApiKeyModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-160 flex items-center justify-center p-6"
+      <ModalShell
+        isOpen={steamApiKeyModalOpen}
+        onClose={() => {
+          playSound("back");
+          setSteamApiKeyModalOpen(false);
+        }}
+        maxWidthClassName="max-w-xl"
+        zIndexClassName="z-[160]"
+      >
+        <h3 className="text-xl font-semibold text-white mb-2">
+          Cole sua Steam Web API Key
+        </h3>
+        <p className="text-sm text-white/65 mb-4">
+          A página da Steam já foi aberta em outra aba. Depois de gerar/copiar a
+          chave, cole aqui para atualizar o backend.
+        </p>
+        <input
+          type="text"
+          value={steamApiKeyInput}
+          onChange={(e) => setSteamApiKeyInput(e.target.value)}
+          placeholder="Ex: 9A8B7C6D5E4F..."
+          className="w-full h-11 rounded-xl bg-white/5 border border-white/15 px-4 text-sm text-white outline-none focus:border-blue-400/70"
+        />
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <GlassButton
+            type="button"
+            onClick={() => {
+              playSound("back");
+              setSteamApiKeyModalOpen(false);
+            }}
+            onMouseEnter={() => playSound("navigate")}
+            variant="secondary"
           >
-            <div
-              className="absolute inset-0 bg-black/70 backdrop-blur-xl"
-              onClick={() => {
-                playSound("back");
-                setSteamApiKeyModalOpen(false);
-              }}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 16 }}
-              className="relative w-full max-w-xl liquid-glass-dark rounded-4xl border border-white/10 p-6"
-            >
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Cole sua Steam Web API Key
-              </h3>
-              <p className="text-sm text-white/65 mb-4">
-                A página da Steam já foi aberta em outra aba. Depois de
-                gerar/copiar a chave, cole aqui para atualizar o backend.
-              </p>
-              <input
-                type="text"
-                value={steamApiKeyInput}
-                onChange={(e) => setSteamApiKeyInput(e.target.value)}
-                placeholder="Ex: 9A8B7C6D5E4F..."
-                className="w-full h-11 rounded-xl bg-white/5 border border-white/15 px-4 text-sm text-white outline-none focus:border-blue-400/70"
-              />
-              <div className="mt-5 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSound("back");
-                    setSteamApiKeyModalOpen(false);
-                  }}
-                  onMouseEnter={() => playSound("navigate")}
-                  className="h-10 px-4 rounded-xl liquid-glass-subtle text-xs font-bold tracking-wider uppercase"
-                >
-                  Fechar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveSteamApiKey}
-                  onMouseEnter={() => playSound("navigate")}
-                  disabled={steamApiKeySaving}
-                  className="h-10 px-4 rounded-xl bg-white text-black text-xs font-bold tracking-wider uppercase disabled:opacity-60"
-                >
-                  {steamApiKeySaving ? "Salvando..." : "Salvar API Key"}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Fechar
+          </GlassButton>
+          <GlassButton
+            type="button"
+            onClick={handleSaveSteamApiKey}
+            onMouseEnter={() => playSound("navigate")}
+            disabled={steamApiKeySaving}
+            variant="primary"
+          >
+            {steamApiKeySaving ? "Salvando..." : "Salvar API Key"}
+          </GlassButton>
+        </div>
+      </ModalShell>
 
       <ConfirmationModal
         isOpen={signOutModalOpen}
@@ -1055,57 +1042,41 @@ const ConfirmationModal: React.FC<{
   onConfirm,
   playSound,
 }) => (
-  <AnimatePresence>
-    {isOpen && (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-170 flex items-center justify-center p-6"
+  <ModalShell
+    isOpen={isOpen}
+    onClose={() => {
+      playSound("back");
+      onClose();
+    }}
+    zIndexClassName="z-[170]"
+  >
+    <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
+    <p className="text-sm text-white/65">{description}</p>
+    <div className="mt-6 flex items-center justify-end gap-2">
+      <GlassButton
+        type="button"
+        onClick={() => {
+          playSound("back");
+          onClose();
+        }}
+        onMouseEnter={() => playSound("navigate")}
+        variant="secondary"
       >
-        <div
-          className="absolute inset-0 bg-black/65 backdrop-blur-xl"
-          onClick={() => {
-            playSound("back");
-            onClose();
-          }}
-        />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 14 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 14 }}
-          className="relative w-full max-w-md liquid-glass-dark rounded-3xl border border-white/10 p-6"
-        >
-          <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
-          <p className="text-sm text-white/65">{description}</p>
-          <div className="mt-6 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                playSound("back");
-                onClose();
-              }}
-              onMouseEnter={() => playSound("navigate")}
-              className="h-10 px-4 rounded-xl liquid-glass-subtle text-xs font-bold tracking-wider uppercase hover:scale-[1.02] active:scale-[0.97] transition-transform"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                playSound("select");
-                void onConfirm();
-              }}
-              onMouseEnter={() => playSound("navigate")}
-              className="h-10 px-4 rounded-xl bg-white text-black text-xs font-bold tracking-wider uppercase hover:scale-[1.03] active:scale-[0.97] transition-transform shadow-[0_0_24px_rgba(255,255,255,0.18)]"
-            >
-              {confirmLabel}
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    )}
-  </AnimatePresence>
+        Cancelar
+      </GlassButton>
+      <GlassButton
+        type="button"
+        onClick={() => {
+          playSound("select");
+          void onConfirm();
+        }}
+        onMouseEnter={() => playSound("navigate")}
+        variant="primary"
+      >
+        {confirmLabel}
+      </GlassButton>
+    </div>
+  </ModalShell>
 );
 
 export default Home;

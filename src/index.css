@@ -142,6 +142,31 @@
       0 16px 48px rgba(0, 0, 0, 0.5);
   }
 
+  .fluid-glass-accent {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .fluid-glass-accent::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.16) 35%, transparent 70%),
+      radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.16), transparent 40%);
+    transform: translateX(-40%);
+    opacity: 0.8;
+    pointer-events: none;
+    transition: transform 0.6s ease, opacity 0.6s ease;
+    z-index: -1;
+  }
+
+  .fluid-glass-accent:hover::before {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
   /* ── Legacy Glass (backwards compatible) ── */
   .glass {
     backdrop-filter: blur(20px) saturate(180%);
