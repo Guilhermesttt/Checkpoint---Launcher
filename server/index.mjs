@@ -310,6 +310,53 @@ app.get("/api/steam/app-size", async (req, res) => {
   }
 });
 
+app.get("/api/steam/achievements", async (req, res) => {
+  if (!steamApiKey) {
+    res.status(500).json({ error: "STEAM_API_KEY não configurada no backend." });
+    return;
+  }
+
+  const steamId = String(req.query.steamId ?? "").trim();
+  const appId = String(req.query.appId ?? "").trim();
+
+  if (!steamId || !appId) {
+    res.status(400).json({ error: "steamId e appId são obrigatórios." });
+    return;
+  }
+
+  try {
+    const url = new URL("https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/");
+    url.searchParams.set("key", steamApiKey);
+    url.searchParams.set("steamid", steamId);
+    url.searchParams.set("appid", appId);
+    url.searchParams.set("l", "brazilian");
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      // Alguns jogos não têm conquistas, a API retorna 400 ou 404
+      if (response.status === 400 || response.status === 404) {
+        res.json({ achievements: [], total: 0, unlocked: 0 });
+        return;
+      }
+      res.status(502).json({ error: `Falha ao consultar conquistas (status ${response.status}).` });
+      return;
+    }
+
+    const payload = await response.json();
+    const achievements = payload?.playerstats?.achievements ?? [];
+    const total = achievements.length;
+    const unlocked = achievements.filter(a => a.achieved === 1).length;
+
+    res.json({
+      achievements,
+      total,
+      unlocked
+    });
+  } catch {
+    res.status(500).json({ error: "Erro interno ao buscar conquistas." });
+  }
+});
+
 app.get("/api/steam/app-details", async (req, res) => {
   const appId = String(req.query.appId ?? "").trim();
   if (!/^\d+$/.test(appId)) {

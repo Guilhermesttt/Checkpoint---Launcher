@@ -258,9 +258,24 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               <Trophy className="w-6 h-6 text-white/60 group-hover:text-amber-400 transition-colors" />
                             </div>
                             <div className="flex flex-col w-full">
-                              <span className="text-2xl font-light text-white leading-none mb-2">14 <span className="text-sm text-white/40">/ 50</span></span>
+                              <span className="text-2xl font-light text-white leading-none mb-2">
+                                {game.completedAchievements ?? 0}{" "}
+                                <span className="text-sm text-white/40">
+                                  / {game.totalAchievements ?? 0}
+                                </span>
+                              </span>
                               <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                                <div className="h-full bg-amber-400 w-[28%] rounded-full" />
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{
+                                    width:
+                                      game.totalAchievements && game.totalAchievements > 0
+                                        ? `${(game.completedAchievements! / game.totalAchievements) * 100}%`
+                                        : "0%",
+                                  }}
+                                  transition={{ duration: 1, ease: "easeOut" }}
+                                  className="h-full bg-amber-400 rounded-full"
+                                />
                               </div>
                             </div>
                           </div>

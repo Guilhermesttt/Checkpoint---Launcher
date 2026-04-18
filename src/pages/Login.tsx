@@ -42,7 +42,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#050507] flex items-center justify-center px-6 relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center px-6 relative overflow-hidden">
       <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.25),transparent_40%),radial-gradient(circle_at_80%_10%,rgba(220,38,38,0.2),transparent_35%)]" />
 
       {/* Animated background noise/ambient particles */}

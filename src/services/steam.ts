@@ -112,6 +112,21 @@ export const fetchSteamAppDetailsResult = async (
   }
 };
 
+export const fetchSteamAchievements = async (steamId: string, appId: string) => {
+  const url = apiUrl(`/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}`);
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return { total: 0, unlocked: 0 };
+    const data = await response.json();
+    return {
+      total: data.total || 0,
+      unlocked: data.unlocked || 0
+    };
+  } catch {
+    return { total: 0, unlocked: 0 };
+  }
+};
+
 export const fetchSteamAppDetails = async (appId: string): Promise<SteamAppDetails | null> => {
   const r = await fetchSteamAppDetailsResult(appId);
   return r.ok ? r.data : null;
@@ -150,13 +165,18 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
   });
 
   const detailsCache = new Map<string, SteamAppDetails | null>();
+  const achievementsCache = new Map<string, { total: number; unlocked: number } | null>();
 
   // Limita a busca de detalhes para os primeiros 80 jogos para evitar timeout/rate limit
   await Promise.all(
     payload.games.slice(0, 80).map(async (owned) => {
       const appId = String(owned.appid);
-      const details = await fetchSteamAppDetails(appId).catch(() => null);
+      const [details, achievements] = await Promise.all([
+        fetchSteamAppDetails(appId).catch(() => null),
+        fetchSteamAchievements(steamId, appId).catch(() => null)
+      ]);
       detailsCache.set(appId, details);
+      achievementsCache.set(appId, achievements);
     }),
   );
 
@@ -168,6 +188,7 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
     
     const assets = buildSteamAssets(owned.appid);
     const details = detailsCache.get(appIdStr);
+    const achievements = achievementsCache.get(appIdStr);
     const normalizedHours = Math.round((owned.playtime_forever ?? 0) / 60);
     const resolvedDescription =
       details?.description ??
@@ -188,6 +209,8 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
       steamPlaytimeMinutes: owned.playtime_forever ?? 0,
       hoursPlayed: normalizedHours,
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
+      totalAchievements: achievements?.total || 0,
+      completedAchievements: achievements?.unlocked || 0,
       trailerUrl: details?.trailerUrl || "", 
       screenshots: details?.screenshots || [],
       releaseDate: details?.releaseDate || "",

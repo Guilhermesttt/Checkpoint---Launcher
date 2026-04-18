@@ -28,6 +28,8 @@ export interface Game {
   developer?: string;
   publisher?: string;
   tags?: string[];
+  totalAchievements?: number;
+  completedAchievements?: number;
 }
 
 export interface UserProfile {

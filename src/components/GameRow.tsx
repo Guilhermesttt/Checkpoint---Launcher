@@ -71,6 +71,16 @@ const GameRow: React.FC<GameRowProps> = ({
   /* Navegação Teclado */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ignore if typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
       if (e.key === "ArrowLeft") {
         onSelect(Math.max(0, canonicalIndex - 1));
         playSound("navigate");

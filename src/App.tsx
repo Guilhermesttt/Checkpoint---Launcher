@@ -8,6 +8,8 @@ import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { NotificationProvider } from "./components/NotificationCenter";
 
 
+import MainVideoBackground from "./components/MainVideoBackground";
+
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
@@ -34,7 +36,8 @@ const AppContent: React.FC = () => {
     
     if (isLoggingInNow) {
       setIsIntroVisible(true);
-      const timer = window.setTimeout(() => setIsIntroVisible(false), 3000);
+      // Backup timeout just in case video fails to play/end
+      const timer = window.setTimeout(() => setIsIntroVisible(false), 12000);
       return () => window.clearTimeout(timer);
     }
     
@@ -50,10 +53,14 @@ const AppContent: React.FC = () => {
 
   return (
     <>
+      <MainVideoBackground />
       {user ? <Home /> : <Login />}
       <AnimatePresence>
         {isIntroVisible && (
-          <GameBootIntro key="boot-intro" />
+          <GameBootIntro
+            key="boot-intro"
+            onFinish={() => setIsIntroVisible(false)}
+          />
         )}
       </AnimatePresence>
     </>

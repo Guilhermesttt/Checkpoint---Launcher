@@ -20,6 +20,7 @@ import { apiUrl } from "../services/api";
 import {
   fetchSteamAppDetailsResult,
   fetchSteamAppSizeGB,
+  fetchSteamAchievements,
   type SteamAppDetails,
 } from "../services/steam";
 import { useNotification } from "./NotificationCenter";
@@ -45,6 +46,8 @@ type GameFormState = {
   publisher: string;
   tags: string[];
   steamAppId: string;
+  totalAchievements?: number;
+  completedAchievements?: number;
 };
 
 const omitUndefined = (obj: Record<string, unknown>) => {
@@ -74,7 +77,7 @@ const mergeSteamStoreIntoForm = (form: GameFormState, details: SteamAppDetails) 
 
 interface AddGameModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (silent?: boolean) => void;
   playSound: (type: "select" | "back" | "navigate") => void;
   gameToEdit?: Game | null;
   onSaved?: () => void;
@@ -87,7 +90,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   gameToEdit,
   onSaved,
 }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { notify } = useNotification();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"info" | "media" | "advanced">("info");
@@ -137,6 +140,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           publisher: gameToEdit.publisher || "",
           tags: gameToEdit.tags || [],
           steamAppId: gameToEdit.steamAppId || "",
+          totalAchievements: gameToEdit.totalAchievements || 0,
+          completedAchievements: gameToEdit.completedAchievements || 0,
         });
         // Extract steam ID if possible from executable path
         if (gameToEdit.executablePath && /^\d+$/.test(gameToEdit.executablePath)) {
@@ -163,6 +168,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           publisher: "",
           tags: [],
           steamAppId: "",
+          totalAchievements: 0,
+          completedAchievements: 0,
         });
         setSteamId("");
       }
@@ -194,12 +201,16 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const header = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_hero.jpg`;
     const card = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_600x900_2x.jpg`;
     
-    const [sizeGB, detailsResult] = await Promise.all([
+    const [sizeGB, detailsResult, achievements] = await Promise.all([
       fetchSteamAppSizeGB(normalizedSteamId).catch(() => undefined),
       fetchSteamAppDetailsResult(normalizedSteamId),
+      userProfile?.steamId 
+        ? fetchSteamAchievements(userProfile.steamId, normalizedSteamId).catch(() => null)
+        : Promise.resolve(null)
     ]);
+
     const details = detailsResult.ok ? detailsResult.data : null;
-    if (!detailsResult.ok) {
+    if (detailsResult.ok === false) {
       notify(detailsResult.message, "info");
     }
 
@@ -220,6 +231,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       developer: details?.developer || prev.developer,
       publisher: details?.publisher || prev.publisher,
       tags: details?.tags || prev.tags,
+      totalAchievements: achievements?.total ?? 0,
+      completedAchievements: achievements?.unlocked ?? 0,
       steamAppId: normalizedSteamId,
     }));
   };
@@ -245,17 +258,27 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
       let mergedForm: GameFormState = { ...formData };
       if (formData.launcherType === "steam") {
-        const [sizeGB, storeResult] = await Promise.all([
+        const [sizeGB, storeResult, achievements] = await Promise.all([
           fetchSteamAppSizeGB(effectiveSteamId).catch(() => undefined),
           fetchSteamAppDetailsResult(effectiveSteamId),
+          userProfile?.steamId 
+            ? fetchSteamAchievements(userProfile.steamId, effectiveSteamId).catch(() => null)
+            : Promise.resolve(null)
         ]);
-        if (!storeResult.ok) {
+        if (storeResult.ok === false) {
           notify(
             `${storeResult.message} O jogo será salvo só com os dados do formulário.`,
             "info",
           );
         } else {
           mergedForm = mergeSteamStoreIntoForm(mergedForm, storeResult.data);
+        }
+        if (achievements) {
+          mergedForm = {
+            ...mergedForm,
+            totalAchievements: achievements.total,
+            completedAchievements: achievements.unlocked,
+          };
         }
         if (typeof sizeGB === "number") {
           mergedForm = { ...mergedForm, sizeGB: Math.max(0, Math.round(sizeGB)) };
@@ -273,7 +296,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }) as Record<string, unknown>;
 
       // Close modal immediately for "instant" feel
-      onClose();
+      onClose(true);
 
       if (gameToEdit) {
         if (!user?.uid) throw new Error("Sessão inválida.");
@@ -355,12 +378,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const header = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_hero.jpg`;
     const card = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`;
 
-    const [sizeGB, detailsResult] = await Promise.all([
+    const [sizeGB, detailsResult, achievements] = await Promise.all([
       fetchSteamAppSizeGB(appId).catch(() => undefined),
       fetchSteamAppDetailsResult(appId),
+      userProfile?.steamId 
+        ? fetchSteamAchievements(userProfile.steamId, appId).catch(() => null)
+        : Promise.resolve(null)
     ]);
     const details = detailsResult.ok ? detailsResult.data : null;
-    if (!detailsResult.ok) {
+    if (detailsResult.ok === false) {
       notify(detailsResult.message, "info");
     }
 
@@ -384,6 +410,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       developer: details?.developer || "",
       publisher: details?.publisher || "",
       tags: details?.tags || [],
+      totalAchievements: achievements?.total ?? 0,
+      completedAchievements: achievements?.unlocked ?? 0,
       steamAppId: appId,
     });
     setSteamId(appId);

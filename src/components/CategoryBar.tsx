@@ -29,6 +29,13 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disableKeyboardShortcuts) return;
+
+      // Ignore if typing in an input or textarea
+      const target = e.target as HTMLElement;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) {
+        return;
+      }
+
       if (e.key.toLowerCase() !== "q" && e.key.toLowerCase() !== "e") return;
       const currentIndex = normalizedCategories.findIndex((category) => category.id === activeCategory);
       if (e.key.toLowerCase() === "q") {

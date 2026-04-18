@@ -421,9 +421,9 @@ const Home: React.FC = () => {
     [openDetails, playSound],
   );
 
-  const closeContextMenu = () => {
+  const closeContextMenu = (silent = false) => {
     setContextMenu(null);
-    playSound("back");
+    if (!silent) playSound("back");
   };
 
   const handleMenuAction = async (action: string, game: Game) => {
@@ -443,6 +443,8 @@ const Home: React.FC = () => {
     } else if (action === "edit") {
       setEditingGame(game);
       setIsAddModalOpen(true);
+      closeContextMenu(true);
+      return;
     }
     closeContextMenu();
   };
@@ -507,11 +509,10 @@ const Home: React.FC = () => {
     }
   };
 
-  const closeAddModal = () => {
-    playSound("back");
+  const closeAddModal = (silent = false) => {
+    if (!silent) playSound("back");
     setIsAddModalOpen(false);
     setEditingGame(null);
-    // Garantia explícita: fechar modal não altera o estado da lista.
     setGames((prev) => prev);
   };
 

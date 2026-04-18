@@ -71,7 +71,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({
   }, [handleMouseMove, reducedEffects]);
 
   return (
-    <div className="fixed inset-0 z-[-1] overflow-hidden bg-[#050507]">
+    <div className="fixed inset-0 z-[-1] overflow-hidden">
       <div className="absolute inset-0 z-0">
         <AnimatePresence mode="popLayout">
           {layers.map((layer) => (
