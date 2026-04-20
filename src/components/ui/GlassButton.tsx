@@ -19,9 +19,9 @@ const sizeBy: Record<GlassButtonSize, string> = {
 
 const variantBy: Record<GlassButtonVariant, string> = {
   primary:
-    "bg-white text-black shadow-[0_0_24px_rgba(255,255,255,0.18)] hover:scale-[1.02]",
-  secondary: "liquid-glass-subtle text-white/90 hover:bg-white/10 hover:scale-[1.02]",
-  danger: "bg-red-500/15 text-red-200 border border-red-500/30 hover:bg-red-500/20 hover:scale-[1.02]",
+    "premium-glass-white text-black shadow-[0_0_24px_rgba(255,255,255,0.18)] hover:scale-[1.02]",
+  secondary: "premium-glass text-white/90 hover:bg-white/10 hover:scale-[1.02]",
+  danger: "premium-glass-black text-white hover:bg-white/10 hover:scale-[1.02] border border-red-500/30 font-bold",
 };
 
 export default function GlassButton({

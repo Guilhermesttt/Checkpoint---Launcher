@@ -70,7 +70,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-100 flex"
+          className="fixed inset-0 z-[100] flex"
         >
           {/* Background Image - Full Screen */}
           <motion.div
@@ -255,9 +255,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4 flex items-center gap-2">
                             <Trophy className="w-3 h-3" /> Conquistas
                           </h3>
-                          <div className="p-4 rounded-xl liquid-glass-subtle flex items-center gap-5 group cursor-pointer hover:bg-white/10 transition-colors h-[120px]">
-                            <div className="w-14 h-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform">
-                              <Trophy className="w-6 h-6 text-white/60 group-hover:text-amber-400 transition-colors" />
+                          <div className="p-4 rounded-xl premium-glass flex items-center gap-5 group cursor-pointer hover:bg-white/10 transition-colors h-[120px]">
+                            <div className="w-14 h-14 rounded-full premium-glass-white flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform">
+                              <Trophy className="w-6 h-6 text-black group-hover:text-black/70 transition-colors" />
                             </div>
                             <div className="flex flex-col w-full">
                               <span className="text-2xl font-light text-white leading-none mb-2">
@@ -276,7 +276,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                                         : "0%",
                                   }}
                                   transition={{ duration: 1, ease: "easeOut" }}
-                                  className="h-full bg-amber-400 rounded-full"
+                                  className="h-full bg-white rounded-full"
                                 />
                               </div>
                             </div>
@@ -300,7 +300,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div className="rounded-xl liquid-glass-subtle flex flex-col items-center justify-center gap-2 text-white/30 border border-dashed border-white/20 h-[120px]">
+                            <div className="rounded-xl premium-glass flex flex-col items-center justify-center gap-2 text-white/30 h-[120px]">
                               <Camera className="w-6 h-6 opacity-50" />
                               <span className="text-[10px] uppercase tracking-widest font-bold">Nenhuma captura</span>
                             </div>
@@ -475,11 +475,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
                         Gerenciamento
                       </h3>
-                      <div className="p-4 rounded-xl liquid-glass-subtle flex items-center justify-between mb-4">
+                      <div className="p-4 rounded-xl premium-glass flex items-center justify-between mb-4">
                         <span className="text-white/60 text-xs truncate max-w-sm">
                           {game.executablePath}
                         </span>
-                        <button className="text-[10px] font-bold text-blue-400 uppercase tracking-widest pl-4">
+                        <button className="text-[10px] font-bold text-white uppercase tracking-widest pl-4 hover:text-white/70 transition-colors">
                           Verificar
                         </button>
                       </div>
@@ -510,7 +510,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               className="flex-1 flex flex-col justify-end items-end p-12"
             >
               {/* Trophy Progress */}
-              <div className="liquid-glass rounded-2xl p-6 mb-6 min-w-[200px]">
+              <div className="premium-glass-black rounded-2xl p-6 mb-6 min-w-[200px] border border-white/10">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-[10px] font-bold tracking-[0.2em] text-white/50 uppercase">
                     Perfil
@@ -545,14 +545,19 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 whileTap={{ scale: 0.98 }}
                 onClick={handleLaunch}
                 disabled={isLaunching}
-                className="liquid-glass rounded-2xl px-8 py-5 flex items-center gap-4 group min-w-[200px] justify-between relative overflow-hidden"
+                className="rounded-2xl px-8 py-5 flex items-center gap-4 group min-w-[200px] justify-between relative overflow-hidden transition-all duration-500"
+                style={{
+                  background: "var(--game-color, #ffffff)",
+                  boxShadow: "0 8px 32px var(--game-color, transparent)"
+                }}
               >
-                <span className="text-sm font-bold tracking-[0.15em] uppercase">
+                <span className="text-sm font-black tracking-[0.15em] uppercase transition-colors" style={{ color: "var(--game-text-color, #000)" }}>
                   {isLaunching ? "Iniciando..." : "Jogar"}
                 </span>
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
                   <Play
-                    className={`w-5 h-5 text-black fill-black ml-0.5 ${isLaunching ? "animate-pulse" : ""}`}
+                    className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
+                    style={{ color: "var(--game-text-color, #000)", fill: "var(--game-text-color, #000)" }}
                   />
                 </div>
               </motion.button>
@@ -567,9 +572,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-8 right-8 z-20 p-4 liquid-glass-subtle rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90"
+            className="absolute top-8 right-8 z-20 p-4 premium-glass rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-white" />
           </button>
 
           {/* Gallery Modal Overlay */}
@@ -581,7 +586,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             }}
             maxWidthClassName="max-w-5xl"
             className="p-0 bg-transparent border-0 shadow-none"
-            backdropClassName="bg-black/90 backdrop-blur-xl"
+            backdropClassName="bg-black/90"
             zIndexClassName="z-[150]"
             reducedEffects
           >
@@ -596,7 +601,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   setGalleryModalOpen(false);
                   playSound("back");
                 }}
-                className="absolute top-3 right-4 z-10 p-3 liquid-glass-subtle rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
+                className="absolute top-3 right-4 z-10 p-3 premium-glass rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -706,22 +711,21 @@ const NavTab: React.FC<{
   active?: boolean;
   badge?: boolean;
   onClick?: () => void;
-}> = ({ label, icon, active, badge, onClick }) => (
+}> = ({ label, icon, active, onClick }) => (
   <button
     onClick={onClick}
     className={`
-      px-3 py-1.5 rounded-full text-[9px] font-bold tracking-[0.15em] uppercase
+      px-4 py-2 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase
       transition-all duration-300 flex items-center gap-1
       ${
         active
-          ? "liquid-glass text-white"
-          : "text-white/40 hover:text-white/70 hover:bg-white/5"
+          ? "premium-glass-white text-black"
+          : "text-white/40 hover:text-white/70 hover:bg-white/10"
       }
     `}
   >
     {icon && <span className="text-xs">{icon}</span>}
     {label}
-    {badge && <span className="w-2 h-2 rounded-full bg-blue-500 ml-1" />}
   </button>
 );
 
@@ -747,7 +751,7 @@ const InfoCard: React.FC<{ label: string; value: string }> = ({
   label,
   value,
 }) => (
-  <div className="p-4 rounded-xl liquid-glass-subtle">
+  <div className="p-4 rounded-xl premium-glass">
     <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">
       {label}
     </span>

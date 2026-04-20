@@ -40,12 +40,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
+          <motion.div
           ref={menuRef}
           initial={{ opacity: 0, scale: 0.95, y: -10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
-          className="fixed z-200 w-64 glass-strong rounded-2xl overflow-hidden shadow-2xl border border-white/20 p-2"
+          className="fixed z-200 w-64 premium-glass-black rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1)] p-2"
           style={{ left: x, top: y }}
         >
           <div className="flex flex-col gap-1">

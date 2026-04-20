@@ -89,7 +89,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
       <button
         onClick={handlePrev}
         onMouseEnter={() => playSound("navigate")}
-        className="shrink-0 w-10 h-10 rounded-xl liquid-glass-subtle flex items-center justify-center
+        className="shrink-0 w-10 h-10 rounded-xl premium-glass flex items-center justify-center
           hover:bg-white/10 transition-all active:scale-95 group"
         aria-label="Previous category"
       >
@@ -119,7 +119,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
                 whitespace-nowrap
                 transition-all duration-300
                 ${isActive 
-                  ? "text-white" 
+                  ? "text-black drop-shadow-md" 
                   : "text-white/30 hover:text-white/60 hover:bg-white/5"
                 }
               `}
@@ -128,7 +128,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
               {isActive && (
                 <motion.div
                   layoutId="category-pill"
-                  className="absolute inset-0 rounded-xl liquid-glass"
+                  className="absolute inset-0 rounded-xl premium-glass-white"
                   transition={{
                     type: "spring",
                     stiffness: 400,
@@ -140,14 +140,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
               {/* Label */}
               <span className="relative z-10 flex items-center gap-2">
                 {category.label}
-                {isActive && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                    style={{ boxShadow: "0 0 10px rgba(96, 165, 250, 0.8)" }}
-                  />
-                )}
               </span>
             </button>
           );
@@ -158,7 +150,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
       <button
         onClick={handleNext}
         onMouseEnter={() => playSound("navigate")}
-        className="shrink-0 w-10 h-10 rounded-xl liquid-glass-subtle flex items-center justify-center
+        className="shrink-0 w-10 h-10 rounded-xl premium-glass flex items-center justify-center
           hover:bg-white/10 transition-all active:scale-95 group"
         aria-label="Next category"
       >

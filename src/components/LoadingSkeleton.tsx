@@ -25,7 +25,7 @@ const LoadingSkeleton: React.FC = () => {
                 repeat: Infinity,
                 ease: "easeInOut",
               }}
-              className="w-full h-full rounded-2xl bg-white/5 border border-white/5"
+              className="w-full h-full rounded-2xl premium-glass-black border border-white/5 opacity-50"
             />
           </div>
         ))}

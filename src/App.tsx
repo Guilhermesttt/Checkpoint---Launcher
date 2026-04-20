@@ -1,30 +1,24 @@
 import React from "react";
 import { AnimatePresence } from "framer-motion";
 import Home from "./pages/Home";
-import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import GameBootIntro from "./components/GameBootIntro";
 import AsyncLoader from "./components/AsyncLoader";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { NotificationProvider } from "./components/NotificationCenter";
-
-
 import MainVideoBackground from "./components/MainVideoBackground";
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
   const previousUserUid = React.useRef<string | null>(null);
-  
-  // This ref ensures the "Game Boot" intro only plays during an active login,
-  // bypassing it if the user is already authenticated (e.g., page refresh).
   const isInitialLoad = React.useRef(true);
 
   React.useEffect(() => {
     if (loading) return;
     const currentUid = user?.uid ?? null;
     const previousUid = previousUserUid.current;
-    
-    // Check if this is the first time authentication state is resolved
+
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
       previousUserUid.current = currentUid;
@@ -33,14 +27,13 @@ const AppContent: React.FC = () => {
 
     const isLoggingInNow = Boolean(currentUid) && previousUid !== currentUid;
     previousUserUid.current = currentUid;
-    
+
     if (isLoggingInNow) {
       setIsIntroVisible(true);
-      // Backup timeout just in case video fails to play/end
       const timer = window.setTimeout(() => setIsIntroVisible(false), 12000);
       return () => window.clearTimeout(timer);
     }
-    
+
     if (!currentUid) {
       setIsIntroVisible(false);
     }
@@ -51,10 +44,22 @@ const AppContent: React.FC = () => {
     return <AsyncLoader />;
   }
 
+  /* 
+   * Route logic:
+   * - user logged in  → Home (game library)
+   * - user not logged in → Landing (public marketing page with login)
+   * 
+   * The video background only renders when logged in (Home),
+   * landing handles its own background internally.
+   */
+  if (!user) {
+    return <Landing />;
+  }
+
   return (
     <>
       <MainVideoBackground />
-      {user ? <Home /> : <Login />}
+      <Home />
       <AnimatePresence>
         {isIntroVisible && (
           <GameBootIntro

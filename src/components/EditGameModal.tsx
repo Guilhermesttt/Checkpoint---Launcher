@@ -76,9 +76,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-3 liquid-glass-subtle rounded-full hover:bg-white/10 transition-colors"
+            className="p-3 premium-glass rounded-full hover:bg-white/10 transition-colors group"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-white group-hover:rotate-90 transition-all" />
           </button>
         </div>
 
@@ -89,7 +89,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </label>
                   <input
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none"
+                    className="w-full premium-glass border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none"
                     placeholder="Ex: Silent Hill 2"
                     value={formData.title}
                     onChange={(e) =>
@@ -104,7 +104,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <Tags className="w-3 h-3" /> Categoria
                     </label>
                     <select
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none cursor-pointer appearance-none"
+                      className="w-full premium-glass border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none cursor-pointer appearance-none"
                       value={formData.category}
                       onChange={(e) =>
                         setFormData({ ...formData, category: e.target.value })
@@ -123,7 +123,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     </label>
                     <input
                       required
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none"
+                      className="w-full premium-glass border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none"
                       placeholder="https://..."
                       value={formData.cardImage}
                       onChange={(e) =>
@@ -154,7 +154,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </label>
                   <textarea
                     rows={3}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none resize-none"
+                    className="w-full premium-glass border border-white/10 rounded-xl px-5 py-4 text-sm focus:bg-white/10 outline-none resize-none"
                     placeholder="Diga algo sobre o jogo..."
                     value={formData.description}
                     onChange={(e) =>

@@ -19,7 +19,7 @@ export default function ModalShell({
   children,
   className,
   maxWidthClassName = "max-w-md",
-  backdropClassName = "bg-black/65 backdrop-blur-xl",
+  backdropClassName = "bg-black/75",
   reducedEffects = false,
   zIndexClassName = "z-[150]",
   contentClassName,

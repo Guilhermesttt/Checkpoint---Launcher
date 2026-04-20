@@ -1,89 +1,50 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  Image as ImageIcon,
-  Tags,
+  ImageIcon,
   Type,
-  AlignLeft,
-  Play,
-  Folder,
-  Gamepad2,
   Sparkles,
-  Clock,
-  HardDrive,
+  Play,
+  Search,
+  Tags,
+  Globe,
+  Gamepad2,
+  RefreshCw,
 } from "lucide-react";
 import { addDoc, updateDoc } from "firebase/firestore";
-import type { Game } from "../types/domain";
-import { useAuth } from "../auth/AuthProvider";
-import { apiUrl } from "../services/api";
 import ModalShell from "./ui/ModalShell";
-import GlassButton from "./ui/GlassButton";
+import GameCard from "./GameCard";
+import { useAuth } from "../auth/AuthProvider";
+import { useNotification } from "./NotificationCenter";
+import {
+  userGamesCollectionRef,
+  userGameDocRef,
+} from "../services/firestorePaths";
 import {
   fetchSteamAppDetailsResult,
   fetchSteamAppSizeGB,
-  fetchSteamAchievements,
   type SteamAppDetails,
 } from "../services/steam";
-import { useNotification } from "./NotificationCenter";
-import { userGameDocRef, userGamesCollectionRef } from "../services/firestorePaths";
-
-type GameFormState = {
-  title: string;
-  category: string;
-  image: string;
-  backgroundImage: string;
-  cardImage: string;
-  logoImage: string;
-  description: string;
-  trailerUrl: string;
-  executablePath: string;
-  hoursPlayed: number;
-  sizeGB: number;
-  launcherType: "steam" | "local";
-  screenshots: string[];
-  aboutTheGame: string;
-  releaseDate: string;
-  developer: string;
-  publisher: string;
-  tags: string[];
-  steamAppId: string;
-  totalAchievements?: number;
-  completedAchievements?: number;
-};
-
-const omitUndefined = (obj: Record<string, unknown>) => {
-  const next: Record<string, unknown> = { ...obj };
-  Object.keys(next).forEach((k) => next[k] === undefined && delete next[k]);
-  return next;
-};
-
-const mergeSteamStoreIntoForm = (form: GameFormState, details: SteamAppDetails) => ({
-  ...form,
-  title: details.title || form.title,
-  image: details.backgroundImage || form.image,
-  backgroundImage: details.backgroundImage || form.backgroundImage,
-  cardImage: details.cardImage || form.cardImage,
-  logoImage: details.logoImage || form.logoImage,
-  description: details.description || form.description,
-  trailerUrl: details.trailerUrl || form.trailerUrl,
-  screenshots:
-    details.screenshots && details.screenshots.length > 0 ? details.screenshots : form.screenshots,
-  aboutTheGame: details.aboutTheGame || details.description || form.aboutTheGame,
-  releaseDate: details.releaseDate || form.releaseDate,
-  developer: details.developer || form.developer,
-  publisher: details.publisher || form.publisher,
-  tags: details.tags && details.tags.length > 0 ? details.tags : form.tags,
-  steamAppId: details.appId || form.steamAppId,
-});
+import { apiUrl } from "../services/api";
 
 interface AddGameModalProps {
   isOpen: boolean;
   onClose: (silent?: boolean) => void;
   playSound: (type: "select" | "back" | "navigate") => void;
-  gameToEdit?: Game | null;
+  gameToEdit?: any | null;
   onSaved?: () => void;
 }
+
+const CATEGORIES = [
+  { id: "ACTION", label: "Ação" },
+  { id: "ADVENTURE", label: "Aventura" },
+  { id: "RACING", label: "Corrida" },
+  { id: "RPG", label: "RPG" },
+  { id: "SHOOTER", label: "FPS" },
+  { id: "SPORTS", label: "Esportes" },
+  { id: "HORROR", label: "Terror" },
+];
 
 const AddGameModal: React.FC<AddGameModalProps> = ({
   isOpen,
@@ -92,816 +53,358 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   gameToEdit,
   onSaved,
 }) => {
-  const { user, userProfile } = useAuth();
+  const { user } = useAuth();
   const { notify } = useNotification();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"info" | "media" | "advanced">("info");
-  const [formData, setFormData] = useState<GameFormState>({
-    title: "",
-    category: "ROLEPLAYING",
-    image: "",
-    backgroundImage: "",
-    cardImage: "",
-    logoImage: "",
-    description: "",
-    trailerUrl: "",
-    executablePath: "",
-    hoursPlayed: 0,
-    sizeGB: 0,
-    launcherType: "local",
-    screenshots: [],
-    aboutTheGame: "",
-    releaseDate: "",
-    developer: "",
-    publisher: "",
-    tags: [],
-    steamAppId: "",
-    totalAchievements: 0,
-    completedAchievements: 0,
-  });
-  const [steamId, setSteamId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
-  React.useEffect(() => {
+  const [formData, setFormData] = useState({
+    title: "",
+    cardImage: "",
+    backgroundImage: "",
+    category: "ACTION",
+    description: "",
+    launcherType: "local" as "steam" | "local",
+    executablePath: "",
+  });
+
+  useEffect(() => {
     if (isOpen) {
       if (gameToEdit) {
         setFormData({
           title: gameToEdit.title || "",
-          category: gameToEdit.category || "ROLEPLAYING",
-          image: gameToEdit.image || "",
-          backgroundImage: gameToEdit.backgroundImage || gameToEdit.image || "",
           cardImage: gameToEdit.cardImage || "",
-          logoImage: gameToEdit.logoImage || "",
+          backgroundImage: gameToEdit.backgroundImage || gameToEdit.image || "",
+          category: gameToEdit.category || "ACTION",
           description: gameToEdit.description || "",
-          trailerUrl: gameToEdit.trailerUrl || "",
-          executablePath: gameToEdit.executablePath || "",
-          hoursPlayed: gameToEdit.hoursPlayed || 0,
-          sizeGB: gameToEdit.sizeGB || 0,
           launcherType: gameToEdit.launcherType || "local",
-          screenshots: gameToEdit.screenshots || [],
-          aboutTheGame: gameToEdit.aboutTheGame || "",
-          releaseDate: gameToEdit.releaseDate || "",
-          developer: gameToEdit.developer || "",
-          publisher: gameToEdit.publisher || "",
-          tags: gameToEdit.tags || [],
-          steamAppId: gameToEdit.steamAppId || "",
-          totalAchievements: gameToEdit.totalAchievements || 0,
-          completedAchievements: gameToEdit.completedAchievements || 0,
+          executablePath: gameToEdit.executablePath || "",
         });
-        // Extract steam ID if possible from executable path
-        if (gameToEdit.executablePath && /^\d+$/.test(gameToEdit.executablePath)) {
-          setSteamId(gameToEdit.executablePath);
-        }
       } else {
         setFormData({
           title: "",
-          category: "ROLEPLAYING",
-          image: "",
-          backgroundImage: "",
           cardImage: "",
-          logoImage: "",
+          backgroundImage: "",
+          category: "ACTION",
           description: "",
-          trailerUrl: "",
+          launcherType: "local",
           executablePath: "",
-          hoursPlayed: 0,
-          sizeGB: 0,
-          launcherType: "local" as "steam" | "local",
-          screenshots: [],
-          aboutTheGame: "",
-          releaseDate: "",
-          developer: "",
-          publisher: "",
-          tags: [],
-          steamAppId: "",
-          totalAchievements: 0,
-          completedAchievements: 0,
         });
-        setSteamId("");
       }
-      setActiveTab("info");
     }
   }, [isOpen, gameToEdit]);
 
-  const categories = ["RACING", "ROLEPLAYING", "SPORTS", "ONLINE", "SHOOTER"];
-
-  const handleBrowse = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement | null;
-      const file = target?.files?.[0];
-      if (file) {
-        setFormData((prev) => ({ ...prev, executablePath: file.name }));
-      }
-    };
-    input.click();
-  };
-
-  const handleSteamAutoFill = async () => {
-    const normalizedSteamId = steamId.trim();
-    if (!/^\d+$/.test(normalizedSteamId)) return;
-    playSound("select");
-    
-    // Steam CDN Assets
-    const header = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_hero.jpg`;
-    const card = `https://cdn.akamai.steamstatic.com/steam/apps/${normalizedSteamId}/library_600x900_2x.jpg`;
-    
-    const [sizeGB, detailsResult, achievements] = await Promise.all([
-      fetchSteamAppSizeGB(normalizedSteamId).catch(() => undefined),
-      fetchSteamAppDetailsResult(normalizedSteamId),
-      userProfile?.steamId 
-        ? fetchSteamAchievements(userProfile.steamId, normalizedSteamId).catch(() => null)
-        : Promise.resolve(null)
-    ]);
-
-    const details = detailsResult.ok ? detailsResult.data : null;
-    if (detailsResult.ok === false) {
-      notify(detailsResult.message, "info");
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      image: details?.backgroundImage || header,
-      backgroundImage: details?.backgroundImage || header,
-      cardImage: details?.cardImage || card,
-      logoImage: details?.logoImage || prev.logoImage,
-      description: details?.description || prev.description,
-      trailerUrl: details?.trailerUrl || prev.trailerUrl,
-      executablePath: normalizedSteamId, // Auto-fill path as Steam ID for easy launching
-      launcherType: "steam",
-      sizeGB: typeof sizeGB === "number" ? Math.round(sizeGB) : prev.sizeGB,
-      screenshots: details?.screenshots || prev.screenshots,
-      aboutTheGame: details?.aboutTheGame || details?.description || prev.aboutTheGame,
-      releaseDate: details?.releaseDate || prev.releaseDate,
-      developer: details?.developer || prev.developer,
-      publisher: details?.publisher || prev.publisher,
-      tags: details?.tags || prev.tags,
-      totalAchievements: achievements?.total ?? 0,
-      completedAchievements: achievements?.unlocked ?? 0,
-      steamAppId: normalizedSteamId,
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    playSound("select");
-
+  const handleSteamSearch = async (query: string) => {
+    if (query.length < 3) return;
     try {
-      const normalizedSteamId = steamId.trim();
-      const normalizedExecutablePath = formData.executablePath.trim();
+      const resp = await fetch(
+        apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
+      );
+      const data = await resp.json();
+      setSearchResults(data.items || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
-      let effectiveSteamId = "";
-      if (formData.launcherType === "steam") {
-        effectiveSteamId = normalizedSteamId || normalizedExecutablePath;
-        if (!/^\d+$/.test(effectiveSteamId)) {
-          notify("Para jogo Steam, informe um App ID numérico válido.", "error");
-          setLoading(false);
-          return;
-        }
-      }
-
-      let mergedForm: GameFormState = { ...formData };
-      if (formData.launcherType === "steam") {
-        const [sizeGB, storeResult, achievements] = await Promise.all([
-          fetchSteamAppSizeGB(effectiveSteamId).catch(() => undefined),
-          fetchSteamAppDetailsResult(effectiveSteamId),
-          userProfile?.steamId 
-            ? fetchSteamAchievements(userProfile.steamId, effectiveSteamId).catch(() => null)
-            : Promise.resolve(null)
-        ]);
-        if (storeResult.ok === false) {
-          notify(
-            `${storeResult.message} O jogo será salvo só com os dados do formulário.`,
-            "info",
-          );
-        } else {
-          mergedForm = mergeSteamStoreIntoForm(mergedForm, storeResult.data);
-        }
-        if (achievements) {
-          mergedForm = {
-            ...mergedForm,
-            totalAchievements: achievements.total,
-            completedAchievements: achievements.unlocked,
-          };
-        }
-        if (typeof sizeGB === "number") {
-          mergedForm = { ...mergedForm, sizeGB: Math.max(0, Math.round(sizeGB)) };
-        }
-      }
-
-      const payload = omitUndefined({
-        ...mergedForm,
-        executablePath:
-          formData.launcherType === "steam" ? effectiveSteamId : normalizedExecutablePath,
-        hoursPlayed: Math.max(0, Math.round(mergedForm.hoursPlayed)),
-        sizeGB: Math.max(0, Math.round(mergedForm.sizeGB)),
-        steamAppId: formData.launcherType === "steam" ? effectiveSteamId : "",
-        updatedAt: new Date().toISOString(),
-      }) as Record<string, unknown>;
-
-      // Close modal immediately for "instant" feel
-      onClose(true);
-
-      if (gameToEdit) {
-        if (!user?.uid) throw new Error("Sessão inválida.");
-        await updateDoc(userGameDocRef(user.uid, gameToEdit.id), payload);
-      } else {
-        if (!user?.uid) {
-          notify("Sessão inválida. Faça login novamente.", "error");
-          return;
-        }
-        await addDoc(userGamesCollectionRef(user.uid), {
-          ...payload,
-          createdAt: new Date().toISOString(),
-          source: "manual",
+  const handleSelectSteamGame = async (game: any) => {
+    playSound("select");
+    const appId = String(game.id);
+    setLoading(true);
+    try {
+      const details = await fetchSteamAppDetailsResult(appId);
+      if (details.ok) {
+        const d = details.data;
+        setFormData({
+          ...formData,
+          title: d.title || game.name,
+          cardImage:
+            d.cardImage ||
+            `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`,
+          backgroundImage:
+            d.backgroundImage ||
+            `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`,
+          description: d.description || "",
+          launcherType: "steam",
+          executablePath: appId,
         });
       }
-      onSaved?.();
-    } catch (error) {
-      console.error("Erro ao salvar no Firestore:", error);
-      notify("Erro ao salvar no banco de dados.", "error");
+      setSearchResults([]);
+      setSearchQuery("");
     } finally {
       setLoading(false);
     }
   };
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Array<{ id: number; name: string; tiny_image?: string }>>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-
-  React.useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      if (searchQuery.length > 2) {
-        searchGames(searchQuery);
-      } else {
-        setSearchResults([]);
-        setSearchError(null);
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
-
-  const searchGames = async (query: string) => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) return;
-    
-    setIsSearching(true);
-    setSearchError(null);
-    try {
-      let response = await fetch(apiUrl(`/api/steam/search?query=${encodeURIComponent(trimmed)}`));
-      if (response.status === 404) {
-        response = await fetch(apiUrl(`/api/steam/search-games?query=${encodeURIComponent(trimmed)}`));
-      }
-      if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || "Falha ao buscar jogos da Steam.");
-      }
-      const data = (await response.json()) as { items?: Array<{ id: number; name: string; tiny_image?: string }> };
-      setSearchResults(data.items || []);
-    } catch (error) {
-      console.error("Search error:", error);
-      setSearchResults([]);
-      const message =
-        error instanceof TypeError
-          ? "Backend Steam offline. Inicie com npm run server ou npm run dev:full."
-          : error instanceof Error
-            ? error.message
-            : "Erro na busca da Steam.";
-      setSearchError(message);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleSelectGame = async (game: { id: number; name: string; tiny_image?: string }) => {
+  const handleSubmit = async () => {
+    if (!user?.uid || !formData.title) return;
+    setLoading(true);
     playSound("select");
-    const appId = String(game.id);
-    
-    const header = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_hero.jpg`;
-    const card = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`;
-
-    const [sizeGB, detailsResult, achievements] = await Promise.all([
-      fetchSteamAppSizeGB(appId).catch(() => undefined),
-      fetchSteamAppDetailsResult(appId),
-      userProfile?.steamId 
-        ? fetchSteamAchievements(userProfile.steamId, appId).catch(() => null)
-        : Promise.resolve(null)
-    ]);
-    const details = detailsResult.ok ? detailsResult.data : null;
-    if (detailsResult.ok === false) {
-      notify(detailsResult.message, "info");
+    try {
+      const data = {
+        ...formData,
+        updatedAt: new Date().toISOString(),
+      };
+      if (gameToEdit) {
+        await updateDoc(userGameDocRef(user.uid, gameToEdit.id), data);
+        notify("Jogo atualizado!", "success");
+      } else {
+        await addDoc(userGamesCollectionRef(user.uid), {
+          ...data,
+          createdAt: new Date().toISOString(),
+        });
+        notify("Jogo adicionado!", "success");
+      }
+      onClose(true);
+      onSaved?.();
+    } catch (e) {
+      notify("Erro ao salvar jogo.", "error");
+    } finally {
+      setLoading(false);
     }
-
-    setFormData({
-      ...formData,
-      title: details?.title || game.name,
-      image: details?.backgroundImage || header,
-      backgroundImage: details?.backgroundImage || header,
-      cardImage: details?.cardImage || card,
-      logoImage: details?.logoImage || formData.logoImage,
-      executablePath: appId,
-      description:
-        details?.description ||
-        `Official Steam ID: ${appId}. Experience ${game.name} in its full glory.`,
-      trailerUrl: details?.trailerUrl || formData.trailerUrl,
-      launcherType: "steam",
-      sizeGB: sizeGB ? Math.round(sizeGB) : formData.sizeGB,
-      screenshots: details?.screenshots || [],
-      aboutTheGame: details?.aboutTheGame || details?.description || "",
-      releaseDate: details?.releaseDate || "",
-      developer: details?.developer || "",
-      publisher: details?.publisher || "",
-      tags: details?.tags || [],
-      totalAchievements: achievements?.total ?? 0,
-      completedAchievements: achievements?.unlocked ?? 0,
-      steamAppId: appId,
-    });
-    setSteamId(appId);
-    setSearchResults([]);
-    setSearchQuery("");
-    setActiveTab("advanced");
   };
-
-  const tabs = [
-    { id: "info", label: "Busca e Info", icon: <Type className="w-4 h-4" /> },
-    { id: "media", label: "Mídia", icon: <ImageIcon className="w-4 h-4" /> },
-    { id: "advanced", label: "Avançado", icon: <Gamepad2 className="w-4 h-4" /> },
-  ] as const;
 
   return (
     <ModalShell
       isOpen={isOpen}
-      onClose={() => {
-        playSound("back");
-        onClose();
-      }}
-      maxWidthClassName="max-w-3xl"
-      className="p-0 overflow-hidden shadow-2xl"
-      contentClassName="overflow-hidden rounded-[2rem]"
-      backdropClassName="bg-black/70 backdrop-blur-2xl"
-      zIndexClassName="z-[150]"
+      onClose={onClose}
+      maxWidthClassName="max-w-4xl"
+      className="p-0! border-0! bg-transparent shadow-none!"
     >
-            {/* Header */}
-            <div className="relative px-8 pt-8 pb-6 border-b border-white/5">
-              {/* Decorative Element */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-linear-to-r from-transparent via-white/20 to-transparent rounded-full" />
-              
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 liquid-glass rounded-2xl flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-white">
-                      {gameToEdit ? "Editar Jogo" : "Novo Jogo"}
-                    </h2>
-                    <p className="text-white/40 text-sm mt-0.5">
-                      {gameToEdit ? "Atualize as informações do jogo" : "Adicione um novo título à biblioteca"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSound("back");
-                    onClose();
+      <div className="w-full bg-[#0a0a0c]/98 backdrop-blur-3xl rounded-[40px] overflow-hidden border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.9)]">
+        {/* Header */}
+        <div className="flex justify-between items-center px-10 py-8 border-b border-white/5 relative bg-white/0.01">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/10 rounded-full" />
+          <div>
+            <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">
+              {gameToEdit ? "Editar informações" : "Adicionar Jogo"}
+            </h2>
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-1">
+              Biblioteca Digital • Checkpoint v.2
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              playSound("back");
+              onClose();
+            }}
+            className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-all border border-white/5"
+          >
+            <X className="text-white/40" size={20} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] min-h-[540px]">
+          {/* Form Side */}
+          <div className="p-10 space-y-8 border-r border-white/5 overflow-y-auto max-h-[600px] no-scrollbar">
+            {/* Steam Search */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                <Search size={14} className="text-white/20" /> Buscar na Steam
+                (Opcional)
+              </label>
+              <div className="relative">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    handleSteamSearch(e.target.value);
                   }}
-                  onMouseEnter={() => playSound("navigate")}
-                  className="p-3 rounded-xl liquid-glass-subtle hover:bg-white/10 transition-colors group"
-                >
-                  <X className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" />
-                </button>
-              </div>
-
-              {/* Tab Navigation */}
-              <div className="flex items-center gap-2 mt-6">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      playSound("navigate");
-                      setActiveTab(tab.id);
-                    }}
-                    onMouseEnter={() => playSound("navigate")}
-                    className={`
-                      flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
-                      transition-all duration-300
-                      ${activeTab === tab.id
-                        ? 'liquid-glass text-white'
-                        : 'text-white/40 hover:text-white/70 hover:bg-white/5'
-                      }
-                    `}
-                  >
-                    {tab.icon}
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Content */}
-            <form onSubmit={handleSubmit}>
-              <div className="p-8 max-h-[60vh] overflow-y-auto no-scrollbar">
-                <AnimatePresence mode="wait">
-                  {activeTab === "info" && (
+                  placeholder="Pesquisar jogo para auto-preenchimento..."
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
+                />
+                <AnimatePresence>
+                  {searchResults.length > 0 && (
                     <motion.div
-                      key="info"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="flex flex-col gap-6"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#121216] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto no-scrollbar"
                     >
-                      <div className="flex flex-col gap-4">
-                        <FormField
-                          label="Tipo de Jogo"
-                          icon={<Gamepad2 className="w-4 h-4" />}
+                      {searchResults.map((g) => (
+                        <button
+                          key={g.id}
+                          onClick={() => handleSelectSteamGame(g)}
+                          className="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left group"
                         >
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                playSound("select");
-                                setFormData({ ...formData, launcherType: "steam" });
-                              }}
-                              onMouseEnter={() => playSound("navigate")}
-                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 ${
-                                formData.launcherType === "steam"
-                                  ? "liquid-glass text-white"
-                                  : "bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10 border border-white/5"
-                              }`}
-                            >
-                              Steam
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                playSound("select");
-                                setFormData({ ...formData, launcherType: "local" });
-                              }}
-                              onMouseEnter={() => playSound("navigate")}
-                              className={`px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 ${
-                                formData.launcherType === "local"
-                                  ? "liquid-glass text-white"
-                                  : "bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10 border border-white/5"
-                              }`}
-                            >
-                              Local
-                            </button>
-                          </div>
-                        </FormField>
-
-                        <FormField
-                          label="Procurar Jogo"
-                          icon={<Sparkles className="w-4 h-4" />}
-                        >
-                          <div className="relative">
-                            <input
-                              className="form-input"
-                              placeholder="Digite o nome do jogo... (ex: Elden Ring)"
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
+                          {g.tiny_image ? (
+                            <img
+                              src={g.tiny_image}
+                              alt=""
+                              className="w-12 h-6 object-cover rounded opacity-40 group-hover:opacity-100 transition-opacity"
                             />
-                            {isSearching && (
-                              <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                              </div>
-                            )}
-
-                            {/* Search Results Dropdown */}
-                            <AnimatePresence>
-                              {searchResults.length > 0 && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: 10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: 10 }}
-                                  className="absolute left-0 right-0 top-full mt-2 z-50 liquid-glass-dark rounded-2xl overflow-hidden border border-white/10 shadow-2xl max-h-60 overflow-y-auto no-scrollbar"
-                                >
-                                  {searchResults.map((game) => (
-                                    <button
-                                      key={game.id}
-                                      type="button"
-                                      onClick={() => handleSelectGame(game)}
-                                      onMouseEnter={() => playSound("navigate")}
-                                      className="w-full flex items-center gap-4 p-3 hover:bg-white/10 transition-colors text-left border-b border-white/5 last:border-0"
-                                    >
-                                      <img
-                                        src={game.tiny_image || `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.id}/header.jpg`}
-                                        alt=""
-                                        className="w-16 h-8 object-cover rounded shadow"
-                                      />
-                                      <div className="flex-1">
-                                        <p className="text-sm font-medium text-white">{game.name}</p>
-                                        <p className="text-[10px] text-white/40 uppercase tracking-widest">Steam ID: {game.id}</p>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                            {searchError && (
-                              <p className="mt-2 text-xs text-amber-300/90">{searchError}</p>
-                            )}
-                          </div>
-                        </FormField>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            label="Título do Jogo"
-                            icon={<Type className="w-4 h-4" />}
-                            required
-                          >
-                            <input
-                              required
-                              className="form-input"
-                              placeholder="Ex: Silent Hill 2"
-                              value={formData.title}
-                              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            />
-                          </FormField>
-                          <FormField
-                            label="Steam App ID"
-                            icon={<Gamepad2 className="w-4 h-4" />}
-                          >
-                            <div className="flex gap-2">
-                              <input
-                                className="form-input"
-                                placeholder="ID"
-                                value={steamId}
-                                onChange={(e) => setSteamId(e.target.value)}
-                              />
-                              <button
-                                type="button"
-                                onClick={handleSteamAutoFill}
-                                onMouseEnter={() => playSound("navigate")}
-                                className="px-4 rounded-xl liquid-glass hover:bg-white/10 transition-colors text-[10px] font-bold tracking-[0.08em] uppercase text-white/80"
-                              >
-                                Auto Fill
-                              </button>
-                            </div>
-                          </FormField>
-                        </div>
-                      </div>
-
-                      <FormField
-                        label="Categoria"
-                        icon={<Tags className="w-4 h-4" />}
-                      >
-                        <div className="flex flex-wrap gap-2">
-                          {categories.map((cat) => (
-                            <button
-                              key={cat}
-                              type="button"
-                              onClick={() => {
-                                playSound("select");
-                                setFormData({ ...formData, category: cat });
-                              }}
-                              onMouseEnter={() => playSound("navigate")}
-                              className={`
-                                px-4 py-2.5 rounded-xl text-xs font-bold tracking-widest uppercase
-                                transition-all duration-300
-                                ${formData.category === cat
-                                  ? 'liquid-glass text-white'
-                                  : 'bg-white/5 text-white/40 hover:text-white/70 hover:bg-white/10 border border-white/5'
-                                }
-                              `}
-                            >
-                              {cat}
-                            </button>
-                          ))}
-                        </div>
-                      </FormField>
-
-                      <FormField
-                        label="Descrição"
-                        icon={<AlignLeft className="w-4 h-4" />}
-                      >
-                        <textarea
-                          rows={3}
-                          className="form-input resize-none"
-                          placeholder="Diga algo sobre o jogo..."
-                          value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        />
-                      </FormField>
-                    </motion.div>
-                  )}
-
-                  {activeTab === "media" && (
-                    <motion.div
-                      key="media"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="flex flex-col gap-6"
-                    >
-                      <div className="grid grid-cols-2 gap-6">
-                        <FormField
-                          label="URL da Capa (Vertical)"
-                          icon={<ImageIcon className="w-4 h-4" />}
-                          required
-                        >
-                          <input
-                            required
-                            className="form-input"
-                            placeholder="https://..."
-                            value={formData.cardImage}
-                            onChange={(e) => setFormData({ ...formData, cardImage: e.target.value })}
-                          />
-                          {formData.cardImage && (
-                            <div className="mt-3 w-24 h-32 rounded-xl overflow-hidden ring-1 ring-white/10">
-                              <img 
-                                src={formData.cardImage} 
-                                alt="Preview" 
-                                className="w-full h-full object-cover" 
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (steamId && !target.src.includes('header.jpg')) {
-                                    target.src = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamId}/header.jpg`;
-                                  }
-                                }}
-                              />
-                            </div>
+                          ) : (
+                            <div className="w-12 h-6 bg-white/5 rounded" />
                           )}
-                        </FormField>
-
-                        <FormField
-                          label="URL do Wallpaper (Horizontal)"
-                          icon={<ImageIcon className="w-4 h-4" />}
-                          required
-                        >
-                          <input
-                            required
-                            className="form-input"
-                            placeholder="https://..."
-                            value={formData.image}
-                            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                          />
-                          {formData.image && (
-                            <div className="mt-3 w-full h-24 rounded-xl overflow-hidden ring-1 ring-white/10">
-                              <img 
-                                src={formData.image} 
-                                alt="Preview" 
-                                className="w-full h-full object-cover" 
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  if (steamId && !target.src.includes('header.jpg')) {
-                                    target.src = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamId}/header.jpg`;
-                                  }
-                                }}
-                              />
-                            </div>
-                          )}
-                        </FormField>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {activeTab === "advanced" && (
-                    <motion.div
-                      key="advanced"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      className="flex flex-col gap-6"
-                    >
-                      <FormField
-                        label="Caminho do Executável"
-                        icon={<Play className="w-4 h-4" />}
-                      >
-                        <div className="flex gap-3">
-                          <input
-                            className="form-input flex-1"
-                            placeholder="Caminho local ou Steam App ID"
-                            value={formData.executablePath}
-                            onChange={(e) => setFormData({ ...formData, executablePath: e.target.value })}
-                          />
-                          <button
-                            type="button"
-                            onClick={handleBrowse}
-                            onMouseEnter={() => playSound("navigate")}
-                            className="px-5 liquid-glass rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 group"
-                          >
-                            <Folder className="w-4 h-4 text-white/50 group-hover:text-white transition-colors" />
-                            <span className="text-sm font-medium text-white/50 group-hover:text-white transition-colors">
-                              Upload
-                            </span>
-                          </button>
-                        </div>
-                      </FormField>
-
-                      <div className="grid grid-cols-2 gap-6">
-                        <FormField
-                          label="Horas Jogadas"
-                          icon={<Clock className="w-4 h-4 text-white/40" />}
-                        >
-                          <input
-                            type="number"
-                            step="0.1"
-                            className="form-input"
-                            value={formData.hoursPlayed}
-                            onChange={(e) => setFormData({ ...formData, hoursPlayed: parseFloat(e.target.value) || 0 })}
-                          />
-                        </FormField>
-                        <FormField
-                          label="Tamanho do Jogo (GB)"
-                          icon={<HardDrive className="w-4 h-4 text-white/40" />}
-                        >
-                          <input
-                            type="number"
-                            className="form-input"
-                            value={formData.sizeGB}
-                            onChange={(e) => setFormData({ ...formData, sizeGB: parseInt(e.target.value) || 0 })}
-                          />
-                        </FormField>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <p className="text-[11px] text-blue-300/80 leading-relaxed">
-                          O arquivo do jogo deve ser selecionado para permitir a abertura direta. 
-                          Se for um jogo da Steam, o ID do app é suficiente para o lançamento.
-                        </p>
-                      </div>
+                          <span className="text-sm text-white/70 group-hover:text-white">
+                            {g.name}
+                          </span>
+                        </button>
+                      ))}
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+            </div>
 
-              {/* Footer */}
-              <div className="px-8 py-6 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <ControlHint
-                    icon="X"
-                    label="CANCELAR"
-                    onMouseEnter={() => playSound("navigate")}
-                    onClick={() => {
-                      playSound("back");
-                      onClose();
-                    }}
+            <div className="h-px bg-white/5" />
+
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 gap-6">
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                  <Type size={14} className="text-white/20" /> Título
+                </label>
+                <input
+                  value={formData.title}
+                  onChange={(e) =>
+                    setFormData({ ...formData, title: e.target.value })
+                  }
+                  placeholder="Nome do seu jogo"
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-white/30 transition-all"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                  <Tags size={14} className="text-white/20" /> Categoria
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        playSound("navigate");
+                        setFormData({ ...formData, category: cat.id });
+                      }}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
+                        formData.category === cat.id
+                          ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                          : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                    <ImageIcon size={14} className="text-white/20" /> Capa
+                    (Link)
+                  </label>
+                  <input
+                    value={formData.cardImage}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cardImage: e.target.value })
+                    }
+                    placeholder="https://..."
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
                   />
                 </div>
-
-                <GlassButton
-                  type="submit"
-                  disabled={loading}
-                  onMouseEnter={() => playSound("navigate")}
-                  variant="primary"
-                  size="md"
-                  className="px-8"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 fill-current" />
-                      {gameToEdit ? "Salvar Alterações" : "Adicionar Jogo"}
-                    </>
-                  )}
-                </GlassButton>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                    <ImageIcon size={14} className="text-white/20" /> Wallpaper
+                    (Link)
+                  </label>
+                  <input
+                    value={formData.backgroundImage}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        backgroundImage: e.target.value,
+                      })
+                    }
+                    placeholder="https://..."
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                  />
+                </div>
               </div>
-            </form>
+            </div>
+
+            <button
+              disabled={loading || !formData.title}
+              onClick={handleSubmit}
+              className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-[#e0e0e0] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.1)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+              {loading ? (
+                <RefreshCw size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <Play
+                    size={16}
+                    className="fill-current group-hover:scale-110 transition-transform"
+                  />
+                  Confirmar Adição
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Preview Side */}
+          <div className="bg-black/20 flex flex-col items-center justify-center p-12 relative overflow-hidden group">
+            <div className="absolute inset-0 z-0">
+              {formData.backgroundImage && (
+                <img
+                  src={formData.backgroundImage}
+                  className="w-full h-full object-cover opacity-20 blur-3xl scale-110 transition-transform duration-1000 group-hover:scale-125"
+                  alt=""
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "";
+                  }}
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent" />
+            </div>
+
+            <div className="relative z-10 space-y-8 flex flex-col items-center">
+              <div className="text-center space-y-1">
+                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">
+                  Prévia no Painel
+                </p>
+                <div className="h-0.5 w-8 bg-white/10 mx-auto rounded-full" />
+              </div>
+
+              <div className="scale-125 transition-transform duration-500 hover:rotate-1 hover:scale-[1.3]">
+                <GameCard
+                  title={formData.title || "Nome do Jogo"}
+                  image={
+                    formData.cardImage ||
+                    "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&q=80"
+                  }
+                  isActive={true}
+                />
+              </div>
+
+              <div className="pt-8 w-full max-w-[200px]">
+                <div className="h-[1px] bg-white/5 w-full mb-4" />
+                <div className="flex justify-between items-center px-1">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-white/20 uppercase tracking-widest">
+                      Categoria
+                    </p>
+                    <p className="text-[10px] font-bold text-white/60 uppercase">
+                      {
+                        CATEGORIES.find((c) => c.id === formData.category)
+                          ?.label
+                      }
+                    </p>
+                  </div>
+                  <div className="w-8 h-8 rounded-full border border-white/5 flex items-center justify-center">
+                    <Gamepad2 size={12} className="text-white/20" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </ModalShell>
   );
 };
-
-// Sub-components
-const FormField: React.FC<{
-  label: string;
-  icon: React.ReactNode;
-  required?: boolean;
-  children: React.ReactNode;
-}> = ({ label, icon, required, children }) => (
-  <div className="flex flex-col gap-3">
-    <label className="flex items-center gap-2 text-sm font-medium text-white/60">
-      {icon}
-      {label}
-      {required && <span className="text-blue-400">*</span>}
-    </label>
-    {children}
-  </div>
-);
-
-const ControlHint: React.FC<{
-  icon: string;
-  label: string;
-  onClick?: () => void;
-  onMouseEnter?: () => void;
-}> = ({ icon, label, onClick, onMouseEnter }) => (
-  <button 
-    type="button"
-    onClick={onClick}
-    onMouseEnter={onMouseEnter}
-    className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors"
-  >
-    <span className="w-6 h-6 rounded-full border border-white/20 flex items-center justify-center text-[10px]">
-      {icon}
-    </span>
-    <span className="text-[9px] font-bold tracking-[0.15em] uppercase">{label}</span>
-  </button>
-);
 
 export default AddGameModal;

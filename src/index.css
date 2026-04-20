@@ -1,33 +1,16 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════
-   Checkpoint — PS5 Liquid Glass Design System
+   Checkpoint — Console-Inspired Design System
+   Performance First: zero backdrop-filter blur
    ═══════════════════════════════════════════════ */
 
 @theme {
-  /* ── Animations ── */
-  --animate-zoom-slow: zoom-slow 30s ease-in-out infinite alternate;
-  --animate-float: float 6s ease-in-out infinite;
-  --animate-glow-pulse: glow-pulse 5s ease-in-out infinite;
-  --animate-fade-in: fade-in 0.6s ease-out forwards;
-  --animate-slide-up: slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  --animate-shimmer: shimmer 2s linear infinite;
-  --animate-liquid: liquid 8s ease-in-out infinite;
-
-  @keyframes zoom-slow {
-    from { transform: scale(1); }
-    to { transform: scale(1.08); }
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
-
-  @keyframes glow-pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 0.7; }
-  }
+  /* ── Animations (lightweight only) ── */
+  --animate-fade-in: fade-in 0.4s ease-out forwards;
+  --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-glow-pulse: glow-pulse 4s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -35,7 +18,7 @@
   }
 
   @keyframes slide-up {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
@@ -44,11 +27,9 @@
     100% { background-position: 200% 0; }
   }
 
-  @keyframes liquid {
-    0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-    25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-    50% { border-radius: 50% 60% 30% 60% / 30% 40% 70% 50%; }
-    75% { border-radius: 60% 40% 60% 30% / 70% 50% 40% 60%; }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
   }
 }
 
@@ -84,64 +65,45 @@
     background: transparent;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.3);
   }
   .thin-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 
-  /* ── Liquid Glass Effect (iOS 26 / visionOS inspired) ── */
+  /* ── Glass Effect — Performance-safe (NO backdrop-filter) ──
+     Uses rgba transparency + border. Zero GPU blur cost.
+  ── */
   .liquid-glass {
-    backdrop-filter: blur(40px) saturate(200%) brightness(1.1);
-    -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.1);
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.05) 50%,
-      rgba(255, 255, 255, 0.08) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 
-      inset 0 1px 1px rgba(255, 255, 255, 0.15),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.05),
-      0 8px 32px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 4px 20px rgba(0, 0, 0, 0.3);
   }
 
   .liquid-glass-subtle {
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.03) 100%
-    );
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 4px 16px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 2px 12px rgba(0, 0, 0, 0.2);
   }
 
   .liquid-glass-dark {
-    backdrop-filter: blur(60px) saturate(150%);
-    -webkit-backdrop-filter: blur(60px) saturate(150%);
-    background: linear-gradient(
-      135deg,
-      rgba(0, 0, 0, 0.6) 0%,
-      rgba(0, 0, 0, 0.4) 50%,
-      rgba(0, 0, 0, 0.5) 100%
-    );
+    background: rgba(5, 5, 7, 0.75);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 
-      inset 0 1px 1px rgba(255, 255, 255, 0.05),
-      0 16px 48px rgba(0, 0, 0, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 8px 32px rgba(0, 0, 0, 0.5);
   }
 
+  /* Accent shimmer overlay (hover effect) – pure CSS, no blur */
   .fluid-glass-accent {
     position: relative;
     overflow: hidden;
@@ -152,88 +114,118 @@
     content: "";
     position: absolute;
     inset: 0;
-    background:
-      linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.16) 35%, transparent 70%),
-      radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.16), transparent 40%);
-    transform: translateX(-40%);
-    opacity: 0.8;
+    background: linear-gradient(120deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.1) 35%,
+      transparent 70%
+    );
+    transform: translateX(-100%);
     pointer-events: none;
-    transition: transform 0.6s ease, opacity 0.6s ease;
-    z-index: -1;
+    transition: transform 0.5s ease;
+    z-index: 0;
   }
 
   .fluid-glass-accent:hover::before {
-    transform: translateX(0);
-    opacity: 1;
+    transform: translateX(100%);
   }
 
-  /* ── Legacy Glass (backwards compatible) ── */
+  /* ── Legacy aliases (backwards compat) ── */
   .glass {
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .glass-strong {
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.07);
     border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
-  /* ── PS5 Active Glow Ring ── */
-  .ring-glow {
-    box-shadow:
-      0 0 0 2.5px rgba(255, 255, 255, 0.85),
-      0 0 20px rgba(255, 255, 255, 0.12),
-      0 0 50px rgba(59, 130, 246, 0.08);
+  /* ── Premium Liquid Glass (B&W) ── */
+  .premium-glass {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+      inset 0 1px 1px rgba(255, 255, 255, 0.15),
+      0 8px 32px rgba(0, 0, 0, 0.5);
   }
 
-  /* ── Elevation Levels ── */
+  .premium-glass-black {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.4) 100%);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 
+      inset 0 1px 1px rgba(255, 255, 255, 0.08),
+      0 12px 40px rgba(0, 0, 0, 0.8);
+  }
+
+  .premium-glass-white {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 1);
+    box-shadow: 
+      inset 0 1px 2px rgba(255, 255, 255, 0.8),
+      0 8px 32px rgba(0, 0, 0, 0.3);
+    color: black;
+  }
+
+  /* ── Console-style Active Ring ── */
+  .ring-glow {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.8),
+      0 0 16px rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── Elevation (shadow-only, no blur) ── */
   .elevation-1 {
     box-shadow:
-      0 4px 20px rgba(0, 0, 0, 0.35),
-      0 1px 6px rgba(0, 0, 0, 0.25);
+      0 4px 16px rgba(0, 0, 0, 0.35),
+      0 1px 4px rgba(0, 0, 0, 0.25);
   }
 
   .elevation-2 {
     box-shadow:
-      0 8px 36px rgba(0, 0, 0, 0.45),
-      0 2px 10px rgba(0, 0, 0, 0.35);
+      0 8px 28px rgba(0, 0, 0, 0.45),
+      0 2px 8px rgba(0, 0, 0, 0.35);
   }
 
   .elevation-active {
     box-shadow:
       0 0 0 2.5px rgba(255, 255, 255, 0.85),
-      0 20px 50px rgba(0, 0, 0, 0.5),
-      0 0 40px rgba(255, 255, 255, 0.06),
-      0 0 100px rgba(59, 130, 246, 0.04);
+      0 16px 40px rgba(0, 0, 0, 0.5);
   }
 
-  /* ── Shimmer Effect ── */
+  /* ── Shimmer (loading) ── */
   .shimmer {
     background: linear-gradient(
       90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.08) 50%,
-      transparent 100%
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0) 100%
     );
     background-size: 200% 100%;
-    animation: shimmer 2s linear infinite;
+    animation: shimmer 1.8s linear infinite;
   }
 
-  /* ── GPU Acceleration ── */
+  /* ── GPU-hint for transforms ── */
   .will-change-transform {
     will-change: transform;
   }
 
-  /* ── Progress Bar ── */
-  .progress-glow {
-    box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  /* ── Console accent line (decorative) ── */
+  .console-accent {
+    background: linear-gradient(90deg,
+      rgba(59, 130, 246, 0.8),
+      rgba(139, 92, 246, 0.8)
+    );
+    height: 2px;
   }
 }
 
+/* ── Scrubber / Range Input ── */
 .game-row-scrubber {
   width: 100%;
   appearance: none;
@@ -246,7 +238,7 @@
 .game-row-scrubber::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 9999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .game-row-scrubber::-webkit-slider-thumb {
@@ -256,24 +248,24 @@
   height: 16px;
   margin-top: -6px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   background: #fff;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 .game-row-scrubber::-moz-range-track {
   height: 4px;
   border-radius: 9999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .game-row-scrubber::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   background: #fff;
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
 * {

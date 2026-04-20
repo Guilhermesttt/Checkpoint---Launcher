@@ -12,26 +12,28 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
   const finishedRef = useRef(false);
 
   // useLottie is often more stable in mixed ESM environments
-  const { View } = useLottie({
-    animationData: animationData,
-    loop: false,
-    autoplay: true,
-    rendererSettings: {
-      preserveAspectRatio: "xMidYMid slice",
+  const { View } = useLottie(
+    {
+      animationData: animationData,
+      loop: false,
+      autoplay: true,
+      rendererSettings: {
+        preserveAspectRatio: "xMidYMid slice",
+      },
     },
-  }, { 
-    width: "100%", 
-    height: "100%",
-    position: "absolute",
-    top: 0,
-    left: 0
-  });
+    {
+      width: "100%",
+      height: "100%",
+      position: "absolute",
+      top: 0,
+      left: 0,
+    },
+  );
 
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.volume = 0.5;
-      // Explicitly call play() to ensure audio starts
-      videoRef.current.play().catch(err => {
+      videoRef.current.play().catch((err) => {
         console.warn("Autoplay with audio blocked or failed:", err);
       });
     }
@@ -71,7 +73,4 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
   );
 };
 
-
 export default GameBootIntro;
-
-
