@@ -166,8 +166,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           <GlassButton
             type="submit"
             disabled={loading}
-            variant="primary"
-            size="md"
+            variant="default"
+            size="default"
             className="w-full py-5"
           >
             {loading ? "Salvando..." : "Adicionar à Biblioteca"}
