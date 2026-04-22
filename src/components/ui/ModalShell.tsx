@@ -1,63 +1,79 @@
-import React from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import * as React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 
-export interface ModalShellProps {
+interface ModalShellProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (silent?: boolean) => void;
   children: React.ReactNode;
-  className?: string;
   maxWidthClassName?: string;
+  className?: string;
   backdropClassName?: string;
-  reducedEffects?: boolean;
   zIndexClassName?: string;
-  contentClassName?: string;
+  reducedEffects?: boolean;
 }
 
-export default function ModalShell({
+const ModalShell: React.FC<ModalShellProps> = ({
   isOpen,
   onClose,
   children,
+  maxWidthClassName = "max-w-2xl",
   className,
-  maxWidthClassName = "max-w-md",
-  backdropClassName = "bg-black/75",
+  backdropClassName,
+  zIndexClassName = "z-[100]",
   reducedEffects = false,
-  zIndexClassName = "z-[150]",
-  contentClassName,
-}: ModalShellProps) {
-  const panelMotion = reducedEffects
-    ? {}
-    : {
-        initial: { opacity: 0, scale: 0.96, y: 14 },
-        animate: { opacity: 1, scale: 1, y: 0 },
-        exit: { opacity: 0, scale: 0.96, y: 14 },
-      };
+}) => {
+  // Handle escape key
+  React.useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, onClose]);
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className={`fixed inset-0 ${zIndexClassName} flex items-center justify-center p-6`}
+        <div
+          className={cn(
+            "fixed inset-0 flex items-center justify-center p-4 md:p-8",
+            zIndexClassName
+          )}
         >
-          <div className={`absolute inset-0 ${backdropClassName}`} onClick={onClose} />
-
+          {/* Backdrop */}
           <motion.div
-            {...panelMotion}
-            className={[
-              "relative w-full liquid-glass-dark rounded-3xl border border-white/10 p-6 elevation-2",
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => onClose()}
+            className={cn(
+              "absolute inset-0 bg-black/60 backdrop-blur-md",
+              backdropClassName
+            )}
+          />
+
+          {/* Modal Content */}
+          <motion.div
+            initial={reducedEffects ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+            animate={reducedEffects ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={reducedEffects ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className={cn(
+              "relative w-full overflow-hidden",
               maxWidthClassName,
-              className,
-            ]
-              .filter(Boolean)
-              .join(" ")}
+              className
+            )}
           >
-            <div className={contentClassName}>{children}</div>
+            {children}
           </motion.div>
-        </motion.div>
+        </div>
       )}
     </AnimatePresence>
   );
-}
+};
 
+export default ModalShell;

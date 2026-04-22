@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, CheckLine, AlertCircle, ArrowRight } from "lucide-react";
-import { useAuth } from "../auth/AuthProvider";
+import { Mail, Lock, AlertCircle, ArrowRight, Gamepad2, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { NotificationProvider } from "../components/NotificationCenter";
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -12,13 +14,21 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const Login: React.FC = () => {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, loading: authLoading } = useAuth();
+const LoginContent: React.FC = () => {
+  const { user, signInWithGoogle, signInWithEmail, signUpWithEmail, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && !authLoading) {
+      navigate("/app", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +36,7 @@ const Login: React.FC = () => {
       setError("Preencha todos os campos.");
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
     try {
@@ -35,13 +45,13 @@ const Login: React.FC = () => {
       } else {
         await signUpWithEmail(email, password);
       }
+      navigate("/app", { replace: true });
     } catch (err: any) {
-      console.error(err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("E-mail ou senha incorretos.");
-      } else if (err.code === 'auth/email-already-in-use') {
+      } else if (err.code === "auth/email-already-in-use") {
         setError("Este e-mail já está em uso.");
-      } else if (err.code === 'auth/weak-password') {
+      } else if (err.code === "auth/weak-password") {
         setError("A senha deve ter pelo menos 6 caracteres.");
       } else {
         setError("Ocorreu um erro. Tente novamente.");
@@ -56,7 +66,8 @@ const Login: React.FC = () => {
     setError(null);
     try {
       await signInWithGoogle();
-    } catch (err) {
+      navigate("/app", { replace: true });
+    } catch {
       setError("Falha ao entrar com Google.");
     } finally {
       setIsLoading(false);
@@ -64,128 +75,162 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center px-6 relative overflow-hidden bg-transparent">
-      {/* Local overlays for legibility (keep video visible behind) */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.18),transparent_45%),radial-gradient(circle_at_80%_10%,rgba(59,130,246,0.10),transparent_40%)] opacity-35" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(5,5,7,0.35)_70%,rgba(5,5,7,0.55)_100%)]" />
+    <div className="min-h-screen w-full bg-black flex items-center justify-center px-6 relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(59,130,246,0.08),transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_80%,rgba(139,92,246,0.06),transparent_60%)]" />
+
+      {/* Grid */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <div key={`v-${i}`} className="absolute w-px bg-white" style={{ left: `${(i + 1) * 8.33}%`, top: 0, bottom: 0 }} />
+        ))}
+        {[...Array(8)].map((_, i) => (
+          <div key={`h-${i}`} className="absolute h-px bg-white" style={{ top: `${(i + 1) * 12.5}%`, left: 0, right: 0 }} />
+        ))}
+      </div>
+
+      {/* Back button */}
+      <a
+        href="/"
+        className="absolute top-8 left-8 flex items-center gap-2 text-white/40 hover:text-white/80 text-sm font-mono transition-colors group"
+      >
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+        Voltar
+      </a>
 
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-md p-8 rounded-[40px] liquid-glass-dark border border-white/10 shadow-2xl elevation-2"
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-md"
       >
-        <div className="flex flex-col items-center text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center mb-4"
-          >
-            <CheckLine className="w-8 h-8 text-blue-500" />
-          </motion.div>
-          <h1 className="text-3xl font-light tracking-tight text-white mb-1">
-            Checkpoint
-          </h1>
-          <p className="text-white/40 text-[11px] font-semibold uppercase tracking-[0.2em]">
-            {mode === "login" ? "Bem-vindo de volta" : "Crie sua conta gratuita"}
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-white/7 transition-all"
-              />
-            </div>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20 group-focus-within:text-blue-500 transition-colors" />
-              <input
-                type="password"
-                placeholder="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:bg-white/7 transition-all"
-              />
-            </div>
+        {/* Card */}
+        <div className="border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
+          {/* Header */}
+          <div className="flex flex-col items-center text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center mb-4"
+            >
+              <Gamepad2 className="w-7 h-7 text-white" />
+            </motion.div>
+            <h1 className="text-3xl font-display tracking-tight text-white mb-1">
+              Checkpoint
+            </h1>
+            <p className="text-white/40 text-[11px] font-semibold uppercase tracking-[0.2em]">
+              {mode === "login" ? "Bem-vindo de volta" : "Crie sua conta gratuita"}
+            </p>
           </div>
 
-          <AnimatePresence mode="wait">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="flex items-center gap-2 text-red-400 text-xs px-2"
-              >
-                <AlertCircle className="w-4 h-4" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+          {/* Google button */}
           <button
-            type="submit"
+            onClick={handleGoogleLogin}
             disabled={isLoading || authLoading}
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-2xl py-4 font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 ring-glow"
+            className="w-full bg-white text-black rounded-2xl py-4 font-semibold flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 mb-6"
           >
-            {isLoading ? (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
-              />
-            ) : (
-              <>
-                {mode === "login" ? "Entrar" : "Criar Conta"}
-                <ArrowRight className="w-5 h-5" />
-              </>
-            )}
+            <GoogleIcon />
+            <span>Continuar com Google</span>
           </button>
-        </form>
 
-        <div className="relative my-8 text-center">
-          <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" />
-          <span className="relative liquid-glass-subtle px-4 py-1 rounded-full text-[10px] uppercase tracking-[0.25em] text-white/35 font-bold">
-            ou
-          </span>
+          {/* Divider */}
+          <div className="relative my-6 text-center">
+            <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" />
+            <span className="relative px-4 bg-transparent text-[10px] uppercase tracking-[0.25em] text-white/30 font-bold">
+              ou com e-mail
+            </span>
+          </div>
+
+          {/* Email form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3">
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-white/60 transition-colors" />
+                <input
+                  type="email"
+                  placeholder="E-mail"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-all text-sm"
+                />
+              </div>
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-white/60 transition-colors" />
+                <input
+                  type="password"
+                  placeholder="Senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white placeholder:text-white/20 focus:outline-none focus:border-white/30 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="flex items-center gap-2 text-red-400 text-xs px-1"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button
+              type="submit"
+              disabled={isLoading || authLoading}
+              className="w-full border border-white/20 hover:border-white/40 hover:bg-white/5 text-white rounded-xl py-3.5 font-semibold flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 text-sm"
+            >
+              {isLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full"
+                />
+              ) : (
+                <>
+                  {mode === "login" ? "Entrar" : "Criar Conta"}
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Toggle mode */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}
+              className="text-sm text-white/30 hover:text-white/60 transition-colors"
+            >
+              {mode === "login"
+                ? "Não tem conta? Cadastre-se grátis"
+                : "Já tem conta? Faça o login"}
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={handleGoogleLogin}
-          disabled={isLoading || authLoading}
-          className="w-full bg-white text-black rounded-2xl py-4 font-semibold flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-70 elevation-1"
-        >
-          <GoogleIcon />
-          <span>Google</span>
-        </button>
-
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            className="text-sm font-light text-white/40 hover:text-white transition-colors"
-          >
-            {mode === "login" 
-              ? "Não tem conta? Cadastre-se" 
-              : "Já tem conta? Faça o login"}
-          </button>
-        </div>
-
-        <div className="mt-8 pt-6 border-t border-white/5 text-center">
-          <p className="text-[10px] text-white/20 uppercase tracking-[0.2em]">
-            Autenticação Segura Firebase
-          </p>
-        </div>
+        {/* Footer note */}
+        <p className="text-center text-[10px] text-white/20 font-mono mt-6 uppercase tracking-[0.2em]">
+          Autenticação segura · Firebase Auth
+        </p>
       </motion.div>
     </div>
   );
 };
 
-export default Login;
+// Wrap with providers since this is a standalone route
+const Login: React.FC = () => (
+  <NotificationProvider>
+    <AuthProvider>
+      <LoginContent />
+    </AuthProvider>
+  </NotificationProvider>
+);
 
+export default Login;

@@ -1,7 +1,7 @@
 import React from "react";
 import { AnimatePresence } from "framer-motion";
+import { Navigate } from "react-router-dom";
 import Home from "./pages/Home";
-import Landing from "./pages/Landing";
 import GameBootIntro from "./components/GameBootIntro";
 import AsyncLoader from "./components/AsyncLoader";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
@@ -11,53 +11,36 @@ import MainVideoBackground from "./components/MainVideoBackground";
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
-  const previousUserUid = React.useRef<string | null>(null);
-  const isInitialLoad = React.useRef(true);
 
   React.useEffect(() => {
     if (loading) return;
     const currentUid = user?.uid ?? null;
-    const previousUid = previousUserUid.current;
 
-    if (isInitialLoad.current) {
-      isInitialLoad.current = false;
-      previousUserUid.current = currentUid;
+    if (!currentUid) {
+      sessionStorage.removeItem("hasSeenIntro");
+      setIsIntroVisible(false);
       return;
     }
 
-    const isLoggingInNow = Boolean(currentUid) && previousUid !== currentUid;
-    previousUserUid.current = currentUid;
-
-    if (isLoggingInNow) {
+    if (currentUid && !sessionStorage.getItem("hasSeenIntro")) {
+      sessionStorage.setItem("hasSeenIntro", "true");
       setIsIntroVisible(true);
-      const timer = window.setTimeout(() => setIsIntroVisible(false), 12000);
+      const timer = window.setTimeout(() => setIsIntroVisible(false), 10000);
       return () => window.clearTimeout(timer);
     }
-
-    if (!currentUid) {
-      setIsIntroVisible(false);
-    }
-    return;
   }, [loading, user?.uid]);
 
   if (loading) {
     return <AsyncLoader />;
   }
 
-  /* 
-   * Route logic:
-   * - user logged in  → Home (game library)
-   * - user not logged in → Landing (public marketing page with login)
-   * 
-   * The video background only renders when logged in (Home),
-   * landing handles its own background internally.
-   */
+  // Redirect unauthenticated users to /login
   if (!user) {
-    return <Landing />;
+    return <Navigate to="/login" replace />;
   }
 
   return (
-    <>
+    <div className="overflow-hidden select-none h-screen w-full">
       <MainVideoBackground />
       <Home />
       <AnimatePresence>
@@ -68,7 +51,7 @@ const AppContent: React.FC = () => {
           />
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

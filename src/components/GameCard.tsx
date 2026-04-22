@@ -7,6 +7,7 @@ interface GameCardProps {
   image: string;
   isActive?: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   isFavorite?: boolean;
   isSteam?: boolean;
 }
@@ -16,12 +17,14 @@ const GameCard: React.FC<GameCardProps> = ({
   image,
   isActive = false,
   onClick,
+  onContextMenu,
   isFavorite = false,
   isSteam = false,
 }) => {
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className="relative flex items-center justify-center cursor-pointer select-none"
       style={{ width: 172, height: 260 }}
     >

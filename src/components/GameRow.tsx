@@ -8,6 +8,7 @@ interface GameRowProps {
   games: Game[];
   selectedIndex: number;
   onSelect: (index: number, openGame?: Game) => void;
+  onContextMenu?: (e: React.MouseEvent, game: Game) => void;
   playSound: (type: "select" | "back" | "navigate") => void;
 }
 
@@ -15,6 +16,7 @@ const GameRow: React.FC<GameRowProps> = ({
   games,
   selectedIndex,
   onSelect,
+  onContextMenu,
   playSound,
 }) => {
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -76,6 +78,7 @@ const GameRow: React.FC<GameRowProps> = ({
                     playSound("navigate");
                   }
                 }}
+                onContextMenu={(e) => onContextMenu?.(e, game)}
               />
             </div>
           ))}

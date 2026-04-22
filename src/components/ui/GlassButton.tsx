@@ -1,42 +1,50 @@
-import React from "react";
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-type GlassButtonVariant = "primary" | "secondary" | "danger";
-type GlassButtonSize = "sm" | "md";
+const glassButtonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "premium-glass text-white hover:bg-white/10 border border-white/10 shadow-2xl",
+        white: "premium-glass-white text-black hover:scale-[1.02] shadow-[0_0_20px_rgba(255,255,255,0.1)]",
+        ghost: "hover:bg-white/5 text-white/60 hover:text-white",
+        outline: "border border-white/20 bg-transparent hover:bg-white/10 text-white",
+      },
+      size: {
+        default: "h-12 px-6",
+        sm: "h-9 px-4 text-[10px]",
+        lg: "h-14 px-8 text-sm",
+        icon: "size-12 rounded-full",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+);
 
 export interface GlassButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: GlassButtonVariant;
-  size?: GlassButtonSize;
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof glassButtonVariants> {
+  asChild?: boolean;
 }
 
-const base =
-  "inline-flex items-center justify-center gap-2 font-semibold transition-transform active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none";
+const GlassButton = React.forwardRef<HTMLButtonElement, GlassButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp
+        className={cn(glassButtonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
+GlassButton.displayName = "GlassButton";
 
-const sizeBy: Record<GlassButtonSize, string> = {
-  sm: "h-10 px-4 rounded-xl text-xs tracking-wider uppercase",
-  md: "h-11 px-5 rounded-2xl text-sm",
-};
-
-const variantBy: Record<GlassButtonVariant, string> = {
-  primary:
-    "premium-glass-white text-black shadow-[0_0_24px_rgba(255,255,255,0.18)] hover:scale-[1.02]",
-  secondary: "premium-glass text-white/90 hover:bg-white/10 hover:scale-[1.02]",
-  danger: "premium-glass-black text-white hover:bg-white/10 hover:scale-[1.02] border border-red-500/30 font-bold",
-};
-
-export default function GlassButton({
-  variant = "secondary",
-  size = "sm",
-  className,
-  ...props
-}: GlassButtonProps) {
-  return (
-    <button
-      {...props}
-      className={[base, sizeBy[size], variantBy[variant], className]
-        .filter(Boolean)
-        .join(" ")}
-    />
-  );
-}
-
+export default GlassButton;

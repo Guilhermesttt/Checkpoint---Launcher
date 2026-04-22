@@ -138,7 +138,7 @@ app.get("/auth/steam/callback", async (req, res) => {
   const token = String(req.query.token ?? "");
   const pending = pendingStates.get(token);
   if (!pending) {
-    res.redirect(`${frontendUrl}?steamStatus=invalid_state`);
+    res.redirect(`${frontendUrl}/app?steamStatus=invalid_state`);
     return;
   }
   pendingStates.delete(token);
@@ -153,7 +153,7 @@ app.get("/auth/steam/callback", async (req, res) => {
     const text = await validation.text();
     const isValid = text.includes("is_valid:true");
     if (!isValid) {
-      res.redirect(`${frontendUrl}?steamStatus=invalid`);
+      res.redirect(`${frontendUrl}/app?steamStatus=invalid`);
       return;
     }
 
@@ -161,7 +161,7 @@ app.get("/auth/steam/callback", async (req, res) => {
     const match = claimedId.match(/\/id\/(\d+)$/);
     const steamId = match?.[1];
     if (!steamId) {
-      res.redirect(`${frontendUrl}?steamStatus=missing_id`);
+      res.redirect(`${frontendUrl}/app?steamStatus=missing_id`);
       return;
     }
 
@@ -170,9 +170,9 @@ app.get("/auth/steam/callback", async (req, res) => {
       steamId,
       state: pending.firebaseUid,
     });
-    res.redirect(`${frontendUrl}?${params.toString()}`);
+    res.redirect(`${frontendUrl}/app?${params.toString()}`);
   } catch {
-    res.redirect(`${frontendUrl}?steamStatus=error`);
+    res.redirect(`${frontendUrl}/app?steamStatus=error`);
   }
 });
 

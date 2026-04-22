@@ -75,14 +75,14 @@ const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "STEAM", label: "Steam", Icon: Zap },
-  { id: "LOCAL", label: "Local", Icon: Sparkles },
+  { id: "LOCAL", label: "Local", Icon: Gamepad2 },
   { id: "RACING", label: "Corrida", Icon: Car },
   { id: "ROLEPLAYING", label: "RPG", Icon: Swords },
   { id: "SPORTS", label: "Esportes", Icon: Trophy },
   { id: "ONLINE", label: "Online", Icon: Globe },
   { id: "SHOOTER", label: "Tiro", Icon: Crosshair },
   { id: "ACTION", label: "Ação", Icon: Gamepad2 },
-  { id: "ADVENTURE", label: "Aventura", Icon: Sparkles },
+  { id: "ADVENTURE", label: "Aventura", Icon: Gamepad2 },
   { id: "HORROR", label: "Terror", Icon: Zap },
   { id: "STRATEGY", label: "Estratégia", Icon: Trophy },
   { id: "FIGHTING", label: "Luta", Icon: Swords },
@@ -129,7 +129,7 @@ const Sidebar: React.FC<{
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       className="fixed left-0 top-0 bottom-0 z-50 flex flex-col"
-      style={{ width: 72 }}
+      style={{ width: 96 }}
     >
       <div
         className="flex-1 flex flex-col items-center py-6 gap-1"
@@ -148,7 +148,7 @@ const Sidebar: React.FC<{
               boxShadow: "0 4px 20px rgba(255,255,255,0.14)",
             }}
           >
-            <Sparkles className="w-4 h-4 text-black" />
+            <Gamepad2 className="w-5 h-5 text-black" />
           </div>
         </div>
 
@@ -249,6 +249,11 @@ const Home: React.FC = () => {
     y: number;
     game: Game;
   } | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, game: Game) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, game });
+  };
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
@@ -744,7 +749,7 @@ const Home: React.FC = () => {
       {/* ── Main canvas ───────────────────────────────────────────────────── */}
       <div
         className="flex-1 flex flex-col h-screen overflow-hidden"
-        style={{ marginLeft: 72 }}
+        style={{ marginLeft: 96 }}
       >
         {/* Top bar */}
         <motion.div
@@ -1096,6 +1101,7 @@ const Home: React.FC = () => {
                       games={displayGames}
                       selectedIndex={selectedIndex}
                       onSelect={onSelectHandler}
+                      onContextMenu={handleContextMenu}
                       playSound={playSound}
                     />
                   </motion.div>
@@ -1109,7 +1115,7 @@ const Home: React.FC = () => {
         <div
           className="fixed bottom-0 z-30 flex items-center justify-between px-8 py-3.5 pointer-events-none"
           style={{
-            left: 72,
+            left: 96,
             right: 0,
             background:
               "linear-gradient(to top, rgba(4,4,8,0.9) 0%, transparent 100%)",
@@ -1181,6 +1187,7 @@ const Home: React.FC = () => {
         }}
         maxWidthClassName="max-w-xl"
         zIndexClassName="z-[160]"
+        className="bg-[#0a0a0c]/95 backdrop-blur-3xl rounded-[32px] p-8 border border-white/10 shadow-2xl"
       >
         <h3 className="text-xl font-bold text-white mb-2">Steam Web API Key</h3>
         <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.5)" }}>
@@ -1192,10 +1199,11 @@ const Home: React.FC = () => {
           value={steamApiKeyInput}
           onChange={(e) => setSteamApiKeyInput(e.target.value)}
           placeholder="Ex: 9A8B7C6D5E4F..."
-          className="w-full h-11 rounded-xl px-4 text-sm text-white outline-none"
+          className="w-full h-11 rounded-xl px-4 text-sm text-white outline-none transition-colors"
           style={{
-            background: "rgba(255,255,255,0.05)",
+            background: "rgba(0,0,0,0.5)",
             border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)"
           }}
           onFocus={(e) =>
             (e.currentTarget.style.borderColor = "rgba(103,182,118,0.5)")
@@ -1212,7 +1220,7 @@ const Home: React.FC = () => {
               setSteamApiKeyModalOpen(false);
             }}
             onMouseEnter={() => playSound("navigate")}
-            variant="secondary"
+            variant="outline"
           >
             Cancelar
           </GlassButton>
@@ -1221,7 +1229,7 @@ const Home: React.FC = () => {
             onClick={handleSaveSteamApiKey}
             onMouseEnter={() => playSound("navigate")}
             disabled={steamApiKeySaving}
-            variant="primary"
+            variant="white"
           >
             {steamApiKeySaving ? "Salvando..." : "Salvar API Key"}
           </GlassButton>
@@ -1269,11 +1277,8 @@ const Home: React.FC = () => {
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
               className="text-center"
             >
-              <div
-                className="w-16 h-16 mx-auto mb-8 rounded-full flex items-center justify-center animate-pulse"
-                style={{ background: "rgba(255,255,255,0.92)" }}
-              >
-                <Sparkles className="w-6 h-6 text-black" />
+              <div className="w-16 h-16 mx-auto mb-8 rounded-full flex items-center justify-center animate-pulse">
+                <Gamepad2 className="w-7 h-7 text-black" />
               </div>
               <h3 className="text-3xl font-black text-white tracking-tighter uppercase mb-4">
                 Encerrando Sessão
@@ -1459,7 +1464,9 @@ const ConfirmationModal: React.FC<{
       playSound("back");
       onClose();
     }}
+    maxWidthClassName="max-w-md"
     zIndexClassName="z-[170]"
+    className="bg-[#0a0a0c]/95 backdrop-blur-3xl rounded-[32px] p-8 border border-white/10 shadow-2xl"
   >
     <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
     <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
@@ -1473,7 +1480,7 @@ const ConfirmationModal: React.FC<{
           onClose();
         }}
         onMouseEnter={() => playSound("navigate")}
-        variant="secondary"
+        variant="outline"
       >
         Cancelar
       </GlassButton>
@@ -1484,7 +1491,7 @@ const ConfirmationModal: React.FC<{
           void onConfirm();
         }}
         onMouseEnter={() => playSound("navigate")}
-        variant="primary"
+        variant="white"
       >
         {confirmLabel}
       </GlassButton>

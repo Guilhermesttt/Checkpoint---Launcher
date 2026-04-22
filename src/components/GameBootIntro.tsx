@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLottie } from "lottie-react";
-import animationData from "../animationData.json";
+import animationData from "../../Scene.json";
 
 interface GameBootIntroProps {
   onFinish?: () => void;
