@@ -18,6 +18,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const steamOpenIdEndpoint = "https://steamcommunity.com/openid/login";
 const pendingStates = new Map();
 
+const appDetailsCache = new Map();
+const achievementsCache = new Map();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hora
+
 const buildReturnTo = (token) =>
   `${process.env.BACKEND_PUBLIC_URL ?? `http://localhost:${port}`}/auth/steam/callback?token=${encodeURIComponent(token)}`;
 
@@ -32,7 +36,6 @@ const normalizeOpenIdBody = (query) => {
   return params;
 };
 
-/** Steam costuma exigir cabeçalho de browser; sem isto a API pode devolver 200 com success:false ou corpo vazio. */
 const steamStoreFetchHeaders = {
   Accept: "application/json",
   "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
@@ -76,8 +79,6 @@ const parseDiskSizeGb = (text) => {
   }
   return null;
 };
-
-
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
@@ -287,11 +288,9 @@ app.get("/api/steam/app-size", async (req, res) => {
       headers: steamStoreFetchHeaders,
     });
     if (!response.ok) {
-      res
-        .status(502)
-        .json({
-          error: `Falha ao consultar detalhes do app (status ${response.status}).`,
-        });
+      res.status(502).json({
+        error: `Falha ao consultar detalhes do app (status ${response.status}).`,
+      });
       return;
     }
 
@@ -312,7 +311,9 @@ app.get("/api/steam/app-size", async (req, res) => {
 
 app.get("/api/steam/achievements", async (req, res) => {
   if (!steamApiKey) {
-    res.status(500).json({ error: "STEAM_API_KEY não configurada no backend." });
+    res
+      .status(500)
+      .json({ error: "STEAM_API_KEY não configurada no backend." });
     return;
   }
 
@@ -324,8 +325,17 @@ app.get("/api/steam/achievements", async (req, res) => {
     return;
   }
 
+  const cacheKey = `${steamId}_${appId}`;
+  const cached = achievementsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    res.json(cached.data);
+    return;
+  }
+
   try {
-    const url = new URL("https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/");
+    const url = new URL(
+      "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/",
+    );
     url.searchParams.set("key", steamApiKey);
     url.searchParams.set("steamid", steamId);
     url.searchParams.set("appid", appId);
@@ -333,25 +343,33 @@ app.get("/api/steam/achievements", async (req, res) => {
 
     const response = await fetch(url.toString());
     if (!response.ok) {
-      // Alguns jogos não têm conquistas, a API retorna 400 ou 404
       if (response.status === 400 || response.status === 404) {
-        res.json({ achievements: [], total: 0, unlocked: 0 });
+        const data = { achievements: [], total: 0, unlocked: 0 };
+        achievementsCache.set(cacheKey, { data, timestamp: Date.now() });
+        res.json(data);
         return;
       }
-      res.status(502).json({ error: `Falha ao consultar conquistas (status ${response.status}).` });
+      res
+        .status(502)
+        .json({
+          error: `Falha ao consultar conquistas (status ${response.status}).`,
+        });
       return;
     }
 
     const payload = await response.json();
     const achievements = payload?.playerstats?.achievements ?? [];
     const total = achievements.length;
-    const unlocked = achievements.filter(a => a.achieved === 1).length;
+    const unlocked = achievements.filter((a) => a.achieved === 1).length;
 
-    res.json({
+    const data = {
       achievements,
       total,
-      unlocked
-    });
+      unlocked,
+    };
+
+    achievementsCache.set(cacheKey, { data, timestamp: Date.now() });
+    res.json(data);
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar conquistas." });
   }
@@ -361,6 +379,12 @@ app.get("/api/steam/app-details", async (req, res) => {
   const appId = String(req.query.appId ?? "").trim();
   if (!/^\d+$/.test(appId)) {
     res.status(400).json({ error: "appId inválido." });
+    return;
+  }
+
+  const cached = appDetailsCache.get(appId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    res.json(cached.data);
     return;
   }
 
@@ -374,14 +398,20 @@ app.get("/api/steam/app-details", async (req, res) => {
       headers: steamStoreFetchHeaders,
     });
     if (!response.ok) {
-      res.status(502).json({ error: `Falha ao consultar detalhes do app (status ${response.status}).` });
+      res
+        .status(502)
+        .json({
+          error: `Falha ao consultar detalhes do app (status ${response.status}).`,
+        });
       return;
     }
 
     const payload = await response.json();
     const appEntry = payload?.[appId];
     if (!appEntry?.success || !appEntry?.data) {
-      res.status(404).json({ error: "Detalhes não encontrados para este appId." });
+      res
+        .status(404)
+        .json({ error: "Detalhes não encontrados para este appId." });
       return;
     }
     const data = appEntry.data;
@@ -389,7 +419,7 @@ app.get("/api/steam/app-details", async (req, res) => {
     const requirements = `${data?.pc_requirements?.minimum ?? ""} ${data?.pc_requirements?.recommended ?? ""}`;
     const trailerUrl = pickSteamTrailerUrl(data?.movies);
 
-    res.json({
+    const result = {
       appId,
       title: data?.name ?? null,
       cardImage: data?.header_image ?? null,
@@ -397,17 +427,30 @@ app.get("/api/steam/app-details", async (req, res) => {
       logoImage: data?.capsule_imagev5 ?? data?.capsule_image ?? null,
       description: data?.short_description ?? null,
       aboutTheGame: data?.about_the_game ?? null,
-      screenshots: Array.isArray(data?.screenshots) ? data.screenshots.map(s => s.path_full) : [],
+      screenshots: Array.isArray(data?.screenshots)
+        ? data.screenshots.map((s) => s.path_full)
+        : [],
       releaseDate: data?.release_date?.date ?? null,
-      developer: Array.isArray(data?.developers) ? data.developers.join(", ") : null,
-      publisher: Array.isArray(data?.publishers) ? data.publishers.join(", ") : null,
+      developer: Array.isArray(data?.developers)
+        ? data.developers.join(", ")
+        : null,
+      publisher: Array.isArray(data?.publishers)
+        ? data.publishers.join(", ")
+        : null,
       tags: [
-        ...(Array.isArray(data?.genres) ? data.genres.map(g => g.description) : []),
-        ...(Array.isArray(data?.categories) ? data.categories.map(c => c.description) : [])
+        ...(Array.isArray(data?.genres)
+          ? data.genres.map((g) => g.description)
+          : []),
+        ...(Array.isArray(data?.categories)
+          ? data.categories.map((c) => c.description)
+          : []),
       ],
       trailerUrl,
       sizeGB: parseDiskSizeGb(requirements),
-    });
+    };
+
+    appDetailsCache.set(appId, { data: result, timestamp: Date.now() });
+    res.json(result);
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar detalhes do jogo." });
   }

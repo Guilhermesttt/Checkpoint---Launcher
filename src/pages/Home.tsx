@@ -595,9 +595,18 @@ const Home: React.FC = () => {
     if (!user?.uid) return;
     playSound("select");
     setSteamConnecting(true);
+
+    notify(
+      "Iniciando conexão com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
+      "info",
+    );
+
     isBackendHealthy().then((h) => {
       if (!h) {
-        notify("Backend Steam offline.", "error");
+        notify(
+          "O servidor Steam demorou demais para responder. Tente novamente em instantes.",
+          "error",
+        );
         setSteamConnecting(false);
         return;
       }
@@ -1203,7 +1212,7 @@ const Home: React.FC = () => {
           style={{
             background: "rgba(0,0,0,0.5)",
             border: "1px solid rgba(255,255,255,0.12)",
-            boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)"
+            boxShadow: "inset 0 2px 4px rgba(0,0,0,0.3)",
           }}
           onFocus={(e) =>
             (e.currentTarget.style.borderColor = "rgba(103,182,118,0.5)")

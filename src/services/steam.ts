@@ -1,14 +1,26 @@
-import { serverTimestamp, writeBatch, getDocs, query, where } from "firebase/firestore";
+import {
+  serverTimestamp,
+  writeBatch,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "../../Firebase";
 import { apiUrl } from "./api";
 import type { Game, SteamOwnedGame } from "../types/domain";
-import { profileDocRef, userGameDocRef, userGamesCollectionRef } from "./firestorePaths";
+import {
+  profileDocRef,
+  userGameDocRef,
+  userGamesCollectionRef,
+} from "./firestorePaths";
 
 // --- FUNÇÃO AUXILIAR PARA CORRIGIR O ERRO ---
 // Remove chaves com valor 'undefined' para não quebrar o Firestore
 const clean = (obj: any) => {
   const newObj = { ...obj };
-  Object.keys(newObj).forEach(key => newObj[key] === undefined && delete newObj[key]);
+  Object.keys(newObj).forEach(
+    (key) => newObj[key] === undefined && delete newObj[key],
+  );
   return newObj;
 };
 
@@ -26,7 +38,8 @@ const buildSteamAssets = (appid: number) => ({
 export const getSteamLinkUrl = (firebaseUid: string) =>
   apiUrl(`/auth/steam/start?state=${encodeURIComponent(firebaseUid)}`);
 
-export const getSteamApiKeyPageUrl = () => "https://steamcommunity.com/dev/apikey";
+export const getSteamApiKeyPageUrl = () =>
+  "https://steamcommunity.com/dev/apikey";
 
 export const isSteamApiKeyConfigured = async () => {
   const response = await fetch(apiUrl("/api/steam/key/status"));
@@ -42,14 +55,20 @@ export const saveSteamApiKey = async (apiKey: string) => {
     body: JSON.stringify({ apiKey }),
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || "Não foi possível salvar a API key da Steam.");
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      body.error || "Não foi possível salvar a API key da Steam.",
+    );
   }
 };
 
 export const fetchSteamAppSizeGB = async (appId: string) => {
   if (!/^\d+$/.test(appId)) return undefined;
-  const response = await fetch(apiUrl(`/api/steam/app-size?appId=${encodeURIComponent(appId)}`));
+  const response = await fetch(
+    apiUrl(`/api/steam/app-size?appId=${encodeURIComponent(appId)}`),
+  );
   if (!response.ok) return undefined;
   const payload = (await response.json()) as { sizeGB?: number | null };
   return typeof payload.sizeGB === "number" ? payload.sizeGB : undefined;
@@ -83,10 +102,14 @@ export const fetchSteamAppDetailsResult = async (
   if (!/^\d+$/.test(appId)) {
     return { ok: false, message: "App ID deve conter só dígitos." };
   }
-  const url = apiUrl(`/api/steam/app-details?appId=${encodeURIComponent(appId)}`);
+  const url = apiUrl(
+    `/api/steam/app-details?appId=${encodeURIComponent(appId)}`,
+  );
   try {
     const response = await fetch(url);
-    const body = (await response.json().catch(() => ({}))) as SteamAppDetails & { error?: string };
+    const body = (await response
+      .json()
+      .catch(() => ({}))) as SteamAppDetails & { error?: string };
     if (!response.ok) {
       const fromApi = typeof body.error === "string" ? body.error : null;
       const message =
@@ -100,7 +123,9 @@ export const fetchSteamAppDetailsResult = async (
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e).toLowerCase();
     const looksLikeNetwork =
-      e instanceof TypeError || msg.includes("failed to fetch") || msg.includes("network");
+      e instanceof TypeError ||
+      msg.includes("failed to fetch") ||
+      msg.includes("network");
     return {
       ok: false,
       message: looksLikeNetwork
@@ -112,27 +137,36 @@ export const fetchSteamAppDetailsResult = async (
   }
 };
 
-export const fetchSteamAchievements = async (steamId: string, appId: string) => {
-  const url = apiUrl(`/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}`);
+export const fetchSteamAchievements = async (
+  steamId: string,
+  appId: string,
+) => {
+  const url = apiUrl(
+    `/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}`,
+  );
   try {
     const response = await fetch(url);
     if (!response.ok) return { total: 0, unlocked: 0 };
     const data = await response.json();
     return {
       total: data.total || 0,
-      unlocked: data.unlocked || 0
+      unlocked: data.unlocked || 0,
     };
   } catch {
     return { total: 0, unlocked: 0 };
   }
 };
 
-export const fetchSteamAppDetails = async (appId: string): Promise<SteamAppDetails | null> => {
+export const fetchSteamAppDetails = async (
+  appId: string,
+): Promise<SteamAppDetails | null> => {
   const r = await fetchSteamAppDetailsResult(appId);
   return r.ok ? r.data : null;
 };
 
-export const fetchSteamLibrary = async (steamId: string): Promise<SteamLibraryResponse> => {
+export const fetchSteamLibrary = async (
+  steamId: string,
+): Promise<SteamLibraryResponse> => {
   const response = await fetch(apiUrl(`/api/steam/library?steamId=${steamId}`));
   if (!response.ok) {
     let message = "Falha ao buscar biblioteca da Steam.";
@@ -147,17 +181,20 @@ export const fetchSteamLibrary = async (steamId: string): Promise<SteamLibraryRe
   return (await response.json()) as SteamLibraryResponse;
 };
 
-export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) => {
+export const syncSteamLibraryToFirestore = async (
+  uid: string,
+  steamId: string,
+) => {
   const payload = await fetchSteamLibrary(steamId);
   const batch = writeBatch(db);
 
   // 1. Mapear jogos existentes para evitar duplicatas e atualizar os manuais
   const existingGamesSnap = await getDocs(
-    query(userGamesCollectionRef(uid), where("steamAppId", "!=", ""))
+    query(userGamesCollectionRef(uid), where("steamAppId", "!=", "")),
   );
-  
+
   const appIdToDocId = new Map<string, string>();
-  existingGamesSnap.docs.forEach(doc => {
+  existingGamesSnap.docs.forEach((doc) => {
     const data = doc.data() as Game;
     if (data.steamAppId) {
       appIdToDocId.set(String(data.steamAppId), doc.id);
@@ -165,27 +202,34 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
   });
 
   const detailsCache = new Map<string, SteamAppDetails | null>();
-  const achievementsCache = new Map<string, { total: number; unlocked: number } | null>();
+  const achievementsCache = new Map<
+    string,
+    { total: number; unlocked: number } | null
+  >();
 
-  // Limita a busca de detalhes para os primeiros 80 jogos para evitar timeout/rate limit
-  await Promise.all(
-    payload.games.slice(0, 80).map(async (owned) => {
-      const appId = String(owned.appid);
-      const [details, achievements] = await Promise.all([
-        fetchSteamAppDetails(appId).catch(() => null),
-        fetchSteamAchievements(steamId, appId).catch(() => null)
-      ]);
-      detailsCache.set(appId, details);
-      achievementsCache.set(appId, achievements);
-    }),
-  );
+  const gamesToSync = payload.games.slice(0, 80);
+  const CHUNK_SIZE = 10;
+
+  for (let i = 0; i < gamesToSync.length; i += CHUNK_SIZE) {
+    const chunk = gamesToSync.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map(async (owned) => {
+        const appId = String(owned.appid);
+        const [details, achievements] = await Promise.all([
+          fetchSteamAppDetails(appId).catch(() => null),
+          fetchSteamAchievements(steamId, appId).catch(() => null),
+        ]);
+        detailsCache.set(appId, details);
+        achievementsCache.set(appId, achievements);
+      }),
+    );
+  }
 
   payload.games.forEach((owned) => {
     const appIdStr = String(owned.appid);
-    // Se já existir um documento com esse AppID (mesmo que com ID aleatório), usamos ele.
     const existingDocId = appIdToDocId.get(appIdStr);
     const id = existingDocId || `${uid}_steam_${owned.appid}`;
-    
+
     const assets = buildSteamAssets(owned.appid);
     const details = detailsCache.get(appIdStr);
     const achievements = achievementsCache.get(appIdStr);
@@ -199,7 +243,7 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
       image: details?.backgroundImage || assets.image,
       backgroundImage: details?.backgroundImage || assets.image,
       cardImage: details?.cardImage || assets.cardImage,
-      logoImage: details?.logoImage || "", 
+      logoImage: details?.logoImage || "",
       category: "STEAM",
       description: resolvedDescription,
       aboutTheGame: details?.aboutTheGame || details?.description || "",
@@ -211,7 +255,7 @@ export const syncSteamLibraryToFirestore = async (uid: string, steamId: string) 
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
       totalAchievements: achievements?.total || 0,
       completedAchievements: achievements?.unlocked || 0,
-      trailerUrl: details?.trailerUrl || "", 
+      trailerUrl: details?.trailerUrl || "",
       screenshots: details?.screenshots || [],
       releaseDate: details?.releaseDate || "",
       developer: details?.developer || "",

@@ -7,6 +7,7 @@ import AsyncLoader from "./components/AsyncLoader";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { NotificationProvider } from "./components/NotificationCenter";
 import MainVideoBackground from "./components/MainVideoBackground";
+import { isBackendHealthy } from "./services/api";
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
@@ -15,6 +16,8 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     if (loading) return;
     const currentUid = user?.uid ?? null;
+
+    isBackendHealthy().catch(() => {});
 
     if (!currentUid) {
       sessionStorage.removeItem("hasSeenIntro");
