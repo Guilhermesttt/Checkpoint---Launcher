@@ -1,0 +1,824 @@
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Play, Clock, HardDrive, Package, Users, Trophy, Camera } from "lucide-react";
+import { updateDoc } from "firebase/firestore";
+import { launchGame } from "../services/launcher";
+import type { Game } from "../types/domain";
+import ModalShell from "./ui/ModalShell";
+import GlassButton from "./ui/GlassButton";
+import { useAuth } from "../auth/AuthProvider";
+import { usePreferences } from "../context/PreferencesContext";
+import { userGameDocRef } from "../services/firestorePaths";
+
+interface GameDetailPanelProps {
+  game: Game | null;
+  isOpen: boolean;
+  onClose: () => void;
+  playSound: (type: "select" | "back" | "navigate" | "play") => void;
+}
+
+const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
+  game,
+  isOpen,
+  onClose,
+  playSound,
+}) => {
+  const { user } = useAuth();
+  const { t } = usePreferences();
+  const [isLaunching, setIsLaunching] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState("JOGAR");
+  const [launchError, setLaunchError] = React.useState<string | null>(null);
+  const [galleryModalOpen, setGalleryModalOpen] = React.useState(false);
+  const [currentGalleryIndex, setCurrentGalleryIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    setActiveTab("JOGAR");
+    setLaunchError(null);
+    setGalleryModalOpen(false);
+    setCurrentGalleryIndex(0);
+  }, [game?.id]);
+
+  if (!game) return null;
+
+  const heroImage = game.backgroundImage || game.image;
+  const coverImage = game.cardImage || game.image || game.backgroundImage;
+  const achievementsTotal = game.totalAchievements ?? 0;
+  const achievementsDone = game.completedAchievements ?? 0;
+  const achievementPercent =
+    achievementsTotal > 0
+      ? Math.round((achievementsDone / achievementsTotal) * 100)
+      : 0;
+
+  const formatHours = (hours: number = 0) => {
+    const h = Math.floor(hours);
+    const m = Math.floor((hours - h) * 60);
+    return `${h}H ${m}M`;
+  };
+
+  const handleLaunch = () => {
+    if (isLaunching) return;
+
+    setIsLaunching(true);
+    setLaunchError(null);
+    playSound("play");
+    window.dispatchEvent(new Event("checkpoint:game-launch"));
+    setTimeout(async () => {
+      try {
+        if (user?.uid) {
+          await updateDoc(userGameDocRef(user.uid, game.id), {
+            lastPlayedAt: new Date().toISOString(),
+          }).catch(() => {
+            return;
+          });
+        }
+        await launchGame(game);
+      } catch (error) {
+        setLaunchError(
+          error instanceof Error ? error.message : "Falha ao iniciar o jogo.",
+        );
+      } finally {
+        setIsLaunching(false);
+      }
+    }, 2200);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[100] flex"
+        >
+          {/* Background Image - Full Screen */}
+          <motion.div
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 1.1, opacity: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute inset-0"
+          >
+            <img
+              src={heroImage}
+              alt={game.title}
+              className="w-full h-full object-cover"
+              loading="eager"
+              decoding="async"
+            />
+            {/* Cinematic Gradients */}
+            <div className="absolute inset-0 bg-linear-to-r from-[#050507] via-[#050507]/70 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-[#050507]/90 via-transparent to-[#050507]/30" />
+          </motion.div>
+
+          {/* Content Container */}
+            <div className="relative z-10 grid w-full h-full grid-cols-[minmax(560px,720px)_1fr] gap-8">
+            {/* Left Panel - Game Info (PS5 Style) */}
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -40 }}
+              transition={{
+                duration: 0.6,
+                delay: 0.2,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="m-8 mr-0 rounded-[32px] border border-white/10 bg-black/35 backdrop-blur-3xl shadow-2xl p-8 flex flex-col justify-center h-[calc(100dvh-4rem)]"
+            >
+              {/* Navigation Tabs */}
+              <div className="flex items-center gap-1 mb-7">
+                <NavTab
+                  icon="◀"
+                  onClick={() => {
+                    playSound("back");
+                    onClose();
+                  }}
+                />
+                <NavTab
+                  label="JOGAR"
+                  active={activeTab === "JOGAR"}
+                  onClick={() => {
+                    setActiveTab("JOGAR");
+                    playSound("navigate");
+                  }}
+                />
+                <NavTab
+                  label="SOBRE"
+                  active={activeTab === "SOBRE"}
+                  onClick={() => {
+                    setActiveTab("SOBRE");
+                    playSound("navigate");
+                  }}
+                />
+                <NavTab
+                  label="MÍDIA"
+                  active={activeTab === "MÍDIA"}
+                  onClick={() => {
+                    setActiveTab("MÍDIA");
+                    playSound("navigate");
+                  }}
+                />
+                <NavTab
+                  label="GERENCIAR"
+                  active={activeTab === "GERENCIAR"}
+                  onClick={() => {
+                    setActiveTab("GERENCIAR");
+                    playSound("navigate");
+                  }}
+                />
+              </div>
+
+              {/* Platform Badge */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex items-center gap-2 mb-4"
+              >
+                <span className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase">
+                  {game.launcherType === "steam" ? "Steam" : "PC Local"}
+                </span>
+                <span className="h-1 w-1 rounded-full bg-white/20" />
+                <span className="text-[10px] font-bold tracking-[0.3em] text-white/30 uppercase">
+                  {game.category || "Biblioteca"}
+                </span>
+              </motion.div>
+
+              {/* Game Title */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+              >
+                {game.logoImage ? (
+                  <img
+                    src={game.logoImage}
+                    alt={game.title}
+                    className="max-h-24 max-w-[520px] object-contain object-left mb-7 drop-shadow-2xl"
+                  />
+                ) : (
+                  <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-7 leading-[0.95]">
+                    {game.title}
+                  </h1>
+                )}
+              </motion.div>
+
+              {/* Stats Row */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8"
+              >
+                <StatItem
+                  icon={<Clock className="w-4 h-4" />}
+                  label="TEMPO JOGADO"
+                  value={formatHours(game.hoursPlayed)}
+                />
+                <StatItem
+                  icon={<HardDrive className="w-4 h-4" />}
+                  label="ESPAÇO"
+                  value={
+                    game.sizeGB && game.sizeGB > 0
+                      ? `${game.sizeGB} GB`
+                      : "--- GB"
+                  }
+                />
+                <StatItem
+                  icon={<Package className="w-4 h-4" />}
+                  label="ADICIONAIS"
+                  value="FREE"
+                />
+                <StatItem
+                  icon={<Users className="w-4 h-4" />}
+                  label="ESTADO"
+                  value="INSTALADO"
+                />
+              </motion.div>
+
+              {/* Dynamic Content based on Active Tab */}
+              <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar pr-4 -mr-4 pb-4">
+                <AnimatePresence mode="wait">
+                  {activeTab === "JOGAR" && (
+                    <motion.div
+                      key="play-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="flex flex-col gap-8 pb-12"
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, y: 30 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: false, amount: 0.2 }}
+                      >
+                        <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
+                          Dados da Sessão
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <InfoCard
+                            label="Plataforma"
+                            value={
+                              game.launcherType === "steam" ? "Steam" : "Local"
+                            }
+                          />
+                          <InfoCard
+                            label="App ID"
+                            value={game.steamAppId || "---"}
+                          />
+                          <InfoCard
+                            label="Fonte"
+                            value={
+                              game.source === "steam" ? "Sync Steam" : "Manual"
+                            }
+                          />
+                        </div>
+                      </motion.div>
+
+                      {/* Grid for Achievements Summary & Captures */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Mock Achievements Summary */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: false, amount: 0.2 }}
+                        >
+                          <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4 flex items-center gap-2">
+                            <Trophy className="w-3 h-3" /> Conquistas
+                          </h3>
+                          <div className="p-4 rounded-xl premium-glass flex items-center gap-5 group cursor-pointer hover:bg-white/10 transition-colors h-[120px]">
+                            <div className="w-14 h-14 rounded-full premium-glass-white flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform">
+                              <Trophy className="w-6 h-6 text-black group-hover:text-black/70 transition-colors" />
+                            </div>
+                            <div className="flex flex-col w-full">
+                              <span className="text-2xl font-light text-white leading-none mb-2">
+                                {game.completedAchievements ?? 0}{" "}
+                                <span className="text-sm text-white/40">
+                                  / {game.totalAchievements ?? 0}
+                                </span>
+                              </span>
+                              <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                                <motion.div
+                                  initial={{ width: 0 }}
+                                  animate={{
+                                    width:
+                                      game.totalAchievements && game.totalAchievements > 0
+                                        ? `${(game.completedAchievements! / game.totalAchievements) * 100}%`
+                                        : "0%",
+                                  }}
+                                  transition={{ duration: 1, ease: "easeOut" }}
+                                  className="h-full bg-white rounded-full"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        {/* Capturas */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: false, amount: 0.2 }}
+                        >
+                          <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4 flex items-center gap-2">
+                            <Camera className="w-3 h-3" /> Capturas Recentes
+                          </h3>
+                          {game.screenshots && game.screenshots.length > 0 ? (
+                            <div onClick={() => { setGalleryModalOpen(true); setCurrentGalleryIndex(0); playSound("select"); }} className="rounded-xl overflow-hidden ring-1 ring-white/10 relative group cursor-pointer h-[120px]">
+                              <img src={game.screenshots[game.screenshots.length - 1]} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105 will-change-transform" />
+                              <div className="absolute inset-0 bg-linear-to-t from-[#050507]/90 via-transparent to-transparent flex items-end p-4 opacity-100 group-hover:opacity-0 transition-opacity duration-300">
+                                <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2"><Camera className="w-3 h-3" /> Ver Galeria</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-xl premium-glass flex flex-col items-center justify-center gap-2 text-white/30 h-[120px]">
+                              <Camera className="w-6 h-6 opacity-50" />
+                              <span className="text-[10px] uppercase tracking-widest font-bold">Nenhuma captura</span>
+                            </div>
+                          )}
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "SOBRE" && (
+                    <motion.div
+                      key="about-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="max-w-xl"
+                    >
+                      <div className="flex flex-col gap-6">
+                        <motion.div
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: false, amount: 0.05 }}
+                          transition={{
+                            duration: 0.6,
+                            ease: [0.16, 1, 0.3, 1],
+                          }}
+                        >
+                          <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
+                            Sobre
+                          </h3>
+                          <div
+                            className="text-white/70 leading-relaxed text-sm prose prose-invert prose-p:my-0 pb-2"
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                game.aboutTheGame ||
+                                game.description ||
+                                "Sem descrição disponível para este jogo.",
+                            }}
+                          />
+                        </motion.div>
+
+                        <motion.div
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: false, amount: 0.2 }}
+                          transition={{
+                            duration: 0.6,
+                            ease: [0.16, 1, 0.3, 1],
+                          }}
+                          className="grid grid-cols-2 gap-y-6 gap-x-12 pt-6 border-t border-white/5"
+                        >
+                          <TechnicalDetail
+                            label="Desenvolvedor"
+                            value={game.developer}
+                          />
+                          <TechnicalDetail
+                            label="Distribuidora"
+                            value={game.publisher}
+                          />
+                          <TechnicalDetail
+                            label="Data de Lançamento"
+                            value={game.releaseDate}
+                          />
+                          <TechnicalDetail
+                            label="Categoria"
+                            value={game.category}
+                          />
+                        </motion.div>
+
+                        {game.tags && game.tags.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: false, amount: 0.2 }}
+                            transition={{
+                              duration: 0.6,
+                              ease: [0.16, 1, 0.3, 1],
+                            }}
+                          >
+                            <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-3">
+                              Marcadores Populares
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                              {game.tags.slice(0, 10).map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-[10px] text-white/60"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "MÍDIA" && (
+                    <motion.div
+                      key="media-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                    >
+                      <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
+                        Mídia
+                      </h3>
+                      <div className="flex flex-col gap-4">
+                        {game.trailerUrl && (
+                          <div className="aspect-16/9 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-black/40">
+                            <video
+                              key={game.trailerUrl}
+                              src={game.trailerUrl}
+                              className="w-full h-full object-cover"
+                              controls
+                              preload="metadata"
+                            />
+                          </div>
+                        )}
+
+                        {game.screenshots && game.screenshots.length > 0 && (
+                          <div className="flex flex-col gap-8 pb-12 pt-4">
+                            {game.screenshots.map((url, i) => (
+                              <motion.div
+                                key={i}
+                                initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                                whileInView={{ opacity: 1, scale: 1, y: 0 }}
+                                viewport={{ once: false, amount: 0.2 }}
+                                transition={{
+                                  duration: 0.6,
+                                  ease: [0.16, 1, 0.3, 1],
+                                }}
+                                className="w-full aspect-16/9 rounded-2xl overflow-hidden ring-1 ring-white/10 shrink-0 bg-white/5"
+                              >
+                                <img
+                                  src={url}
+                                  alt={`Screenshot ${i}`}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                />
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
+
+                        {!game.trailerUrl &&
+                          (!game.screenshots ||
+                            game.screenshots.length === 0) && (
+                            <div className="aspect-16/9 rounded-2xl overflow-hidden ring-1 ring-white/10 bg-white/5 flex items-center justify-center">
+                              <img
+                                src={heroImage}
+                                alt={game.title}
+                                className="w-full h-full object-cover blur-sm opacity-50"
+                              />
+                              <p className="absolute text-white/30 text-xs uppercase tracking-widest font-black">
+                                Nenhuma mídia adicional
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === "GERENCIAR" && (
+                    <motion.div
+                      key="mgmt-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                    >
+                      <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
+                        Gerenciamento
+                      </h3>
+                      <div className="p-4 rounded-xl premium-glass flex items-center justify-between mb-4">
+                        <span className="text-white/60 text-xs truncate max-w-sm">
+                          {game.executablePath}
+                        </span>
+                        <button className="text-[10px] font-bold text-white uppercase tracking-widest pl-4 hover:text-white/70 transition-colors">
+                          Verificar
+                        </button>
+                      </div>
+                      <div className="flex gap-4">
+                        <button className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest">
+                          Criar Atalho
+                        </button>
+                        <button className="px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-400/60 hover:text-red-400 hover:bg-red-500/20 transition-all uppercase tracking-widest">
+                          Remover
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+
+            {/* Right Panel - Actions */}
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 40 }}
+              transition={{
+                duration: 0.6,
+                delay: 0.3,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="flex flex-col justify-end items-end p-8 pl-0"
+            >
+              <div className="w-[260px] rounded-[28px] overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
+                <div className="aspect-[3/4] bg-white/5">
+                  <img
+                    src={coverImage}
+                    alt={game.title}
+                    className="h-full w-full object-cover"
+                    loading="eager"
+                    decoding="async"
+                  />
+                </div>
+                <div className="p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35 mb-1">
+                    Última sessão
+                  </p>
+                  <p className="text-sm font-semibold text-white/80">
+                    {game.lastPlayedAt
+                      ? new Date(game.lastPlayedAt).toLocaleDateString("pt-BR")
+                      : "Ainda não iniciado"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Trophy Progress */}
+              <div className="premium-glass-black rounded-2xl p-6 mb-5 w-[260px] border border-white/10">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-bold tracking-[0.2em] text-white/50 uppercase">
+                    Conquistas
+                  </span>
+                  <span className="text-2xl font-light text-white">
+                    {achievementPercent}%
+                  </span>
+                </div>
+                <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${achievementPercent}%` }}
+                    transition={{
+                      duration: 1,
+                      delay: 0.5,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                    className="h-full bg-white rounded-full"
+                  />
+                </div>
+              </div>
+
+              {/* Start Game Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleLaunch}
+                disabled={isLaunching}
+                className="rounded-2xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500"
+                style={{
+                  background: "var(--game-color, #ffffff)",
+                  boxShadow: "0 8px 32px var(--game-color, transparent)"
+                }}
+              >
+                <span className="text-sm font-black tracking-[0.15em] uppercase transition-colors" style={{ color: "var(--game-text-color, #000)" }}>
+                  {isLaunching ? t("launching") : t("play")}
+                </span>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
+                  <Play
+                    className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
+                    style={{ color: "var(--game-text-color, #000)", fill: "var(--game-text-color, #000)" }}
+                  />
+                </div>
+              </motion.button>
+              {launchError && (
+                <p className="mt-3 text-xs text-amber-300/90 max-w-[260px] text-right">
+                  {launchError}
+                </p>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-8 right-8 z-20 p-4 premium-glass rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Gallery Modal Overlay */}
+          <ModalShell
+            isOpen={Boolean(galleryModalOpen && game.screenshots && game.screenshots.length > 0)}
+            onClose={() => {
+              setGalleryModalOpen(false);
+              playSound("back");
+            }}
+            maxWidthClassName="max-w-5xl"
+            className="p-0 bg-transparent border-0 shadow-none"
+            backdropClassName="bg-black/90"
+            zIndexClassName="z-[150]"
+            reducedEffects
+          >
+            <div className="relative">
+              <div className="absolute top-4 left-6 z-10">
+                <span className="text-[10px] font-bold tracking-[0.3em] text-white/50 uppercase">
+                  GALERIA ({currentGalleryIndex + 1}/{game.screenshots?.length ?? 0})
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setGalleryModalOpen(false);
+                  playSound("back");
+                }}
+                className="absolute top-3 right-4 z-10 p-3 premium-glass rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="w-full aspect-video px-4 md:px-0">
+                <AnimatePresence mode="wait">
+                  <motion.img
+                    key={currentGalleryIndex}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.1 }}
+                    transition={{ duration: 0.3 }}
+                    src={game.screenshots?.[currentGalleryIndex]}
+                    alt="Screenshot"
+                    className="w-full h-full object-contain rounded-xl overflow-hidden drop-shadow-2xl"
+                  />
+                </AnimatePresence>
+              </div>
+
+              <div className="flex gap-4 mt-6 justify-center pb-2">
+                <GlassButton
+                  type="button"
+                  onClick={() => {
+                    setCurrentGalleryIndex((c) =>
+                      c > 0 ? c - 1 : (game.screenshots?.length ?? 1) - 1,
+                    );
+                    playSound("navigate");
+                  }}
+                >
+                  ◀ Anterior
+                </GlassButton>
+                <GlassButton
+                  type="button"
+                  onClick={() => {
+                    setCurrentGalleryIndex((c) =>
+                      c < (game.screenshots?.length ?? 1) - 1 ? c + 1 : 0,
+                    );
+                    playSound("navigate");
+                  }}
+                >
+                  Próximo ▶
+                </GlassButton>
+              </div>
+            </div>
+          </ModalShell>
+
+          {/* Launching Cinematic Overlay */}
+          <AnimatePresence>
+            {isLaunching && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-200 bg-black flex flex-col items-center justify-center"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                  className="relative w-full h-full"
+                >
+                  <img
+                    src={heroImage}
+                    alt={game.title}
+                    className="w-full h-full object-cover scale-110 blur-sm brightness-50"
+                    loading="eager"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <motion.div
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-center"
+                    >
+                      <h2 className="text-4xl font-light tracking-[0.2em] text-white/90 uppercase mb-4">
+                        {game.title}
+                      </h2>
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-white/40 animate-bounce [animation-delay:-0.3s]" />
+                        <div className="w-2 h-2 rounded-full bg-white/40 animate-bounce [animation-delay:-0.15s]" />
+                        <div className="w-2 h-2 rounded-full bg-white/40 animate-bounce" />
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+
+                {/* Signature PS5 Transition Stripe */}
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ duration: 2, ease: "easeInOut" }}
+                  className="absolute bottom-0 left-0 right-0 h-1 bg-linear-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+// Sub-components
+const NavTab: React.FC<{
+  label?: string;
+  icon?: string;
+  active?: boolean;
+  badge?: boolean;
+  onClick?: () => void;
+}> = ({ label, icon, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`
+      px-4 py-2 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase
+      transition-all duration-300 flex items-center gap-1
+      ${
+        active
+          ? "premium-glass-white text-black"
+          : "text-white/40 hover:text-white/70 hover:bg-white/10"
+      }
+    `}
+  >
+    {icon && <span className="text-xs">{icon}</span>}
+    {label}
+  </button>
+);
+
+const StatItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}> = ({ icon, label, value }) => (
+  <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 min-h-[94px] flex flex-col justify-between">
+    <div className="flex items-center gap-2 text-white/40">
+      {icon}
+      <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
+        {label}
+      </span>
+    </div>
+    <span className="text-xl font-semibold text-white tracking-tight truncate">
+      {value}
+    </span>
+  </div>
+);
+
+const InfoCard: React.FC<{ label: string; value: string }> = ({
+  label,
+  value,
+}) => (
+  <div className="p-4 rounded-xl premium-glass">
+    <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">
+      {label}
+    </span>
+    <span className="text-white text-xs">{value}</span>
+  </div>
+);
+
+const TechnicalDetail: React.FC<{ label: string; value?: string }> = ({
+  label,
+  value,
+}) => (
+  <div>
+    <span className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5">
+      {label}
+    </span>
+    <span className="text-white/80 text-sm font-medium">
+      {value || "Não informado"}
+    </span>
+  </div>
+);
+
+export default GameDetailPanel;
