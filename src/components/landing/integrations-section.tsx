@@ -14,8 +14,7 @@ const integrations = [
     name: "Epic Games",
     image: "/Epic-Games-Logo.png",
     description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
-    color: "from-zinc-500/10",
-    iconColor: "text-white",
+
   },
   {
     name: "Jogos Locais",
@@ -101,7 +100,7 @@ export function IntegrationsSection() {
                     <img
                       src={integration.image}
                       alt={integration.name}
-                      className="h-16 w-16 object-contain"
+                      className="h-20 w-20 object-contain"
                     />
                   ) : (
                     <img src="/Checkpoint_Logo.png" alt="" className="h-16 w-16 object-contain opacity-80" />
