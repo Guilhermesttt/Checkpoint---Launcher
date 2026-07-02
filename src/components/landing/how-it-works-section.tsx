@@ -6,18 +6,18 @@ const steps = [
     title: "Conecte",
     subtitle: "sua conta",
     description: "Entre com Google e vincule sua conta Steam. O Checkpoint importa toda sua biblioteca automaticamente.",
-    code: `// AutenticaÃ§Ã£o simples
+    code: `// Autenticação simples
 await signInWithGoogle();
 await linkSteamAccount(steamId);
 
 // Biblioteca sincronizada!
-// 247 jogos importados âœ“`,
+// 247 jogos importados`,
   },
   {
     number: "02",
     title: "Organize",
     subtitle: "seus jogos",
-    description: "Categorize por gÃªnero, adicione jogos locais, marque favoritos e personalize com imagens da Steam.",
+    description: "Categorize por gênero, adicione jogos locais, marque favoritos e personalize com imagens da Steam.",
     code: `// Adicione jogos locais
 await addGame({
   title: "Meu Jogo",
@@ -31,12 +31,12 @@ await addGame({
     title: "Jogue",
     subtitle: "& acompanhe",
     description: "Lance qualquer jogo com um clique. Acompanhe horas jogadas, conquistas e mantenha tudo sincronizado na nuvem.",
-    code: `// LanÃ§amento instantÃ¢neo
+    code: `// Lançamento instantâneo
 await launchGame(game);
 
-// EstatÃ­sticas automÃ¡ticas
+// Estatísticas automáticas
 // Horas jogadas: 142h 30m
-// Conquistas: 47/80 âœ“`,
+// Conquistas: 47/80`,
   },
 ];
 

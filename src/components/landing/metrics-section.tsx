@@ -1,10 +1,10 @@
 ﻿import { useEffect, useRef, useState } from "react";
 
 const metrics = [
-  { value: "10k+", label: "Jogadores ativos", sublabel: "e crescendo todo mÃªs" },
+  { value: "10k+", label: "Jogadores ativos", sublabel: "e crescendo todo mês" },
   { value: "50k+", label: "Jogos catalogados", sublabel: "via Steam + locais" },
   { value: "99.9%", label: "Uptime Firebase", sublabel: "disponibilidade garantida" },
-  { value: "4.9â˜…", label: "AvaliaÃ§Ã£o mÃ©dia", sublabel: "dos usuÃ¡rios" },
+  { value: "4.9★", label: "Avaliação média", sublabel: "dos usuários" },
 ];
 
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -61,7 +61,7 @@ export function MetricsSection() {
         <div className="text-center mb-16">
           <span className="inline-flex items-center gap-3 text-sm font-mono text-background/50 mb-6">
             <span className="w-12 h-px bg-background/30" />
-            NÃºmeros Reais
+            Números Reais
             <span className="w-12 h-px bg-background/30" />
           </span>
           <h2 className={`text-5xl md:text-6xl font-display tracking-tight transition-all duration-1000 ${
@@ -94,7 +94,7 @@ export function MetricsSection() {
             "O Checkpoint mudou completamente como gerencio minha biblioteca. Nunca mais vou usar outro launcher."
           </blockquote>
           <cite className="mt-6 block text-sm font-mono text-background/40 not-italic">
-            â€” Guilherme S., jogador hÃ¡ 12 anos
+            - Guilherme S., jogador há 12 anos
           </cite>
         </div>
       </div>

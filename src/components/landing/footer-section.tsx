@@ -1,5 +1,3 @@
-﻿import { Gamepad2 } from "lucide-react";
-
 export function FooterSection() {
   return (
     <footer className="relative bg-black text-white">
@@ -8,7 +6,7 @@ export function FooterSection() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.06),transparent_70%)]" />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
-            <Gamepad2 className="w-12 h-12 text-white/10 mx-auto mb-3" />
+            <img src="/Checkpoint_Logo.png" alt="" className="w-12 h-12 object-contain opacity-10 mx-auto mb-3" />
             <div className="text-4xl font-display text-white/10 tracking-tight">
               CHECKPOINT
             </div>
@@ -19,12 +17,12 @@ export function FooterSection() {
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="py-12 flex flex-col md:flex-row items-center justify-between gap-6">
           <a href="#" className="inline-flex items-center gap-2">
-            <Gamepad2 className="w-6 h-6 text-white/70" />
+            <img src="/Checkpoint_Logo.png" alt="" className="w-6 h-6 object-contain opacity-70" />
             <span className="text-xl font-display text-white">CHECKPOINT</span>
           </a>
 
           <p className="text-sm text-white/30 text-center">
-            Â© 2025 Checkpoint. Feito com â¤ï¸ por gamers, para gamers.
+            © 2025 Checkpoint. Feito por gamers, para gamers.
           </p>
 
           <div className="flex items-center gap-4 text-sm text-white/30">

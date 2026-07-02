@@ -10,12 +10,12 @@ const pillars = [
   {
     icon: HardDrive,
     title: "Armazenamento Local",
-    description: "ConfiguraÃ§Ãµes e cache mantidos localmente para acesso offline rÃ¡pido.",
+    description: "Configurações e cache mantidos localmente para acesso offline rápido.",
   },
   {
     icon: Cpu,
-    title: "Leve & RÃ¡pido",
-    description: "Zero dependÃªncias pesadas. Carrega em menos de 2 segundos, sempre.",
+    title: "Leve & Rápido",
+    description: "Zero dependências pesadas. Carrega em menos de 2 segundos, sempre.",
   },
   {
     icon: Wifi,
@@ -49,13 +49,13 @@ export function InfrastructureSection() {
             <h2 className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.9] mb-8 transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}>
-              ConstruÃ­do para<br />
+              Construído para<br />
               <span className="text-muted-foreground">durar.</span>
             </h2>
             <p className={`text-lg text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}>
-              Tecnologia moderna com foco em performance e confiabilidade. React + Vite + Firebase â€” stack battle-tested por milhÃµes.
+              Tecnologia moderna com foco em performance e confiabilidade. React + Vite + Firebase - stack testada por milhões.
             </p>
 
             <div className={`flex flex-wrap gap-3 mt-8 transition-all duration-1000 delay-300 ${isVisible ? "opacity-100" : "opacity-0"}`}>
@@ -97,9 +97,9 @@ export function InfrastructureSection() {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl border border-foreground/20 bg-foreground/5 flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">ðŸ‘¤</span>
+                <span className="text-sm font-display">USER</span>
               </div>
-              <span className="text-xs font-mono text-muted-foreground">VocÃª</span>
+              <span className="text-xs font-mono text-muted-foreground">Você</span>
             </div>
 
             <div className="flex-1 h-px border-t border-dashed border-foreground/20 hidden lg:block" />
@@ -115,10 +115,10 @@ export function InfrastructureSection() {
 
             <div className="grid grid-cols-2 gap-3">
               {[
-                { emoji: "ðŸŽ®", label: "Steam" },
-                { emoji: "ðŸ”¥", label: "Firebase" },
-                { emoji: "ðŸ–¥ï¸", label: "Local Games" },
-                { emoji: "â˜ï¸", label: "Cloud Sync" },
+                { emoji: "ST", label: "Steam" },
+                { emoji: "FB", label: "Firebase" },
+                { emoji: "PC", label: "Local Games" },
+                { emoji: "CS", label: "Cloud Sync" },
               ].map((s) => (
                 <div key={s.label} className="text-center">
                   <div className="w-12 h-12 rounded-xl border border-foreground/20 bg-foreground/5 flex items-center justify-center mx-auto mb-1">

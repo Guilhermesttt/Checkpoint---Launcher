@@ -3,33 +3,33 @@ import { Check } from "lucide-react";
 
 const plans = [
   {
-    name: "GrÃ¡tis",
-    description: "Para quem quer comeÃ§ar agora",
+    name: "Grátis",
+    description: "Para quem quer começar agora",
     price: "R$ 0",
     period: "para sempre",
     features: [
       "Biblioteca ilimitada",
-      "IntegraÃ§Ã£o Steam",
+      "Integração Steam",
       "Jogos locais",
       "Interface premium",
       "Sync na nuvem",
       "Suporte da comunidade",
     ],
-    cta: "ComeÃ§ar Agora",
+    cta: "Começar Agora",
     href: "/login",
     highlight: false,
   },
   {
     name: "Pro",
-    description: "Para jogadores sÃ©rios",
+    description: "Para jogadores sérios",
     price: "Em breve",
     period: "",
     features: [
-      "Tudo do GrÃ¡tis",
-      "EstatÃ­sticas avanÃ§adas",
-      "Backup automÃ¡tico",
+      "Tudo do Grátis",
+      "Estatísticas avançadas",
+      "Backup automático",
       "Temas personalizados",
-      "Suporte prioritÃ¡rio",
+      "Suporte prioritário",
       "Acesso antecipado a novidades",
     ],
     cta: "Entrar na lista de espera",
@@ -73,7 +73,7 @@ export function PricingSection() {
             <p className={`text-lg text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
               isVisible ? "opacity-100" : "opacity-0"
             }`}>
-              O Checkpoint Ã© e sempre serÃ¡ gratuito para uso bÃ¡sico. Funcionalidades avanÃ§adas chegam em breve.
+              O Checkpoint é e sempre será gratuito para uso básico. Funcionalidades avançadas chegam em breve.
             </p>
           </div>
         </div>

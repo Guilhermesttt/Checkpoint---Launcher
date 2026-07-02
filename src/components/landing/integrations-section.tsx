@@ -100,7 +100,7 @@ export function IntegrationsSection() {
                     <img
                       src={integration.image}
                       alt={integration.name}
-                      className="h-20 w-20 object-contain"
+                      className="h-15 w-15 object-contain"
                     />
                   ) : (
                     <img src="/Checkpoint_Logo.png" alt="" className="h-16 w-16 object-contain opacity-80" />

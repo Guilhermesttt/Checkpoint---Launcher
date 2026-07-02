@@ -4,27 +4,27 @@ import { Shield, Lock, Eye, Database } from "lucide-react";
 const securityPoints = [
   {
     icon: Lock,
-    title: "Autenticacao Firebase",
+    title: "Autenticação Firebase",
     description:
-      "Login com Firebase Auth usando Google ou e-mail/senha. Cada usuario acessa apenas os proprios dados.",
+      "Login com Firebase Auth usando Google ou e-mail/senha. Cada usuário acessa apenas os próprios dados.",
   },
   {
     icon: Eye,
-    title: "Importacao com Consentimento",
+    title: "Importação com Consentimento",
     description:
-      "Sua biblioteca Steam so e importada quando voce conecta a conta e inicia a sincronizacao.",
+      "Sua biblioteca Steam só é importada quando você conecta a conta e inicia a sincronização.",
   },
   {
     icon: Database,
     title: "Chaves no Backend",
     description:
-      "A chave da Steam fica no servidor. O usuario nao precisa criar, informar ou salvar uma API key.",
+      "A chave da Steam fica no servidor. O usuário não precisa criar, informar ou salvar uma API key.",
   },
   {
     icon: Shield,
     title: "Open Source Friendly",
     description:
-      "Codigo auditavel e transparencia sobre como seus dados sao usados.",
+      "Código auditável e transparência sobre como seus dados são usados.",
   },
 ];
 
@@ -56,7 +56,7 @@ export function SecuritySection() {
           <div className="lg:col-span-5">
             <span className="inline-flex items-center gap-3 text-sm font-mono text-white/40 mb-6">
               <span className="w-12 h-px bg-white/20" />
-              Seguranca
+              Segurança
             </span>
             <h2
               className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.9] mb-8 transition-all duration-1000 ${
@@ -71,8 +71,8 @@ export function SecuritySection() {
                 isVisible ? "opacity-100" : "opacity-0"
               }`}
             >
-              Privacidade nao e um recurso adicional. E o padrao. Construimos
-              o Checkpoint com seguranca em mente desde o primeiro dia.
+              Privacidade não é um recurso adicional. É o padrão. Construímos
+              o Checkpoint com segurança em mente desde o primeiro dia.
             </p>
 
             <div

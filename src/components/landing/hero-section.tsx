@@ -172,7 +172,7 @@ export function HeroSection() {
                   <img
                     src="/Epic-Games-Logo.png"
                     alt="Epic Games"
-                    className="h-20 w-20 object-contain"
+                    className="h-9 w-9 object-contain"
                   />
                 </span>
               ),

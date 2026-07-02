@@ -6,28 +6,28 @@ const features = [
     number: "01",
     icon: Gamepad2,
     title: "Biblioteca Unificada",
-    description: "ReÃºna todos os seus jogos â€” Steam, Epic, locais â€” em uma Ãºnica interface elegante. Chega de abrir mÃºltiplos launchers.",
-    stats: { value: "âˆž", label: "jogos suportados" },
+    description: "Reúna todos os seus jogos - Steam, Epic e locais - em uma única interface elegante. Chega de abrir múltiplos launchers.",
+    stats: { value: "∞", label: "jogos suportados" },
   },
   {
     number: "02",
     icon: Zap,
-    title: "LanÃ§amento Ultra-RÃ¡pido",
-    description: "Abra qualquer jogo em um clique. Acesso imediato com atalhos de teclado e navegaÃ§Ã£o estilo console.",
-    stats: { value: "<1s", label: "tempo de lanÃ§amento" },
+    title: "Lançamento Ultra-Rápido",
+    description: "Abra qualquer jogo em um clique. Acesso imediato com atalhos de teclado e navegação estilo console.",
+    stats: { value: "<1s", label: "tempo de lançamento" },
   },
   {
     number: "03",
     icon: Star,
     title: "Interface Premium",
-    description: "Design inspirado no PS5 com glassmorphism, animaÃ§Ãµes fluidas e imagens de fundo dinÃ¢micas para cada jogo.",
-    stats: { value: "60fps", label: "animaÃ§Ãµes suaves" },
+    description: "Design inspirado no PS5 com glassmorphism, animações fluidas e imagens de fundo dinâmicas para cada jogo.",
+    stats: { value: "60fps", label: "animações suaves" },
   },
   {
     number: "04",
     icon: Shield,
     title: "Dados na Nuvem",
-    description: "Sua biblioteca sincronizada em todos os dispositivos via Firebase. Nunca perca suas configuraÃ§Ãµes e progresso.",
+    description: "Sua biblioteca sincronizada em todos os dispositivos via Firebase. Nunca perca suas configurações e progresso.",
     stats: { value: "100%", label: "sincronizado" },
   },
 ];
@@ -162,7 +162,7 @@ export function FeaturesSection() {
               <p className={`text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-                Tudo que vocÃª precisa para gerenciar sua biblioteca de jogos em um Ãºnico lugar, com uma interface que impressiona.
+                Tudo que você precisa para gerenciar sua biblioteca de jogos em um único lugar, com uma interface que impressiona.
               </p>
             </div>
           </div>

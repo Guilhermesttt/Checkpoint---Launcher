@@ -5,25 +5,25 @@ const devFeatures = [
   {
     icon: Code2,
     title: "Open Source",
-    description: "CÃ³digo aberto no GitHub. Contribua, faÃ§a fork, adapte para suas necessidades.",
+    description: "Código aberto no GitHub. Contribua, faça fork, adapte para suas necessidades.",
     href: "https://github.com",
   },
   {
     icon: Terminal,
     title: "Backend Cloudflare",
-    description: "Workers na edge para integraÃ§Ã£o Steam. Deploy global em menos de 500ms.",
+    description: "Workers na edge para integração Steam. Deploy global em menos de 500ms.",
     href: "#",
   },
   {
     icon: BookOpen,
     title: "Documentado",
-    description: "CÃ³digo com TypeScript estrito, comentado e pronto para extensÃ£o.",
+    description: "Código com TypeScript estrito, comentado e pronto para extensão.",
     href: "#",
   },
   {
     icon: GitBranch,
     title: "Contribua",
-    description: "PRs sÃ£o bem-vindos! Ajude a construir o melhor launcher de jogos open source.",
+    description: "PRs são bem-vindos! Ajude a construir o melhor launcher de jogos open source.",
     href: "https://github.com",
   },
 ];
@@ -53,13 +53,13 @@ export function DevelopersSection() {
             <h2 className={`text-5xl md:text-6xl font-display tracking-tight leading-[0.9] mb-8 transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}>
-              ConstruÃ­do por<br />
+              Construído por<br />
               <span className="text-muted-foreground">devs, para devs.</span>
             </h2>
             <p className={`text-lg text-muted-foreground leading-relaxed mb-8 transition-all duration-1000 delay-200 ${
               isVisible ? "opacity-100" : "opacity-0"
             }`}>
-              Stack moderna, cÃ³digo limpo e bem estruturado. Explore, contribua ou use como base para seus prÃ³prios projetos.
+              Stack moderna, código limpo e bem estruturado. Explore, contribua ou use como base para seus próprios projetos.
             </p>
 
             <a
@@ -99,7 +99,7 @@ export function DevelopersSection() {
   });
   
   await batch.commit();
-  return games.length; // 247 jogos sincronizados âœ“
+  return games.length; // 247 jogos sincronizados
 }`}
               </pre>
             </div>

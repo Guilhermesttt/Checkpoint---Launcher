@@ -54,8 +54,8 @@ export function CtaSection() {
                 </h2>
 
                 <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-xl">
-                  Junte-se a milhares de jogadores que jÃ¡ transformaram sua
-                  experiÃªncia com o Checkpoint. GrÃ¡tis, sem cartÃ£o de crÃ©dito.
+                  Junte-se a milhares de jogadores que já transformaram sua
+                  experiência com o Checkpoint. Grátis, sem cartão de crédito.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -63,7 +63,7 @@ export function CtaSection() {
                     href="/login"
                     className="inline-flex items-center gap-2 bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group transition-all"
                   >
-                    Criar conta grÃ¡tis
+                    Criar conta grátis
                     <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                   </a>
                   <a
@@ -93,7 +93,7 @@ export function CtaSection() {
                   <div className="absolute -top-6 -right-6 w-32 h-20 rounded-2xl bg-background border border-foreground/20 flex items-center justify-center shadow-xl">
                     <Zap className="w-6 h-6 text-yellow-500" />
                     <span className="text-xs font-mono text-muted-foreground ml-2">
-                      RÃ¡pido
+                      Rápido
                     </span>
                   </div>
                   <div className="absolute -bottom-6 -left-6 w-32 h-20 rounded-2xl bg-background border border-foreground/20 flex items-center justify-center shadow-xl">
