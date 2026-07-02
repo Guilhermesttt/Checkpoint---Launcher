@@ -40,6 +40,9 @@ const epicClientSecret = process.env.EPIC_CLIENT_SECRET?.trim();
 const epicOauthScope = process.env.EPIC_OAUTH_SCOPE?.trim() || "basic_profile";
 const epicSandboxId = process.env.EPIC_SANDBOX_ID?.trim();
 const epicDeploymentId = process.env.EPIC_DEPLOYMENT_ID?.trim();
+const discordClientId = process.env.DISCORD_CLIENT_ID?.trim();
+const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
+const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
 
 const parseFirebaseServiceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
@@ -88,14 +91,19 @@ const epicAuthorizeEndpoint = "https://www.epicgames.com/id/authorize";
 const epicTokenEndpoint = "https://api.epicgames.dev/epic/oauth/v2/token";
 const epicOwnershipEndpointBase = "https://api.epicgames.dev/epic/ecom/v3/platforms/EPIC/identities";
 const epicStoreGraphqlEndpoint = "https://store.epicgames.com/graphql";
+const discordAuthorizeEndpoint = "https://discord.com/oauth2/authorize";
+const discordTokenEndpoint = "https://discord.com/api/oauth2/token";
+const discordCurrentUserEndpoint = "https://discord.com/api/users/@me";
 const pendingStates = new Map();
 const pendingEpicStates = new Map();
+const pendingDiscordStates = new Map();
 
 const appDetailsCache = new Map();
 const achievementsCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const EPIC_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
+const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 
 const steamAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -127,6 +135,12 @@ const buildEpicRedirectUri = () =>
     "",
   );
 
+const buildDiscordRedirectUri = () =>
+  (
+    process.env.DISCORD_REDIRECT_URI?.trim() ||
+    `${backendPublicUrl}/auth/discord/callback`
+  ).replace(/\/$/, "");
+
 const cleanupPendingStates = () => {
   const now = Date.now();
   for (const [token, pending] of pendingStates.entries()) {
@@ -141,6 +155,15 @@ const cleanupPendingEpicStates = () => {
   for (const [state, pending] of pendingEpicStates.entries()) {
     if (now - pending.createdAt > EPIC_AUTH_STATE_TTL) {
       pendingEpicStates.delete(state);
+    }
+  }
+};
+
+const cleanupPendingDiscordStates = () => {
+  const now = Date.now();
+  for (const [state, pending] of pendingDiscordStates.entries()) {
+    if (now - pending.createdAt > DISCORD_AUTH_STATE_TTL) {
+      pendingDiscordStates.delete(state);
     }
   }
 };
@@ -176,6 +199,20 @@ const buildEpicAuthorizeUrl = (state) => {
   authorizeUrl.searchParams.set("scope", epicOauthScope);
   authorizeUrl.searchParams.set("redirect_uri", buildEpicRedirectUri());
   authorizeUrl.searchParams.set("state", state);
+  return authorizeUrl.toString();
+};
+
+const buildDiscordAuthorizeUrl = (state) => {
+  if (!discordClientId) {
+    throw new Error("DISCORD_CLIENT_ID nao configurado no backend.");
+  }
+  const authorizeUrl = new URL(discordAuthorizeEndpoint);
+  authorizeUrl.searchParams.set("client_id", discordClientId);
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("scope", discordOauthScope);
+  authorizeUrl.searchParams.set("redirect_uri", buildDiscordRedirectUri());
+  authorizeUrl.searchParams.set("state", state);
+  authorizeUrl.searchParams.set("prompt", "consent");
   return authorizeUrl.toString();
 };
 
@@ -229,6 +266,27 @@ const requestEpicToken = async (grantType, fields = {}) => {
       Authorization: getEpicBasicAuthHeader(),
     },
     body: buildEpicTokenBody(grantType, fields),
+  });
+  const payload = await response.json().catch(() => ({}));
+  return { response, payload };
+};
+
+const requestDiscordToken = async (code) => {
+  if (!discordClientId || !discordClientSecret) {
+    throw new Error("Credenciais Discord nao configuradas no backend.");
+  }
+
+  const body = new URLSearchParams();
+  body.set("client_id", discordClientId);
+  body.set("client_secret", discordClientSecret);
+  body.set("grant_type", "authorization_code");
+  body.set("code", code);
+  body.set("redirect_uri", buildDiscordRedirectUri());
+
+  const response = await fetch(discordTokenEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
@@ -547,6 +605,29 @@ app.post("/auth/epic/start", steamAuthLimiter, requireFirebaseUser, (req, res) =
   }
 });
 
+app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
+  cleanupPendingDiscordStates();
+  if (!discordClientId || !discordClientSecret) {
+    res.status(500).json({ error: "Credenciais Discord nao configuradas no backend." });
+    return;
+  }
+
+  const state = crypto.randomUUID();
+  pendingDiscordStates.set(state, {
+    firebaseUid: req.firebaseUser.uid,
+    createdAt: Date.now(),
+  });
+
+  try {
+    res.json({ url: buildDiscordAuthorizeUrl(state) });
+  } catch (error) {
+    pendingDiscordStates.delete(state);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Falha ao iniciar autenticacao Discord.",
+    });
+  }
+});
+
 app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
   cleanupPendingStates();
   const token = String(req.query.token ?? "");
@@ -672,6 +753,82 @@ app.get("/auth/epic/callback", steamAuthLimiter, async (req, res) => {
   }
 });
 
+app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
+  cleanupPendingDiscordStates();
+  const state = String(req.query.state ?? "");
+  const pending = pendingDiscordStates.get(state);
+  if (!pending) {
+    res.redirect(`${frontendUrl}/app?discordStatus=invalid_state`);
+    return;
+  }
+  pendingDiscordStates.delete(state);
+
+  const oauthError = String(req.query.error ?? "").trim();
+  if (oauthError) {
+    res.redirect(`${frontendUrl}/app?discordStatus=denied`);
+    return;
+  }
+
+  const code = String(req.query.code ?? "").trim();
+  if (!code) {
+    res.redirect(`${frontendUrl}/app?discordStatus=missing_code`);
+    return;
+  }
+
+  if (!discordClientId || !discordClientSecret) {
+    res.redirect(`${frontendUrl}/app?discordStatus=client_not_configured`);
+    return;
+  }
+
+  if (getApps().length === 0) {
+    res.redirect(`${frontendUrl}/app?discordStatus=server_not_configured`);
+    return;
+  }
+
+  try {
+    const { response: tokenResponse, payload: tokenPayload } =
+      await requestDiscordToken(code);
+
+    if (!tokenResponse.ok) {
+      res.redirect(`${frontendUrl}/app?discordStatus=token_error`);
+      return;
+    }
+
+    const userResponse = await fetch(discordCurrentUserEndpoint, {
+      headers: {
+        Authorization: `${tokenPayload.token_type ?? "Bearer"} ${tokenPayload.access_token}`,
+      },
+    });
+    const discordUser = await userResponse.json().catch(() => ({}));
+
+    if (!userResponse.ok || !discordUser?.id) {
+      res.redirect(`${frontendUrl}/app?discordStatus=missing_id`);
+      return;
+    }
+
+    const username = discordUser.discriminator && discordUser.discriminator !== "0"
+      ? `${discordUser.username}#${discordUser.discriminator}`
+      : String(discordUser.global_name || discordUser.username || "Discord");
+    const avatar = discordUser.avatar
+      ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+      : "";
+
+    await getFirestore().doc(`profiles/${pending.firebaseUid}`).set(
+      {
+        discordId: String(discordUser.id),
+        discordUsername: username,
+        discordAvatar: avatar,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+
+    res.redirect(`${frontendUrl}/app?discordStatus=ok`);
+  } catch {
+    res.redirect(`${frontendUrl}/app?discordStatus=error`);
+  }
+});
+
 app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
     await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
@@ -700,6 +857,23 @@ app.post("/api/epic/disconnect", steamPrivateLimiter, requireFirebaseUser, async
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Erro ao desconectar Epic Games." });
+  }
+});
+
+app.post("/api/discord/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  try {
+    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
+      {
+        discordId: "",
+        discordUsername: "",
+        discordAvatar: "",
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao desconectar Discord." });
   }
 });
 

@@ -41,7 +41,7 @@ interface AddGameModalProps {
 }
 
 const CATEGORIES = [
-  { id: "ACTION", label: "AÃ§Ã£o" },
+  { id: "ACTION", label: "Ação" },
   { id: "ADVENTURE", label: "Aventura" },
   { id: "RACING", label: "Corrida" },
   { id: "RPG", label: "RPG" },
@@ -89,12 +89,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const { t, language } = usePreferences();
   const copy = {
     "pt-BR": {
-      editInfo: "Editar informaÃ§Ãµes",
+      editInfo: "Editar informações",
       addGame: "Adicionar Jogo",
       steamSearch: "Buscar na Steam",
       optional: "Opcional",
       searchPlaceholder: "Pesquisar jogo para auto-preenchimento...",
-      title: "TÃ­tulo",
+      title: "Título",
       titlePlaceholder: "Nome do seu jogo",
       category: "Categoria",
       cover: "Capa",
@@ -104,13 +104,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       local: "Local",
       epic: "Epic Games",
       upload: "Upload",
-      confirmAdd: "Confirmar AdiÃ§Ã£o",
+      confirmAdd: "Confirmar Adição",
       saving: "Salvando...",
-      executable: "ExecutÃ¡vel",
+      executable: "Executável",
       chooseExe: "Selecionar .exe",
       executableHint:
-        "No navegador, o sistema nÃ£o expÃµe o caminho completo. Em runtime desktop, o caminho local pode ser usado para iniciar o jogo.",
-      noExecutable: "Nenhum executÃ¡vel selecionado",
+        "No navegador, o sistema não expõe o caminho completo. Em runtime desktop, o caminho local pode ser usado para iniciar o jogo.",
+      noExecutable: "Nenhum executável selecionado",
     },
     "en-US": {
       editInfo: "Edit information",
@@ -137,14 +137,14 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       noExecutable: "No executable selected",
     },
     "es-ES": {
-      editInfo: "Editar informaciÃ³n",
-      addGame: "AÃ±adir Jogo",
+      editInfo: "Editar información",
+      addGame: "Añadir juego",
       steamSearch: "Buscar en Steam",
       optional: "Opcional",
       searchPlaceholder: "Buscar juego para autocompletar...",
-      title: "TÃ­tulo",
+      title: "Título",
       titlePlaceholder: "Nombre de tu juego",
-      category: "CategorÃ­a",
+      category: "Categoría",
       cover: "Portada",
       link: "Link",
       platform: "Plataforma",
@@ -158,7 +158,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       chooseExe: "Seleccionar .exe",
       executableHint:
         "El navegador no expone la ruta local completa. En runtime de escritorio, la ruta local puede usarse para iniciar el juego.",
-      noExecutable: "NingÃºn ejecutable seleccionado",
+      noExecutable: "Ningún ejecutable seleccionado",
     },
   }[language];
   const { notify } = useNotification();
@@ -453,7 +453,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               {gameToEdit ? copy.editInfo : copy.addGame}
             </h2>
             <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-1">
-              Biblioteca Digital â€¢ Checkpoint v.2
+              Biblioteca Digital • Checkpoint v.2
             </p>
           </div>
           <button
@@ -841,7 +841,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             <div className="relative z-10 space-y-8 flex flex-col items-center">
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">
-                  PrÃ©via no Painel
+                  Prévia no Painel
                 </p>
                 <div className="h-0.5 w-8 bg-white/10 mx-auto rounded-full" />
               </div>

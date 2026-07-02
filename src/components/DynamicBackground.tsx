@@ -14,14 +14,14 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
   }, [backgroundImage]);
 
   return (
-    <div className="fixed inset-0 z-[-1] bg-[#050507] overflow-hidden">
+    <div className="fixed inset-0 z-0 bg-[#050507] overflow-hidden pointer-events-none">
       {!reducedEffects && (
         <video
           autoPlay
           loop
           muted
           playsInline
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vh] h-[100vw] rotate-90 object-cover opacity-[0.08]"
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vh] h-[100vw] rotate-90 object-cover opacity-[0.18]"
         >
           <source src="/PinDown.io_@sebasoler__1776538674.mp4" type="video/mp4" />
         </video>
@@ -44,6 +44,14 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-[#050507]/40 to-transparent opacity-95" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#050507]/60 via-transparent to-transparent opacity-80" />
+      <div
+        className="absolute inset-0 transition-[background] duration-700"
+        style={{
+          background:
+            "radial-gradient(circle at 76% 18%, var(--launcher-tint), transparent 34%), radial-gradient(circle at 18% 82%, var(--launcher-accent-soft), transparent 42%)",
+          opacity: 0.65,
+        }}
+      />
 
       {!reducedEffects && (
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />

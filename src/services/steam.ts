@@ -36,7 +36,7 @@ const buildSteamAssets = (appid: number) => ({
 const getAuthHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
   if (!token) {
-    throw new Error("SessÃ£o expirada. Entre novamente para sincronizar a Steam.");
+    throw new Error("Sessão expirada. Entre novamente para sincronizar a Steam.");
   }
   return { Authorization: `Bearer ${token}` };
 };
@@ -101,7 +101,7 @@ export const fetchSteamAppDetailsResult = async (
   appId: string,
 ): Promise<SteamAppDetailsFetchResult> => {
   if (!/^\d+$/.test(appId)) {
-    return { ok: false, message: "App ID deve conter sÃ³ dÃ­gitos." };
+    return { ok: false, message: "App ID deve conter só dígitos." };
   }
   const url = apiUrl(
     `/api/steam/app-details?appId=${encodeURIComponent(appId)}`,
@@ -116,7 +116,7 @@ export const fetchSteamAppDetailsResult = async (
       const message =
         fromApi ||
         (response.status === 502
-          ? "O backend nÃ£o conseguiu obter dados na Steam (502)."
+          ? "O backend não conseguiu obter dados na Steam (502)."
           : `O backend respondeu com erro HTTP ${response.status}.`);
       return { ok: false, message };
     }
@@ -130,7 +130,7 @@ export const fetchSteamAppDetailsResult = async (
     return {
       ok: false,
       message: looksLikeNetwork
-        ? "Backend inacessÃ­vel (porta 8787). Em outro terminal: npm run server. Ou: npm run dev:full. Teste no browser: http://localhost:8787/health"
+        ? "Backend inacessível (porta 8787). Em outro terminal: npm run server. Ou: npm run dev:full. Teste no browser: http://localhost:8787/health"
         : e instanceof Error
           ? e.message
           : "Falha de rede ao buscar dados da loja Steam.",

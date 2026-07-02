@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useState,
   useEffect,
   useCallback,
@@ -30,6 +30,11 @@ import {
   Settings,
   Languages,
   Volume2,
+  Users,
+  MessageCircle,
+  Bell,
+  Palette,
+  BadgeDollarSign,
 } from "lucide-react";
 import {
   collection,
@@ -59,6 +64,7 @@ import {
   usePreferences,
   type LauncherLanguage,
   type SoundTheme,
+  type VisualTheme,
 } from "../context/PreferencesContext";
 import { isBackendHealthy } from "../services/api";
 import {
@@ -71,6 +77,10 @@ import {
   getEpicLinkUrl,
   syncEpicLibraryToFirestore,
 } from "../services/epic";
+import {
+  disconnectDiscordAccount,
+  getDiscordLinkUrl,
+} from "../services/discord";
 import type { Game } from "../types/domain";
 import {
   profileDocRef,
@@ -85,6 +95,8 @@ const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel")
 const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
+  { id: "FRIENDS", label: "Amigos", Icon: Users },
+  { id: "DEALS", label: "Ofertas", Icon: BadgeDollarSign },
   { id: "STEAM", label: "Steam", Icon: Zap },
   { id: "EPIC", label: "Epic", Icon: Globe },
   { id: "LOCAL", label: "Local", Icon: Gamepad2 },
@@ -100,20 +112,50 @@ const CATEGORIES = [
   { id: "FIGHTING", label: "Luta", Icon: Swords },
 ];
 
+const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
+  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL"].includes(id),
+);
+
 const normalizeCategory = (v?: string) =>
   v?.toUpperCase().replace(/[^A-Z0-9]/g, "") ?? "";
 const steamIdKey = (uid: string) => `checkpoint_steam_id_${uid}`;
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
-  { id: "pt-BR", label: "PortuguÃªs", hint: "Brasil" },
+  { id: "pt-BR", label: "Português", hint: "Brasil" },
   { id: "en-US", label: "English", hint: "United States" },
-  { id: "es-ES", label: "EspaÃ±ol", hint: "EspaÃ±a" },
+  { id: "es-ES", label: "Español", hint: "España" },
 ];
 
 const SOUND_THEME_OPTIONS: Array<{ id: SoundTheme; labelKey: "defaultTheme" | "gamecubeTheme"; hint: string }> = [
   { id: "ps2", labelKey: "defaultTheme", hint: "PS2 System Sounds" },
   { id: "gamecube", labelKey: "gamecubeTheme", hint: "Nintendo GameCube Menu SFX" },
 ];
+
+const VISUAL_THEME_OPTIONS: Array<{
+  id: VisualTheme;
+  labelKey: "checkpointTheme" | "carbonTheme" | "neonTheme" | "sunsetTheme";
+  hint: string;
+  swatch: string;
+}> = [
+  { id: "checkpoint", labelKey: "checkpointTheme", hint: "Clean monochrome", swatch: "rgb(255 255 255)" },
+  { id: "carbon", labelKey: "carbonTheme", hint: "Steel gray", swatch: "rgb(148 163 184)" },
+  { id: "neon", labelKey: "neonTheme", hint: "Cyan glow", swatch: "rgb(34 211 238)" },
+  { id: "sunset", labelKey: "sunsetTheme", hint: "Warm orange", swatch: "rgb(251 146 60)" },
+];
+
+interface SocialFriend {
+  id: string;
+  name: string;
+  status: "online" | "playing" | "offline";
+  playing?: string;
+}
+
+interface PriceAlert {
+  id: string;
+  gameId: string;
+  title: string;
+  source: "Steam" | "Epic" | "Manual";
+}
 
 const Sidebar: React.FC<{
   activeCategory: string;
@@ -151,18 +193,19 @@ const Sidebar: React.FC<{
       initial={{ x: -80, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed left-0 top-0 bottom-0 z-50 flex flex-col"
+        className="fixed left-0 top-0 bottom-0 z-50 flex flex-col"
       style={{ width: 96 }}
     >
       <div
-        className="flex-1 flex flex-col items-center py-6 gap-1"
+          className="flex-1 flex flex-col items-center py-5 gap-1 min-h-0"
         style={{
           background: "rgba(6,6,10,0.78)",
+          boxShadow: "12px 0 40px rgba(0,0,0,0.35), inset -1px 0 rgb(var(--launcher-accent) / 0.08)",
           backdropFilter: "blur(40px)",
           borderRight: "1px solid rgba(255,255,255,0.055)",
         }}
       >
-        <div className="mb-5 flex flex-col items-center">
+          <div className="mb-4 flex flex-col items-center shrink-0">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center"
             style={{
@@ -175,12 +218,12 @@ const Sidebar: React.FC<{
         </div>
 
         <div
-          className="w-8 h-px mb-3"
+            className="w-8 h-px mb-2 shrink-0"
           style={{ background: "rgba(255,255,255,0.07)" }}
         />
 
-        <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
-          {CATEGORIES.map(({ id, label, Icon }) => {
+          <nav className="flex flex-col gap-0.5 w-full px-2 shrink-0">
+            {SIDEBAR_CATEGORIES.map(({ id, label, Icon }) => {
             const active = activeCategory === id;
             return (
               <button
@@ -190,9 +233,9 @@ const Sidebar: React.FC<{
                   playSound("navigate");
                 }}
                 title={label}
-                className="relative group flex flex-col items-center justify-center gap-1 w-full py-2.5 rounded-xl transition-all duration-200"
+                  className="relative group flex flex-col items-center justify-center gap-1 w-full py-2 rounded-xl transition-all duration-200"
                 style={{
-                  background: active ? "rgba(255,255,255,0.09)" : "transparent",
+                  background: active ? "var(--launcher-accent-soft)" : "transparent",
                   border: active
                     ? "1px solid rgba(255,255,255,0.1)"
                     : "1px solid transparent",
@@ -202,14 +245,14 @@ const Sidebar: React.FC<{
                   <motion.div
                     layoutId="sb-active"
                     className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-                    style={{ background: "rgba(255,255,255,0.75)" }}
+                    style={{ background: "rgb(var(--launcher-accent))" }}
                   />
                 )}
                 <Icon
                   className="w-[15px] h-[15px] transition-colors"
                   style={{
                     color: active
-                      ? "rgba(255,255,255,0.88)"
+                        ? "rgb(var(--launcher-accent))"
                       : "rgba(255,255,255,0.28)",
                   }}
                 />
@@ -217,7 +260,7 @@ const Sidebar: React.FC<{
                   className="text-[7.5px] font-black uppercase tracking-wide leading-none transition-colors"
                   style={{
                     color: active
-                      ? "rgba(255,255,255,0.65)"
+                        ? "rgb(var(--launcher-accent))"
                       : "rgba(255,255,255,0.18)",
                   }}
                 >
@@ -241,7 +284,7 @@ const Sidebar: React.FC<{
         </nav>
 
         <div
-          className="w-8 h-px my-3"
+            className="w-8 h-px mt-auto mb-3 shrink-0"
           style={{ background: "rgba(255,255,255,0.07)" }}
         />
 
@@ -250,12 +293,12 @@ const Sidebar: React.FC<{
             onCategory("SETTINGS");
             playSound("navigate");
           }}
-          title="ConfiguraÃ§Ãµes"
-          className="relative group flex flex-col items-center justify-center gap-1 w-full mx-2 py-2.5 rounded-xl transition-all duration-200"
+          title="Configurações"
+            className="relative group flex flex-col items-center justify-center gap-1 w-[80px] py-2 rounded-xl transition-all duration-200 shrink-0"
           style={{
             background:
               activeCategory === "SETTINGS"
-                ? "rgba(255,255,255,0.09)"
+                ? "var(--launcher-accent-soft)"
                 : "transparent",
             border:
               activeCategory === "SETTINGS"
@@ -267,7 +310,7 @@ const Sidebar: React.FC<{
             <motion.div
               layoutId="sb-active"
               className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-              style={{ background: "rgba(255,255,255,0.75)" }}
+              style={{ background: "rgb(var(--launcher-accent))" }}
             />
           )}
           <Settings
@@ -275,7 +318,7 @@ const Sidebar: React.FC<{
             style={{
               color:
                 activeCategory === "SETTINGS"
-                  ? "rgba(255,255,255,0.88)"
+                  ? "rgb(var(--launcher-accent))"
                   : "rgba(255,255,255,0.28)",
             }}
           />
@@ -284,7 +327,7 @@ const Sidebar: React.FC<{
             style={{
               color:
                 activeCategory === "SETTINGS"
-                  ? "rgba(255,255,255,0.65)"
+                  ? "rgb(var(--launcher-accent))"
                   : "rgba(255,255,255,0.18)",
             }}
           >
@@ -320,6 +363,7 @@ const Home: React.FC = () => {
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [epicSyncing, setEpicSyncing] = useState(false);
   const [epicConnecting, setEpicConnecting] = useState(false);
+  const [discordConnecting, setDiscordConnecting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
@@ -327,7 +371,11 @@ const Home: React.FC = () => {
     useState(false);
   const [disconnectEpicModalOpen, setDisconnectEpicModalOpen] =
     useState(false);
+  const [disconnectDiscordModalOpen, setDisconnectDiscordModalOpen] =
+    useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
+  const [socialFriends, setSocialFriends] = useState<SocialFriend[]>([]);
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -350,10 +398,12 @@ const Home: React.FC = () => {
     effectsVolume,
     musicVolume,
     soundTheme,
+    visualTheme,
     setLanguage: setLauncherLanguage,
     setEffectsVolume,
     setMusicVolume,
     setSoundTheme,
+    setVisualTheme,
     t,
   } = usePreferences();
   const { playSound } = useSoundEffects(effectsVolume / 100, soundTheme);
@@ -366,6 +416,10 @@ const Home: React.FC = () => {
   const resolvedEpicAccountId = useMemo(
     () => userProfile?.epicAccountId || undefined,
     [userProfile?.epicAccountId],
+  );
+  const resolvedDiscordId = useMemo(
+    () => userProfile?.discordId || undefined,
+    [userProfile?.discordId],
   );
 
   useEffect(() => {
@@ -399,6 +453,30 @@ const Home: React.FC = () => {
         Boolean(userProfile?.onboardingCompletedAt),
     );
   }, [user?.uid, userProfile?.onboardingCompletedAt]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setSocialFriends([]);
+      setPriceAlerts([]);
+      return;
+    }
+    setSocialFriends(
+      JSON.parse(localStorage.getItem(`checkpoint_social_friends_${user.uid}`) || "[]"),
+    );
+    setPriceAlerts(
+      JSON.parse(localStorage.getItem(`checkpoint_price_alerts_${user.uid}`) || "[]"),
+    );
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    localStorage.setItem(`checkpoint_social_friends_${user.uid}`, JSON.stringify(socialFriends));
+  }, [socialFriends, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    localStorage.setItem(`checkpoint_price_alerts_${user.uid}`, JSON.stringify(priceAlerts));
+  }, [priceAlerts, user?.uid]);
 
   useEffect(() => {
     const migrate = async () => {
@@ -448,7 +526,8 @@ const Home: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const steamStatus = params.get("steamStatus");
     const epicStatus = params.get("epicStatus");
-    if ((!steamStatus && !epicStatus) || !user?.uid) return;
+    const discordStatus = params.get("discordStatus");
+    if ((!steamStatus && !epicStatus && !discordStatus) || !user?.uid) return;
 
     if (steamStatus === "ok") {
       localStorage.removeItem(steamDiscKey(user.uid));
@@ -456,14 +535,14 @@ const Home: React.FC = () => {
       void refreshProfile();
     } else if (steamStatus) {
       const labels: Record<string, string> = {
-        invalid_state: "Estado invÃ¡lido.",
-        invalid: "Falha na validaÃ§Ã£o OpenID.",
-        missing_id: "Steam ID nÃ£o retornado.",
-        server_not_configured: "Backend Firebase Admin nÃ£o configurado.",
+        invalid_state: "Estado inválido.",
+        invalid: "Falha na validação OpenID.",
+        missing_id: "Steam ID não retornado.",
+        server_not_configured: "Backend Firebase Admin não configurado.",
         error: "Erro inesperado.",
       };
       notify(
-        labels[steamStatus] ?? "NÃ£o foi possÃ­vel conectar com a Steam.",
+        labels[steamStatus] ?? "Não foi possível conectar com a Steam.",
         "error",
       );
     }
@@ -473,7 +552,7 @@ const Home: React.FC = () => {
       void refreshProfile();
     } else if (epicStatus) {
       const labels: Record<string, string> = {
-        invalid_state: "Estado invÃ¡lido.",
+        invalid_state: "Estado inválido.",
         denied: "Autorização da Epic Games cancelada.",
         missing_code: "Código de retorno da Epic Games não recebido.",
         missing_id: "Conta Epic Games não retornou identificador.",
@@ -484,6 +563,26 @@ const Home: React.FC = () => {
       };
       notify(
         labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.",
+        "error",
+      );
+    }
+
+    if (discordStatus === "ok") {
+      notify("Conta Discord conectada com sucesso.", "success");
+      void refreshProfile();
+    } else if (discordStatus) {
+      const labels: Record<string, string> = {
+        invalid_state: "Estado inválido.",
+        denied: "Autorização do Discord cancelada.",
+        missing_code: "Código de retorno do Discord não recebido.",
+        missing_id: "Conta Discord não retornou identificador.",
+        client_not_configured: "Credenciais do Discord não configuradas no backend.",
+        server_not_configured: "Backend Firebase Admin não configurado.",
+        token_error: "O Discord recusou a troca do código de autenticação.",
+        error: "Erro inesperado.",
+      };
+      notify(
+        labels[discordStatus] ?? "Não foi possível conectar com o Discord.",
         "error",
       );
     }
@@ -544,7 +643,8 @@ const Home: React.FC = () => {
     Boolean(contextMenu) ||
     signOutModalOpen ||
     disconnectSteamModalOpen ||
-    disconnectEpicModalOpen;
+    disconnectEpicModalOpen ||
+    disconnectDiscordModalOpen;
 
   useImagePreloader(
     useMemo(
@@ -663,14 +763,14 @@ const Home: React.FC = () => {
       );
       notify(
         count === 0
-          ? "Nenhum jogo retornado. Verifique se o perfil Ã© pÃºblico."
+          ? "Nenhum jogo retornado. Verifique se o perfil é público."
           : `${count} jogos importados/atualizados.`,
         count === 0 ? "info" : "success",
       );
       await refreshProfile();
     } catch (e) {
       notify(
-        e instanceof Error ? e.message : "Falha na sincronizaÃ§Ã£o Steam.",
+        e instanceof Error ? e.message : "Falha na sincronização Steam.",
         "error",
       );
     } finally {
@@ -685,7 +785,7 @@ const Home: React.FC = () => {
     setSteamConnecting(true);
 
     notify(
-      "Iniciando conexÃ£o com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
+      "Iniciando conexão com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
       "info",
     );
 
@@ -702,7 +802,7 @@ const Home: React.FC = () => {
         window.location.href = await getSteamLinkUrl();
       } catch (e) {
         notify(
-          e instanceof Error ? e.message : "NÃ£o foi possÃ­vel conectar com a Steam.",
+          e instanceof Error ? e.message : "Não foi possível conectar com a Steam.",
           "error",
         );
         setSteamConnecting(false);
@@ -774,6 +874,69 @@ const Home: React.FC = () => {
         setEpicConnecting(false);
       }
     });
+  };
+
+  const connectDiscord = () => {
+    if (!user?.uid) return;
+    playSound("select");
+    setDiscordConnecting(true);
+
+    isBackendHealthy().then(async (h) => {
+      if (!h) {
+        notify("Backend Discord offline.", "error");
+        setDiscordConnecting(false);
+        return;
+      }
+      try {
+        window.location.href = await getDiscordLinkUrl();
+      } catch (e) {
+        notify(
+          e instanceof Error ? e.message : "Não foi possível conectar com o Discord.",
+          "error",
+        );
+        setDiscordConnecting(false);
+      }
+    });
+  };
+
+  const addDemoFriend = () => {
+    const names = ["Rafa", "Nina", "Kai", "Duda", "Leo"];
+    const sampleGame = games[socialFriends.length % Math.max(games.length, 1)]?.title;
+    setSocialFriends((current) => [
+      {
+        id: crypto.randomUUID(),
+        name: `${names[current.length % names.length]}#${String(1000 + current.length).padStart(4, "0")}`,
+        status: current.length % 2 === 0 ? "playing" : "online",
+        playing: sampleGame,
+      },
+      ...current,
+    ]);
+  };
+
+  const removeFriend = (id: string) => {
+    setSocialFriends((current) => current.filter((friend) => friend.id !== id));
+  };
+
+  const addPriceAlert = (game: Game) => {
+    setPriceAlerts((current) => [
+      {
+        id: crypto.randomUUID(),
+        gameId: game.id,
+        title: game.title,
+        source:
+          game.launcherType === "steam"
+            ? "Steam"
+            : game.launcherType === "epic"
+              ? "Epic"
+              : "Manual",
+      },
+      ...current,
+    ]);
+    notify("Alerta de oferta criado.", "success");
+  };
+
+  const removePriceAlert = (id: string) => {
+    setPriceAlerts((current) => current.filter((alert) => alert.id !== id));
   };
 
   const onSelectHandler = useCallback(
@@ -873,6 +1036,17 @@ const Home: React.FC = () => {
     }
   };
 
+  const handleDisconnectDiscord = async () => {
+    if (!user?.uid) return;
+    try {
+      await disconnectDiscordAccount();
+      await refreshProfile();
+      notify("Discord desconectado.", "success");
+    } catch {
+      notify("Erro ao desconectar Discord.", "error");
+    }
+  };
+
   const closeAddModal = (silent = false) => {
     if (!silent) playSound("back");
     setIsAddModalOpen(false);
@@ -919,7 +1093,7 @@ const Home: React.FC = () => {
       />
 
       <div
-        className="flex-1 flex flex-col h-screen overflow-hidden"
+        className="relative z-10 flex-1 flex flex-col h-screen overflow-hidden"
         style={{ marginLeft: 96 }}
       >
         <motion.div
@@ -988,7 +1162,7 @@ const Home: React.FC = () => {
               </div>
             </div>
 
-            <span style={{ color: "rgba(255,255,255,0.14)" }}>â€º</span>
+            <span style={{ color: "rgba(255,255,255,0.14)" }}>›</span>
 
             <AnimatePresence mode="wait">
               <motion.span
@@ -1108,6 +1282,7 @@ const Home: React.FC = () => {
               effectsVolume={effectsVolume}
               musicVolume={musicVolume}
               soundTheme={soundTheme}
+              visualTheme={visualTheme}
               onLanguageChange={(next) => {
                 setLauncherLanguage(next);
                 playSound("select");
@@ -1120,16 +1295,25 @@ const Home: React.FC = () => {
                 setSoundTheme(next);
                 playSound("select");
               }}
+              onVisualThemeChange={(next) => {
+                setVisualTheme(next);
+                playSound("select");
+              }}
               onPreviewSound={() => playSound("select")}
               t={t}
               steamConnected={Boolean(resolvedSteamId)}
               epicConnected={Boolean(resolvedEpicAccountId)}
+              discordConnected={Boolean(resolvedDiscordId)}
+              discordUsername={userProfile?.discordUsername}
+              discordAvatar={userProfile?.discordAvatar}
               steamConnecting={steamConnecting}
               epicConnecting={epicConnecting}
+              discordConnecting={discordConnecting}
               steamSyncing={steamSyncing}
               epicSyncing={epicSyncing}
               onConnectSteam={connectSteam}
               onConnectEpic={connectEpic}
+              onConnectDiscord={connectDiscord}
               onDisconnectSteam={() => {
                 playSound("back");
                 setDisconnectSteamModalOpen(true);
@@ -1138,8 +1322,30 @@ const Home: React.FC = () => {
                 playSound("back");
                 setDisconnectEpicModalOpen(true);
               }}
+              onDisconnectDiscord={() => {
+                playSound("back");
+                setDisconnectDiscordModalOpen(true);
+              }}
               onSyncSteam={handleSyncSteam}
               onSyncEpic={handleSyncEpic}
+            />
+          ) : activeCategory === "FRIENDS" ? (
+            <FriendsPage
+              t={t}
+              discordConnected={Boolean(resolvedDiscordId)}
+              discordUsername={userProfile?.discordUsername}
+              friends={socialFriends}
+              onConnectDiscord={connectDiscord}
+              onAddDemoFriend={addDemoFriend}
+              onRemoveFriend={removeFriend}
+            />
+          ) : activeCategory === "DEALS" ? (
+            <PriceAlertsPage
+              t={t}
+              games={games}
+              alerts={priceAlerts}
+              onAddAlert={addPriceAlert}
+              onRemoveAlert={removePriceAlert}
             />
           ) : isLoading ? (
             <div className="flex-1 flex items-center justify-center">
@@ -1198,7 +1404,7 @@ const Home: React.FC = () => {
                         className="text-[10px] font-black uppercase tracking-[0.28em] mb-2.5"
                         style={{ color: "rgba(255,255,255,0.25)" }}
                       >
-                        {currentGame?.category ?? "Jogo"} Â· {canonicalIndex + 1}
+                        {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1}
                         /{displayGames.length}
                       </p>
                       <h1
@@ -1332,10 +1538,10 @@ const Home: React.FC = () => {
             {[
               {
                 label: "Navegar",
-                node: <span className="text-[12px] font-bold">â† â†’</span>,
+                node: <span className="text-[12px] font-bold">← →</span>,
               },
               { label: "Abrir", node: <MouseLeft className="w-3.5 h-3.5" /> },
-              { label: "OpÃ§Ãµes", node: <MouseRight className="w-3.5 h-3.5" /> },
+              { label: "Opções", node: <MouseRight className="w-3.5 h-3.5" /> },
             ].map(({ label, node }) => (
               <div key={label} className="flex items-center gap-2">
                 <span style={{ color: "rgba(255,255,255,0.28)" }}>{node}</span>
@@ -1422,6 +1628,19 @@ const Home: React.FC = () => {
         playSound={playSound}
       />
 
+      <ConfirmationModal
+        isOpen={disconnectDiscordModalOpen}
+        title={t("disconnectDiscordTitle")}
+        description={t("disconnectDiscordDescription")}
+        confirmLabel={t("confirm")}
+        onClose={() => setDisconnectDiscordModalOpen(false)}
+        onConfirm={async () => {
+          setDisconnectDiscordModalOpen(false);
+          await handleDisconnectDiscord();
+        }}
+        playSound={playSound}
+      />
+
       <AnimatePresence>
         {isExitingSession && (
           <motion.div
@@ -1441,13 +1660,13 @@ const Home: React.FC = () => {
                 <Gamepad2 className="w-7 h-7 text-black" />
               </div>
               <h3 className="text-3xl font-black text-white tracking-tighter uppercase mb-4">
-                Encerrando SessÃ£o
+                Encerrando Sessão
               </h3>
               <p
                 className="text-[10px] tracking-[0.4em] uppercase"
                 style={{ color: "rgba(255,255,255,0.3)" }}
               >
-                AtÃ© logo
+                Até logo
               </p>
             </motion.div>
           </motion.div>
@@ -1462,22 +1681,30 @@ const SettingsPageV2: React.FC<{
   effectsVolume: number;
   musicVolume: number;
   soundTheme: SoundTheme;
+  visualTheme: VisualTheme;
   onLanguageChange: (language: LauncherLanguage) => void;
   onEffectsVolumeChange: (volume: number) => void;
   onMusicVolumeChange: (volume: number) => void;
   onSoundThemeChange: (theme: SoundTheme) => void;
+  onVisualThemeChange: (theme: VisualTheme) => void;
   onPreviewSound: () => void;
   t: ReturnType<typeof usePreferences>["t"];
   steamConnected: boolean;
   epicConnected: boolean;
+  discordConnected: boolean;
+  discordUsername?: string;
+  discordAvatar?: string;
   steamConnecting: boolean;
   epicConnecting: boolean;
+  discordConnecting: boolean;
   steamSyncing: boolean;
   epicSyncing: boolean;
   onConnectSteam: () => void;
   onConnectEpic: () => void;
+  onConnectDiscord: () => void;
   onDisconnectSteam: () => void;
   onDisconnectEpic: () => void;
+  onDisconnectDiscord: () => void;
   onSyncSteam: () => void;
   onSyncEpic: () => void;
 }> = ({
@@ -1485,49 +1712,42 @@ const SettingsPageV2: React.FC<{
   effectsVolume,
   musicVolume,
   soundTheme,
+  visualTheme,
   onLanguageChange,
   onEffectsVolumeChange,
   onMusicVolumeChange,
   onSoundThemeChange,
+  onVisualThemeChange,
   onPreviewSound,
   t,
   steamConnected,
   epicConnected,
+  discordConnected,
+  discordUsername,
+  discordAvatar,
   steamConnecting,
   epicConnecting,
+  discordConnecting,
   steamSyncing,
   epicSyncing,
   onConnectSteam,
   onConnectEpic,
+  onConnectDiscord,
   onDisconnectSteam,
   onDisconnectEpic,
+  onDisconnectDiscord,
   onSyncSteam,
   onSyncEpic,
 }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-    className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
-  >
-    <div className="max-w-5xl">
-      <div className="mb-10">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
-          {t("system")}
-        </p>
-        <h1 className="text-5xl font-black tracking-tight text-white uppercase">
-          {t("settings")}
-        </h1>
-      </div>
-
+  <SystemPageShell eyebrow={t("system")} title={t("settings")}>
       <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
         <SettingsHeader
           icon={<Globe className="w-5 h-5 text-white/70" />}
           title={t("connectedAccounts")}
           description={t("connectedAccountsHint")}
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-white/60" />
@@ -1605,6 +1825,40 @@ const SettingsPageV2: React.FC<{
             )}
           </div>
 
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
+                {discordAvatar ? (
+                  <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <MessageCircle className="w-4 h-4 text-white/60" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-white">Discord</p>
+                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
+                  {discordConnected ? discordUsername || t("connected") : t("notConnected")}
+                </p>
+              </div>
+            </div>
+            {discordConnected ? (
+              <button
+                onClick={onDisconnectDiscord}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+              >
+                {t("unlink")}
+              </button>
+            ) : (
+              <button
+                onClick={onConnectDiscord}
+                disabled={discordConnecting}
+                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {discordConnecting ? t("connecting") : t("connectDiscord")}
+              </button>
+            )}
+          </div>
+
         </div>
       </section>
 
@@ -1623,6 +1877,26 @@ const SettingsPageV2: React.FC<{
                 label={option.label}
                 hint={option.hint}
                 onClick={() => onLanguageChange(option.id)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+          <SettingsHeader
+            icon={<Palette className="w-5 h-5 text-white/70" />}
+            title={t("visualTheme")}
+            description={t("visualThemeHint")}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            {VISUAL_THEME_OPTIONS.map((option) => (
+              <SettingsChoice
+                key={option.id}
+                active={visualTheme === option.id}
+                label={t(option.labelKey)}
+                hint={option.hint}
+                swatch={option.swatch}
+                onClick={() => onVisualThemeChange(option.id)}
               />
             ))}
           </div>
@@ -1667,9 +1941,209 @@ const SettingsPageV2: React.FC<{
           t={t}
         />
       </div>
+  </SystemPageShell>
+  );
+
+const SystemPageShell: React.FC<{
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}> = ({ eyebrow, title, children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
+    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+    className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
+  >
+    <div className="max-w-6xl mx-auto min-h-full flex flex-col">
+      <div className="w-full max-w-5xl mx-auto mb-8 text-right">
+        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
+          {eyebrow}
+        </p>
+        <h1
+          className="text-5xl font-black tracking-tight text-white uppercase"
+          style={{ textShadow: "0 0 28px rgb(var(--launcher-accent) / 0.28)" }}
+        >
+          {title}
+        </h1>
+      </div>
+      <div className="w-full max-w-5xl mx-auto">{children}</div>
     </div>
   </motion.div>
 );
+
+const FriendsPage: React.FC<{
+  t: ReturnType<typeof usePreferences>["t"];
+  discordConnected: boolean;
+  discordUsername?: string;
+  friends: SocialFriend[];
+  onConnectDiscord: () => void;
+  onAddDemoFriend: () => void;
+  onRemoveFriend: (id: string) => void;
+}> = ({
+  t,
+  discordConnected,
+  discordUsername,
+  friends,
+  onConnectDiscord,
+  onAddDemoFriend,
+  onRemoveFriend,
+}) => {
+  const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
+
+  return (
+    <SystemPageShell eyebrow="Social" title={t("friends")}>
+      <div className="flex justify-end mb-5">
+        <button
+          type="button"
+          onClick={discordConnected ? onAddDemoFriend : onConnectDiscord}
+          className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
+        >
+          {discordConnected ? "Fixar amigo" : t("connectDiscord")}
+        </button>
+      </div>
+
+      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+        <SettingsHeader
+          icon={<MessageCircle className="w-5 h-5 text-white/70" />}
+          title={t("discordFriends")}
+          description={
+            discordConnected
+              ? `${discordUsername || "Discord"} conectado. ${onlineCount} online.`
+              : "Conecte o Discord para preparar presença, convites e amigos fixados."
+          }
+        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {[
+            { label: "Online", value: onlineCount },
+            { label: "Jogando", value: friends.filter((friend) => friend.status === "playing").length },
+            { label: "Fixados", value: friends.length },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
+                {item.label}
+              </p>
+              <p className="mt-2 text-3xl font-black text-white tabular-nums">
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {friends.length === 0 ? (
+          <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
+            <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
+            <p className="text-sm font-bold text-white/70">Nenhum amigo fixado ainda.</p>
+            <p className="mt-2 text-xs text-white/35">
+              Use dados locais para testar o layout enquanto a integração social completa é aprovada.
+            </p>
+          </div>
+        ) : (
+          friends.map((friend) => (
+            <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center">
+                  <MessageCircle className="w-4 h-4 text-white/70" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white truncate">{friend.name}</p>
+                  <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
+                    {friend.status === "playing" ? `Jogando ${friend.playing || "agora"}` : friend.status}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onRemoveFriend(friend.id)}
+                className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
+              >
+                Remover
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </SystemPageShell>
+  );
+};
+
+const PriceAlertsPage: React.FC<{
+  t: ReturnType<typeof usePreferences>["t"];
+  games: Game[];
+  alerts: PriceAlert[];
+  onAddAlert: (game: Game) => void;
+  onRemoveAlert: (id: string) => void;
+}> = ({ t, games, alerts, onAddAlert, onRemoveAlert }) => {
+  const [selectedGameId, setSelectedGameId] = useState("");
+  const selectedGame = games.find((game) => game.id === selectedGameId) || games[0];
+
+  return (
+    <SystemPageShell eyebrow="Deals" title={t("priceAlerts")}>
+      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+        <SettingsHeader
+          icon={<Bell className="w-5 h-5 text-white/70" />}
+          title={t("priceAlerts")}
+          description={t("priceAlertsHint")}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+          <select
+            value={selectedGame?.id ?? ""}
+            onChange={(event) => setSelectedGameId(event.target.value)}
+            className="h-11 rounded-xl bg-black/40 border border-white/10 px-3 text-sm text-white outline-none"
+          >
+            {games.map((game) => (
+              <option key={game.id} value={game.id} className="bg-black">
+                {game.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={!selectedGame}
+            onClick={() => selectedGame && onAddAlert(selectedGame)}
+            className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
+          >
+            {t("addAlert")}
+          </button>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {alerts.length === 0 ? (
+          <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
+            <BadgeDollarSign className="w-8 h-8 mx-auto mb-4 text-white/35" />
+            <p className="text-sm font-bold text-white/70">{t("noAlerts")}</p>
+          </div>
+        ) : (
+          alerts.map((alert) => (
+            <div key={alert.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-white">{alert.title}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-widest text-white/35">
+                    {alert.source}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemoveAlert(alert.id)}
+                  className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
+                >
+                  Remover
+                </button>
+              </div>
+              <p className="mt-5 text-xs font-bold text-white/50">
+                Avisaremos quando encontrarmos uma oferta relevante para este jogo.
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </SystemPageShell>
+  );
+};
 
 const SettingsHeader: React.FC<{
   icon: React.ReactNode;
@@ -1691,18 +2165,35 @@ const SettingsChoice: React.FC<{
   active: boolean;
   label: string;
   hint: string;
+  swatch?: string;
   onClick: () => void;
-}> = ({ active, label, hint, onClick }) => (
+}> = ({ active, label, hint, swatch, onClick }) => (
   <button
     type="button"
     onClick={onClick}
-    className="text-left rounded-2xl border p-4 transition-all"
+    className="relative overflow-hidden text-left rounded-2xl border p-4 transition-all"
     style={{
-      background: active ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.04)",
-      borderColor: active ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.08)",
+      background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.04)",
+      borderColor: active ? "rgb(var(--launcher-accent) / 0.45)" : "rgba(255,255,255,0.08)",
     }}
   >
-    <span className="block text-sm font-bold text-white">{label}</span>
+    <span className="flex items-center gap-2 text-sm font-bold text-white">
+      {swatch && (
+        <span
+          className="h-3 w-3 rounded-full border border-white/20"
+          style={{ background: swatch }}
+        />
+      )}
+      {label}
+    </span>
+    {active && (
+      <span
+        className="pointer-events-none absolute inset-0 rounded-2xl"
+        style={{
+          boxShadow: "inset 0 0 0 1px rgb(var(--launcher-accent) / 0.28), 0 0 28px rgb(var(--launcher-accent) / 0.16)",
+        }}
+      />
+    )}
     <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
       {hint}
     </span>
@@ -1777,12 +2268,12 @@ const SettingsPage: React.FC<{
         eyebrow: "Sistema",
         title: "Ajustes",
         language: "Idioma",
-        languageHint: "PreferÃªncia visual salva neste dispositivo.",
+        languageHint: "Preferência visual salva neste dispositivo.",
         sound: "Efeitos sonoros",
-        soundHint: "Volume de navegaÃ§Ã£o, seleÃ§Ã£o e retorno.",
+        soundHint: "Volume de navegação, seleção e retorno.",
         test: "Testar",
         mute: "Mudo",
-        max: "MÃ¡ximo",
+        max: "Máximo",
       },
       "en-US": {
         eyebrow: "System",
@@ -1801,10 +2292,10 @@ const SettingsPage: React.FC<{
         language: "Idioma",
         languageHint: "Preferencia visual guardada en este dispositivo.",
         sound: "Efectos sonoros",
-        soundHint: "Volumen de navegaciÃ³n, selecciÃ³n y retorno.",
+        soundHint: "Volumen de navegación, selección y retorno.",
         test: "Probar",
         mute: "Silencio",
-        max: "MÃ¡ximo",
+        max: "Máximo",
       },
     }[language];
 
@@ -1940,7 +2431,7 @@ const EmptyState: React.FC<{
       {searchTerm
         ? "Tente buscar por outro termo."
         : steamConnected
-          ? "VocÃª nÃ£o possui jogos salvos. Adicione um jogo manualmente."
+          ? "Você não possui jogos salvos. Adicione um jogo manualmente."
           : "Adicione um jogo ou conecte sua conta Steam."}
     </p>
     {!searchTerm && (
@@ -1995,7 +2486,7 @@ const EmptyLibraryOnboarding: React.FC<{
       contentClassName="pb-2"
       footerClassName="pt-2"
       backButtonText="Voltar"
-      nextButtonText="PrÃ³ximo"
+      nextButtonText="Próximo"
       onStepChange={() => playSound("navigate")}
       onFinalStepCompleted={() => {
         playSound("select");
@@ -2005,7 +2496,7 @@ const EmptyLibraryOnboarding: React.FC<{
     >
       <Step>
         <h3 className="text-2xl font-black mb-2 text-white">
-          Sua biblioteca estÃ¡ vazia
+          Sua biblioteca está vazia
         </h3>
         <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
           Adicione um jogo manualmente ou conecte sua conta Steam.
@@ -2055,7 +2546,7 @@ const EmptyLibraryOnboarding: React.FC<{
       style={{ color: "rgba(255,255,255,0.35)" }}
     >
       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-      Depois da primeira sincronizaÃ§Ã£o, seus jogos aparecem automaticamente.
+      Depois da primeira sincronização, seus jogos aparecem automaticamente.
     </p>
   </div>
 );

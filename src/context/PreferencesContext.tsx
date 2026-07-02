@@ -1,18 +1,21 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+﻿import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 
 export type LauncherLanguage = "pt-BR" | "en-US" | "es-ES";
 export type SoundTheme = "ps2" | "gamecube";
+export type VisualTheme = "checkpoint" | "carbon" | "neon" | "sunset";
 
 interface PreferencesContextValue {
   language: LauncherLanguage;
   effectsVolume: number;
   musicVolume: number;
   soundTheme: SoundTheme;
+  visualTheme: VisualTheme;
   setLanguage: (language: LauncherLanguage) => void;
   setEffectsVolume: (volume: number) => void;
   setMusicVolume: (volume: number) => void;
   setSoundTheme: (theme: SoundTheme) => void;
+  setVisualTheme: (theme: VisualTheme) => void;
   t: (key: TranslationKey) => string;
 }
 
@@ -28,6 +31,12 @@ const translations = {
     musicHint: "Volume da trilha de fundo em loop.",
     soundTheme: "Tema sonoro",
     soundThemeHint: "Pacote de sons usado pela interface.",
+    visualTheme: "Tema visual",
+    visualThemeHint: "Skin de cores aplicada ao launcher.",
+    checkpointTheme: "Checkpoint",
+    carbonTheme: "Carbon",
+    neonTheme: "Neon",
+    sunsetTheme: "Sunset",
     defaultTheme: "Padrão",
     gamecubeTheme: "GameCube",
     test: "Testar",
@@ -81,6 +90,10 @@ const translations = {
     steamFriends: "Amigos da Steam",
     epicFriends: "Amigos da Epic",
     discordFriends: "Amigos do Discord",
+    priceAlerts: "Alertas de preço",
+    priceAlertsHint: "Monitore ofertas dos jogos da sua biblioteca.",
+    addAlert: "Monitorar oferta",
+    noAlerts: "Nenhum alerta criado.",
   },
   "en-US": {
     settings: "Settings",
@@ -93,6 +106,12 @@ const translations = {
     musicHint: "Background loop track volume.",
     soundTheme: "Sound theme",
     soundThemeHint: "Sound pack used by the interface.",
+    visualTheme: "Visual theme",
+    visualThemeHint: "Color skin applied to the launcher.",
+    checkpointTheme: "Checkpoint",
+    carbonTheme: "Carbon",
+    neonTheme: "Neon",
+    sunsetTheme: "Sunset",
     defaultTheme: "Default",
     gamecubeTheme: "GameCube",
     test: "Test",
@@ -146,6 +165,10 @@ const translations = {
     steamFriends: "Steam Friends",
     epicFriends: "Epic Friends",
     discordFriends: "Discord Friends",
+    priceAlerts: "Price alerts",
+    priceAlertsHint: "Monitor deals for games in your library.",
+    addAlert: "Track deal",
+    noAlerts: "No alerts created.",
   },
   "es-ES": {
     settings: "Ajustes",
@@ -158,6 +181,12 @@ const translations = {
     musicHint: "Volumen de la pista de fondo en loop.",
     soundTheme: "Tema sonoro",
     soundThemeHint: "Paquete de sonidos usado por la interfaz.",
+    visualTheme: "Tema visual",
+    visualThemeHint: "Skin de colores aplicada al launcher.",
+    checkpointTheme: "Checkpoint",
+    carbonTheme: "Carbon",
+    neonTheme: "Neon",
+    sunsetTheme: "Sunset",
     defaultTheme: "Predeterminado",
     gamecubeTheme: "GameCube",
     test: "Probar",
@@ -211,6 +240,10 @@ const translations = {
     steamFriends: "Amigos de Steam",
     epicFriends: "Amigos de Epic",
     discordFriends: "Amigos de Discord",
+    priceAlerts: "Alertas de precio",
+    priceAlertsHint: "Monitorea ofertas de los juegos de tu biblioteca.",
+    addAlert: "Monitorear oferta",
+    noAlerts: "Ninguna alerta creada.",
   },
 } as const;
 
@@ -231,6 +264,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [effectsVolume, setEffectsVolume] = useState(35);
   const [musicVolume, setMusicVolume] = useState(8);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps2");
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -242,6 +276,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       localStorage.getItem(prefKey(user.uid, "music_volume")),
     );
     const savedSoundTheme = localStorage.getItem(prefKey(user.uid, "sound_theme"));
+    const savedVisualTheme = localStorage.getItem(prefKey(user.uid, "visual_theme"));
 
     if (
       savedLanguage === "pt-BR" ||
@@ -259,6 +294,14 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedSoundTheme === "ps2" || savedSoundTheme === "gamecube") {
       setSoundTheme(savedSoundTheme);
     }
+    if (
+      savedVisualTheme === "checkpoint" ||
+      savedVisualTheme === "carbon" ||
+      savedVisualTheme === "neon" ||
+      savedVisualTheme === "sunset"
+    ) {
+      setVisualTheme(savedVisualTheme);
+    }
   }, [user?.uid]);
 
   useEffect(() => {
@@ -267,7 +310,12 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(prefKey(user.uid, "effects_volume"), String(effectsVolume));
     localStorage.setItem(prefKey(user.uid, "music_volume"), String(musicVolume));
     localStorage.setItem(prefKey(user.uid, "sound_theme"), soundTheme);
-  }, [effectsVolume, language, musicVolume, soundTheme, user?.uid]);
+    localStorage.setItem(prefKey(user.uid, "visual_theme"), visualTheme);
+  }, [effectsVolume, language, musicVolume, soundTheme, user?.uid, visualTheme]);
+
+  useEffect(() => {
+    document.documentElement.dataset.launcherTheme = visualTheme;
+  }, [visualTheme]);
 
   const value = useMemo<PreferencesContextValue>(
     () => ({
@@ -275,13 +323,15 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       effectsVolume,
       musicVolume,
       soundTheme,
+      visualTheme,
       setLanguage,
       setEffectsVolume: (volume) => setEffectsVolume(clampVolume(volume)),
       setMusicVolume: (volume) => setMusicVolume(clampVolume(volume)),
       setSoundTheme,
+      setVisualTheme,
       t: (key) => translations[language][key] ?? translations["pt-BR"][key],
     }),
-    [effectsVolume, language, musicVolume, soundTheme],
+    [effectsVolume, language, musicVolume, soundTheme, visualTheme],
   );
 
   return (

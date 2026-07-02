@@ -6,6 +6,27 @@
   --muted: oklch(0.12 0.008 260);
   --muted-foreground: oklch(0.55 0.015 90);
   --border: oklch(0.18 0.008 260);
+  --launcher-accent: 255 255 255;
+  --launcher-accent-soft: rgba(255, 255, 255, 0.22);
+  --launcher-tint: rgba(255, 255, 255, 0.09);
+}
+
+html[data-launcher-theme="carbon"] {
+  --launcher-accent: 148 163 184;
+  --launcher-accent-soft: rgba(148, 163, 184, 0.34);
+  --launcher-tint: rgba(51, 65, 85, 0.42);
+}
+
+html[data-launcher-theme="neon"] {
+  --launcher-accent: 34 211 238;
+  --launcher-accent-soft: rgba(34, 211, 238, 0.36);
+  --launcher-tint: rgba(6, 182, 212, 0.28);
+}
+
+html[data-launcher-theme="sunset"] {
+  --launcher-accent: 251 146 60;
+  --launcher-accent-soft: rgba(251, 146, 60, 0.38);
+  --launcher-tint: rgba(234, 88, 12, 0.3);
 }
 
 @theme inline {

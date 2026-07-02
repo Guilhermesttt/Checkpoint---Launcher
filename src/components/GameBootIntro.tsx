@@ -35,7 +35,7 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
       animate={{ opacity: isFadingOut ? 0 : 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: isFadingOut ? 0.65 : 0.5, ease: "easeInOut" }}
-      className="fixed inset-0 z-[500] bg-black flex items-center justify-center overflow-hidden pointer-events-none"
+      className="fixed inset-0 z-500 bg-black flex items-center justify-center overflow-hidden pointer-events-none"
     >
       <video
         ref={videoRef}
@@ -44,7 +44,7 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
         onEnded={handleFinish}
         muted={false}
         className="absolute inset-0 h-full w-full object-cover"
-        src="/CheckPoint Intro.mp4"
+        src="/Checkpoint-Intro.mp4"
       />
     </motion.div>
   );

@@ -41,6 +41,9 @@ export interface UserProfile {
   photoURL?: string | null;
   steamId?: string;
   epicAccountId?: string;
+  discordId?: string;
+  discordUsername?: string;
+  discordAvatar?: string;
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
