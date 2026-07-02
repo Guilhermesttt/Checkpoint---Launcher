@@ -137,11 +137,11 @@ const VISUAL_THEME_OPTIONS: Array<{
   hint: string;
   swatch: string;
 }> = [
-  { id: "checkpoint", labelKey: "checkpointTheme", hint: "Clean monochrome", swatch: "rgb(255 255 255)" },
-  { id: "carbon", labelKey: "carbonTheme", hint: "Steel gray", swatch: "rgb(148 163 184)" },
-  { id: "neon", labelKey: "neonTheme", hint: "Cyan glow", swatch: "rgb(34 211 238)" },
-  { id: "sunset", labelKey: "sunsetTheme", hint: "Warm orange", swatch: "rgb(251 146 60)" },
-];
+    { id: "checkpoint", labelKey: "checkpointTheme", hint: "Clean monochrome", swatch: "rgb(255 255 255)" },
+    { id: "carbon", labelKey: "carbonTheme", hint: "Steel gray", swatch: "rgb(148 163 184)" },
+    { id: "neon", labelKey: "neonTheme", hint: "Cyan glow", swatch: "rgb(34 211 238)" },
+    { id: "sunset", labelKey: "sunsetTheme", hint: "Warm orange", swatch: "rgb(251 146 60)" },
+  ];
 
 interface SocialFriend {
   id: string;
@@ -186,170 +186,166 @@ const Sidebar: React.FC<{
   settingsLabel,
   playSound,
 }) => {
-  const [showSteamMenu, setShowSteamMenu] = useState(false);
+    const [showSteamMenu, setShowSteamMenu] = useState(false);
 
-  return (
-    <motion.aside
-      initial={{ x: -80, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+    return (
+      <motion.aside
+        initial={{ x: -80, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         className="fixed left-0 top-0 bottom-0 z-50 flex flex-col"
-      style={{ width: 96 }}
-    >
-      <div
-          className="flex-1 flex flex-col items-center py-5 gap-1 min-h-0"
-        style={{
-          background: "rgba(6,6,10,0.78)",
-          boxShadow: "12px 0 40px rgba(0,0,0,0.35), inset -1px 0 rgb(var(--launcher-accent) / 0.08)",
-          backdropFilter: "blur(40px)",
-          borderRight: "1px solid rgba(255,255,255,0.055)",
-        }}
+        style={{ width: 96 }}
       >
-          <div className="mb-4 flex flex-col items-center shrink-0">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{
-              background: "rgba(255,255,255,0.92)",
-              boxShadow: "0 4px 20px rgba(255,255,255,0.14)",
-            }}
-          >
-            <Gamepad2 className="w-5 h-5 text-black" />
-          </div>
-        </div>
-
         <div
+          className="flex-1 flex flex-col items-center py-5 gap-1 min-h-0"
+          style={{
+            background: "rgba(6,6,10,0.78)",
+            boxShadow: "12px 0 40px rgba(0,0,0,0.35), inset -1px 0 rgb(var(--launcher-accent) / 0.08)",
+            backdropFilter: "blur(40px)",
+            borderRight: "1px solid rgba(255,255,255,0.055)",
+          }}
+        >
+          <div className="mb-4 flex flex-col items-center shrink-0">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
+            >
+              <img src="/public/Checkpoint_Logo.png" alt="" />
+            </div>
+          </div>
+
+          <div
             className="w-8 h-px mb-2 shrink-0"
-          style={{ background: "rgba(255,255,255,0.07)" }}
-        />
+            style={{ background: "rgba(255,255,255,0.07)" }}
+          />
 
           <nav className="flex flex-col gap-0.5 w-full px-2 shrink-0">
             {SIDEBAR_CATEGORIES.map(({ id, label, Icon }) => {
-            const active = activeCategory === id;
-            return (
-              <button
-                key={id}
-                onClick={() => {
-                  onCategory(id);
-                  playSound("navigate");
-                }}
-                title={label}
+              const active = activeCategory === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => {
+                    onCategory(id);
+                    playSound("navigate");
+                  }}
+                  title={label}
                   className="relative group flex flex-col items-center justify-center gap-1 w-full py-2 rounded-xl transition-all duration-200"
-                style={{
-                  background: active ? "var(--launcher-accent-soft)" : "transparent",
-                  border: active
-                    ? "1px solid rgba(255,255,255,0.1)"
-                    : "1px solid transparent",
-                }}
-              >
-                {active && (
-                  <motion.div
-                    layoutId="sb-active"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-                    style={{ background: "rgb(var(--launcher-accent))" }}
+                  style={{
+                    background: active ? "var(--launcher-accent-soft)" : "transparent",
+                    border: active
+                      ? "1px solid rgba(255,255,255,0.1)"
+                      : "1px solid transparent",
+                  }}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="sb-active"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                      style={{ background: "rgb(var(--launcher-accent))" }}
+                    />
+                  )}
+                  <Icon
+                    className="w-[15px] h-[15px] transition-colors"
+                    style={{
+                      color: active
+                        ? "rgb(var(--launcher-accent))"
+                        : "rgba(255,255,255,0.28)",
+                    }}
                   />
-                )}
-                <Icon
-                  className="w-[15px] h-[15px] transition-colors"
-                  style={{
-                    color: active
+                  <span
+                    className="text-[7.5px] font-black uppercase tracking-wide leading-none transition-colors"
+                    style={{
+                      color: active
                         ? "rgb(var(--launcher-accent))"
-                      : "rgba(255,255,255,0.28)",
-                  }}
-                />
-                <span
-                  className="text-[7.5px] font-black uppercase tracking-wide leading-none transition-colors"
-                  style={{
-                    color: active
-                        ? "rgb(var(--launcher-accent))"
-                      : "rgba(255,255,255,0.18)",
-                  }}
-                >
-                  {label}
-                </span>
-                <div
-                  className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
-                  style={{
-                    background: "rgba(14,14,22,0.97)",
-                    border: "1px solid rgba(255,255,255,0.09)",
-                    color: "rgba(255,255,255,0.8)",
-                    backdropFilter: "blur(16px)",
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
-                  }}
-                >
-                  {label}
-                </div>
-              </button>
-            );
-          })}
-        </nav>
+                        : "rgba(255,255,255,0.18)",
+                    }}
+                  >
+                    {label}
+                  </span>
+                  <div
+                    className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
+                    style={{
+                      background: "rgba(14,14,22,0.97)",
+                      border: "1px solid rgba(255,255,255,0.09)",
+                      color: "rgba(255,255,255,0.8)",
+                      backdropFilter: "blur(16px)",
+                      boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+                    }}
+                  >
+                    {label}
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
 
-        <div
-            className="w-8 h-px mt-auto mb-3 shrink-0"
-          style={{ background: "rgba(255,255,255,0.07)" }}
-        />
-
-        <button
-          onClick={() => {
-            onCategory("SETTINGS");
-            playSound("navigate");
-          }}
-          title="Configurações"
-            className="relative group flex flex-col items-center justify-center gap-1 w-[80px] py-2 rounded-xl transition-all duration-200 shrink-0"
-          style={{
-            background:
-              activeCategory === "SETTINGS"
-                ? "var(--launcher-accent-soft)"
-                : "transparent",
-            border:
-              activeCategory === "SETTINGS"
-                ? "1px solid rgba(255,255,255,0.1)"
-                : "1px solid transparent",
-          }}
-        >
-          {activeCategory === "SETTINGS" && (
-            <motion.div
-              layoutId="sb-active"
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
-              style={{ background: "rgb(var(--launcher-accent))" }}
-            />
-          )}
-          <Settings
-            className="w-[15px] h-[15px] transition-colors"
-            style={{
-              color:
-                activeCategory === "SETTINGS"
-                  ? "rgb(var(--launcher-accent))"
-                  : "rgba(255,255,255,0.28)",
-            }}
-          />
-          <span
-            className="text-[7.5px] font-black uppercase tracking-wide leading-none transition-colors"
-            style={{
-              color:
-                activeCategory === "SETTINGS"
-                  ? "rgb(var(--launcher-accent))"
-                  : "rgba(255,255,255,0.18)",
-            }}
-          >
-            {settingsLabel}
-          </span>
           <div
-            className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
+            className="w-8 h-px mt-auto mb-3 shrink-0"
+            style={{ background: "rgba(255,255,255,0.07)" }}
+          />
+
+          <button
+            onClick={() => {
+              onCategory("SETTINGS");
+              playSound("navigate");
+            }}
+            title="Configurações"
+            className="relative group flex flex-col items-center justify-center gap-1 w-[80px] py-2 rounded-xl transition-all duration-200 shrink-0"
             style={{
-              background: "rgba(14,14,22,0.97)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              color: "rgba(255,255,255,0.8)",
-              backdropFilter: "blur(16px)",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+              background:
+                activeCategory === "SETTINGS"
+                  ? "var(--launcher-accent-soft)"
+                  : "transparent",
+              border:
+                activeCategory === "SETTINGS"
+                  ? "1px solid rgba(255,255,255,0.1)"
+                  : "1px solid transparent",
             }}
           >
-            {settingsLabel}
-          </div>
-        </button>
-      </div>
-    </motion.aside>
-  );
-};
+            {activeCategory === "SETTINGS" && (
+              <motion.div
+                layoutId="sb-active"
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                style={{ background: "rgb(var(--launcher-accent))" }}
+              />
+            )}
+            <Settings
+              className="w-[15px] h-[15px] transition-colors"
+              style={{
+                color:
+                  activeCategory === "SETTINGS"
+                    ? "rgb(var(--launcher-accent))"
+                    : "rgba(255,255,255,0.28)",
+              }}
+            />
+            <span
+              className="text-[7.5px] font-black uppercase tracking-wide leading-none transition-colors"
+              style={{
+                color:
+                  activeCategory === "SETTINGS"
+                    ? "rgb(var(--launcher-accent))"
+                    : "rgba(255,255,255,0.18)",
+              }}
+            >
+              {settingsLabel}
+            </span>
+            <div
+              className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
+              style={{
+                background: "rgba(14,14,22,0.97)",
+                border: "1px solid rgba(255,255,255,0.09)",
+                color: "rgba(255,255,255,0.8)",
+                backdropFilter: "blur(16px)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+              }}
+            >
+              {settingsLabel}
+            </div>
+          </button>
+        </div>
+      </motion.aside>
+    );
+  };
 
 const Home: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
@@ -450,7 +446,7 @@ const Home: React.FC = () => {
     }
     setOnboardingCompleted(
       localStorage.getItem(`checkpoint_onboarding_${user.uid}`) === "1" ||
-        Boolean(userProfile?.onboardingCompletedAt),
+      Boolean(userProfile?.onboardingCompletedAt),
     );
   }, [user?.uid, userProfile?.onboardingCompletedAt]);
 
@@ -607,13 +603,13 @@ const Home: React.FC = () => {
           ? ordered.filter((g) => g.isFavorite)
           : activeCategory === "STEAM"
             ? ordered.filter((g) => g.launcherType === "steam")
-          : activeCategory === "LOCAL"
+            : activeCategory === "LOCAL"
               ? ordered.filter(
-                  (g) => g.launcherType === "local" || !g.launcherType,
-                )
+                (g) => g.launcherType === "local" || !g.launcherType,
+              )
               : activeCategory === "EPIC"
-              ? ordered.filter((g) => g.launcherType === "epic")
-              : ordered.filter((g) => {
+                ? ordered.filter((g) => g.launcherType === "epic")
+                : ordered.filter((g) => {
                   const gCat = normalizeCategory(g.category);
                   return (
                     gCat === normalizeCategory(activeCategory) ||
@@ -622,10 +618,10 @@ const Home: React.FC = () => {
                 });
     return s
       ? filtered.filter(
-          (g) =>
-            g.title.toLowerCase().includes(s) ||
-            (g.category ?? "").toLowerCase().includes(s),
-        )
+        (g) =>
+          g.title.toLowerCase().includes(s) ||
+          (g.category ?? "").toLowerCase().includes(s),
+      )
       : filtered;
   }, [activeCategory, games, searchTerm]);
 
@@ -1583,7 +1579,7 @@ const Home: React.FC = () => {
         <AddGameModal
           isOpen={isAddModalOpen}
           onClose={closeAddModal}
-          onSaved={() => {}}
+          onSaved={() => { }}
           playSound={playSound}
           gameToEdit={editingGame}
         />
@@ -1739,7 +1735,7 @@ const SettingsPageV2: React.FC<{
   onSyncSteam,
   onSyncEpic,
 }) => (
-  <SystemPageShell eyebrow={t("system")} title={t("settings")}>
+    <SystemPageShell eyebrow={t("system")} title={t("settings")}>
       <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
         <SettingsHeader
           icon={<Globe className="w-5 h-5 text-white/70" />}
@@ -1762,18 +1758,18 @@ const SettingsPageV2: React.FC<{
             {steamConnected ? (
               <div className="flex items-center gap-2">
                 <button
-                onClick={onSyncSteam}
-                disabled={steamSyncing}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              >
-                {steamSyncing ? t("syncing") : t("sync")}
-              </button>
-              <button
-                onClick={onDisconnectSteam}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-              >
-                {t("unlink")}
-              </button>
+                  onClick={onSyncSteam}
+                  disabled={steamSyncing}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                >
+                  {steamSyncing ? t("syncing") : t("sync")}
+                </button>
+                <button
+                  onClick={onDisconnectSteam}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                >
+                  {t("unlink")}
+                </button>
               </div>
             ) : (
               <button
@@ -1801,18 +1797,18 @@ const SettingsPageV2: React.FC<{
             {epicConnected ? (
               <div className="flex items-center gap-2">
                 <button
-                onClick={onSyncEpic}
-                disabled={epicSyncing}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              >
-                {epicSyncing ? t("syncing") : t("sync")}
-              </button>
-              <button
-                onClick={onDisconnectEpic}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-              >
-                {t("unlink")}
-              </button>
+                  onClick={onSyncEpic}
+                  disabled={epicSyncing}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                >
+                  {epicSyncing ? t("syncing") : t("sync")}
+                </button>
+                <button
+                  onClick={onDisconnectEpic}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                >
+                  {t("unlink")}
+                </button>
               </div>
             ) : (
               <button
@@ -1941,7 +1937,7 @@ const SettingsPageV2: React.FC<{
           t={t}
         />
       </div>
-  </SystemPageShell>
+    </SystemPageShell>
   );
 
 const SystemPageShell: React.FC<{
@@ -1989,85 +1985,85 @@ const FriendsPage: React.FC<{
   onAddDemoFriend,
   onRemoveFriend,
 }) => {
-  const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
+    const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
 
-  return (
-    <SystemPageShell eyebrow="Social" title={t("friends")}>
-      <div className="flex justify-end mb-5">
-        <button
-          type="button"
-          onClick={discordConnected ? onAddDemoFriend : onConnectDiscord}
-          className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
-        >
-          {discordConnected ? "Fixar amigo" : t("connectDiscord")}
-        </button>
-      </div>
-
-      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-        <SettingsHeader
-          icon={<MessageCircle className="w-5 h-5 text-white/70" />}
-          title={t("discordFriends")}
-          description={
-            discordConnected
-              ? `${discordUsername || "Discord"} conectado. ${onlineCount} online.`
-              : "Conecte o Discord para preparar presença, convites e amigos fixados."
-          }
-        />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {[
-            { label: "Online", value: onlineCount },
-            { label: "Jogando", value: friends.filter((friend) => friend.status === "playing").length },
-            { label: "Fixados", value: friends.length },
-          ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
-                {item.label}
-              </p>
-              <p className="mt-2 text-3xl font-black text-white tabular-nums">
-                {item.value}
-              </p>
-            </div>
-          ))}
+    return (
+      <SystemPageShell eyebrow="Social" title={t("friends")}>
+        <div className="flex justify-end mb-5">
+          <button
+            type="button"
+            onClick={discordConnected ? onAddDemoFriend : onConnectDiscord}
+            className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
+          >
+            {discordConnected ? "Fixar amigo" : t("connectDiscord")}
+          </button>
         </div>
-      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {friends.length === 0 ? (
-          <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
-            <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
-            <p className="text-sm font-bold text-white/70">Nenhum amigo fixado ainda.</p>
-            <p className="mt-2 text-xs text-white/35">
-              Use dados locais para testar o layout enquanto a integração social completa é aprovada.
-            </p>
-          </div>
-        ) : (
-          friends.map((friend) => (
-            <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center">
-                  <MessageCircle className="w-4 h-4 text-white/70" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{friend.name}</p>
-                  <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
-                    {friend.status === "playing" ? `Jogando ${friend.playing || "agora"}` : friend.status}
-                  </p>
-                </div>
+        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+          <SettingsHeader
+            icon={<MessageCircle className="w-5 h-5 text-white/70" />}
+            title={t("discordFriends")}
+            description={
+              discordConnected
+                ? `${discordUsername || "Discord"} conectado. ${onlineCount} online.`
+                : "Conecte o Discord para preparar presença, convites e amigos fixados."
+            }
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { label: "Online", value: onlineCount },
+              { label: "Jogando", value: friends.filter((friend) => friend.status === "playing").length },
+              { label: "Fixados", value: friends.length },
+            ].map((item) => (
+              <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
+                  {item.label}
+                </p>
+                <p className="mt-2 text-3xl font-black text-white tabular-nums">
+                  {item.value}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => onRemoveFriend(friend.id)}
-                className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
-              >
-                Remover
-              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {friends.length === 0 ? (
+            <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
+              <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
+              <p className="text-sm font-bold text-white/70">Nenhum amigo fixado ainda.</p>
+              <p className="mt-2 text-xs text-white/35">
+                Use dados locais para testar o layout enquanto a integração social completa é aprovada.
+              </p>
             </div>
-          ))
-        )}
-      </div>
-    </SystemPageShell>
-  );
-};
+          ) : (
+            friends.map((friend) => (
+              <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center">
+                    <MessageCircle className="w-4 h-4 text-white/70" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-white truncate">{friend.name}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
+                      {friend.status === "playing" ? `Jogando ${friend.playing || "agora"}` : friend.status}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemoveFriend(friend.id)}
+                  className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
+                >
+                  Remover
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </SystemPageShell>
+    );
+  };
 
 const PriceAlertsPage: React.FC<{
   t: ReturnType<typeof usePreferences>["t"];
@@ -2262,153 +2258,153 @@ const SettingsPage: React.FC<{
   onVolumeChange,
   onPreviewSound,
 }) => (
-  (() => {
-    const copy = {
-      "pt-BR": {
-        eyebrow: "Sistema",
-        title: "Ajustes",
-        language: "Idioma",
-        languageHint: "Preferência visual salva neste dispositivo.",
-        sound: "Efeitos sonoros",
-        soundHint: "Volume de navegação, seleção e retorno.",
-        test: "Testar",
-        mute: "Mudo",
-        max: "Máximo",
-      },
-      "en-US": {
-        eyebrow: "System",
-        title: "Settings",
-        language: "Language",
-        languageHint: "Visual preference saved on this device.",
-        sound: "Sound effects",
-        soundHint: "Navigation, selection and back volume.",
-        test: "Test",
-        mute: "Mute",
-        max: "Max",
-      },
-      "es-ES": {
-        eyebrow: "Sistema",
-        title: "Ajustes",
-        language: "Idioma",
-        languageHint: "Preferencia visual guardada en este dispositivo.",
-        sound: "Efectos sonoros",
-        soundHint: "Volumen de navegación, selección y retorno.",
-        test: "Probar",
-        mute: "Silencio",
-        max: "Máximo",
-      },
-    }[language];
+    (() => {
+      const copy = {
+        "pt-BR": {
+          eyebrow: "Sistema",
+          title: "Ajustes",
+          language: "Idioma",
+          languageHint: "Preferência visual salva neste dispositivo.",
+          sound: "Efeitos sonoros",
+          soundHint: "Volume de navegação, seleção e retorno.",
+          test: "Testar",
+          mute: "Mudo",
+          max: "Máximo",
+        },
+        "en-US": {
+          eyebrow: "System",
+          title: "Settings",
+          language: "Language",
+          languageHint: "Visual preference saved on this device.",
+          sound: "Sound effects",
+          soundHint: "Navigation, selection and back volume.",
+          test: "Test",
+          mute: "Mute",
+          max: "Max",
+        },
+        "es-ES": {
+          eyebrow: "Sistema",
+          title: "Ajustes",
+          language: "Idioma",
+          languageHint: "Preferencia visual guardada en este dispositivo.",
+          sound: "Efectos sonoros",
+          soundHint: "Volumen de navegación, selección y retorno.",
+          test: "Probar",
+          mute: "Silencio",
+          max: "Máximo",
+        },
+      }[language];
 
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
-      >
-        <div className="max-w-5xl">
-          <div className="mb-10">
-            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
-              {copy.eyebrow}
-            </p>
-            <h1 className="text-5xl font-black tracking-tight text-white uppercase">
-              {copy.title}
-            </h1>
-          </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-              <Languages className="w-5 h-5 text-white/70" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{copy.language}</h2>
-              <p className="text-xs text-white/40">
-                {copy.languageHint}
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
+        >
+          <div className="max-w-5xl">
+            <div className="mb-10">
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
+                {copy.eyebrow}
               </p>
+              <h1 className="text-5xl font-black tracking-tight text-white uppercase">
+                {copy.title}
+              </h1>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
+              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
+                    <Languages className="w-5 h-5 text-white/70" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">{copy.language}</h2>
+                    <p className="text-xs text-white/40">
+                      {copy.languageHint}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {LANGUAGE_OPTIONS.map((option) => {
+                    const active = language === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => onLanguageChange(option.id)}
+                        className="text-left rounded-2xl border p-4 transition-all"
+                        style={{
+                          background: active
+                            ? "rgba(255,255,255,0.13)"
+                            : "rgba(255,255,255,0.04)",
+                          borderColor: active
+                            ? "rgba(255,255,255,0.28)"
+                            : "rgba(255,255,255,0.08)",
+                        }}
+                      >
+                        <span className="block text-sm font-bold text-white">
+                          {option.label}
+                        </span>
+                        <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
+                          {option.hint}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
+                    <Volume2 className="w-5 h-5 text-white/70" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">{copy.sound}</h2>
+                    <p className="text-xs text-white/40">
+                      {copy.soundHint}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-end justify-between gap-5 mb-5">
+                  <div>
+                    <span className="text-6xl font-light text-white tabular-nums">
+                      {volume}
+                    </span>
+                    <span className="ml-1 text-sm font-bold text-white/35">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onPreviewSound}
+                    className="h-10 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
+                  >
+                    {copy.test}
+                  </button>
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={volume}
+                  onChange={(e) => onVolumeChange(Number(e.target.value))}
+                  className="w-full accent-white"
+                />
+                <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
+                  <span>{copy.mute}</span>
+                  <span>{copy.max}</span>
+                </div>
+              </section>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {LANGUAGE_OPTIONS.map((option) => {
-              const active = language === option.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => onLanguageChange(option.id)}
-                  className="text-left rounded-2xl border p-4 transition-all"
-                  style={{
-                    background: active
-                      ? "rgba(255,255,255,0.13)"
-                      : "rgba(255,255,255,0.04)",
-                    borderColor: active
-                      ? "rgba(255,255,255,0.28)"
-                      : "rgba(255,255,255,0.08)",
-                  }}
-                >
-                  <span className="block text-sm font-bold text-white">
-                    {option.label}
-                  </span>
-                  <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
-                    {option.hint}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-              <Volume2 className="w-5 h-5 text-white/70" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{copy.sound}</h2>
-              <p className="text-xs text-white/40">
-                {copy.soundHint}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-end justify-between gap-5 mb-5">
-            <div>
-              <span className="text-6xl font-light text-white tabular-nums">
-                {volume}
-              </span>
-              <span className="ml-1 text-sm font-bold text-white/35">%</span>
-            </div>
-            <button
-              type="button"
-              onClick={onPreviewSound}
-              className="h-10 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
-            >
-              {copy.test}
-            </button>
-          </div>
-
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={volume}
-            onChange={(e) => onVolumeChange(Number(e.target.value))}
-            className="w-full accent-white"
-          />
-          <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
-            <span>{copy.mute}</span>
-            <span>{copy.max}</span>
-          </div>
-        </section>
-      </div>
-    </div>
-  </motion.div>
-    );
-  })()
-);
+        </motion.div>
+      );
+    })()
+  );
 
 const EmptyState: React.FC<{
   searchTerm: string;
@@ -2568,45 +2564,45 @@ const ConfirmationModal: React.FC<{
   onConfirm,
   playSound,
 }) => (
-  <ModalShell
-    isOpen={isOpen}
-    onClose={() => {
-      playSound("back");
-      onClose();
-    }}
-    maxWidthClassName="max-w-md"
-    zIndexClassName="z-[170]"
-    className="bg-[#0a0a0c]/95 backdrop-blur-3xl rounded-[32px] p-8 border border-white/10 shadow-2xl"
-  >
-    <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
-    <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-      {description}
-    </p>
-    <div className="mt-6 flex items-center justify-end gap-2">
-      <GlassButton
-        type="button"
-        onClick={() => {
-          playSound("back");
-          onClose();
-        }}
-        onMouseEnter={() => playSound("hover")}
-        variant="outline"
-      >
-        Cancelar
-      </GlassButton>
-      <GlassButton
-        type="button"
-        onClick={() => {
-          playSound("select");
-          void onConfirm();
-        }}
-        onMouseEnter={() => playSound("hover")}
-        variant="white"
-      >
-        {confirmLabel}
-      </GlassButton>
-    </div>
-  </ModalShell>
-);
+    <ModalShell
+      isOpen={isOpen}
+      onClose={() => {
+        playSound("back");
+        onClose();
+      }}
+      maxWidthClassName="max-w-md"
+      zIndexClassName="z-[170]"
+      className="bg-[#0a0a0c]/95 backdrop-blur-3xl rounded-[32px] p-8 border border-white/10 shadow-2xl"
+    >
+      <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
+      <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
+        {description}
+      </p>
+      <div className="mt-6 flex items-center justify-end gap-2">
+        <GlassButton
+          type="button"
+          onClick={() => {
+            playSound("back");
+            onClose();
+          }}
+          onMouseEnter={() => playSound("hover")}
+          variant="outline"
+        >
+          Cancelar
+        </GlassButton>
+        <GlassButton
+          type="button"
+          onClick={() => {
+            playSound("select");
+            void onConfirm();
+          }}
+          onMouseEnter={() => playSound("hover")}
+          variant="white"
+        >
+          {confirmLabel}
+        </GlassButton>
+      </div>
+    </ModalShell>
+  );
 
 export default Home;
