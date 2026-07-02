@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState, useRef } from "react";
-import { Gamepad2 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSteam } from "@fortawesome/free-brands-svg-icons";
 
-const words = ["organize", "lanÃ§ar", "descobrir", "dominar"];
+const words = ["organizar", "lançar", "descobrir", "jogar"];
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   const letters = word.split("");
@@ -118,7 +119,7 @@ export function HeroSection() {
         <div className="lg:max-w-[60%]">
           <div className={`mb-8 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
-              <Gamepad2 className="w-4 h-4" />
+              <img src="/Checkpoint_Logo.png" alt="" className="h-4 w-4 object-contain opacity-80" />
               O launcher definitivo para sua biblioteca de jogos
             </span>
           </div>
@@ -141,14 +142,14 @@ export function HeroSection() {
 
           <div className={`transition-all duration-700 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <p className="text-xl text-white/50 leading-relaxed mb-10 max-w-xl">
-              Conecte a Steam, adicione jogos locais e acesse tudo em um launcher bonito com estÃ©tica de console premium.
+              Conecte Steam e Epic Games, adicione jogos locais e acesse tudo em um launcher bonito com estética de console premium.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="/login"
                 className="inline-flex items-center gap-2 bg-white hover:bg-white/90 text-black px-8 py-4 rounded-full text-sm font-semibold transition-all hover:scale-105 active:scale-95"
               >
-                ComeÃ§ar GrÃ¡tis
+                Começar Grátis
               </a>
               <a
                 href="#features"
@@ -165,8 +166,20 @@ export function HeroSection() {
         <div className="max-w-[1400px] mx-auto flex items-start gap-10 lg:gap-20">
           {[
             { value: "100%", label: "gratuito para usar" },
-            { value: "Steam", label: "integraÃ§Ã£o nativa" },
-            { value: "<1s",   label: "para lanÃ§ar um jogo" },
+            {
+              value: (
+                <span className="flex items-center gap-3">
+                  <FontAwesomeIcon icon={faSteam} className="text-3xl lg:text-4xl" />
+                  <img
+                    src="/Epic-Games-Logo.png"
+                    alt="Epic Games"
+                    className="h-9 w-9 object-contain"
+                  />
+                </span>
+              ),
+              label: "Steam e Epic integradas",
+            },
+            { value: "<1s", label: "para lançar um jogo" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-2">
               <span className="text-3xl lg:text-4xl font-display text-white">{stat.value}</span>

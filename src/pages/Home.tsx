@@ -209,7 +209,7 @@ const Sidebar: React.FC<{
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center"
             >
-              <img src="/public/Checkpoint_Logo.png" alt="" />
+              <img src="/Checkpoint_Logo.png" alt="" className="h-full w-full object-contain" />
             </div>
           </div>
 

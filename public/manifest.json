@@ -3,13 +3,13 @@
   "name": "Checkpoint - Game Launcher",
   "icons": [
     {
-      "src": "favicon.svg",
+      "src": "Checkpoint_Logo.png",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "favicon.svg",
-      "type": "image/svg+xml",
+      "src": "Checkpoint_Logo.png",
+      "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
     }

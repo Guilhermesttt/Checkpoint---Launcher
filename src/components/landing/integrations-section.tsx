@@ -6,14 +6,21 @@ const integrations = [
   {
     name: "Steam",
     icon: faSteam,
-    description: "SincronizaÃ§Ã£o automÃ¡tica da sua biblioteca original",
+    description: "Sincronização automática da sua biblioteca original",
     color: "from-blue-500/10",
     iconColor: "text-white",
   },
   {
-    name: "Steam Verde",
-    icon: faSteam,
-    description: "Adicione e organize seus jogos locais/alternativos",
+    name: "Epic Games",
+    image: "/Epic-Games-Logo.png",
+    description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
+    color: "from-zinc-500/10",
+    iconColor: "text-white",
+  },
+  {
+    name: "Jogos Locais",
+    icon: null,
+    description: "Adicione e organize jogos instalados manualmente",
     color: "from-green-500/10",
     iconColor: "text-green-500",
   },
@@ -48,51 +55,57 @@ export function IntegrationsSection() {
               Fontes
             </span>
             <h2
-              className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${
-                isVisible
-                  ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-8"
-              }`}
+              className={`text-5xl md:text-6xl lg:text-7xl font-display tracking-tight leading-[0.9] transition-all duration-1000 ${isVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-8"
+                }`}
             >
-              De onde vÃªm
+              De onde vêm
               <br />
               <span className="text-muted-foreground">seus jogos?</span>
             </h2>
           </div>
           <div className="lg:col-span-6 flex items-end">
             <p
-              className={`text-lg text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
-                isVisible
-                  ? "opacity-100 translate-y-0"
-                  : "opacity-0 translate-y-4"
-              }`}
+              className={`text-lg text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${isVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-4"
+                }`}
             >
-              O Checkpoint nÃ£o julga. Seja sua imensa biblioteca original ou
-              seus jogos locais da "Steam verde", nÃ³s organizamos tudo em uma
-              Ãºnica interface premium.
+              O Checkpoint reúne Steam, Epic Games e jogos locais em uma única
+              interface premium, sem você precisar abrir vários launchers.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto lg:mx-0">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto lg:mx-0">
           {integrations.map((integration, i) => {
             return (
               <div
                 key={integration.name}
-                className={`relative p-8 border transition-all duration-700 group border-foreground/10 hover:border-foreground/30 cursor-pointer ${
-                  isVisible
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-8"
-                } bg-linear-to-br ${integration.color} to-transparent`}
+                className={`relative p-8 border transition-all duration-700 group border-foreground/10 hover:border-foreground/30 cursor-pointer ${isVisible
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-8"
+                  } bg-linear-to-br ${integration.color} to-transparent`}
                 style={{ transitionDelay: `${i * 80}ms` }}
               >
                 <div
                   className={`mb-6 flex items-center justify-start ${integration.iconColor}`}
                 >
-                  <FontAwesomeIcon
-                    icon={integration.icon}
-                    className="text-[64px]"
-                  />
+                  {integration.icon ? (
+                    <FontAwesomeIcon
+                      icon={integration.icon}
+                      className="text-[64px]"
+                    />
+                  ) : integration.image ? (
+                    <img
+                      src={integration.image}
+                      alt={integration.name}
+                      className="h-16 w-16 object-contain"
+                    />
+                  ) : (
+                    <img src="/Checkpoint_Logo.png" alt="" className="h-16 w-16 object-contain opacity-80" />
+                  )}
                 </div>
                 <h3 className="text-2xl font-display mb-2">
                   {integration.name}
@@ -102,7 +115,7 @@ export function IntegrationsSection() {
                 </p>
                 <div className="mt-6 flex items-center gap-2 text-xs font-mono text-green-500">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  DisponÃ­vel e funcionando
+                  Disponível e funcionando
                 </div>
               </div>
             );

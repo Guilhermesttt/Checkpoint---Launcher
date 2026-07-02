@@ -1,11 +1,11 @@
 ﻿import { useState, useEffect } from "react";
-import { Menu, X, Gamepad2 } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const navLinks = [
   { name: "Recursos",     href: "#features"      },
   { name: "Como Funciona",href: "#how-it-works"  },
-  { name: "IntegraÃ§Ãµes",  href: "#integrations"  },
-  { name: "SeguranÃ§a",    href: "#security"      },
+  { name: "Integrações",  href: "#integrations"  },
+  { name: "Segurança",    href: "#security"      },
 ];
 
 export function Navigation() {
@@ -37,7 +37,11 @@ export function Navigation() {
           }`}
         >
           <a href="#" className="flex items-center gap-2 group">
-            <Gamepad2 className={`transition-all duration-500 ${isScrolled ? "w-5 h-5 text-foreground" : "w-6 h-6 text-white"}`} />
+            <img
+              src="/Checkpoint_Logo.png"
+              alt=""
+              className={`transition-all duration-500 object-contain ${isScrolled ? "w-6 h-6" : "w-7 h-7"}`}
+            />
             <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
               CHECKPOINT
             </span>
@@ -67,7 +71,7 @@ export function Navigation() {
               href="/login"
               className={`rounded-full transition-all duration-500 inline-flex items-center ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6 py-2 text-sm"}`}
             >
-              ComeÃ§ar GrÃ¡tis
+              Começar Grátis
             </a>
           </div>
 
@@ -121,7 +125,7 @@ export function Navigation() {
               onClick={() => setIsMobileMenuOpen(false)}
               className="flex-1 bg-foreground text-background rounded-full h-14 text-base flex items-center justify-center hover:bg-foreground/90 transition-colors"
             >
-              ComeÃ§ar
+              Começar
             </a>
           </div>
         </div>
