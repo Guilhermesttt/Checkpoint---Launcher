@@ -54,7 +54,7 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
       framesRef.current.forEach(cancelAnimationFrame);
       timersRef.current.forEach(clearTimeout);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
   const gradientColors = ["#60a5fa", "#a78bfa", "#34d399", "#fbbf24", "#60a5fa"];
@@ -66,9 +66,9 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
         const lower = Math.floor(colorIndex);
         const upper = Math.min(lower + 1, gradientColors.length - 1);
         const t = colorIndex - lower;
-        const hex2rgb = (hex: string) => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-        const [r1,g1,b1] = hex2rgb(gradientColors[lower]);
-        const [r2,g2,b2] = hex2rgb(gradientColors[upper]);
+        const hex2rgb = (hex: string) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+        const [r1, g1, b1] = hex2rgb(gradientColors[lower]);
+        const [r2, g2, b2] = hex2rgb(gradientColors[upper]);
         return (
           <span
             key={i}
@@ -76,7 +76,7 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
               display: "inline-block",
               opacity: letterStates[i]?.opacity ?? 0,
               filter: `blur(${letterStates[i]?.blur ?? 20}px)`,
-              color: showGradient ? `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})` : "white",
+              color: showGradient ? `rgb(${Math.round(r1 + (r2 - r1) * t)},${Math.round(g1 + (g2 - g1) * t)},${Math.round(b1 + (b2 - b1) * t)})` : "white",
               transition: "color 0.4s ease",
             }}
           >
@@ -108,10 +108,10 @@ export function HeroSection() {
 
       <div className="absolute inset-0 z-[2] overflow-hidden pointer-events-none opacity-10">
         {[...Array(8)].map((_, i) => (
-          <div key={`h-${i}`} className="absolute h-px bg-white/20" style={{ top: `${12.5*(i+1)}%`, left: 0, right: 0 }} />
+          <div key={`h-${i}`} className="absolute h-px bg-white/20" style={{ top: `${12.5 * (i + 1)}%`, left: 0, right: 0 }} />
         ))}
         {[...Array(12)].map((_, i) => (
-          <div key={`v-${i}`} className="absolute w-px bg-white/20" style={{ left: `${8.33*(i+1)}%`, top: 0, bottom: 0 }} />
+          <div key={`v-${i}`} className="absolute w-px bg-white/20" style={{ left: `${8.33 * (i + 1)}%`, top: 0, bottom: 0 }} />
         ))}
       </div>
 
@@ -126,9 +126,8 @@ export function HeroSection() {
 
           <div className="mb-8">
             <h1
-              className={`text-left text-[clamp(2.5rem,7vw,7.5rem)] font-display leading-[0.92] tracking-tight text-white transition-all duration-1000 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-              }`}
+              className={`text-left text-[clamp(2.5rem,7vw,7.5rem)] font-display leading-[0.92] tracking-tight text-white transition-all duration-1000 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+                }`}
             >
               <span className="block whitespace-nowrap">Sua biblioteca,</span>
               <span className="block whitespace-nowrap">
@@ -173,7 +172,7 @@ export function HeroSection() {
                   <img
                     src="/Epic-Games-Logo.png"
                     alt="Epic Games"
-                    className="h-9 w-9 object-contain"
+                    className="h-20 w-20 object-contain"
                   />
                 </span>
               ),
