@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckLine } from "lucide-react";
 
@@ -10,11 +10,6 @@ const loadingMsgs = [
   "Quase pronto...",
 ];
 
-/**
- * AsyncLoader — performance-safe loading screen.
- * Removed heavy blur blobs (blur-[120px] animated = GPU killer).
- * Uses static radial gradient + lightweight spinner rings.
- */
 const AsyncLoader: React.FC = () => {
   const [msgIndex, setMsgIndex] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -39,7 +34,6 @@ const AsyncLoader: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[1000] bg-[#050507] flex flex-col items-center justify-center overflow-hidden">
-      {/* Static gradient background — zero GPU cost, no blur */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -49,9 +43,7 @@ const AsyncLoader: React.FC = () => {
       />
 
       <div className="relative z-10 w-full max-w-xs px-8 flex flex-col items-center">
-        {/* Logo icon */}
         <div className="relative w-16 h-16 mb-10 flex items-center justify-center">
-          {/* Spinner rings — pure CSS border rotate, no blur */}
           {[...Array(3)].map((_, i) => (
             <motion.div
               key={i}
@@ -68,13 +60,11 @@ const AsyncLoader: React.FC = () => {
               }}
             />
           ))}
-          {/* Center icon */}
           <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
             <CheckLine className="w-4 h-4 text-blue-400" />
           </div>
         </div>
 
-        {/* Rotating loading messages */}
         <div className="h-6 mb-5 overflow-hidden text-center w-full">
           <AnimatePresence mode="wait">
             <motion.p
@@ -90,7 +80,6 @@ const AsyncLoader: React.FC = () => {
           </AnimatePresence>
         </div>
 
-        {/* Progress bar */}
         <div className="w-full h-[2px] bg-white/8 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: "0%" }}
@@ -109,7 +98,6 @@ const AsyncLoader: React.FC = () => {
         </motion.span>
       </div>
 
-      {/* Decorative dots */}
       <div className="absolute bottom-10 left-10 flex gap-3">
         {[0.08, 0.06, 0.12].map((op, i) => (
           <div

@@ -53,7 +53,7 @@ import GlassButton from "../components/ui/GlassButton";
 import ModalShell from "../components/ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 import { useImagePreloader } from "../hooks/useImagePreloader";
-import { useSoundEffects } from "../hooks/useSoundEffects";
+import { useSoundEffects, type SoundEffectType } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
 import {
   usePreferences,
@@ -62,9 +62,15 @@ import {
 } from "../context/PreferencesContext";
 import { isBackendHealthy } from "../services/api";
 import {
+  disconnectSteamAccount,
   getSteamLinkUrl,
   syncSteamLibraryToFirestore,
 } from "../services/steam";
+import {
+  disconnectEpicAccount,
+  getEpicLinkUrl,
+  syncEpicLibraryToFirestore,
+} from "../services/epic";
 import type { Game } from "../types/domain";
 import {
   profileDocRef,
@@ -76,11 +82,11 @@ import {
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
 
-// ─── Category config with icons ──────────────────────────────────────────────
 const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "STEAM", label: "Steam", Icon: Zap },
+  { id: "EPIC", label: "Epic", Icon: Globe },
   { id: "LOCAL", label: "Local", Icon: Gamepad2 },
   { id: "RACING", label: "Corrida", Icon: Car },
   { id: "ROLEPLAYING", label: "RPG", Icon: Swords },
@@ -99,9 +105,9 @@ const normalizeCategory = (v?: string) =>
 const steamIdKey = (uid: string) => `checkpoint_steam_id_${uid}`;
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
-  { id: "pt-BR", label: "Português", hint: "Brasil" },
+  { id: "pt-BR", label: "PortuguÃªs", hint: "Brasil" },
   { id: "en-US", label: "English", hint: "United States" },
-  { id: "es-ES", label: "Español", hint: "España" },
+  { id: "es-ES", label: "EspaÃ±ol", hint: "EspaÃ±a" },
 ];
 
 const SOUND_THEME_OPTIONS: Array<{ id: SoundTheme; labelKey: "defaultTheme" | "gamecubeTheme"; hint: string }> = [
@@ -109,7 +115,6 @@ const SOUND_THEME_OPTIONS: Array<{ id: SoundTheme; labelKey: "defaultTheme" | "g
   { id: "gamecube", labelKey: "gamecubeTheme", hint: "Nintendo GameCube Menu SFX" },
 ];
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
 const Sidebar: React.FC<{
   activeCategory: string;
   onCategory: (id: string) => void;
@@ -157,7 +162,6 @@ const Sidebar: React.FC<{
           borderRight: "1px solid rgba(255,255,255,0.055)",
         }}
       >
-        {/* Logo */}
         <div className="mb-5 flex flex-col items-center">
           <div
             className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -175,7 +179,6 @@ const Sidebar: React.FC<{
           style={{ background: "rgba(255,255,255,0.07)" }}
         />
 
-        {/* Category nav */}
         <nav className="flex flex-col gap-0.5 w-full px-2 flex-1">
           {CATEGORIES.map(({ id, label, Icon }) => {
             const active = activeCategory === id;
@@ -220,7 +223,6 @@ const Sidebar: React.FC<{
                 >
                   {label}
                 </span>
-                {/* Tooltip */}
                 <div
                   className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
                   style={{
@@ -248,7 +250,7 @@ const Sidebar: React.FC<{
             onCategory("SETTINGS");
             playSound("navigate");
           }}
-          title="Configurações"
+          title="ConfiguraÃ§Ãµes"
           className="relative group flex flex-col items-center justify-center gap-1 w-full mx-2 py-2.5 rounded-xl transition-all duration-200"
           style={{
             background:
@@ -288,13 +290,24 @@ const Sidebar: React.FC<{
           >
             {settingsLabel}
           </span>
+          <div
+            className="absolute left-full ml-3 px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-50 translate-x-1 group-hover:translate-x-0"
+            style={{
+              background: "rgba(14,14,22,0.97)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              color: "rgba(255,255,255,0.8)",
+              backdropFilter: "blur(16px)",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+            }}
+          >
+            {settingsLabel}
+          </div>
         </button>
       </div>
     </motion.aside>
   );
 };
 
-// ─── Home ────────────────────────────────────────────────────────────────────
 const Home: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -305,10 +318,14 @@ const Home: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [steamSyncing, setSteamSyncing] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
+  const [epicSyncing, setEpicSyncing] = useState(false);
+  const [epicConnecting, setEpicConnecting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [disconnectSteamModalOpen, setDisconnectSteamModalOpen] =
+    useState(false);
+  const [disconnectEpicModalOpen, setDisconnectEpicModalOpen] =
     useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -346,8 +363,11 @@ const Home: React.FC = () => {
     () => userProfile?.steamId || undefined,
     [userProfile?.steamId],
   );
+  const resolvedEpicAccountId = useMemo(
+    () => userProfile?.epicAccountId || undefined,
+    [userProfile?.epicAccountId],
+  );
 
-  // ── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.uid) {
       setGames([]);
@@ -426,41 +446,51 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const status = params.get("steamStatus"),
-      id = params.get("steamId"),
-      state = params.get("state");
-    if (!status || !user?.uid) return;
-    if (status === "ok" && id && state === user.uid) {
+    const steamStatus = params.get("steamStatus");
+    const epicStatus = params.get("epicStatus");
+    if ((!steamStatus && !epicStatus) || !user?.uid) return;
+
+    if (steamStatus === "ok") {
       localStorage.removeItem(steamDiscKey(user.uid));
-      localStorage.setItem(steamIdKey(user.uid), id);
-      setDoc(
-        profileDocRef(user.uid),
-        { steamId: id, updatedAt: new Date().toISOString() },
-        { merge: true },
-      )
-        .catch(() =>
-          notify(
-            "Conta Steam autenticada, mas não foi possível salvar o vínculo.",
-            "error",
-          ),
-        )
-        .finally(() => refreshProfile());
-    } else if (status !== "ok") {
+      notify("Conta Steam conectada com sucesso.", "success");
+      void refreshProfile();
+    } else if (steamStatus) {
       const labels: Record<string, string> = {
-        invalid_state: "Estado inválido.",
-        invalid: "Falha na validação OpenID.",
-        missing_id: "Steam ID não retornado.",
+        invalid_state: "Estado invÃ¡lido.",
+        invalid: "Falha na validaÃ§Ã£o OpenID.",
+        missing_id: "Steam ID nÃ£o retornado.",
+        server_not_configured: "Backend Firebase Admin nÃ£o configurado.",
         error: "Erro inesperado.",
       };
       notify(
-        labels[status] ?? "Não foi possível conectar com a Steam.",
+        labels[steamStatus] ?? "NÃ£o foi possÃ­vel conectar com a Steam.",
         "error",
       );
     }
+
+    if (epicStatus === "ok") {
+      notify("Conta Epic Games conectada com sucesso.", "success");
+      void refreshProfile();
+    } else if (epicStatus) {
+      const labels: Record<string, string> = {
+        invalid_state: "Estado invÃ¡lido.",
+        denied: "Autorização da Epic Games cancelada.",
+        missing_code: "Código de retorno da Epic Games não recebido.",
+        missing_id: "Conta Epic Games não retornou identificador.",
+        client_not_configured: "Credenciais da Epic Games não configuradas no backend.",
+        server_not_configured: "Backend Firebase Admin não configurado.",
+        token_error: "A Epic Games recusou a troca do código de autenticação.",
+        error: "Erro inesperado.",
+      };
+      notify(
+        labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.",
+        "error",
+      );
+    }
+
     window.history.replaceState({}, document.title, window.location.pathname);
   }, [notify, refreshProfile, user?.uid]);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
   const displayGames = useMemo(() => {
     const s = searchTerm.trim().toLowerCase();
     const ordered = [...games].sort((a, b) => {
@@ -478,10 +508,12 @@ const Home: React.FC = () => {
           ? ordered.filter((g) => g.isFavorite)
           : activeCategory === "STEAM"
             ? ordered.filter((g) => g.launcherType === "steam")
-            : activeCategory === "LOCAL"
+          : activeCategory === "LOCAL"
               ? ordered.filter(
                   (g) => g.launcherType === "local" || !g.launcherType,
                 )
+              : activeCategory === "EPIC"
+              ? ordered.filter((g) => g.launcherType === "epic")
               : ordered.filter((g) => {
                   const gCat = normalizeCategory(g.category);
                   return (
@@ -511,7 +543,8 @@ const Home: React.FC = () => {
     isDetailOpen ||
     Boolean(contextMenu) ||
     signOutModalOpen ||
-    disconnectSteamModalOpen;
+    disconnectSteamModalOpen ||
+    disconnectEpicModalOpen;
 
   useImagePreloader(
     useMemo(
@@ -531,7 +564,6 @@ const Home: React.FC = () => {
       setSelectedIndex(displayGames.length - 1);
   }, [displayGames.length, selectedIndex]);
 
-  // ── Handlers & Navigation ───────────────────────────────────────────────
   const openDetails = useCallback(
     (game: Game) => {
       setSelectedGame(game);
@@ -545,7 +577,6 @@ const Home: React.FC = () => {
     if (isAnyModalOpen || displayGames.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Allow input interactions
       if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName || ""))
         return;
 
@@ -584,7 +615,6 @@ const Home: React.FC = () => {
 
     const handleWheel = (e: WheelEvent) => {
       const now = Date.now();
-      // Scroll cooldown of 120ms to allow 1 tile change per small scroll flick
       if (now - lastWheelTime.current < 120) return;
 
       if (Math.abs(e.deltaX) > 15 || Math.abs(e.deltaY) > 15) {
@@ -633,14 +663,14 @@ const Home: React.FC = () => {
       );
       notify(
         count === 0
-          ? "Nenhum jogo retornado. Verifique se o perfil é público."
+          ? "Nenhum jogo retornado. Verifique se o perfil Ã© pÃºblico."
           : `${count} jogos importados/atualizados.`,
         count === 0 ? "info" : "success",
       );
       await refreshProfile();
     } catch (e) {
       notify(
-        e instanceof Error ? e.message : "Falha na sincronização Steam.",
+        e instanceof Error ? e.message : "Falha na sincronizaÃ§Ã£o Steam.",
         "error",
       );
     } finally {
@@ -655,11 +685,11 @@ const Home: React.FC = () => {
     setSteamConnecting(true);
 
     notify(
-      "Iniciando conexão com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
+      "Iniciando conexÃ£o com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
       "info",
     );
 
-    isBackendHealthy().then((h) => {
+    isBackendHealthy().then(async (h) => {
       if (!h) {
         notify(
           "O servidor Steam demorou demais para responder. Tente novamente em instantes.",
@@ -668,7 +698,81 @@ const Home: React.FC = () => {
         setSteamConnecting(false);
         return;
       }
-      window.location.href = getSteamLinkUrl(user.uid);
+      try {
+        window.location.href = await getSteamLinkUrl();
+      } catch (e) {
+        notify(
+          e instanceof Error ? e.message : "NÃ£o foi possÃ­vel conectar com a Steam.",
+          "error",
+        );
+        setSteamConnecting(false);
+      }
+    });
+  };
+
+  const handleSyncEpic = async () => {
+    if (!user?.uid || !resolvedEpicAccountId) {
+      notify("Conecte sua conta Epic para sincronizar.", "info");
+      return;
+    }
+    const healthy = await isBackendHealthy();
+    if (!healthy) {
+      notify("Backend Epic offline.", "error");
+      return;
+    }
+    setIsLoading(true);
+    setEpicSyncing(true);
+    try {
+      const count = await syncEpicLibraryToFirestore(
+        user.uid,
+        resolvedEpicAccountId,
+      );
+      notify(
+        count === 0
+          ? "Nenhum jogo retornado. Verifique se o perfil é público."
+          : `${count} jogos importados/atualizados.`,
+        count === 0 ? "info" : "success",
+      );
+      await refreshProfile();
+    } catch (e) {
+      notify(
+        e instanceof Error ? e.message : "Falha na sincronização Epic.",
+        "error",
+      );
+    } finally {
+      setEpicSyncing(false);
+      setIsLoading(false);
+    }
+  };
+
+  const connectEpic = () => {
+    if (!user?.uid) return;
+    playSound("select");
+    setEpicConnecting(true);
+
+    notify(
+      "Iniciando conexão com Epic Games. Isso pode levar alguns segundos se o servidor estiver acordando...",
+      "info",
+    );
+
+    isBackendHealthy().then(async (h) => {
+      if (!h) {
+        notify(
+          "O servidor Epic Games demorou demais para responder. Tente novamente em instantes.",
+          "error",
+        );
+        setEpicConnecting(false);
+        return;
+      }
+      try {
+        window.location.href = await getEpicLinkUrl();
+      } catch (e) {
+        notify(
+          e instanceof Error ? e.message : "Não foi possível conectar com a Epic Games.",
+          "error",
+        );
+        setEpicConnecting(false);
+      }
     });
   };
 
@@ -718,10 +822,7 @@ const Home: React.FC = () => {
     playSound("back");
     setIsLoading(true);
     try {
-      await updateDoc(profileDocRef(user.uid), {
-        steamId: "",
-        updatedAt: new Date().toISOString(),
-      });
+      await disconnectSteamAccount();
       const snap = await getDocs(
         query(
           userGamesCollectionRef(user.uid),
@@ -745,6 +846,33 @@ const Home: React.FC = () => {
     }
   };
 
+  const handleDisconnectEpic = async () => {
+    if (!user?.uid) return;
+    playSound("back");
+    setIsLoading(true);
+    try {
+      await disconnectEpicAccount();
+      const snap = await getDocs(
+        query(
+          userGamesCollectionRef(user.uid),
+          where("launcherType", "==", "epic"),
+        ),
+      );
+      if (snap.docs.length > 0) {
+        const b = writeBatch(db);
+        snap.docs.forEach((d) => b.delete(d.ref));
+        await b.commit();
+      }
+      await refreshProfile();
+      setSelectedIndex(0);
+      notify("Epic Games desconectada e biblioteca atualizada.", "success");
+    } catch {
+      notify("Erro ao desconectar conta Epic Games.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const closeAddModal = (silent = false) => {
     if (!silent) playSound("back");
     setIsAddModalOpen(false);
@@ -752,7 +880,6 @@ const Home: React.FC = () => {
     setGames((p) => p);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div
       className="relative h-screen w-full text-white overflow-hidden no-scrollbar flex transition-colors duration-1000"
@@ -773,7 +900,6 @@ const Home: React.FC = () => {
         reducedEffects={isAnyModalOpen}
       />
 
-      {/* Sidebar */}
       <Sidebar
         activeCategory={activeCategory}
         onCategory={setActiveCategory}
@@ -792,19 +918,16 @@ const Home: React.FC = () => {
         playSound={playSound}
       />
 
-      {/* ── Main canvas ───────────────────────────────────────────────────── */}
       <div
         className="flex-1 flex flex-col h-screen overflow-hidden"
         style={{ marginLeft: 96 }}
       >
-        {/* Top bar */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="shrink-0 flex items-center justify-between px-10 pt-7 relative"
         >
-          {/* Breadcrumb */}
           <div className="flex items-center gap-5">
             <div className="flex items-center gap-2">
               <span
@@ -814,7 +937,6 @@ const Home: React.FC = () => {
                 Checkpoint
               </span>
 
-              {/* Search next to Checkpoint */}
               <div className="relative flex items-center h-4 ml-1">
                 <AnimatePresence>
                   {searchOpen && (
@@ -858,7 +980,7 @@ const Home: React.FC = () => {
                     setSearchOpen((s) => !s);
                     playSound("search");
                   }}
-                  onMouseEnter={() => playSound("navigate")}
+                  onMouseEnter={() => playSound("hover")}
                   className="p-1 hover:bg-white/5 rounded-full transition-all group"
                 >
                   <Search className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
@@ -866,7 +988,7 @@ const Home: React.FC = () => {
               </div>
             </div>
 
-            <span style={{ color: "rgba(255,255,255,0.14)" }}>›</span>
+            <span style={{ color: "rgba(255,255,255,0.14)" }}>â€º</span>
 
             <AnimatePresence mode="wait">
               <motion.span
@@ -886,7 +1008,6 @@ const Home: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Action Buttons Top Bar */}
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
               <button
                 onClick={() => {
@@ -905,7 +1026,6 @@ const Home: React.FC = () => {
 
               {resolvedSteamId ? (
                 <div className="flex items-center gap-1.5">
-                  {/* Steam Status / Disconnect Toggle */}
                   <button
                     onClick={() => {
                       playSound("back");
@@ -934,7 +1054,6 @@ const Home: React.FC = () => {
 
                   <div className="w-px h-3 bg-white/5" />
 
-                  {/* Sync Button */}
                   <button
                     onClick={handleSyncSteam}
                     disabled={steamSyncing}
@@ -962,7 +1081,6 @@ const Home: React.FC = () => {
               )}
             </div>
 
-            {/* Profile / Logout with Username */}
             <div className="flex items-center gap-3 pl-2">
               <div className="flex flex-col items-end">
                 <span className="text-[8px] font-black uppercase tracking-widest text-white/20 select-none">
@@ -983,7 +1101,6 @@ const Home: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* ── Content: flex-1, carousel + hero anchored to bottom ────── */}
         <div className="flex-1 flex flex-col justify-end min-h-0">
           {activeCategory === "SETTINGS" ? (
             <SettingsPageV2
@@ -1005,6 +1122,24 @@ const Home: React.FC = () => {
               }}
               onPreviewSound={() => playSound("select")}
               t={t}
+              steamConnected={Boolean(resolvedSteamId)}
+              epicConnected={Boolean(resolvedEpicAccountId)}
+              steamConnecting={steamConnecting}
+              epicConnecting={epicConnecting}
+              steamSyncing={steamSyncing}
+              epicSyncing={epicSyncing}
+              onConnectSteam={connectSteam}
+              onConnectEpic={connectEpic}
+              onDisconnectSteam={() => {
+                playSound("back");
+                setDisconnectSteamModalOpen(true);
+              }}
+              onDisconnectEpic={() => {
+                playSound("back");
+                setDisconnectEpicModalOpen(true);
+              }}
+              onSyncSteam={handleSyncSteam}
+              onSyncEpic={handleSyncEpic}
             />
           ) : isLoading ? (
             <div className="flex-1 flex items-center justify-center">
@@ -1043,7 +1178,6 @@ const Home: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* ── Hero info ── */}
               <motion.div
                 className="px-10 pb-7 shrink-0"
                 initial={{ opacity: 0 }}
@@ -1059,13 +1193,12 @@ const Home: React.FC = () => {
                     transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                     className="flex items-end justify-between gap-8"
                   >
-                    {/* Title + meta */}
                     <div className="min-w-0 flex-1">
                       <p
                         className="text-[10px] font-black uppercase tracking-[0.28em] mb-2.5"
                         style={{ color: "rgba(255,255,255,0.25)" }}
                       >
-                        {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1}
+                        {currentGame?.category ?? "Jogo"} Â· {canonicalIndex + 1}
                         /{displayGames.length}
                       </p>
                       <h1
@@ -1081,7 +1214,6 @@ const Home: React.FC = () => {
                       >
                         {currentGame?.title}
                       </h1>
-                      {/* Metadata pills */}
                       <div className="flex items-center gap-4 mt-3.5 flex-wrap">
                         {currentGame?.launcherType === "steam" && (
                           <span
@@ -1107,10 +1239,9 @@ const Home: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Primary CTA */}
                     <button
                       onClick={() => currentGame && openDetails(currentGame)}
-                      onMouseEnter={() => playSound("navigate")}
+                      onMouseEnter={() => playSound("hover")}
                       className="shrink-0 flex items-center gap-3 px-8 py-4 rounded-full font-black text-[13px] tracking-wider uppercase relative overflow-hidden group transition-all duration-500"
                       style={{
                         background: "var(--game-color, rgba(255,255,255,1))",
@@ -1159,7 +1290,6 @@ const Home: React.FC = () => {
                 </AnimatePresence>
               </motion.div>
 
-              {/* ── Carousel ── */}
               <div className="shrink-0 pb-14">
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.div
@@ -1183,7 +1313,6 @@ const Home: React.FC = () => {
           )}
         </div>
 
-        {/* ── HUD footer ───────────────────────────────────────────────── */}
         <div
           className="fixed bottom-0 z-30 flex items-center justify-between px-8 py-3.5 pointer-events-none"
           style={{
@@ -1203,10 +1332,10 @@ const Home: React.FC = () => {
             {[
               {
                 label: "Navegar",
-                node: <span className="text-[12px] font-bold">← →</span>,
+                node: <span className="text-[12px] font-bold">â† â†’</span>,
               },
               { label: "Abrir", node: <MouseLeft className="w-3.5 h-3.5" /> },
-              { label: "Opções", node: <MouseRight className="w-3.5 h-3.5" /> },
+              { label: "OpÃ§Ãµes", node: <MouseRight className="w-3.5 h-3.5" /> },
             ].map(({ label, node }) => (
               <div key={label} className="flex items-center gap-2">
                 <span style={{ color: "rgba(255,255,255,0.28)" }}>{node}</span>
@@ -1222,7 +1351,6 @@ const Home: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Overlays ─────────────────────────────────────────────────────── */}
       <React.Suspense fallback={null}>
         <GameDetailPanel
           game={selectedGame}
@@ -1281,6 +1409,19 @@ const Home: React.FC = () => {
         playSound={playSound}
       />
 
+      <ConfirmationModal
+        isOpen={disconnectEpicModalOpen}
+        title={t("disconnectEpicTitle")}
+        description={t("disconnectEpicDescription")}
+        confirmLabel={t("confirm")}
+        onClose={() => setDisconnectEpicModalOpen(false)}
+        onConfirm={async () => {
+          setDisconnectEpicModalOpen(false);
+          await handleDisconnectEpic();
+        }}
+        playSound={playSound}
+      />
+
       <AnimatePresence>
         {isExitingSession && (
           <motion.div
@@ -1300,13 +1441,13 @@ const Home: React.FC = () => {
                 <Gamepad2 className="w-7 h-7 text-black" />
               </div>
               <h3 className="text-3xl font-black text-white tracking-tighter uppercase mb-4">
-                Encerrando Sessão
+                Encerrando SessÃ£o
               </h3>
               <p
                 className="text-[10px] tracking-[0.4em] uppercase"
                 style={{ color: "rgba(255,255,255,0.3)" }}
               >
-                Até logo
+                AtÃ© logo
               </p>
             </motion.div>
           </motion.div>
@@ -1316,7 +1457,6 @@ const Home: React.FC = () => {
   );
 };
 
-// ─── Empty State ─────────────────────────────────────────────────────────────
 const SettingsPageV2: React.FC<{
   language: LauncherLanguage;
   effectsVolume: number;
@@ -1328,6 +1468,18 @@ const SettingsPageV2: React.FC<{
   onSoundThemeChange: (theme: SoundTheme) => void;
   onPreviewSound: () => void;
   t: ReturnType<typeof usePreferences>["t"];
+  steamConnected: boolean;
+  epicConnected: boolean;
+  steamConnecting: boolean;
+  epicConnecting: boolean;
+  steamSyncing: boolean;
+  epicSyncing: boolean;
+  onConnectSteam: () => void;
+  onConnectEpic: () => void;
+  onDisconnectSteam: () => void;
+  onDisconnectEpic: () => void;
+  onSyncSteam: () => void;
+  onSyncEpic: () => void;
 }> = ({
   language,
   effectsVolume,
@@ -1339,6 +1491,18 @@ const SettingsPageV2: React.FC<{
   onSoundThemeChange,
   onPreviewSound,
   t,
+  steamConnected,
+  epicConnected,
+  steamConnecting,
+  epicConnecting,
+  steamSyncing,
+  epicSyncing,
+  onConnectSteam,
+  onConnectEpic,
+  onDisconnectSteam,
+  onDisconnectEpic,
+  onSyncSteam,
+  onSyncEpic,
 }) => (
   <motion.div
     initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
@@ -1355,6 +1519,94 @@ const SettingsPageV2: React.FC<{
           {t("settings")}
         </h1>
       </div>
+
+      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+        <SettingsHeader
+          icon={<Globe className="w-5 h-5 text-white/70" />}
+          title={t("connectedAccounts")}
+          description={t("connectedAccountsHint")}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                <Zap className="w-4 h-4 text-white/60" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Steam</p>
+                <p className="text-[10px] text-white/40">
+                  {steamConnected ? t("connected") : t("notConnected")}
+                </p>
+              </div>
+            </div>
+            {steamConnected ? (
+              <div className="flex items-center gap-2">
+                <button
+                onClick={onSyncSteam}
+                disabled={steamSyncing}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {steamSyncing ? t("syncing") : t("sync")}
+              </button>
+              <button
+                onClick={onDisconnectSteam}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+              >
+                {t("unlink")}
+              </button>
+              </div>
+            ) : (
+              <button
+                onClick={onConnectSteam}
+                disabled={steamConnecting}
+                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {steamConnecting ? t("connecting") : t("connectSteam")}
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                <Globe className="w-4 h-4 text-white/60" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">Epic Games</p>
+                <p className="text-[10px] text-white/40">
+                  {epicConnected ? t("connected") : t("notConnected")}
+                </p>
+              </div>
+            </div>
+            {epicConnected ? (
+              <div className="flex items-center gap-2">
+                <button
+                onClick={onSyncEpic}
+                disabled={epicSyncing}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {epicSyncing ? t("syncing") : t("sync")}
+              </button>
+              <button
+                onClick={onDisconnectEpic}
+                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+              >
+                {t("unlink")}
+              </button>
+              </div>
+            ) : (
+              <button
+                onClick={onConnectEpic}
+                disabled={epicConnecting}
+                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+              >
+                {epicConnecting ? t("connecting") : t("connectEpic")}
+              </button>
+            )}
+          </div>
+
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
@@ -1525,12 +1777,12 @@ const SettingsPage: React.FC<{
         eyebrow: "Sistema",
         title: "Ajustes",
         language: "Idioma",
-        languageHint: "Preferência visual salva neste dispositivo.",
+        languageHint: "PreferÃªncia visual salva neste dispositivo.",
         sound: "Efeitos sonoros",
-        soundHint: "Volume de navegação, seleção e retorno.",
+        soundHint: "Volume de navegaÃ§Ã£o, seleÃ§Ã£o e retorno.",
         test: "Testar",
         mute: "Mudo",
-        max: "Máximo",
+        max: "MÃ¡ximo",
       },
       "en-US": {
         eyebrow: "System",
@@ -1549,10 +1801,10 @@ const SettingsPage: React.FC<{
         language: "Idioma",
         languageHint: "Preferencia visual guardada en este dispositivo.",
         sound: "Efectos sonoros",
-        soundHint: "Volumen de navegación, selección y retorno.",
+        soundHint: "Volumen de navegaciÃ³n, selecciÃ³n y retorno.",
         test: "Probar",
         mute: "Silencio",
-        max: "Máximo",
+        max: "MÃ¡ximo",
       },
     }[language];
 
@@ -1688,7 +1940,7 @@ const EmptyState: React.FC<{
       {searchTerm
         ? "Tente buscar por outro termo."
         : steamConnected
-          ? "Você não possui jogos salvos. Adicione um jogo manualmente."
+          ? "VocÃª nÃ£o possui jogos salvos. Adicione um jogo manualmente."
           : "Adicione um jogo ou conecte sua conta Steam."}
     </p>
     {!searchTerm && (
@@ -1717,12 +1969,11 @@ const EmptyState: React.FC<{
   </div>
 );
 
-// ─── Empty Library Onboarding ─────────────────────────────────────────────────
 const EmptyLibraryOnboarding: React.FC<{
   onConnectSteam: () => void;
   onOpenAddGame: () => void;
   onComplete: () => void | Promise<void>;
-  playSound: (type: "select" | "back" | "navigate") => void;
+  playSound: (type: SoundEffectType) => void;
 }> = ({ onConnectSteam, onOpenAddGame, onComplete, playSound }) => (
   <div
     className="w-full max-w-2xl rounded-3xl p-8"
@@ -1744,7 +1995,7 @@ const EmptyLibraryOnboarding: React.FC<{
       contentClassName="pb-2"
       footerClassName="pt-2"
       backButtonText="Voltar"
-      nextButtonText="Próximo"
+      nextButtonText="PrÃ³ximo"
       onStepChange={() => playSound("navigate")}
       onFinalStepCompleted={() => {
         playSound("select");
@@ -1754,7 +2005,7 @@ const EmptyLibraryOnboarding: React.FC<{
     >
       <Step>
         <h3 className="text-2xl font-black mb-2 text-white">
-          Sua biblioteca está vazia
+          Sua biblioteca estÃ¡ vazia
         </h3>
         <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
           Adicione um jogo manualmente ou conecte sua conta Steam.
@@ -1804,12 +2055,11 @@ const EmptyLibraryOnboarding: React.FC<{
       style={{ color: "rgba(255,255,255,0.35)" }}
     >
       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-      Depois da primeira sincronização, seus jogos aparecem automaticamente.
+      Depois da primeira sincronizaÃ§Ã£o, seus jogos aparecem automaticamente.
     </p>
   </div>
 );
 
-// ─── Confirmation Modal ───────────────────────────────────────────────────────
 const ConfirmationModal: React.FC<{
   isOpen: boolean;
   title: string;
@@ -1817,7 +2067,7 @@ const ConfirmationModal: React.FC<{
   confirmLabel: string;
   onClose: () => void;
   onConfirm: () => Promise<void> | void;
-  playSound: (type: "select" | "back" | "navigate") => void;
+  playSound: (type: SoundEffectType) => void;
 }> = ({
   isOpen,
   title,
@@ -1848,7 +2098,7 @@ const ConfirmationModal: React.FC<{
           playSound("back");
           onClose();
         }}
-        onMouseEnter={() => playSound("navigate")}
+        onMouseEnter={() => playSound("hover")}
         variant="outline"
       >
         Cancelar
@@ -1859,7 +2109,7 @@ const ConfirmationModal: React.FC<{
           playSound("select");
           void onConfirm();
         }}
-        onMouseEnter={() => playSound("navigate")}
+        onMouseEnter={() => playSound("hover")}
         variant="white"
       >
         {confirmLabel}

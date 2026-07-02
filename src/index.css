@@ -1,6 +1,5 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-/* ── CSS Custom Properties for landing page ── */
 :root {
   --background: oklch(0.06 0.008 260);
   --foreground: oklch(0.94 0.005 90);
@@ -18,7 +17,6 @@
   --color-border: var(--border);
 }
 
-/* utility for font-display */
 .font-display {
   font-family: var(--font-display);
 }
@@ -27,13 +25,8 @@
   -webkit-text-fill-color: transparent;
 }
 
-/* ═══════════════════════════════════════════════
-   Checkpoint — Console-Inspired Design System
-   Performance First: zero backdrop-filter blur
-   ═══════════════════════════════════════════════ */
 
 @theme {
-  /* ── Animations (lightweight only) ── */
   --animate-fade-in: fade-in 0.4s ease-out forwards;
   --animate-slide-up: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   --animate-shimmer: shimmer 1.8s linear infinite;
@@ -66,7 +59,6 @@
     overflow-x: hidden;
   }
   body {
-    /* overflow-hidden handled at component level for /app, not globally */
     @apply bg-[#050507] m-0 p-0 antialiased;
     font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -83,7 +75,6 @@
 }
 
 @layer utilities {
-  /* ── Scrollbar ── */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar {
     -ms-overflow-style: none;
@@ -109,9 +100,9 @@
     scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 
-  /* ── Glass Effect — Performance-safe (NO backdrop-filter) ──
+  /* â”€â”€ Glass Effect â€” Performance-safe (NO backdrop-filter) â”€â”€
      Uses rgba transparency + border. Zero GPU blur cost.
-  ── */
+  â”€â”€ */
   .liquid-glass {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -136,7 +127,6 @@
       0 8px 32px rgba(0, 0, 0, 0.5);
   }
 
-  /* Accent shimmer overlay (hover effect) – pure CSS, no blur */
   .fluid-glass-accent {
     position: relative;
     overflow: hidden;
@@ -162,7 +152,6 @@
     transform: translateX(100%);
   }
 
-  /* ── Legacy aliases (backwards compat) ── */
   .glass {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -173,7 +162,6 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
-  /* ── Premium Liquid Glass (B&W) ── */
   .premium-glass {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
     backdrop-filter: blur(24px);
@@ -205,14 +193,12 @@
     color: black;
   }
 
-  /* ── Console-style Active Ring ── */
   .ring-glow {
     box-shadow:
       0 0 0 2px rgba(255, 255, 255, 0.8),
       0 0 16px rgba(255, 255, 255, 0.1);
   }
 
-  /* ── Elevation (shadow-only, no blur) ── */
   .elevation-1 {
     box-shadow:
       0 4px 16px rgba(0, 0, 0, 0.35),
@@ -231,7 +217,6 @@
       0 16px 40px rgba(0, 0, 0, 0.5);
   }
 
-  /* ── Shimmer (loading) ── */
   .shimmer {
     background: linear-gradient(
       90deg,
@@ -243,12 +228,10 @@
     animation: shimmer 1.8s linear infinite;
   }
 
-  /* ── GPU-hint for transforms ── */
   .will-change-transform {
     will-change: transform;
   }
 
-  /* ── Console accent line (decorative) ── */
   .console-accent {
     background: linear-gradient(90deg,
       rgba(59, 130, 246, 0.8),
@@ -258,7 +241,6 @@
   }
 }
 
-/* ── Scrubber / Range Input ── */
 .game-row-scrubber {
   width: 100%;
   appearance: none;

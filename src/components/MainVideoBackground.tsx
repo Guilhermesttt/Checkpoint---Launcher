@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 
 const MainVideoBackground: React.FC = () => {
   return (
@@ -21,7 +21,6 @@ const MainVideoBackground: React.FC = () => {
         </video>
       </div>
       
-      {/* Cinematic Overlay for depth and readability */}
       <div 
         className="absolute inset-0 z-10"
         style={{
@@ -29,7 +28,6 @@ const MainVideoBackground: React.FC = () => {
         }}
       />
       
-      {/* Noise/Grain texture for premium feel */}
       <div
         className="absolute inset-0 opacity-[0.03] z-20 mix-blend-overlay pointer-events-none"
         style={{

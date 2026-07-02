@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Play, Star, Zap } from "lucide-react";
 
 interface GameCardProps {
@@ -27,7 +27,6 @@ const GameCard: React.FC<GameCardProps> = ({
       className="relative flex items-center justify-center cursor-pointer select-none"
       style={{ width: 172, height: 260 }}
     >
-      {/* Glow aura behind active card */}
       {isActive && (
         <div
           className="absolute inset-0 rounded-2xl pointer-events-none"
@@ -51,7 +50,6 @@ const GameCard: React.FC<GameCardProps> = ({
           willChange: isActive ? "transform" : "auto",
         }}
       >
-        {/* Card shell */}
         <div
           className={`
             relative w-full h-full overflow-hidden rounded-2xl
@@ -64,7 +62,6 @@ const GameCard: React.FC<GameCardProps> = ({
           `}
           style={isActive ? { boxShadow: "0 0 0 2px rgba(255,255,255,0.18), 0 32px 64px rgba(0,0,0,0.9), 0 8px 32px var(--game-color)" } : {}}
         >
-          {/* Cover image */}
           <img
             src={image}
             alt={title}
@@ -75,7 +72,6 @@ const GameCard: React.FC<GameCardProps> = ({
             decoding="async"
           />
 
-          {/* Cinematic gradient overlay */}
           <div
             className="absolute inset-0"
             style={{
@@ -85,7 +81,6 @@ const GameCard: React.FC<GameCardProps> = ({
             }}
           />
 
-          {/* Subtle specular sheen on active */}
           {isActive && (
             <div
               className="absolute inset-0 pointer-events-none"
@@ -97,7 +92,6 @@ const GameCard: React.FC<GameCardProps> = ({
             />
           )}
 
-          {/* Top badges */}
           <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">
             {isSteam && (
               <div
@@ -130,7 +124,6 @@ const GameCard: React.FC<GameCardProps> = ({
             )}
           </div>
 
-          {/* Bottom info */}
           <div
             className={`absolute bottom-0 left-0 right-0 p-3 transition-all duration-400 ${
               isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
@@ -147,7 +140,6 @@ const GameCard: React.FC<GameCardProps> = ({
             </h3>
           </div>
 
-          {/* Play overlay on hover */}
           {isActive && (
             <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
               <div
@@ -166,7 +158,6 @@ const GameCard: React.FC<GameCardProps> = ({
           )}
         </div>
 
-        {/* Active indicator bar at bottom */}
         {isActive && (
           <div
             className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-0.5 rounded-full"

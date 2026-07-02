@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 
 const steps = [
   {
@@ -6,18 +6,18 @@ const steps = [
     title: "Conecte",
     subtitle: "sua conta",
     description: "Entre com Google e vincule sua conta Steam. O Checkpoint importa toda sua biblioteca automaticamente.",
-    code: `// Autenticação simples
+    code: `// AutenticaÃ§Ã£o simples
 await signInWithGoogle();
 await linkSteamAccount(steamId);
 
 // Biblioteca sincronizada!
-// 247 jogos importados ✓`,
+// 247 jogos importados âœ“`,
   },
   {
     number: "02",
     title: "Organize",
     subtitle: "seus jogos",
-    description: "Categorize por gênero, adicione jogos locais, marque favoritos e personalize com imagens da Steam.",
+    description: "Categorize por gÃªnero, adicione jogos locais, marque favoritos e personalize com imagens da Steam.",
     code: `// Adicione jogos locais
 await addGame({
   title: "Meu Jogo",
@@ -31,12 +31,12 @@ await addGame({
     title: "Jogue",
     subtitle: "& acompanhe",
     description: "Lance qualquer jogo com um clique. Acompanhe horas jogadas, conquistas e mantenha tudo sincronizado na nuvem.",
-    code: `// Lançamento instantâneo
+    code: `// LanÃ§amento instantÃ¢neo
 await launchGame(game);
 
-// Estatísticas automáticas
+// EstatÃ­sticas automÃ¡ticas
 // Horas jogadas: 142h 30m
-// Conquistas: 47/80 ✓`,
+// Conquistas: 47/80 âœ“`,
   },
 ];
 
@@ -68,7 +68,6 @@ export function HowItWorksSection() {
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-blue-500/[0.03] blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
         <div className="relative mb-0 lg:mb-0 grid lg:grid-cols-2 gap-4 lg:gap-12 items-end">
           <div className="overflow-hidden pb-0 lg:pb-32">
             <div className={`transition-all duration-1000 ${isVisible ? "translate-x-0 opacity-100" : "-translate-x-12 opacity-0"}`}>
@@ -87,7 +86,6 @@ export function HowItWorksSection() {
             </h2>
           </div>
 
-          {/* Code preview panel */}
           <div className={`relative h-[320px] lg:h-[580px] transition-all duration-1000 delay-200 ${isVisible ? "opacity-100" : "opacity-0"}`}>
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
@@ -103,7 +101,6 @@ export function HowItWorksSection() {
           </div>
         </div>
 
-        {/* Steps */}
         <div className="grid lg:grid-cols-3 gap-4 mt-8">
           {steps.map((step, index) => (
             <button

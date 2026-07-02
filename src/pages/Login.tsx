@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, AlertCircle, ArrowRight, Gamepad2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,6 @@ const LoginContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
       navigate("/app", { replace: true });
@@ -50,7 +49,7 @@ const LoginContent: React.FC = () => {
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("E-mail ou senha incorretos.");
       } else if (err.code === "auth/email-already-in-use") {
-        setError("Este e-mail já está em uso.");
+        setError("Este e-mail jÃ¡ estÃ¡ em uso.");
       } else if (err.code === "auth/weak-password") {
         setError("A senha deve ter pelo menos 6 caracteres.");
       } else {
@@ -76,11 +75,9 @@ const LoginContent: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-black flex items-center justify-center px-6 relative overflow-hidden">
-      {/* Background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(59,130,246,0.08),transparent_60%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_80%,rgba(139,92,246,0.06),transparent_60%)]" />
 
-      {/* Grid */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
         {[...Array(12)].map((_, i) => (
           <div key={`v-${i}`} className="absolute w-px bg-white" style={{ left: `${(i + 1) * 8.33}%`, top: 0, bottom: 0 }} />
@@ -90,7 +87,6 @@ const LoginContent: React.FC = () => {
         ))}
       </div>
 
-      {/* Back button */}
       <a
         href="/"
         className="absolute top-8 left-8 flex items-center gap-2 text-white/40 hover:text-white/80 text-sm font-mono transition-colors group"
@@ -105,9 +101,7 @@ const LoginContent: React.FC = () => {
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full max-w-md"
       >
-        {/* Card */}
         <div className="border border-white/10 bg-white/[0.03] backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
-          {/* Header */}
           <div className="flex flex-col items-center text-center mb-8">
             <motion.div
               initial={{ scale: 0 }}
@@ -125,7 +119,6 @@ const LoginContent: React.FC = () => {
             </p>
           </div>
 
-          {/* Google button */}
           <button
             onClick={handleGoogleLogin}
             disabled={isLoading || authLoading}
@@ -135,7 +128,6 @@ const LoginContent: React.FC = () => {
             <span>Continuar com Google</span>
           </button>
 
-          {/* Divider */}
           <div className="relative my-6 text-center">
             <div className="absolute inset-x-0 top-1/2 h-px bg-white/10" />
             <span className="relative px-4 bg-transparent text-[10px] uppercase tracking-[0.25em] text-white/30 font-bold">
@@ -143,7 +135,6 @@ const LoginContent: React.FC = () => {
             </span>
           </div>
 
-          {/* Email form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-3">
               <div className="relative group">
@@ -202,29 +193,26 @@ const LoginContent: React.FC = () => {
             </button>
           </form>
 
-          {/* Toggle mode */}
           <div className="mt-6 text-center">
             <button
               onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); }}
               className="text-sm text-white/30 hover:text-white/60 transition-colors"
             >
               {mode === "login"
-                ? "Não tem conta? Cadastre-se grátis"
-                : "Já tem conta? Faça o login"}
+                ? "NÃ£o tem conta? Cadastre-se grÃ¡tis"
+                : "JÃ¡ tem conta? FaÃ§a o login"}
             </button>
           </div>
         </div>
 
-        {/* Footer note */}
         <p className="text-center text-[10px] text-white/20 font-mono mt-6 uppercase tracking-[0.2em]">
-          Autenticação segura · Firebase Auth
+          AutenticaÃ§Ã£o segura Â· Firebase Auth
         </p>
       </motion.div>
     </div>
   );
 };
 
-// Wrap with providers since this is a standalone route
 const Login: React.FC = () => (
   <NotificationProvider>
     <AuthProvider>

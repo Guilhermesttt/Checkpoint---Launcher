@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 
 const metrics = [
-  { value: "10k+", label: "Jogadores ativos", sublabel: "e crescendo todo mês" },
+  { value: "10k+", label: "Jogadores ativos", sublabel: "e crescendo todo mÃªs" },
   { value: "50k+", label: "Jogos catalogados", sublabel: "via Steam + locais" },
   { value: "99.9%", label: "Uptime Firebase", sublabel: "disponibilidade garantida" },
-  { value: "4.9★", label: "Avaliação média", sublabel: "dos usuários" },
+  { value: "4.9â˜…", label: "AvaliaÃ§Ã£o mÃ©dia", sublabel: "dos usuÃ¡rios" },
 ];
 
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
@@ -53,7 +53,6 @@ export function MetricsSection() {
 
   return (
     <section ref={sectionRef} className="relative py-24 lg:py-32 bg-foreground text-background overflow-hidden">
-      {/* Subtle noise texture */}
       <div className="absolute inset-0 opacity-[0.03]" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`
       }} />
@@ -62,7 +61,7 @@ export function MetricsSection() {
         <div className="text-center mb-16">
           <span className="inline-flex items-center gap-3 text-sm font-mono text-background/50 mb-6">
             <span className="w-12 h-px bg-background/30" />
-            Números Reais
+            NÃºmeros Reais
             <span className="w-12 h-px bg-background/30" />
           </span>
           <h2 className={`text-5xl md:text-6xl font-display tracking-tight transition-all duration-1000 ${
@@ -90,13 +89,12 @@ export function MetricsSection() {
           ))}
         </div>
 
-        {/* Bottom quote */}
         <div className={`mt-16 text-center transition-all duration-1000 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}>
           <blockquote className="text-2xl lg:text-3xl font-display text-background/60 max-w-3xl mx-auto leading-relaxed">
             "O Checkpoint mudou completamente como gerencio minha biblioteca. Nunca mais vou usar outro launcher."
           </blockquote>
           <cite className="mt-6 block text-sm font-mono text-background/40 not-italic">
-            — Guilherme S., jogador há 12 anos
+            â€” Guilherme S., jogador hÃ¡ 12 anos
           </cite>
         </div>
       </div>

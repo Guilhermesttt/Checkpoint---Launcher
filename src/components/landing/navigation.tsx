@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Menu, X, Gamepad2 } from "lucide-react";
 
 const navLinks = [
   { name: "Recursos",     href: "#features"      },
   { name: "Como Funciona",href: "#how-it-works"  },
-  { name: "Integrações",  href: "#integrations"  },
-  { name: "Segurança",    href: "#security"      },
+  { name: "IntegraÃ§Ãµes",  href: "#integrations"  },
+  { name: "SeguranÃ§a",    href: "#security"      },
 ];
 
 export function Navigation() {
@@ -36,7 +36,6 @@ export function Navigation() {
             isScrolled ? "h-14" : "h-20"
           }`}
         >
-          {/* Logo */}
           <a href="#" className="flex items-center gap-2 group">
             <Gamepad2 className={`transition-all duration-500 ${isScrolled ? "w-5 h-5 text-foreground" : "w-6 h-6 text-white"}`} />
             <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
@@ -44,7 +43,6 @@ export function Navigation() {
             </span>
           </a>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-12">
             {navLinks.map((link) => (
               <a
@@ -58,7 +56,6 @@ export function Navigation() {
             ))}
           </div>
 
-          {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-4">
             <a
               href="/login"
@@ -70,11 +67,10 @@ export function Navigation() {
               href="/login"
               className={`rounded-full transition-all duration-500 inline-flex items-center ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6 py-2 text-sm"}`}
             >
-              Começar Grátis
+              ComeÃ§ar GrÃ¡tis
             </a>
           </div>
 
-          {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className={`md:hidden p-2 transition-colors duration-500 ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
@@ -85,7 +81,6 @@ export function Navigation() {
         </div>
       </nav>
 
-      {/* Mobile Menu */}
       <div
         className={`md:hidden fixed inset-0 bg-background z-40 transition-all duration-500 ${
           isMobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -126,7 +121,7 @@ export function Navigation() {
               onClick={() => setIsMobileMenuOpen(false)}
               className="flex-1 bg-foreground text-background rounded-full h-14 text-base flex items-center justify-center hover:bg-foreground/90 transition-colors"
             >
-              Começar
+              ComeÃ§ar
             </a>
           </div>
         </div>

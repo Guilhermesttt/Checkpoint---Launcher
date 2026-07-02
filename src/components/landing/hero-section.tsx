@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import { Gamepad2 } from "lucide-react";
 
-const words = ["organize", "lançar", "descobrir", "dominar"];
+const words = ["organize", "lanÃ§ar", "descobrir", "dominar"];
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   const letters = word.split("");
@@ -99,14 +99,12 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center items-start overflow-hidden bg-black">
-      {/* Background gradient */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_80%,rgba(139,92,246,0.1),transparent_60%)]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
       </div>
 
-      {/* Subtle grid lines */}
       <div className="absolute inset-0 z-[2] overflow-hidden pointer-events-none opacity-10">
         {[...Array(8)].map((_, i) => (
           <div key={`h-${i}`} className="absolute h-px bg-white/20" style={{ top: `${12.5*(i+1)}%`, left: 0, right: 0 }} />
@@ -118,7 +116,6 @@ export function HeroSection() {
 
       <div className="relative z-10 w-full max-w-[1400px] mx-auto px-6 lg:px-12 py-32 lg:py-40">
         <div className="lg:max-w-[60%]">
-          {/* Eyebrow */}
           <div className={`mb-8 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
               <Gamepad2 className="w-4 h-4" />
@@ -126,7 +123,6 @@ export function HeroSection() {
             </span>
           </div>
 
-          {/* Main headline */}
           <div className="mb-8">
             <h1
               className={`text-left text-[clamp(2.5rem,7vw,7.5rem)] font-display leading-[0.92] tracking-tight text-white transition-all duration-1000 ${
@@ -145,14 +141,14 @@ export function HeroSection() {
 
           <div className={`transition-all duration-700 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <p className="text-xl text-white/50 leading-relaxed mb-10 max-w-xl">
-              Conecte a Steam, adicione jogos locais e acesse tudo em um launcher bonito com estética de console premium.
+              Conecte a Steam, adicione jogos locais e acesse tudo em um launcher bonito com estÃ©tica de console premium.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="/login"
                 className="inline-flex items-center gap-2 bg-white hover:bg-white/90 text-black px-8 py-4 rounded-full text-sm font-semibold transition-all hover:scale-105 active:scale-95"
               >
-                Começar Grátis
+                ComeÃ§ar GrÃ¡tis
               </a>
               <a
                 href="#features"
@@ -165,13 +161,12 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className={`absolute bottom-12 left-0 right-0 px-6 lg:px-12 transition-all duration-700 delay-500 ${isVisible ? "opacity-100" : "opacity-0"}`}>
         <div className="max-w-[1400px] mx-auto flex items-start gap-10 lg:gap-20">
           {[
             { value: "100%", label: "gratuito para usar" },
-            { value: "Steam", label: "integração nativa" },
-            { value: "<1s",   label: "para lançar um jogo" },
+            { value: "Steam", label: "integraÃ§Ã£o nativa" },
+            { value: "<1s",   label: "para lanÃ§ar um jogo" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-2">
               <span className="text-3xl lg:text-4xl font-display text-white">{stat.value}</span>

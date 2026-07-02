@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Gamepad2, Zap, Lock } from "lucide-react";
 
 export function CtaSection() {
@@ -37,7 +37,6 @@ export function CtaSection() {
           }`}
           onMouseMove={handleMouseMove}
         >
-          {/* Spotlight */}
           <div
             className="absolute inset-0 opacity-5 pointer-events-none transition-opacity duration-300"
             style={{
@@ -47,7 +46,6 @@ export function CtaSection() {
 
           <div className="relative z-10 px-8 lg:px-16 py-16 lg:py-24">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-12">
-              {/* Left */}
               <div className="flex-1">
                 <h2 className="text-6xl md:text-7xl lg:text-[72px] font-display tracking-tight mb-8 leading-[0.95]">
                   Pronto para
@@ -56,8 +54,8 @@ export function CtaSection() {
                 </h2>
 
                 <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-xl">
-                  Junte-se a milhares de jogadores que já transformaram sua
-                  experiência com o Checkpoint. Grátis, sem cartão de crédito.
+                  Junte-se a milhares de jogadores que jÃ¡ transformaram sua
+                  experiÃªncia com o Checkpoint. GrÃ¡tis, sem cartÃ£o de crÃ©dito.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -65,7 +63,7 @@ export function CtaSection() {
                     href="/login"
                     className="inline-flex items-center gap-2 bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group transition-all"
                   >
-                    Criar conta grátis
+                    Criar conta grÃ¡tis
                     <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                   </a>
                   <a
@@ -77,7 +75,6 @@ export function CtaSection() {
                 </div>
               </div>
 
-              {/* Right — decorative */}
               <div className="hidden lg:flex items-center justify-center w-[380px] flex-shrink-0">
                 <div className="relative">
                   <div className="w-64 h-80 rounded-3xl bg-foreground/5 border border-foreground/20 flex items-center justify-center">
@@ -93,11 +90,10 @@ export function CtaSection() {
                       </div>
                     </div>
                   </div>
-                  {/* Floating cards */}
                   <div className="absolute -top-6 -right-6 w-32 h-20 rounded-2xl bg-background border border-foreground/20 flex items-center justify-center shadow-xl">
                     <Zap className="w-6 h-6 text-yellow-500" />
                     <span className="text-xs font-mono text-muted-foreground ml-2">
-                      Rápido
+                      RÃ¡pido
                     </span>
                   </div>
                   <div className="absolute -bottom-6 -left-6 w-32 h-20 rounded-2xl bg-background border border-foreground/20 flex items-center justify-center shadow-xl">
@@ -111,7 +107,6 @@ export function CtaSection() {
             </div>
           </div>
 
-          {/* Decorative corners */}
           <div className="absolute top-0 right-0 w-32 h-32 border-b border-l border-foreground/10" />
           <div className="absolute bottom-0 left-0 w-32 h-32 border-t border-r border-foreground/10" />
         </div>

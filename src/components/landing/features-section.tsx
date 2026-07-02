@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Gamepad2, Zap, Shield, Star } from "lucide-react";
 
 const features = [
@@ -6,28 +6,28 @@ const features = [
     number: "01",
     icon: Gamepad2,
     title: "Biblioteca Unificada",
-    description: "Reúna todos os seus jogos — Steam, Epic, locais — em uma única interface elegante. Chega de abrir múltiplos launchers.",
-    stats: { value: "∞", label: "jogos suportados" },
+    description: "ReÃºna todos os seus jogos â€” Steam, Epic, locais â€” em uma Ãºnica interface elegante. Chega de abrir mÃºltiplos launchers.",
+    stats: { value: "âˆž", label: "jogos suportados" },
   },
   {
     number: "02",
     icon: Zap,
-    title: "Lançamento Ultra-Rápido",
-    description: "Abra qualquer jogo em um clique. Acesso imediato com atalhos de teclado e navegação estilo console.",
-    stats: { value: "<1s", label: "tempo de lançamento" },
+    title: "LanÃ§amento Ultra-RÃ¡pido",
+    description: "Abra qualquer jogo em um clique. Acesso imediato com atalhos de teclado e navegaÃ§Ã£o estilo console.",
+    stats: { value: "<1s", label: "tempo de lanÃ§amento" },
   },
   {
     number: "03",
     icon: Star,
     title: "Interface Premium",
-    description: "Design inspirado no PS5 com glassmorphism, animações fluidas e imagens de fundo dinâmicas para cada jogo.",
-    stats: { value: "60fps", label: "animações suaves" },
+    description: "Design inspirado no PS5 com glassmorphism, animaÃ§Ãµes fluidas e imagens de fundo dinÃ¢micas para cada jogo.",
+    stats: { value: "60fps", label: "animaÃ§Ãµes suaves" },
   },
   {
     number: "04",
     icon: Shield,
     title: "Dados na Nuvem",
-    description: "Sua biblioteca sincronizada em todos os dispositivos via Firebase. Nunca perca suas configurações e progresso.",
+    description: "Sua biblioteca sincronizada em todos os dispositivos via Firebase. Nunca perca suas configuraÃ§Ãµes e progresso.",
     stats: { value: "100%", label: "sincronizado" },
   },
 ];
@@ -141,7 +141,6 @@ export function FeaturesSection() {
   return (
     <section id="features" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
         <div className="relative mb-24 lg:mb-32">
           <div className="grid lg:grid-cols-12 gap-8 items-end">
             <div className="lg:col-span-7">
@@ -163,15 +162,13 @@ export function FeaturesSection() {
               <p className={`text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
                 isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}>
-                Tudo que você precisa para gerenciar sua biblioteca de jogos em um único lugar, com uma interface que impressiona.
+                Tudo que vocÃª precisa para gerenciar sua biblioteca de jogos em um Ãºnico lugar, com uma interface que impressiona.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Features Grid */}
         <div className="grid lg:grid-cols-12 gap-4 lg:gap-6">
-          {/* Large feature card */}
           <div
             className={`lg:col-span-12 relative bg-black border border-foreground/10 min-h-[500px] overflow-hidden group transition-all duration-700 flex ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
@@ -195,7 +192,6 @@ export function FeaturesSection() {
               </div>
             </div>
 
-            {/* Right decorative panel */}
             <div className="hidden lg:flex relative w-[42%] shrink-0 overflow-hidden items-center justify-center bg-black/50">
               <div className="text-center p-12">
                 <div className="w-48 h-48 mx-auto rounded-3xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center mb-8">
@@ -211,7 +207,6 @@ export function FeaturesSection() {
             </div>
           </div>
 
-          {/* Smaller cards */}
           {features.slice(1).map((feature, i) => {
             const Icon = feature.icon;
             return (

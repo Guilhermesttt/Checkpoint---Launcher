@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { AnimatePresence } from "framer-motion";
 import { Navigate } from "react-router-dom";
 import Home from "./pages/Home";
@@ -134,7 +134,6 @@ const AppContent: React.FC = () => {
     return <AsyncLoader />;
   }
 
-  // Redirect unauthenticated users to /login
   if (!user) {
     return <Navigate to="/login" replace />;
   }

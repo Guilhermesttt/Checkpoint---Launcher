@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 interface DynamicBackgroundProps {
@@ -15,7 +15,6 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
 
   return (
     <div className="fixed inset-0 z-[-1] bg-[#050507] overflow-hidden">
-      {/* Cinematic Ambient Video (Rotated) */}
       {!reducedEffects && (
         <video
           autoPlay
@@ -28,7 +27,6 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
         </video>
       )}
 
-      {/* Dynamic Image Layer (Blurred) */}
       <AnimatePresence mode="popLayout">
         <motion.img
           key={currentImg}
@@ -44,11 +42,9 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
         />
       </AnimatePresence>
 
-      {/* Gradientes Premium para profundidade */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-[#050507]/40 to-transparent opacity-95" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#050507]/60 via-transparent to-transparent opacity-80" />
 
-      {/* Film Grain Texture Overlay - only if not reduced effects */}
       {!reducedEffects && (
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />
       )}

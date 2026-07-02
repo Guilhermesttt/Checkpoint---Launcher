@@ -1,4 +1,4 @@
-import {
+﻿import {
   serverTimestamp,
   writeBatch,
   getDocs,
@@ -14,8 +14,6 @@ import {
   userGamesCollectionRef,
 } from "./firestorePaths";
 
-// --- FUNÇÃO AUXILIAR PARA CORRIGIR O ERRO ---
-// Remove chaves com valor 'undefined' para não quebrar o Firestore
 const clean = (obj: any) => {
   const newObj = { ...obj };
   Object.keys(newObj).forEach(
@@ -38,13 +36,35 @@ const buildSteamAssets = (appid: number) => ({
 const getAuthHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
   if (!token) {
-    throw new Error("Sessão expirada. Entre novamente para sincronizar a Steam.");
+    throw new Error("SessÃ£o expirada. Entre novamente para sincronizar a Steam.");
   }
   return { Authorization: `Bearer ${token}` };
 };
 
-export const getSteamLinkUrl = (firebaseUid: string) =>
-  apiUrl(`/auth/steam/start?state=${encodeURIComponent(firebaseUid)}`);
+export const getSteamLinkUrl = async () => {
+  const response = await fetch(apiUrl("/auth/steam/start"), {
+    method: "POST",
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Nao foi possivel iniciar a conexao com a Steam.");
+  }
+  const payload = (await response.json()) as { url?: string };
+  if (!payload.url) {
+    throw new Error("Backend nao retornou a URL de autenticacao da Steam.");
+  }
+  return payload.url;
+};
+
+export const disconnectSteamAccount = async () => {
+  const response = await fetch(apiUrl("/api/steam/disconnect"), {
+    method: "POST",
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Falha ao desconectar Steam.");
+  }
+};
 
 export const fetchSteamAppSizeGB = async (appId: string) => {
   if (!/^\d+$/.test(appId)) return undefined;
@@ -77,12 +97,11 @@ export type SteamAppDetailsFetchResult =
   | { ok: true; data: SteamAppDetails }
   | { ok: false; message: string };
 
-/** Devolve motivo concreto (rede vs HTTP vs corpo) para mostrar no UI. */
 export const fetchSteamAppDetailsResult = async (
   appId: string,
 ): Promise<SteamAppDetailsFetchResult> => {
   if (!/^\d+$/.test(appId)) {
-    return { ok: false, message: "App ID deve conter só dígitos." };
+    return { ok: false, message: "App ID deve conter sÃ³ dÃ­gitos." };
   }
   const url = apiUrl(
     `/api/steam/app-details?appId=${encodeURIComponent(appId)}`,
@@ -97,7 +116,7 @@ export const fetchSteamAppDetailsResult = async (
       const message =
         fromApi ||
         (response.status === 502
-          ? "O backend não conseguiu obter dados na Steam (502)."
+          ? "O backend nÃ£o conseguiu obter dados na Steam (502)."
           : `O backend respondeu com erro HTTP ${response.status}.`);
       return { ok: false, message };
     }
@@ -111,7 +130,7 @@ export const fetchSteamAppDetailsResult = async (
     return {
       ok: false,
       message: looksLikeNetwork
-        ? "Backend inacessível (porta 8787). Em outro terminal: npm run server. Ou: npm run dev:full. Teste no browser: http://localhost:8787/health"
+        ? "Backend inacessÃ­vel (porta 8787). Em outro terminal: npm run server. Ou: npm run dev:full. Teste no browser: http://localhost:8787/health"
         : e instanceof Error
           ? e.message
           : "Falha de rede ao buscar dados da loja Steam.",
@@ -158,9 +177,7 @@ export const fetchSteamLibrary = async (
     try {
       const body = (await response.json()) as { error?: string };
       if (body.error) message = body.error;
-    } catch {
-      // keep fallback message
-    }
+    } catch {}
     throw new Error(message);
   }
   return (await response.json()) as SteamLibraryResponse;
@@ -173,7 +190,6 @@ export const syncSteamLibraryToFirestore = async (
   const payload = await fetchSteamLibrary(steamId);
   const batch = writeBatch(db);
 
-  // 1. Mapear jogos existentes para evitar duplicatas e atualizar os manuais
   const existingGamesSnap = await getDocs(
     query(userGamesCollectionRef(uid), where("steamAppId", "!=", "")),
   );
@@ -219,6 +235,10 @@ export const syncSteamLibraryToFirestore = async (
     const details = detailsCache.get(appIdStr);
     const achievements = achievementsCache.get(appIdStr);
     const normalizedHours = Math.round((owned.playtime_forever ?? 0) / 60);
+    const steamLastPlayedAt =
+      owned.rtime_last_played && owned.rtime_last_played > 0
+        ? new Date(owned.rtime_last_played * 1000).toISOString()
+        : "";
     const resolvedDescription =
       details?.description ??
       `Importado da Steam. Dados da conta conectada. AppID ${owned.appid}.`;
@@ -236,6 +256,7 @@ export const syncSteamLibraryToFirestore = async (
       launcherType: "steam",
       steamAppId: appIdStr,
       steamPlaytimeMinutes: owned.playtime_forever ?? 0,
+      steamLastPlayedAt,
       hoursPlayed: normalizedHours,
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
       totalAchievements: achievements?.total || 0,
@@ -261,7 +282,6 @@ export const syncSteamLibraryToFirestore = async (
     profileBatch.set(
       profileDocRef(uid),
       {
-        steamId,
         lastSteamSyncAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       },

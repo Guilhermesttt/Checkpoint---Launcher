@@ -94,7 +94,7 @@ const MenuButton: React.FC<{
       onClick();
       playSound(soundType);
     }}
-    onMouseEnter={() => playSound("navigate")}
+    onMouseEnter={() => playSound("hover")}
     className={`
       w-full flex items-center gap-4 px-4 py-3 rounded-xl
       text-[11px] font-bold uppercase tracking-wider text-white/60

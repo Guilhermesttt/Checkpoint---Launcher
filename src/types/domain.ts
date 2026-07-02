@@ -1,4 +1,4 @@
-export type LauncherType = "steam" | "local";
+export type LauncherType = "steam" | "local" | "epic";
 
 export interface Game {
   id: string;
@@ -16,8 +16,10 @@ export interface Game {
   sizeGB?: number;
   launcherType?: LauncherType;
   steamAppId?: string;
+  epicCatalogId?: string;
   steamPlaytimeMinutes?: number;
-  source?: "manual" | "steam";
+  steamLastPlayedAt?: string;
+  source?: "manual" | "steam" | "epic";
   lastSyncedAt?: string;
   lastPlayedAt?: string;
   createdAt?: string;
@@ -38,9 +40,11 @@ export interface UserProfile {
   displayName?: string | null;
   photoURL?: string | null;
   steamId?: string;
+  epicAccountId?: string;
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
+  lastEpicSyncAt?: string;
   gamesMigratedAt?: string;
   onboardingCompletedAt?: string;
 }
@@ -50,6 +54,7 @@ export interface SteamOwnedGame {
   name?: string;
   playtime_forever: number;
   playtime_windows_forever?: number;
+  rtime_last_played?: number;
   img_icon_url?: string;
   img_logo_url?: string;
   has_community_visible_stats?: boolean;

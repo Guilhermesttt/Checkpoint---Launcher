@@ -10,9 +10,6 @@ interface CategoryBarProps {
   disableKeyboardShortcuts?: boolean;
 }
 
-/**
- * PS5-style category navigation with Liquid Glass design
- */
 const CategoryBar: React.FC<CategoryBarProps> = ({
   categories,
   activeCategory,
@@ -25,12 +22,10 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
     typeof category === "string" ? { id: category, label: category } : category,
   );
 
-  // Keyboard navigation: Q = prev, E = next
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (disableKeyboardShortcuts) return;
 
-      // Ignore if typing in an input or textarea
       const target = e.target as HTMLElement;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) {
         return;
@@ -55,7 +50,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [activeCategory, disableKeyboardShortcuts, normalizedCategories, onCategoryChange, playSound]);
 
-  // Auto-scroll active button into view
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -85,10 +79,9 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
 
   return (
     <div className="flex items-center gap-4 px-8 md:px-12 py-4 select-none">
-      {/* Prev Button */}
       <button
         onClick={handlePrev}
-        onMouseEnter={() => playSound("navigate")}
+        onMouseEnter={() => playSound("hover")}
         className="shrink-0 w-10 h-10 rounded-xl premium-glass flex items-center justify-center
           hover:bg-white/10 transition-all active:scale-95 group"
         aria-label="Previous category"
@@ -96,7 +89,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
         <ChevronLeft className="w-5 h-5 text-white/40 group-hover:text-white/80 transition-colors" />
       </button>
 
-      {/* Categories */}
       <div
         ref={scrollRef}
         className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar"
@@ -112,7 +104,7 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
                 onCategoryChange?.(category.id);
                 playSound("select");
               }}
-              onMouseEnter={() => playSound("navigate")}
+              onMouseEnter={() => playSound("hover")}
               className={`
                 relative px-6 py-3 rounded-xl
                 text-[11px] font-bold tracking-[0.2em] uppercase
@@ -124,7 +116,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
                 }
               `}
             >
-              {/* Animated Liquid Glass background */}
               {isActive && (
                 <motion.div
                   layoutId="category-pill"
@@ -137,7 +128,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
                 />
               )}
 
-              {/* Label */}
               <span className="relative z-10 flex items-center gap-2">
                 {category.label}
               </span>
@@ -146,10 +136,9 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
         })}
       </div>
 
-      {/* Next Button */}
       <button
         onClick={handleNext}
-        onMouseEnter={() => playSound("navigate")}
+        onMouseEnter={() => playSound("hover")}
         className="shrink-0 w-10 h-10 rounded-xl premium-glass flex items-center justify-center
           hover:bg-white/10 transition-all active:scale-95 group"
         aria-label="Next category"
@@ -157,7 +146,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
         <ChevronRight className="w-5 h-5 text-white/40 group-hover:text-white/80 transition-colors" />
       </button>
 
-      {/* Keyboard Hints */}
       <div className="hidden md:flex items-center gap-3 ml-4">
         <KeyHint label="Q" />
         <span className="text-[9px] font-bold tracking-[0.2em] text-white/20 uppercase">Navegar</span>
@@ -167,7 +155,6 @@ const CategoryBar: React.FC<CategoryBarProps> = ({
   );
 };
 
-/** Small keyboard hint indicator */
 const KeyHint: React.FC<{ label: string }> = ({ label }) => (
   <div
     className="shrink-0 flex items-center justify-center

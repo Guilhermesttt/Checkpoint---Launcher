@@ -1,35 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 
 const plans = [
   {
-    name: "Grátis",
-    description: "Para quem quer começar agora",
+    name: "GrÃ¡tis",
+    description: "Para quem quer comeÃ§ar agora",
     price: "R$ 0",
     period: "para sempre",
     features: [
       "Biblioteca ilimitada",
-      "Integração Steam",
+      "IntegraÃ§Ã£o Steam",
       "Jogos locais",
       "Interface premium",
       "Sync na nuvem",
       "Suporte da comunidade",
     ],
-    cta: "Começar Agora",
+    cta: "ComeÃ§ar Agora",
     href: "/login",
     highlight: false,
   },
   {
     name: "Pro",
-    description: "Para jogadores sérios",
+    description: "Para jogadores sÃ©rios",
     price: "Em breve",
     period: "",
     features: [
-      "Tudo do Grátis",
-      "Estatísticas avançadas",
-      "Backup automático",
+      "Tudo do GrÃ¡tis",
+      "EstatÃ­sticas avanÃ§adas",
+      "Backup automÃ¡tico",
       "Temas personalizados",
-      "Suporte prioritário",
+      "Suporte prioritÃ¡rio",
       "Acesso antecipado a novidades",
     ],
     cta: "Entrar na lista de espera",
@@ -54,7 +54,6 @@ export function PricingSection() {
   return (
     <section id="pricing" ref={sectionRef} className="relative py-32 lg:py-40">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
         <div className="grid lg:grid-cols-12 gap-8 mb-20">
           <div className="lg:col-span-7">
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-8">
@@ -74,12 +73,11 @@ export function PricingSection() {
             <p className={`text-lg text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
               isVisible ? "opacity-100" : "opacity-0"
             }`}>
-              O Checkpoint é e sempre será gratuito para uso básico. Funcionalidades avançadas chegam em breve.
+              O Checkpoint Ã© e sempre serÃ¡ gratuito para uso bÃ¡sico. Funcionalidades avanÃ§adas chegam em breve.
             </p>
           </div>
         </div>
 
-        {/* Pricing cards */}
         <div className="grid lg:grid-cols-2 gap-4 max-w-3xl">
           {plans.map((plan, index) => (
             <div

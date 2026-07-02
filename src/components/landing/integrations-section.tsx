@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
 
@@ -6,7 +6,7 @@ const integrations = [
   {
     name: "Steam",
     icon: faSteam,
-    description: "Sincronização automática da sua biblioteca original",
+    description: "SincronizaÃ§Ã£o automÃ¡tica da sua biblioteca original",
     color: "from-blue-500/10",
     iconColor: "text-white",
   },
@@ -41,7 +41,6 @@ export function IntegrationsSection() {
       className="relative py-24 lg:py-32 overflow-hidden"
     >
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header */}
         <div className="grid lg:grid-cols-12 gap-8 mb-20">
           <div className="lg:col-span-6">
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
@@ -55,7 +54,7 @@ export function IntegrationsSection() {
                   : "opacity-0 translate-y-8"
               }`}
             >
-              De onde vêm
+              De onde vÃªm
               <br />
               <span className="text-muted-foreground">seus jogos?</span>
             </h2>
@@ -68,14 +67,13 @@ export function IntegrationsSection() {
                   : "opacity-0 translate-y-4"
               }`}
             >
-              O Checkpoint não julga. Seja sua imensa biblioteca original ou
-              seus jogos locais da "Steam verde", nós organizamos tudo em uma
-              única interface premium.
+              O Checkpoint nÃ£o julga. Seja sua imensa biblioteca original ou
+              seus jogos locais da "Steam verde", nÃ³s organizamos tudo em uma
+              Ãºnica interface premium.
             </p>
           </div>
         </div>
 
-        {/* Integrations grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto lg:mx-0">
           {integrations.map((integration, i) => {
             return (
@@ -104,7 +102,7 @@ export function IntegrationsSection() {
                 </p>
                 <div className="mt-6 flex items-center gap-2 text-xs font-mono text-green-500">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Disponível e funcionando
+                  DisponÃ­vel e funcionando
                 </div>
               </div>
             );

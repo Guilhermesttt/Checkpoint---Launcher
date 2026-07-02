@@ -1,46 +1,46 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 
 const testimonials = [
   {
     name: "Rafael M.",
-    role: "Gamer há 15 anos",
-    avatar: "🎮",
-    text: "Finalmente um launcher que não parece uma planilha. A interface do Checkpoint é linda e tudo funciona perfeitamente.",
+    role: "Gamer hÃ¡ 15 anos",
+    avatar: "ðŸŽ®",
+    text: "Finalmente um launcher que nÃ£o parece uma planilha. A interface do Checkpoint Ã© linda e tudo funciona perfeitamente.",
     games: "340 jogos",
   },
   {
     name: "Ana C.",
     role: "Streamer",
-    avatar: "🎬",
-    text: "A integração com Steam é perfeita. Sincronizei minha biblioteca de 500+ jogos em segundos. Impressionante!",
+    avatar: "ðŸŽ¬",
+    text: "A integraÃ§Ã£o com Steam Ã© perfeita. Sincronizei minha biblioteca de 500+ jogos em segundos. Impressionante!",
     games: "520 jogos",
   },
   {
     name: "Lucas P.",
     role: "Dev & Gamer",
-    avatar: "💻",
-    text: "Como dev, aprecio o código limpo e bem estruturado. Já até contribuí com algumas melhorias no GitHub.",
+    avatar: "ðŸ’»",
+    text: "Como dev, aprecio o cÃ³digo limpo e bem estruturado. JÃ¡ atÃ© contribuÃ­ com algumas melhorias no GitHub.",
     games: "180 jogos",
   },
   {
     name: "Marina F.",
     role: "RPG Enthusiast",
-    avatar: "⚔️",
-    text: "O visual PS5 me conquistou. Navegar pela biblioteca com o teclado é uma experiência de console de verdade.",
+    avatar: "âš”ï¸",
+    text: "O visual PS5 me conquistou. Navegar pela biblioteca com o teclado Ã© uma experiÃªncia de console de verdade.",
     games: "95 jogos",
   },
   {
     name: "Pedro H.",
     role: "Colecionador",
-    avatar: "🏆",
+    avatar: "ðŸ†",
     text: "Nunca perdi mais tempo procurando onde instalei um jogo. O Checkpoint centralizou tudo que eu precisava.",
     games: "1200 jogos",
   },
   {
     name: "Julia R.",
     role: "Casual Gamer",
-    avatar: "🌟",
-    text: "Nem sabia que precisava de um launcher assim até usar. Simples, rápido e bonito. Recomendo muito!",
+    avatar: "ðŸŒŸ",
+    text: "Nem sabia que precisava de um launcher assim atÃ© usar. Simples, rÃ¡pido e bonito. Recomendo muito!",
     games: "45 jogos",
   },
 ];
@@ -90,7 +90,7 @@ export function TestimonialsSection() {
                 </div>
                 <div>
                   <div className="font-medium text-white text-sm">{t.name}</div>
-                  <div className="text-xs text-white/40">{t.role} · {t.games}</div>
+                  <div className="text-xs text-white/40">{t.role} Â· {t.games}</div>
                 </div>
               </div>
             </div>

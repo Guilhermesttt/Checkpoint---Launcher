@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from "react";
+﻿import React, { useCallback, useEffect, useMemo } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import GameCard from "./GameCard";
 import type { Game } from "../types/domain";
@@ -119,7 +119,6 @@ const GameRow: React.FC<GameRowProps> = ({
     <div className="relative w-full flex flex-col" style={{ gap: 0 }}>
 
 
-      {/* ── Carousel ── */}
       <div className="overflow-visible pb-2" ref={emblaRef}>
         <div
           className="flex"
@@ -143,7 +142,6 @@ const GameRow: React.FC<GameRowProps> = ({
         </div>
       </div>
 
-      {/* ── Dot pagination ── */}
       <div className="flex justify-center mt-6 gap-1.5">
         {visibleDots.map((i) => (
           <div
