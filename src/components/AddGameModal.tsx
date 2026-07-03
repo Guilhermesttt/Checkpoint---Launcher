@@ -177,6 +177,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const executableInputRef = React.useRef<HTMLInputElement>(null);
   const coverInputRef = React.useRef<HTMLInputElement>(null);
   const wallpaperInputRef = React.useRef<HTMLInputElement>(null);
+  const searchDebounceRef = React.useRef<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -232,6 +233,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   }, [isOpen, gameToEdit]);
 
+  useEffect(
+    () => () => {
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+      }
+    },
+    [],
+  );
+
   const fileToDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -241,7 +251,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     });
 
   const handleSteamSearch = async (query: string) => {
-    if (query.length < 3) return;
+    if (query.length < 3) {
+      setSearchResults([]);
+      return;
+    }
     try {
       const resp = await fetch(
         apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
@@ -302,13 +315,30 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   };
 
   const handleEpicSearch = async (query: string) => {
-    if (query.length < 3) return;
+    if (query.length < 3) {
+      setSearchResults([]);
+      return;
+    }
     try {
       const data = await searchEpicGames(query);
       setSearchResults(data.items || []);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const scheduleSearch = (query: string, platform: "steam" | "epic") => {
+    setSearchQuery(query);
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      if (platform === "steam") {
+        handleSteamSearch(query);
+        return;
+      }
+      handleEpicSearch(query);
+    }, 350);
   };
 
   const handleSelectEpicGame = async (game: any) => {
@@ -556,8 +586,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   <input
                     value={searchQuery}
                     onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      handleSteamSearch(e.target.value);
+                      scheduleSearch(e.target.value, "steam");
                     }}
                     placeholder={copy.searchPlaceholder}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
@@ -606,8 +635,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   <input
                     value={searchQuery}
                     onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      handleEpicSearch(e.target.value);
+                      scheduleSearch(e.target.value, "epic");
                     }}
                     placeholder={copy.searchPlaceholder}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"

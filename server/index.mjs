@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import { createRequire } from "node:module";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -11,6 +12,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const app = express();
+const require = createRequire(import.meta.url);
+const cloudscraper = require("cloudscraper");
 const port = Number(process.env.PORT ?? 8787);
 const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(
   /\/$/,
@@ -460,6 +463,42 @@ const fetchEpicCatalogItem = async (namespace, itemId, locale = "pt-BR") => {
   }
 
   return payload?.data?.Catalog?.catalogItem ?? null;
+};
+
+const postEpicGraphql = async (query, variables) => {
+  const headers = {
+    ...steamStoreFetchHeaders,
+    Accept: "application/json, text/plain, */*",
+    "Content-Type": "application/json;charset=UTF-8",
+    Origin: "https://store.epicgames.com",
+    Referer: "https://store.epicgames.com/",
+  };
+  const body = JSON.stringify({ query, variables });
+
+  const response = await fetch(epicStoreGraphqlEndpoint, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  if (response.ok) {
+    return { ok: true, status: response.status, payload: await response.json().catch(() => ({})) };
+  }
+
+  if (response.status !== 403) {
+    return { ok: false, status: response.status, payload: null };
+  }
+
+  try {
+    const raw = await cloudscraper.post({
+      uri: epicStoreGraphqlEndpoint,
+      headers,
+      body,
+    });
+    return { ok: true, status: 200, payload: JSON.parse(raw) };
+  } catch {
+    return { ok: false, status: 403, payload: null };
+  }
 };
 
 const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
@@ -1712,35 +1751,22 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
   }
 
   try {
-    const response = await fetch(epicStoreGraphqlEndpoint, {
-      method: "POST",
-      headers: {
-        ...steamStoreFetchHeaders,
-        "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json;charset=UTF-8",
-        "Origin": "https://store.epicgames.com",
-        "Referer": "https://store.epicgames.com/pt-BR/browse",
-      },
-      body: JSON.stringify({
-        query: EPIC_SEARCH_STORE_QUERY,
-        variables: {
-          keywords: query,
-          locale: "pt-BR",
-          country: "BR",
-          count: 12,
-          start: 0,
-        },
-      }),
+    const result = await postEpicGraphql(EPIC_SEARCH_STORE_QUERY, {
+      keywords: query,
+      locale: "pt-BR",
+      country: "BR",
+      count: 12,
+      start: 0,
     });
 
-    if (!response.ok) {
+    if (!result.ok) {
       res.status(502).json({
-        error: `Falha na busca Epic Games Store (status ${response.status}).`,
+        error: `Falha na busca Epic Games Store (status ${result.status}).`,
       });
       return;
     }
 
-    const payload = await response.json().catch(() => ({}));
+    const payload = result.payload ?? {};
     if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
       res.status(502).json({ error: "GraphQL da Epic retornou erro na busca." });
       return;
