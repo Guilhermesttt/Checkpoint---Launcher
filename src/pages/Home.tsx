@@ -2367,15 +2367,15 @@ const FriendsPage: React.FC<{
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
-              { label: "Online", value: onlineCount, color: "text-green-400" },
-              { label: "Jogando", value: playingCount, color: "text-blue-400" },
-              { label: "Total", value: friends.length, color: "text-white/70" },
+              { label: "Online", value: onlineCount },
+              { label: "Jogando", value: playingCount },
+              { label: "Total", value: friends.length },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
                   {item.label}
                 </p>
-                <p className={`mt-2 text-3xl font-black tabular-nums ${item.color}`}>
+                <p className="mt-2 text-3xl font-black text-white tabular-nums">
                   {item.value}
                 </p>
               </div>
