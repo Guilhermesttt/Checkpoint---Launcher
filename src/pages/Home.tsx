@@ -149,7 +149,7 @@ interface SocialFriend {
   status: "online" | "playing" | "offline";
   playing?: string;
   avatar?: string;
-  source?: "discord" | "local";
+  source?: "discord" | "discord_friend" | "local";
 }
 
 interface PriceAlert {
@@ -478,28 +478,39 @@ const Home: React.FC = () => {
     if (!localSocialStateLoaded) return;
     if (!resolvedDiscordId) {
       setSocialFriends((current) =>
-        current.filter((friend) => friend.source !== "discord"),
+        current.filter((friend) => !friend.source?.startsWith("discord")),
       );
       return;
     }
 
     setSocialFriends((current) => {
-      const discordFriend: SocialFriend = {
+      const discordSelf: SocialFriend = {
         id: `discord:${resolvedDiscordId}`,
         name: userProfile?.discordUsername || "Discord",
         status: "online",
         avatar: userProfile?.discordAvatar || undefined,
         source: "discord",
       };
-      const withoutDiscord = current.filter(
-        (friend) => friend.id !== discordFriend.id && friend.source !== "discord",
+      const remoteFriends: SocialFriend[] = (userProfile?.discordFriends ?? [])
+        .filter((friend) => friend.id && friend.id !== resolvedDiscordId)
+        .map((friend) => ({
+          id: `discord-friend:${friend.id}`,
+          name: friend.username || "Discord",
+          status: "online",
+          avatar: friend.avatar || undefined,
+          source: "discord_friend",
+        }));
+      const remoteIds = new Set([discordSelf.id, ...remoteFriends.map((friend) => friend.id)]);
+      const localFriends = current.filter(
+        (friend) => !friend.source?.startsWith("discord") && !remoteIds.has(friend.id),
       );
-      return [discordFriend, ...withoutDiscord];
+      return [discordSelf, ...remoteFriends, ...localFriends];
     });
   }, [
     localSocialStateLoaded,
     resolvedDiscordId,
     userProfile?.discordAvatar,
+    userProfile?.discordFriends,
     userProfile?.discordUsername,
   ]);
 
@@ -2020,7 +2031,16 @@ const FriendsPage: React.FC<{
   onAddDemoFriend,
   onRemoveFriend,
 }) => {
+    const [friendSearch, setFriendSearch] = useState("");
     const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
+    const normalizedSearch = friendSearch.trim().toLowerCase();
+    const visibleFriends = normalizedSearch
+      ? friends.filter(
+        (friend) =>
+          friend.name.toLowerCase().includes(normalizedSearch) ||
+          friend.playing?.toLowerCase().includes(normalizedSearch),
+      )
+      : friends;
 
     return (
       <SystemPageShell eyebrow="Social" title={t("friends")}>
@@ -2062,17 +2082,33 @@ const FriendsPage: React.FC<{
           </div>
         </section>
 
+        <div className="mb-5">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+            <input
+              value={friendSearch}
+              onChange={(event) => setFriendSearch(event.target.value)}
+              placeholder="Pesquisar amigos..."
+              className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {friends.length === 0 ? (
+          {visibleFriends.length === 0 ? (
             <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
               <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
-              <p className="text-sm font-bold text-white/70">Nenhum amigo fixado ainda.</p>
+              <p className="text-sm font-bold text-white/70">
+                {friends.length === 0 ? "Nenhum amigo encontrado ainda." : "Nenhum amigo nessa busca."}
+              </p>
               <p className="mt-2 text-xs text-white/35">
-                Use dados locais para testar o layout enquanto a integração social completa é aprovada.
+                {friends.length === 0
+                  ? "Conecte o Discord com permissão de amigos ou adicione fixados locais."
+                  : "Tente buscar por outro nome."}
               </p>
             </div>
           ) : (
-            friends.map((friend) => (
+            visibleFriends.map((friend) => (
               <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center overflow-hidden">
@@ -2085,15 +2121,17 @@ const FriendsPage: React.FC<{
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-white truncate">{friend.name}</p>
                     <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
-                    {friend.source === "discord"
-                      ? "Discord conectado"
-                      : friend.status === "playing"
-                        ? `Jogando ${friend.playing || "agora"}`
-                        : friend.status}
+                      {friend.source === "discord"
+                        ? "Discord conectado"
+                        : friend.source === "discord_friend"
+                          ? "Amigo do Discord"
+                          : friend.status === "playing"
+                            ? `Jogando ${friend.playing || "agora"}`
+                            : friend.status}
                     </p>
                   </div>
                 </div>
-                {friend.source !== "discord" && (
+                {!friend.source?.startsWith("discord") && (
                   <button
                     type="button"
                     onClick={() => onRemoveFriend(friend.id)}

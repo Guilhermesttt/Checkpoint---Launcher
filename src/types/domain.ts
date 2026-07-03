@@ -44,6 +44,12 @@ export interface UserProfile {
   discordId?: string;
   discordUsername?: string;
   discordAvatar?: string;
+  discordFriends?: Array<{
+    id: string;
+    username: string;
+    avatar?: string;
+    relationshipType?: number | null;
+  }>;
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;

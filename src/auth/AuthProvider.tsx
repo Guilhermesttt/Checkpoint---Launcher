@@ -32,6 +32,7 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   discordId: data?.discordId,
   discordUsername: data?.discordUsername,
   discordAvatar: data?.discordAvatar,
+  discordFriends: data?.discordFriends,
   createdAt: data?.createdAt,
   updatedAt: data?.updatedAt,
   lastSteamSyncAt: data?.lastSteamSyncAt,

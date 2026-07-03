@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { SoundTheme } from "../context/PreferencesContext";
 
 import ps2NavigateSound from "../sounds/PS2-System-Sounds/deck_ui_navigation.wav";
@@ -61,10 +61,28 @@ const soundThemes = {
 
 export type SoundEffectType = keyof (typeof soundThemes)["ps2"];
 
+const audioCache = new Map<string, HTMLAudioElement>();
+const allSoundPaths = Array.from(
+  new Set(Object.values(soundThemes).flatMap((themeSounds) => Object.values(themeSounds))),
+);
+
+const preloadAudio = (path: string) => {
+  if (audioCache.has(path)) return audioCache.get(path);
+  const audio = new Audio(path);
+  audio.preload = "auto";
+  audio.load();
+  audioCache.set(path, audio);
+  return audio;
+};
+
 export const useSoundEffects = (volume = 0.35, theme: SoundTheme = "ps2") => {
   const lastNavigateAtRef = useRef(0);
   const sounds = soundThemes[theme] ?? soundThemes.ps2;
   const soundPaths = useMemo(() => sounds, [sounds]);
+
+  useEffect(() => {
+    allSoundPaths.forEach(preloadAudio);
+  }, []);
 
   const playSound = useCallback(
     (type: SoundEffectType) => {
@@ -75,9 +93,10 @@ export const useSoundEffects = (volume = 0.35, theme: SoundTheme = "ps2") => {
       }
       const path = soundPaths[type];
       if (!path) return;
-      const audio = new Audio(path);
+      const cachedAudio = preloadAudio(path);
+      const audio = cachedAudio?.cloneNode(true) as HTMLAudioElement | undefined;
+      if (!audio) return;
       audio.volume = volume;
-      audio.preload = "none";
       audio.play().catch(() => {
         return;
       });

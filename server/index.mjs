@@ -94,6 +94,7 @@ const epicStoreGraphqlEndpoint = "https://store.epicgames.com/graphql";
 const discordAuthorizeEndpoint = "https://discord.com/oauth2/authorize";
 const discordTokenEndpoint = "https://discord.com/api/oauth2/token";
 const discordCurrentUserEndpoint = "https://discord.com/api/users/@me";
+const discordRelationshipsEndpoint = "https://discord.com/api/users/@me/relationships";
 const pendingStates = new Map();
 const pendingEpicStates = new Map();
 const pendingDiscordStates = new Map();
@@ -290,6 +291,40 @@ const requestDiscordToken = async (code) => {
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
+};
+
+const discordAvatarUrl = (discordUser) => {
+  if (!discordUser?.id || !discordUser?.avatar) return "";
+  const extension = String(discordUser.avatar).startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.${extension}`;
+};
+
+const discordDisplayName = (discordUser) =>
+  discordUser?.discriminator && discordUser.discriminator !== "0"
+    ? `${discordUser.username}#${discordUser.discriminator}`
+    : String(discordUser?.global_name || discordUser?.username || "Discord");
+
+const fetchDiscordFriends = async (accessToken, tokenType = "Bearer") => {
+  try {
+    const response = await fetch(discordRelationshipsEndpoint, {
+      headers: { Authorization: `${tokenType} ${accessToken}` },
+    });
+    if (!response.ok) return [];
+    const relationships = await response.json().catch(() => []);
+    if (!Array.isArray(relationships)) return [];
+
+    return relationships
+      .filter((relationship) => relationship?.user?.id)
+      .map((relationship) => ({
+        id: String(relationship.user.id),
+        username: discordDisplayName(relationship.user),
+        avatar: discordAvatarUrl(relationship.user),
+        relationshipType: relationship.type ?? null,
+      }))
+      .slice(0, 250);
+  } catch {
+    return [];
+  }
 };
 
 const normalizeOpenIdBody = (query) => {
@@ -806,18 +841,19 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
       return;
     }
 
-    const username = discordUser.discriminator && discordUser.discriminator !== "0"
-      ? `${discordUser.username}#${discordUser.discriminator}`
-      : String(discordUser.global_name || discordUser.username || "Discord");
-    const avatar = discordUser.avatar
-      ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-      : "";
+    const username = discordDisplayName(discordUser);
+    const avatar = discordAvatarUrl(discordUser);
+    const discordFriends = await fetchDiscordFriends(
+      tokenPayload.access_token,
+      tokenPayload.token_type ?? "Bearer",
+    );
 
     await getFirestore().doc(`profiles/${pending.firebaseUid}`).set(
       {
         discordId: String(discordUser.id),
         discordUsername: username,
         discordAvatar: avatar,
+        discordFriends,
         updatedAt: new Date().toISOString(),
       },
       { merge: true },
@@ -867,6 +903,7 @@ app.post("/api/discord/disconnect", steamPrivateLimiter, requireFirebaseUser, as
         discordId: "",
         discordUsername: "",
         discordAvatar: "",
+        discordFriends: [],
         updatedAt: new Date().toISOString(),
       },
       { merge: true },
