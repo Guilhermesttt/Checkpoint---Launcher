@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Grid3X3, 
-  Layout, 
-  Layers, 
-  MousePointer2, 
+import {
+  Grid3X3,
+  Layout,
+  Layers,
+  MousePointer2,
   Search,
   Eye,
-  EyeOff
+  EyeOff,
+  X,
 } from 'lucide-react';
 import type { Game } from '../types/domain';
 
@@ -22,358 +23,253 @@ interface GameWallProps {
   className?: string;
 }
 
-interface GameCard3DProps {
+/* ─── Single card ─────────────────────────────────────────── */
+const GameCard: React.FC<{
   game: Game;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  scale: number;
   isSelected: boolean;
   isHovered: boolean;
+  index: number;
+  viewMode: ViewMode;
   onClick: () => void;
   onHover: () => void;
   onLeave: () => void;
-}
+}> = ({ game, isSelected, isHovered, index, viewMode, onClick, onHover, onLeave }) => {
+  const src = game.cardImage || game.image || '';
 
-const GameCard3D: React.FC<GameCard3DProps> = ({
-  game,
-  position,
-  rotation,
-  scale,
-  isSelected,
-  isHovered,
-  onClick,
-  onHover,
-  onLeave
-}) => {
-  const cardImage = game.cardImage || game.image || '/placeholder-game.png';
-  
+  // slight tilt only for wall mode
+  const wallRotate =
+    viewMode === 'wall'
+      ? `rotateY(${Math.sin(index * 0.4) * 6}deg) rotateX(${Math.cos(index * 0.3) * 3}deg)`
+      : 'none';
+
   return (
     <motion.div
-      className="absolute cursor-pointer group"
-      style={{
-        transform: `translate3d(${position.x}px, ${position.y}px, ${position.z}px) 
-                   rotateX(${rotation.x}deg) rotateY(${rotation.y}deg) rotateZ(${rotation.z}deg) 
-                   scale(${scale})`,
-        transformStyle: 'preserve-3d',
-        zIndex: isHovered ? 1000 : Math.floor(position.z + 100),
-      }}
-      initial={{ opacity: 0, scale: 0 }}
-      animate={{ 
-        opacity: 1, 
-        scale: scale,
-        rotateX: rotation.x,
-        rotateY: rotation.y,
-        rotateZ: rotation.z
-      }}
-      transition={{ 
-        duration: 0.6, 
-        ease: [0.16, 1, 0.3, 1],
-        delay: Math.random() * 0.2
-      }}
-      whileHover={{ 
-        scale: scale * 1.1, 
-        z: position.z + 50,
-        transition: { duration: 0.2 }
-      }}
+      layout
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.85 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: index * 0.015 }}
+      whileHover={{ scale: 1.07, zIndex: 50 }}
       onClick={onClick}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
+      className="relative cursor-pointer"
+      style={{ transformStyle: 'preserve-3d', transform: isHovered ? 'none' : wallRotate }}
     >
-      {/* Card Container */}
-      <div 
-        className={`relative w-44 h-60 rounded-2xl overflow-hidden transition-all duration-300 ${
-          isSelected ? 'ring-4 ring-white/50' : ''
-        } ${isHovered ? 'ring-2 ring-white/30' : ''}`}
+      {/* ── card body ── */}
+      <div
+        className={`relative overflow-hidden rounded-2xl transition-all duration-300 ${
+          viewMode === 'shelf' ? 'w-40 h-56' : 'w-44 h-60'
+        } ${isSelected ? 'ring-4 ring-white/60' : ''} ${isHovered ? 'ring-2 ring-white/40' : ''}`}
         style={{
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
-          backdropFilter: 'blur(10px)',
-          boxShadow: isHovered 
-            ? '0 25px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)' 
-            : '0 15px 35px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05)'
+          boxShadow: isHovered
+            ? '0 28px 56px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.15)'
+            : '0 12px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06)',
         }}
       >
-        {/* Game Image */}
-        <div className="relative w-full h-full overflow-hidden">
+        {src ? (
           <img
-            src={cardImage}
+            src={src}
             alt={game.title}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-            style={{
-              filter: isSelected ? 'brightness(1.1) saturate(1.2)' : 'brightness(0.9)'
-            }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/placeholder-game.png';
-            }}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+            style={{ filter: 'brightness(0.88)' }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
           />
-          
-          {/* Overlay Gradient */}
-          <div 
-            className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"
-            style={{ opacity: isHovered ? 0.7 : 0.9 }}
-          />
-          
-          {/* Game Info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <h3 className="text-white font-bold text-sm truncate mb-1">
-              {game.title}
-            </h3>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/70">
-                {game.launcherType === 'steam' ? 'Steam' : 
-                 game.launcherType === 'epic' ? 'Epic' : 'Local'}
-              </span>
-              {game.isFavorite && (
-                <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs">⭐</span>
-                </div>
-              )}
-            </div>
+        ) : (
+          <div className="w-full h-full bg-white/10 flex items-center justify-center">
+            <span className="text-white/30 text-xs uppercase tracking-widest">Sem capa</span>
           </div>
-          
-          {/* Hover Effects */}
-          <AnimatePresence>
-            {isHovered && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-gradient-to-t from-blue-500/20 to-purple-500/20"
-              />
-            )}
-          </AnimatePresence>
+        )}
+
+        {/* gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+        {/* bottom info */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <p className="text-white font-bold text-xs truncate leading-tight mb-0.5">{game.title}</p>
+          <p className="text-white/55 text-[10px] uppercase tracking-wide">
+            {game.launcherType === 'steam' ? 'Steam' : game.launcherType === 'epic' ? 'Epic' : 'Local'}
+          </p>
         </div>
+
+        {/* hover shimmer */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              key="shimmer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gradient-to-t from-blue-600/20 to-purple-600/20"
+            />
+          )}
+        </AnimatePresence>
+
+        {/* favorite badge */}
+        {game.isFavorite && (
+          <div className="absolute top-2 right-2 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center text-[10px]">
+            ★
+          </div>
+        )}
       </div>
     </motion.div>
   );
 };
 
+/* ─── Hover info tooltip ──────────────────────────────────── */
+const HoverCard: React.FC<{ game: Game; onPlay: () => void }> = ({ game, onPlay }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+    transition={{ duration: 0.15 }}
+    className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] w-80 pointer-events-none"
+    style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))' }}
+  >
+    <div
+      className="rounded-2xl border border-white/20 p-5"
+      style={{ background: 'rgba(12,12,18,0.96)', backdropFilter: 'blur(24px)' }}
+    >
+      <div className="flex items-center gap-3 mb-3">
+        {(game.cardImage || game.image) && (
+          <img
+            src={game.cardImage || game.image}
+            alt={game.title}
+            className="w-12 h-16 rounded-xl object-cover flex-shrink-0"
+          />
+        )}
+        <div className="min-w-0">
+          <h3 className="text-white font-bold text-sm leading-tight truncate">{game.title}</h3>
+          <p className="text-white/50 text-xs mt-0.5">{game.category || 'Jogo'}</p>
+          <p className="text-white/40 text-[10px] uppercase tracking-wide mt-1">
+            {game.launcherType === 'steam' ? 'Steam' : game.launcherType === 'epic' ? 'Epic Games' : 'Local'}
+          </p>
+        </div>
+      </div>
+
+      {game.description && (
+        <p className="text-white/65 text-xs leading-relaxed line-clamp-2 mb-3">
+          {game.description}
+        </p>
+      )}
+
+      <button
+        className="pointer-events-auto w-full py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+        onClick={onPlay}
+      >
+        Jogar
+      </button>
+    </div>
+  </motion.div>
+);
+
+/* ─── Main component ──────────────────────────────────────── */
 const GameWall: React.FC<GameWallProps> = ({
   games,
   onGameSelect,
   onGameHover,
   selectedGame,
-  className = ''
+  className = '',
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('wall');
   const [sortMode, setSortMode] = useState<SortMode>('alphabetical');
   const [hoveredGame, setHoveredGame] = useState<Game | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [showControls, setShowControls] = useState(true);
-  const [rotationSpeed] = useState(0.5);
-  const [windowSize, setWindowSize] = useState({ 
-    width: window.innerWidth, 
-    height: window.innerHeight 
-  });
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const autoRotation = useRef(0);
 
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Filter and sort games
+  /* filtered + sorted list */
   const filteredGames = useMemo(() => {
-    let filtered = games.filter(game => 
-      game.title.toLowerCase().includes(searchFilter.toLowerCase())
-    );
+    const q = searchFilter.trim().toLowerCase();
+    let list = q ? games.filter((g) => g.title.toLowerCase().includes(q)) : [...games];
 
     switch (sortMode) {
-      case 'alphabetical':
-        return filtered.sort((a, b) => a.title.localeCompare(b.title));
+      case 'alphabetical': list.sort((a, b) => a.title.localeCompare(b.title)); break;
       case 'recent':
-        return filtered.sort((a, b) => 
+        list.sort((a, b) =>
           new Date(b.lastPlayedAt || 0).getTime() - new Date(a.lastPlayedAt || 0).getTime()
-        );
-      case 'playtime':
-        return filtered.sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0));
-      case 'random':
-        return filtered.sort(() => Math.random() - 0.5);
-      case 'category':
-        return filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
-      default:
-        return filtered;
+        ); break;
+      case 'playtime': list.sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0)); break;
+      case 'random': list.sort(() => Math.random() - 0.5); break;
+      case 'category': list.sort((a, b) => (a.category || '').localeCompare(b.category || '')); break;
     }
+    return list;
   }, [games, searchFilter, sortMode]);
-  // Calculate 3D positions for games
-  const gamePositions = useMemo(() => {
-    const positions: Array<{
-      game: Game;
-      position: { x: number; y: number; z: number };
-      rotation: { x: number; y: number; z: number };
-      scale: number;
-    }> = [];
 
-    // Use current window dimensions for responsive layout
-    const containerWidth = windowSize.width - 96; // Subtract sidebar width
-    const containerHeight = windowSize.height;
-    
-    filteredGames.forEach((game, index) => {
-      let pos, rot, scale;
-      
-      switch (viewMode) {
-        case 'wall':
-          // 3D Wall layout - centeralized and responsive
-          const cols = Math.min(Math.ceil(Math.sqrt(filteredGames.length)), 5); // Max 5 columns
-          const rows = Math.ceil(filteredGames.length / cols);
-          const col = index % cols;
-          const row = Math.floor(index / cols);
-          
-          // Center the grid in the container with proper spacing
-          const cardWidth = 180;
-          const cardHeight = 250;
-          const spacingX = 40;
-          const spacingY = 40;
-          const totalGridWidth = (cols * cardWidth) + ((cols - 1) * spacingX);
-          const totalGridHeight = (rows * cardHeight) + ((rows - 1) * spacingY);
-          
-          pos = {
-            x: (col * (cardWidth + spacingX)) - (totalGridWidth / 2) + (containerWidth / 2),
-            y: (row * (cardHeight + spacingY)) - (totalGridHeight / 2) + (containerHeight / 2),
-            z: Math.sin(col * 0.5) * 80 + Math.cos(row * 0.5) * 40
-          };
-          rot = {
-            x: Math.sin(index * 0.1) * 3,
-            y: Math.cos(index * 0.15) * 8,
-            z: 0
-          };
-          scale = 0.8 + (1 - Math.abs(pos.z) / 500) * 0.2;
-          break;
-          
-        case 'shelf':
-          // Bookshelf layout - centered
-          const shelfCols = Math.min(Math.floor(containerWidth / 240), 6);
-          const shelfCol = index % shelfCols;
-          const shelfRow = Math.floor(index / shelfCols);
-          const shelfSpacingX = 30;
-          const shelfSpacingY = 50;
-          const shelfTotalWidth = (shelfCols * 210) + ((shelfCols - 1) * shelfSpacingX);
-          
-          pos = {
-            x: (shelfCol * (210 + shelfSpacingX)) - (shelfTotalWidth / 2) + (containerWidth / 2),
-            y: (shelfRow * (280 + shelfSpacingY)) - 200 + (containerHeight / 2),
-            z: (shelfRow % 2) * 30
-          };
-          rot = { x: -5, y: 0, z: 0 };
-          scale = 0.85;
-          break;
-          
-        case 'carousel':
-          // Circular carousel
-          const angle = (index / filteredGames.length) * Math.PI * 2;
-          const radius = 400;
-          pos = {
-            x: Math.cos(angle + autoRotation.current) * radius + containerWidth / 2,
-            y: Math.sin(angle + autoRotation.current) * radius + containerHeight / 2,
-            z: Math.sin(angle + autoRotation.current) * 100
-          };
-          rot = {
-            x: 0,
-            y: (angle + autoRotation.current) * (180 / Math.PI) + 90,
-            z: 0
-          };
-          scale = 0.8 + Math.cos(angle + autoRotation.current) * 0.2;
-          break;
-          
-        default:
-          // Grid layout - centered and responsive
-          const gridCols = Math.min(Math.ceil(Math.sqrt(filteredGames.length)), 6);
-          const gridCol = index % gridCols;
-          const gridRow = Math.floor(index / gridCols);
-          const gridSpacing = 30;
-          const gridTotalWidth = (gridCols * 200) + ((gridCols - 1) * gridSpacing);
-          
-          pos = {
-            x: (gridCol * (200 + gridSpacing)) - (gridTotalWidth / 2) + (containerWidth / 2),
-            y: (gridRow * (280 + gridSpacing)) - 100 + (containerHeight / 2),
-            z: 0
-          };
-          rot = { x: 0, y: 0, z: 0 };
-          scale = 0.9;
-      }
-      
-      positions.push({ game, position: pos, rotation: rot, scale });
-    });
-    
-    return positions;
-  }, [filteredGames, viewMode, autoRotation.current, windowSize]);
-
-  // Auto-rotation for carousel mode
-  useEffect(() => {
-    if (viewMode !== 'carousel') return;
-    
-    const interval = setInterval(() => {
-      autoRotation.current += 0.01 * rotationSpeed;
-    }, 16);
-    
-    return () => clearInterval(interval);
-  }, [viewMode, rotationSpeed]);
-
-  const handleGameHover = (game: Game | null) => {
+  const handleHover = (game: Game | null) => {
     setHoveredGame(game);
     onGameHover?.(game);
   };
 
+  /* grid columns per mode */
+  const gridCols: Record<ViewMode, string> = {
+    wall: 'repeat(auto-fill, minmax(176px, 1fr))',
+    shelf: 'repeat(auto-fill, minmax(160px, 1fr))',
+    grid: 'repeat(auto-fill, minmax(176px, 1fr))',
+    carousel: 'repeat(auto-fill, minmax(176px, 1fr))',
+  };
+
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
-      {/* Controls */}
+    <div className={`relative flex flex-col w-full h-full overflow-hidden ${className}`}>
+
+      {/* ── Controls bar ── */}
       <AnimatePresence>
         {showControls && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between"
+            exit={{ opacity: 0, y: -16 }}
+            className="shrink-0 flex items-center justify-between gap-3 px-6 pt-4 pb-2 z-40"
           >
-            <div className="flex items-center gap-3">
-              {/* View Mode Controls */}
-              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-2xl p-2 border border-white/10">
-                {[
-                  { mode: 'wall' as ViewMode, icon: Layers, label: '3D Wall' },
-                  { mode: 'shelf' as ViewMode, icon: Layout, label: 'Shelf' },
-                  { mode: 'grid' as ViewMode, icon: Grid3X3, label: 'Grid' },
-                  { mode: 'carousel' as ViewMode, icon: MousePointer2, label: 'Carousel' }
-                ].map(({ mode, icon: Icon, label }) => (
+            <div className="flex items-center gap-2">
+              {/* view mode */}
+              <div className="flex items-center gap-1 bg-black/50 backdrop-blur-md rounded-2xl p-1.5 border border-white/10">
+                {([
+                  { mode: 'wall', icon: Layers, label: '3D Wall' },
+                  { mode: 'shelf', icon: Layout, label: 'Estante' },
+                  { mode: 'grid', icon: Grid3X3, label: 'Grade' },
+                  { mode: 'carousel', icon: MousePointer2, label: 'Carrossel' },
+                ] as const).map(({ mode, icon: Icon, label }) => (
                   <button
                     key={mode}
                     onClick={() => setViewMode(mode)}
-                    className={`p-2 rounded-xl transition-all ${
-                      viewMode === mode 
-                        ? 'bg-white/20 text-white' 
-                        : 'text-white/60 hover:text-white hover:bg-white/10'
-                    }`}
                     title={label}
+                    className={`p-2 rounded-xl transition-all ${
+                      viewMode === mode ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white hover:bg-white/10'
+                    }`}
                   >
                     <Icon className="w-4 h-4" />
                   </button>
                 ))}
               </div>
 
-              {/* Search */}
+              {/* search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Buscar jogos..."
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-white/30"
+                  className="h-10 pl-9 pr-8 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-white/30 w-52"
                 />
+                {searchFilter && (
+                  <button
+                    onClick={() => setSearchFilter('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Sort Controls */}
+            <div className="flex items-center gap-2">
+              {/* sort */}
               <select
                 value={sortMode}
                 onChange={(e) => setSortMode(e.target.value as SortMode)}
-                className="bg-black/40 backdrop-blur-md border border-white/10 rounded-xl px-3 py-2 text-white text-sm focus:outline-none"
+                className="h-10 px-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl text-white text-sm focus:outline-none appearance-none pr-8"
+                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\'%3E%3Cpath d=\'M6 9l6 6 6-6\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
               >
                 <option value="alphabetical">A-Z</option>
                 <option value="recent">Recentes</option>
@@ -382,10 +278,9 @@ const GameWall: React.FC<GameWallProps> = ({
                 <option value="random">Aleatório</option>
               </select>
 
-              {/* Hide Controls */}
               <button
                 onClick={() => setShowControls(false)}
-                className="p-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl text-white/60 hover:text-white transition-colors"
+                className="h-10 w-10 flex items-center justify-center bg-black/50 backdrop-blur-md border border-white/10 rounded-xl text-white/50 hover:text-white transition-colors"
                 title="Ocultar controles"
               >
                 <EyeOff className="w-4 h-4" />
@@ -395,128 +290,88 @@ const GameWall: React.FC<GameWallProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Show Controls Button (when hidden) */}
+      {/* show controls button */}
       {!showControls && (
         <button
           onClick={() => setShowControls(true)}
-          className="absolute top-4 right-4 z-50 p-3 bg-black/60 backdrop-blur-md border border-white/20 rounded-full text-white hover:bg-black/80 transition-colors"
+          className="absolute top-4 right-4 z-50 h-10 w-10 flex items-center justify-center bg-black/60 backdrop-blur-md border border-white/20 rounded-full text-white hover:bg-black/80 transition-colors"
           title="Mostrar controles"
         >
-          <Eye className="w-5 h-5" />
+          <Eye className="w-4 h-4" />
         </button>
       )}
-      {/* Game Wall Container */}
-      <div 
-        ref={containerRef}
-        className="relative w-full h-full"
-        style={{ 
-          perspective: '1000px',
-          perspectiveOrigin: '50% 50%'
-        }}
-      >
-        {gamePositions.map(({ game, position, rotation, scale }, index) => (
-          <GameCard3D
-            key={game.id}
-            game={game}
-            position={position}
-            rotation={rotation}
-            scale={scale}
-            isSelected={selectedGame?.id === game.id}
-            isHovered={hoveredGame?.id === game.id}
-            onClick={() => onGameSelect(game)}
-            onHover={() => handleGameHover(game)}
-            onLeave={() => handleGameHover(null)}
-          />
-        ))}
-      </div>
 
-      {/* Game Info Panel */}
-      <AnimatePresence>
-        {hoveredGame && (
+      {/* ── Cards grid ── */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' }}>
+        {filteredGames.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
+            <div className="w-20 h-20 bg-white/8 rounded-2xl flex items-center justify-center">
+              <Search className="w-8 h-8 text-white/30" />
+            </div>
+            <div>
+              <p className="text-white/50 font-semibold">
+                {searchFilter ? 'Nenhum jogo encontrado' : 'Nenhum jogo disponível'}
+              </p>
+              <p className="text-white/30 text-sm mt-1">
+                {searchFilter ? `Sem resultados para "${searchFilter}"` : 'Adicione jogos para começar'}
+              </p>
+            </div>
+          </div>
+        ) : (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 bg-black/90 backdrop-blur-xl border border-white/30 rounded-2xl p-6 z-50 pointer-events-none"
+            layout
+            className="grid justify-items-center"
             style={{
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)'
+              gridTemplateColumns: gridCols[viewMode],
+              gap: viewMode === 'shelf' ? '12px 20px' : '16px 24px',
             }}
           >
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 rounded-xl overflow-hidden">
-                <img 
-                  src={hoveredGame.cardImage || hoveredGame.image} 
-                  alt={hoveredGame.title}
-                  className="w-full h-full object-cover"
+            <AnimatePresence mode="popLayout">
+              {filteredGames.map((game, index) => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  index={index}
+                  viewMode={viewMode}
+                  isSelected={selectedGame?.id === game.id}
+                  isHovered={hoveredGame?.id === game.id}
+                  onClick={() => onGameSelect(game)}
+                  onHover={() => handleHover(game)}
+                  onLeave={() => handleHover(null)}
                 />
-              </div>
-              <div>
-                <h3 className="text-white font-bold text-lg">{hoveredGame.title}</h3>
-                <p className="text-white/60 text-sm">{hoveredGame.category || 'Jogo'}</p>
-              </div>
-            </div>
-            
-            {hoveredGame.description && (
-              <p className="text-white/80 text-sm leading-relaxed mb-4">
-                {hoveredGame.description.slice(0, 150)}...
-              </p>
-            )}
-            
-            <div className="flex items-center justify-between pt-4 border-t border-white/10">
-              <span className="text-white/60 text-xs">
-                {hoveredGame.launcherType === 'steam' ? 'Steam' : 
-                 hoveredGame.launcherType === 'epic' ? 'Epic Games' : 'Local'}
-              </span>
-              <button
-                onClick={() => onGameSelect(hoveredGame)}
-                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-bold transition-colors pointer-events-auto"
-              >
-                Jogar
-              </button>
-            </div>
+              ))}
+            </AnimatePresence>
           </motion.div>
+        )}
+      </div>
+
+      {/* ── Hover info card ── */}
+      <AnimatePresence>
+        {hoveredGame && (
+          <HoverCard
+            key={hoveredGame.id}
+            game={hoveredGame}
+            onPlay={() => onGameSelect(hoveredGame)}
+          />
         )}
       </AnimatePresence>
 
-      {/* Stats Panel */}
-      <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 z-40">
-        <div className="flex items-center gap-4 text-sm text-white/70">
-          <span>{filteredGames.length} jogos</span>
-          <span>•</span>
-          <span>Modo: {
-            viewMode === 'wall' ? '3D Wall' :
-            viewMode === 'shelf' ? 'Estante' :
-            viewMode === 'grid' ? 'Grade' :
-            'Carrossel'
-          }</span>
+      {/* ── Stats bar ── */}
+      <div className="shrink-0 px-6 pb-4 pt-1">
+        <div className="inline-flex items-center gap-3 bg-black/50 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2 text-xs text-white/50">
+          <span>{filteredGames.length} jogo{filteredGames.length !== 1 ? 's' : ''}</span>
+          <span className="w-px h-3 bg-white/20" />
+          <span>
+            {viewMode === 'wall' ? '3D Wall' : viewMode === 'shelf' ? 'Estante' : viewMode === 'grid' ? 'Grade' : 'Carrossel'}
+          </span>
           {searchFilter && (
             <>
-              <span>•</span>
-              <span>Filtro: "{searchFilter}"</span>
+              <span className="w-px h-3 bg-white/20" />
+              <span>"{searchFilter}"</span>
             </>
           )}
         </div>
       </div>
-
-      {/* Empty State */}
-      {filteredGames.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-24 h-24 mx-auto mb-4 bg-white/10 rounded-2xl flex items-center justify-center">
-              <Search className="w-8 h-8 text-white/40" />
-            </div>
-            <h3 className="text-white/60 text-lg font-medium mb-2">
-              {searchFilter ? 'Nenhum jogo encontrado' : 'Nenhum jogo disponível'}
-            </h3>
-            <p className="text-white/40 text-sm">
-              {searchFilter 
-                ? `Tente buscar por outro termo que não "${searchFilter}"`
-                : 'Adicione alguns jogos para começar'
-              }
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
