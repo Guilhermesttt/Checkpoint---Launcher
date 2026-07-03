@@ -1,5 +1,5 @@
 import { auth } from "../../Firebase";
-import type { UserProfile } from "../types/domain";
+import type { Game, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
 
 const getAuthHeaders = async () => {
@@ -12,15 +12,16 @@ const getAuthHeaders = async () => {
 };
 
 export const searchCheckpointFriends = async (query: string): Promise<UserProfile[]> => {
-  const response = await fetch(
-    apiUrl(`/api/friends/search?q=${encodeURIComponent(query)}`),
-    { headers: await getAuthHeaders() },
-  );
+  const response = await fetch(apiUrl(`/api/friends/search?q=${encodeURIComponent(query)}`), {
+    headers: await getAuthHeaders(),
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    users?: UserProfile[];
+  };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao buscar usuarios.");
   }
-  const payload = (await response.json()) as { users?: UserProfile[] };
   return payload.users ?? [];
 };
 
@@ -30,8 +31,8 @@ export const sendCheckpointFriendRequest = async (uid: string) => {
     headers: await getAuthHeaders(),
     body: JSON.stringify({ uid }),
   });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao enviar solicitacao.");
   }
 };
@@ -42,11 +43,13 @@ export const acceptCheckpointFriendRequest = async (uid: string) => {
     headers: await getAuthHeaders(),
     body: JSON.stringify({ uid }),
   });
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    friend?: UserProfile;
+  };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao aceitar solicitacao.");
   }
-  const payload = (await response.json()) as { friend?: UserProfile };
   return payload.friend;
 };
 
@@ -56,8 +59,8 @@ export const rejectCheckpointFriendRequest = async (uid: string) => {
     headers: await getAuthHeaders(),
     body: JSON.stringify({ uid }),
   });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao rejeitar solicitacao.");
   }
 };
@@ -68,8 +71,8 @@ export const removeCheckpointFriend = async (uid: string) => {
     headers: await getAuthHeaders(),
     body: JSON.stringify({ uid }),
   });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao remover amigo.");
   }
 };
@@ -83,8 +86,8 @@ export const updateCheckpointPresence = async (
     headers: await getAuthHeaders(),
     body: JSON.stringify({ status, currentGameTitle }),
   });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao atualizar presenca.");
   }
 };
@@ -93,10 +96,35 @@ export const getCheckpointFriendStatuses = async (): Promise<UserProfile[]> => {
   const response = await fetch(apiUrl("/api/friends/status"), {
     headers: await getAuthHeaders(),
   });
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    friends?: UserProfile[];
+  };
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
     throw new Error(payload.error || "Erro ao consultar presenca dos amigos.");
   }
-  const payload = (await response.json()) as { friends?: UserProfile[] };
   return payload.friends ?? [];
+};
+
+export const getCheckpointFriendProfile = async (
+  uid: string,
+): Promise<{ profile: UserProfile; games: Game[] }> => {
+  const response = await fetch(apiUrl(`/api/friends/${encodeURIComponent(uid)}/profile`), {
+    headers: await getAuthHeaders(),
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    profile?: UserProfile;
+    games?: Game[];
+  };
+  if (!response.ok) {
+    throw new Error(payload.error || "Erro ao carregar perfil do amigo.");
+  }
+  if (!payload.profile) {
+    throw new Error("Perfil do amigo nao encontrado.");
+  }
+  return {
+    profile: payload.profile,
+    games: payload.games ?? [],
+  };
 };

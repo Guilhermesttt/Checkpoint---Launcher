@@ -9,10 +9,21 @@ import { NotificationProvider } from "./components/NotificationCenter";
 import MainVideoBackground from "./components/MainVideoBackground";
 import { PreferencesProvider, usePreferences } from "./context/PreferencesContext";
 import { isBackendHealthy } from "./services/api";
+import ps5MenuMusic from "./sounds/PS5_Sounds/menu_music.mp3";
+import ps2MenuMusic from "./sounds/PS2-System-Sounds/menu_music.mp3";
+import gamecubeMenuMusic from "./sounds/Nintendo GameCube Menu SFX/menu_music.mp3";
+import xbox360MenuMusic from "./sounds/Xbox 360 Metro UI Sounds/menu_music.mp3";
+
+const menuMusicByTheme = {
+  ps5: ps5MenuMusic,
+  ps2: ps2MenuMusic,
+  gamecube: gamecubeMenuMusic,
+  xbox360: xbox360MenuMusic,
+} as const;
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { musicVolume } = usePreferences();
+  const { musicVolume, soundTheme } = usePreferences();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const musicFadeRef = React.useRef<number | null>(null);
@@ -49,13 +60,20 @@ const AppContent: React.FC = () => {
   );
 
   const startBackgroundMusic = React.useCallback(() => {
+    const musicSrc = menuMusicByTheme[soundTheme] ?? menuMusicByTheme.ps5;
+
     if (!musicRef.current) {
-      musicRef.current = new Audio("/Good-at-what-you-do.mp3");
+      musicRef.current = new Audio(musicSrc);
       musicRef.current.loop = true;
       musicRef.current.preload = "auto";
     }
 
     const audio = musicRef.current;
+    if (audio.src !== new URL(musicSrc, window.location.href).href) {
+      audio.pause();
+      audio.src = musicSrc;
+      audio.load();
+    }
     if (!audio.paused) return;
 
     audio.currentTime = 0;
@@ -70,7 +88,7 @@ const AppContent: React.FC = () => {
         pendingMusicStartRef.current = true;
         return;
       });
-  }, [fadeMusicTo, musicVolume]);
+  }, [fadeMusicTo, musicVolume, soundTheme]);
 
   const stopBackgroundMusic = React.useCallback(() => {
     const audio = musicRef.current;
@@ -140,6 +158,29 @@ const AppContent: React.FC = () => {
     if (!audio || audio.paused) return;
     fadeMusicTo(musicVolume / 100, 450);
   }, [fadeMusicTo, musicVolume]);
+
+  React.useEffect(() => {
+    const audio = musicRef.current;
+    const musicSrc = menuMusicByTheme[soundTheme] ?? menuMusicByTheme.ps5;
+    if (!audio) return;
+
+    const nextUrl = new URL(musicSrc, window.location.href).href;
+    if (audio.src === nextUrl) return;
+
+    const wasPlaying = !audio.paused;
+    clearMusicFade();
+    audio.pause();
+    audio.src = musicSrc;
+    audio.load();
+    if (wasPlaying) {
+      audio.volume = 0;
+      audio.play().then(() => {
+        fadeMusicTo(musicVolume / 100, 700);
+      }).catch(() => {
+        pendingMusicStartRef.current = true;
+      });
+    }
+  }, [clearMusicFade, fadeMusicTo, musicVolume, soundTheme]);
 
   React.useEffect(
     () => () => {

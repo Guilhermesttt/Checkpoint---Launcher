@@ -31,12 +31,12 @@ import {
   Languages,
   Volume2,
   Users,
-  MessageCircle,
   Bell,
   Palette,
   BadgeDollarSign,
-  Layers,
 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import {
   collection,
   deleteDoc,
@@ -85,6 +85,7 @@ import {
 } from "../services/discord";
 import {
   acceptCheckpointFriendRequest,
+  getCheckpointFriendProfile,
   getCheckpointFriendStatuses,
   rejectCheckpointFriendRequest,
   removeCheckpointFriend,
@@ -103,18 +104,35 @@ import {
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
-const GameWall = React.lazy(() => import("../components/GameWall"));
 const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
+
+const SteamBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <FontAwesomeIcon icon={faSteam} className={className} style={style as any} />
+);
+
+const DiscordBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <FontAwesomeIcon icon={faDiscord} className={className} style={style as any} />
+);
+
+const EpicBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
+  <img
+    width={96}
+    height={96}
+    src="https://img.icons8.com/windows/96/epic-games--v1.png"
+    alt="epic-games--v1"
+    className={className}
+    style={{ filter: "invert(1)", ...style }}
+  />
+);
 
 const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "FRIENDS", label: "Amigos", Icon: Users },
   { id: "DEALS", label: "Ofertas", Icon: BadgeDollarSign },
-  { id: "WALL", label: "Game Wall", Icon: Layers },
   { id: "PROFILE", label: "Perfil", Icon: User },
-  { id: "STEAM", label: "Steam", Icon: Zap },
-  { id: "EPIC", label: "Epic", Icon: Globe },
+  { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
+  { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },
   { id: "LOCAL", label: "Local", Icon: Gamepad2 },
   { id: "RACING", label: "Corrida", Icon: Car },
   { id: "ROLEPLAYING", label: "RPG", Icon: Swords },
@@ -129,7 +147,7 @@ const CATEGORIES = [
 ];
 
 const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL", "WALL", "PROFILE"].includes(id),
+  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL", "PROFILE"].includes(id),
 );
 
 const normalizeCategory = (v?: string) =>
@@ -142,22 +160,47 @@ const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: strin
   { id: "es-ES", label: "Español", hint: "España" },
 ];
 
-const SOUND_THEME_OPTIONS: Array<{ id: SoundTheme; labelKey: "defaultTheme" | "gamecubeTheme"; hint: string }> = [
-  { id: "ps2", labelKey: "defaultTheme", hint: "PS2 System Sounds" },
-  { id: "gamecube", labelKey: "gamecubeTheme", hint: "Nintendo GameCube Menu SFX" },
-];
-
-const VISUAL_THEME_OPTIONS: Array<{
-  id: VisualTheme;
-  labelKey: "checkpointTheme" | "carbonTheme" | "neonTheme" | "sunsetTheme";
+const APP_THEME_OPTIONS: Array<{
+  id: "default" | "playstation" | "gamecube" | "xbox360";
+  label: string;
   hint: string;
   swatch: string;
+  soundTheme: SoundTheme;
+  visualTheme: VisualTheme;
 }> = [
-    { id: "checkpoint", labelKey: "checkpointTheme", hint: "Clean monochrome", swatch: "rgb(255 255 255)" },
-    { id: "carbon", labelKey: "carbonTheme", hint: "Steel gray", swatch: "rgb(148 163 184)" },
-    { id: "neon", labelKey: "neonTheme", hint: "Cyan glow", swatch: "rgb(34 211 238)" },
-    { id: "sunset", labelKey: "sunsetTheme", hint: "Warm orange", swatch: "rgb(251 146 60)" },
-  ];
+  {
+    id: "default",
+    label: "Padrao",
+    hint: "Visual Checkpoint + sons PS5",
+    swatch: "rgb(255 255 255)",
+    soundTheme: "ps5",
+    visualTheme: "checkpoint",
+  },
+  {
+    id: "playstation",
+    label: "PlayStation",
+    hint: "Azul frio + sons PS2",
+    swatch: "rgb(37 99 235)",
+    soundTheme: "ps2",
+    visualTheme: "playstation",
+  },
+  {
+    id: "gamecube",
+    label: "GameCube",
+    hint: "Roxo Nintendo + sons GameCube",
+    swatch: "rgb(124 58 237)",
+    soundTheme: "gamecube",
+    visualTheme: "gamecube",
+  },
+  {
+    id: "xbox360",
+    label: "Xbox 360",
+    hint: "Verde Xbox + sons Metro UI",
+    swatch: "rgb(132 204 22)",
+    soundTheme: "xbox360",
+    visualTheme: "xbox360",
+  },
+];
 
 interface SocialFriend {
   id: string;
@@ -167,6 +210,19 @@ interface SocialFriend {
   avatar?: string;
   source?: "discord" | "discord_friend" | "local" | "checkpoint";
 }
+
+const buildLocalFriendProfile = (friend: SocialFriend): { profile: UserProfile; games: Game[] } => ({
+  profile: {
+    uid: friend.id,
+    displayName: friend.name,
+    photoURL: friend.avatar || null,
+    discordAvatar: friend.source === "discord_friend" ? friend.avatar : undefined,
+    discordUsername: friend.source === "discord_friend" ? friend.name : undefined,
+    status: friend.status,
+    playing: friend.playing || null,
+  },
+  games: [],
+});
 
 type CheckpointFriendRequest = NonNullable<UserProfile["checkpointFriendRequestsIncoming"]>[number];
 
@@ -394,6 +450,11 @@ const Home: React.FC = () => {
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<CheckpointFriendRequest[]>([]);
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [friendProfileModal, setFriendProfileModal] = useState<{
+    profile: UserProfile;
+    games: Game[];
+  } | null>(null);
+  const [friendProfileLoadingId, setFriendProfileLoadingId] = useState<string | null>(null);
   const [localSocialStateLoaded, setLocalSocialStateLoaded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -429,12 +490,12 @@ const Home: React.FC = () => {
     t,
   } = usePreferences();
   const { playSound } = useSoundEffects(effectsVolume / 100, soundTheme);
-  const { 
-    setGameActivity, 
-    setBrowsingActivity, 
-    clearActivity, 
+  const {
+    setGameActivity,
+    setBrowsingActivity,
+    clearActivity,
     setEnabled: setRichPresenceEnabled,
-    isEnabled: isRichPresenceEnabled 
+    isEnabled: isRichPresenceEnabled
   } = useDiscordRichPresence();
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
@@ -497,7 +558,7 @@ const Home: React.FC = () => {
         }
       }
     };
-    
+
     initializeRichPresence();
   }, [resolvedDiscordId, user?.uid]);
 
@@ -511,7 +572,7 @@ const Home: React.FC = () => {
     }
 
     // Encontrar o jogo que está sendo jogado
-    const playingGame = games.find(game => 
+    const playingGame = games.find(game =>
       game.title.toLowerCase().includes(currentPresenceGame.toLowerCase()) ||
       currentPresenceGame.toLowerCase().includes(game.title.toLowerCase())
     );
@@ -572,14 +633,14 @@ const Home: React.FC = () => {
       const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
       if (title) {
         setCurrentPresenceGame(title);
-        
+
         // Atualizar Discord Rich Presence imediatamente quando jogo é lançado
         if (isRichPresenceEnabled()) {
-          const launchedGame = games.find(game => 
+          const launchedGame = games.find(game =>
             game.title.toLowerCase().includes(title.toLowerCase()) ||
             title.toLowerCase().includes(game.title.toLowerCase())
           );
-          
+
           if (launchedGame) {
             setGameActivity(launchedGame, 'playing');
           }
@@ -617,13 +678,13 @@ const Home: React.FC = () => {
         setSocialFriends((current) => {
           const statusById = new Map(statuses.map((friend) => [friend.uid, friend]));
           let hasChanges = false;
-          
+
           const updatedFriends = current.map((friend) => {
             if (!friend.id.startsWith("cp-friend:")) return friend;
             const uid = friend.id.split(":")[1];
             const status = statusById.get(uid);
             if (!status) return friend;
-            
+
             const newFriend = {
               ...friend,
               name: status.displayName || friend.name,
@@ -631,25 +692,25 @@ const Home: React.FC = () => {
               status: status.status || "offline",
               playing: status.playing || undefined,
             };
-            
+
             // Verificar mudanças relevantes e notificar
             if (friend.status !== newFriend.status || friend.playing !== newFriend.playing) {
               hasChanges = true;
-              
+
               // Notificar quando amigo fica online
               if (friend.status === "offline" && newFriend.status === "online") {
                 notify(`${newFriend.name} ficou online`, "success");
               }
-              
+
               // Notificar quando amigo começa a jogar
               if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing) {
                 notify(`${newFriend.name} começou a jogar ${newFriend.playing}`, "success");
               }
             }
-            
+
             return newFriend;
           });
-          
+
           // Só atualizar se houver mudanças reais
           return hasChanges ? updatedFriends : current;
         });
@@ -666,13 +727,13 @@ const Home: React.FC = () => {
         if (statuses.length === 0) return;
         setSocialFriends((current) => {
           const statusById = new Map(statuses.map((friend) => [friend.uid, friend]));
-          
+
           const updatedFriends = current.map((friend) => {
             if (!friend.id.startsWith("cp-friend:")) return friend;
             const uid = friend.id.split(":")[1];
             const status = statusById.get(uid);
             if (!status) return friend;
-            
+
             return {
               ...friend,
               name: status.displayName || friend.name,
@@ -681,7 +742,7 @@ const Home: React.FC = () => {
               playing: status.playing || undefined,
             };
           });
-          
+
           return updatedFriends;
         });
       } catch {
@@ -689,25 +750,25 @@ const Home: React.FC = () => {
       }
       isInitialSync = false;
     };
-    
+
     initialSync();
-    
+
     // Intervalo mais frequente para updates em tempo real (com notificações)
     const interval = window.setInterval(() => {
       if (!isInitialSync) {
         syncFriendStatuses();
       }
     }, 15_000);
-    
+
     // Sincronizar quando a aba volta ao foco
     const handleFocus = () => {
       if (!isInitialSync) {
         syncFriendStatuses();
       }
     };
-    
+
     window.addEventListener('focus', handleFocus);
-    
+
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
@@ -758,7 +819,7 @@ const Home: React.FC = () => {
         .map((friend) => ({
           id: `discord-friend:${friend.id}`,
           name: friend.username || "Discord",
-          status: "online",
+          status: "offline",
           avatar: friend.avatar || undefined,
           source: "discord_friend",
         }));
@@ -913,7 +974,7 @@ const Home: React.FC = () => {
     const categoryLabel = categoryConfig?.label;
 
     const filtered =
-      activeCategory === "ALL" || activeCategory === "WALL"
+      activeCategory === "ALL"
         ? ordered
         : activeCategory === "FAVORITES"
           ? ordered.filter((g) => g.isFavorite)
@@ -1222,6 +1283,27 @@ const Home: React.FC = () => {
       }
     } else {
       setSocialFriends((current) => current.filter((friend) => friend.id !== id));
+    }
+  };
+
+  const handleViewFriendProfile = async (friend: SocialFriend) => {
+    if (!friend.id.startsWith("cp-friend:")) {
+      setFriendProfileModal(buildLocalFriendProfile(friend));
+      playSound("detailOpen");
+      return;
+    }
+
+    const friendUid = friend.id.split(":")[1];
+    setFriendProfileLoadingId(friend.id);
+    try {
+      const payload = await getCheckpointFriendProfile(friendUid);
+      setFriendProfileModal(payload);
+      playSound("detailOpen");
+    } catch (e) {
+      setFriendProfileModal(buildLocalFriendProfile(friend));
+      playSound("detailOpen");
+    } finally {
+      setFriendProfileLoadingId(null);
     }
   };
 
@@ -1684,10 +1766,6 @@ const Home: React.FC = () => {
               }}
               onSyncSteam={handleSyncSteam}
               onSyncEpic={handleSyncEpic}
-              steamAvatar={userProfile?.steamAvatar}
-              steamUsername={userProfile?.steamUsername}
-              epicAvatar={userProfile?.epicAvatar}
-              epicUsername={userProfile?.epicUsername}
             />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
@@ -1700,32 +1778,12 @@ const Home: React.FC = () => {
               currentPresenceGame={currentPresenceGame}
               onConnectDiscord={connectDiscord}
               onRemoveFriend={removeFriend}
+              onViewFriendProfile={handleViewFriendProfile}
+              friendProfileLoadingId={friendProfileLoadingId}
               onAcceptRequest={handleAcceptCheckpointFriendRequest}
               onRejectRequest={handleRejectCheckpointFriendRequest}
               onAddFriendClick={() => setIsAddFriendModalOpen(true)}
             />
-          ) : activeCategory === "WALL" ? (
-            <div className="w-full h-full">
-              <React.Suspense fallback={
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-white/40">Carregando Game Wall...</div>
-                </div>
-              }>
-                <GameWall
-                  games={displayGames}
-                  onGameSelect={openDetails}
-                  onGameHover={(game) => {
-                    // Atualizar Discord Rich Presence quando hover em jogo
-                    if (game && isRichPresenceEnabled()) {
-                      discordRichPresence.setGameActivity(game, 'menu');
-                    }
-                  }}
-                  selectedGame={selectedGame}
-                  className="h-full"
-                  playSound={playSound}
-                />
-              </React.Suspense>
-            </div>
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
               <div className="flex items-center justify-center flex-1">
@@ -1825,7 +1883,7 @@ const Home: React.FC = () => {
                             className="flex items-center gap-1.5 text-[11px] font-bold"
                             style={{ color: "rgba(103,182,118,0.82)" }}
                           >
-                            <Zap className="w-3 h-3" /> {t("viaSteam")}
+                            <SteamBrandIcon className="w-3 h-3" /> {t("viaSteam")}
                           </span>
                         )}
                         {currentGame?.hoursPlayed != null && (
@@ -1995,6 +2053,37 @@ const Home: React.FC = () => {
         t={t}
       />
 
+      <ModalShell
+        isOpen={Boolean(friendProfileModal)}
+        onClose={() => {
+          playSound("back");
+          setFriendProfileModal(null);
+        }}
+        maxWidthClassName="max-w-6xl"
+        zIndexClassName="z-[165]"
+        className="relative max-h-[90vh] overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] p-0 shadow-2xl"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            playSound("back");
+            setFriendProfileModal(null);
+          }}
+          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/60 text-white/60 hover:bg-white/10 hover:text-white"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        {friendProfileModal && (
+          <React.Suspense fallback={<div className="p-10 text-white/40">Carregando perfil...</div>}>
+            <UserProfilePage
+              userProfile={friendProfileModal.profile}
+              user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
+              games={friendProfileModal.games}
+            />
+          </React.Suspense>
+        )}
+      </ModalShell>
+
       <ConfirmationModal
         isOpen={signOutModalOpen}
         title={t("signOutTitle")}
@@ -2113,10 +2202,6 @@ const SettingsPageV2: React.FC<{
   onDisconnectDiscord: () => void;
   onSyncSteam: () => void;
   onSyncEpic: () => void;
-  steamAvatar?: string;
-  steamUsername?: string;
-  epicAvatar?: string;
-  epicUsername?: string;
 }> = ({
   language,
   effectsVolume,
@@ -2148,11 +2233,17 @@ const SettingsPageV2: React.FC<{
   onDisconnectDiscord,
   onSyncSteam,
   onSyncEpic,
-  steamAvatar,
-  steamUsername,
-  epicAvatar,
-  epicUsername,
-}) => (
+}) => {
+    const activeAppTheme =
+      visualTheme === "checkpoint"
+        ? "default"
+        : soundTheme === "gamecube" || visualTheme === "gamecube"
+          ? "gamecube"
+          : soundTheme === "xbox360" || visualTheme === "xbox360"
+            ? "xbox360"
+            : "playstation";
+
+    return (
     <SystemPageShell eyebrow={t("system")} title={t("settings")}>
       <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
         <SettingsHeader
@@ -2163,17 +2254,13 @@ const SettingsPageV2: React.FC<{
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
-                {steamAvatar ? (
-                  <img src={steamAvatar} alt="Steam" className="w-full h-full object-cover" />
-                ) : (
-                  <Zap className="w-4 h-4 text-white/60" />
-                )}
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                <SteamBrandIcon className="w-4 h-4 text-white/60" />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Steam</p>
-                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
-                  {steamConnected ? (steamUsername || t("connected")) : t("notConnected")}
+                <p className="text-[10px] text-white/40">
+                  {steamConnected ? t("connected") : t("notConnected")}
                 </p>
               </div>
             </div>
@@ -2206,17 +2293,13 @@ const SettingsPageV2: React.FC<{
 
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
-                {epicAvatar ? (
-                  <img src={epicAvatar} alt="Epic" className="w-full h-full object-cover" />
-                ) : (
-                  <Globe className="w-4 h-4 text-white/60" />
-                )}
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                <EpicBrandIcon className="w-4 h-4 opacity-70" />
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Epic Games</p>
-                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
-                  {epicConnected ? (epicUsername || t("connected")) : t("notConnected")}
+                <p className="text-[10px] text-white/40">
+                  {epicConnected ? t("connected") : t("notConnected")}
                 </p>
               </div>
             </div>
@@ -2253,7 +2336,7 @@ const SettingsPageV2: React.FC<{
                 {discordAvatar ? (
                   <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <MessageCircle className="w-4 h-4 text-white/60" />
+                  <DiscordBrandIcon className="w-4 h-4 text-white/60" />
                 )}
               </div>
               <div className="min-w-0">
@@ -2306,38 +2389,30 @@ const SettingsPageV2: React.FC<{
 
         <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
           <SettingsHeader
-            icon={<Palette className="w-5 h-5 text-white/70" />}
-            title={t("visualTheme")}
-            description={t("visualThemeHint")}
+            icon={<Settings className="w-5 h-5 text-white/70" />}
+            title={t("themes")}
+            description={t("themesHint")}
           />
-          <div className="grid grid-cols-2 gap-3">
-            {VISUAL_THEME_OPTIONS.map((option) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {APP_THEME_OPTIONS.map((option) => (
               <SettingsChoice
                 key={option.id}
-                active={visualTheme === option.id}
-                label={t(option.labelKey)}
+                active={activeAppTheme === option.id}
+                label={
+                  option.id === "default"
+                    ? t("defaultTheme")
+                    : option.id === "playstation"
+                      ? t("playstationTheme")
+                      : option.id === "gamecube"
+                        ? t("gamecubeTheme")
+                        : t("xbox360Theme")
+                }
                 hint={option.hint}
                 swatch={option.swatch}
-                onClick={() => onVisualThemeChange(option.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-          <SettingsHeader
-            icon={<Settings className="w-5 h-5 text-white/70" />}
-            title={t("soundTheme")}
-            description={t("soundThemeHint")}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            {SOUND_THEME_OPTIONS.map((option) => (
-              <SettingsChoice
-                key={option.id}
-                active={soundTheme === option.id}
-                label={t(option.labelKey)}
-                hint={option.hint}
-                onClick={() => onSoundThemeChange(option.id)}
+                onClick={() => {
+                  onVisualThemeChange(option.visualTheme);
+                  onSoundThemeChange(option.soundTheme);
+                }}
               />
             ))}
           </div>
@@ -2365,6 +2440,7 @@ const SettingsPageV2: React.FC<{
       </div>
     </SystemPageShell>
   );
+};
 
 const SystemPageShell: React.FC<{
   eyebrow: string;
@@ -2404,6 +2480,8 @@ const FriendsPage: React.FC<{
   currentPresenceGame?: string | null;
   onConnectDiscord: () => void;
   onRemoveFriend: (id: string) => void;
+  onViewFriendProfile: (friend: SocialFriend) => void;
+  friendProfileLoadingId?: string | null;
   onAcceptRequest: (uid: string) => void;
   onRejectRequest: (uid: string) => void;
   onAddFriendClick: () => void;
@@ -2417,13 +2495,16 @@ const FriendsPage: React.FC<{
   currentPresenceGame,
   onConnectDiscord,
   onRemoveFriend,
+  onViewFriendProfile,
+  friendProfileLoadingId,
   onAcceptRequest,
   onRejectRequest,
   onAddFriendClick,
 }) => {
     const [friendSearch, setFriendSearch] = useState("");
-    const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
-    const playingCount = friends.filter((friend) => friend.status === "playing").length;
+    const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
+    const onlineCount = presenceFriends.filter((friend) => friend.status !== "offline").length;
+    const playingCount = presenceFriends.filter((friend) => friend.status === "playing").length;
     const normalizedSearch = friendSearch.trim().toLowerCase();
     const visibleFriends = normalizedSearch
       ? friends.filter(
@@ -2443,7 +2524,7 @@ const FriendsPage: React.FC<{
                 {discordAvatar ? (
                   <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <MessageCircle className="w-6 h-6 text-white/60" />
+                  <DiscordBrandIcon className="w-6 h-6 text-white/60" />
                 )}
                 {/* Status indicator */}
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0A0A0C] flex items-center justify-center">
@@ -2457,20 +2538,20 @@ const FriendsPage: React.FC<{
                   </p>
                   <div className="flex items-center gap-1">
                     {discordConnected && (
-                      <div className="w-4 h-4 rounded bg-indigo-500/20 flex items-center justify-center">
-                        <MessageCircle className="w-2.5 h-2.5 text-indigo-400" />
+                      <div className="w-4 h-4 rounded bg-white/10 flex items-center justify-center">
+                        <DiscordBrandIcon className="w-2.5 h-2.5 text-white/70" />
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   {currentPresenceGame ? (
-                    <p className="text-[11px] text-blue-400 font-bold uppercase tracking-wider">
-                      🎮 Jogando {currentPresenceGame}
+                    <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
+                      Jogando {currentPresenceGame}
                     </p>
                   ) : (
-                    <p className="text-[11px] text-green-400 font-bold uppercase tracking-wider">
-                      🟢 Online
+                    <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
+                      Online
                     </p>
                   )}
                 </div>
@@ -2500,7 +2581,7 @@ const FriendsPage: React.FC<{
               )}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
               { label: "Online", value: onlineCount },
@@ -2616,19 +2697,23 @@ const FriendsPage: React.FC<{
                     {friend.avatar ? (
                       <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <MessageCircle className="w-4 h-4 text-white/70" />
+                      friend.source === "discord_friend" ? (
+                        <DiscordBrandIcon className="w-4 h-4 text-white/70" />
+                      ) : (
+                        <Users className="w-4 h-4 text-white/70" />
+                      )
                     )}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-white truncate">{friend.name}</p>
                     <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
                       {friend.source === "discord_friend"
-                        ? "Amigo do Discord"
+                        ? "Discord conectado"
                         : friend.source === "checkpoint"
                           ? friend.status === "playing"
                             ? `Jogando ${friend.playing || "um jogo"}`
-                            : friend.status === "online" 
-                              ? "Online" 
+                            : friend.status === "online"
+                              ? "Online"
                               : "Offline"
                           : friend.status === "playing"
                             ? `Jogando ${friend.playing || "agora"}`
@@ -2636,7 +2721,16 @@ const FriendsPage: React.FC<{
                     </p>
                   </div>
                 </div>
-                {!friend.source?.startsWith("discord") && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onViewFriendProfile(friend)}
+                    disabled={friendProfileLoadingId === friend.id}
+                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40"
+                  >
+                    {friendProfileLoadingId === friend.id ? "Abrindo..." : "Perfil"}
+                  </button>
+                  {!friend.source?.startsWith("discord") && (
                   <button
                     type="button"
                     onClick={() => onRemoveFriend(friend.id)}
@@ -2644,7 +2738,8 @@ const FriendsPage: React.FC<{
                   >
                     Remover
                   </button>
-                )}
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -2685,15 +2780,15 @@ const AddFriendModal: React.FC<{
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!search.trim()) return;
-    
+
     setSearching(true);
     setResults([]);
     setSelectedIndex(0);
-    
+
     try {
       const searchResults = await searchCheckpointFriends(search.trim());
       setResults(searchResults);
-      
+
       // Adicionar à lista de pesquisas recentes
       const newRecent = [search.trim(), ...recentSearches.filter(s => s !== search.trim())].slice(0, 5);
       setRecentSearches(newRecent);
@@ -2707,7 +2802,7 @@ const AddFriendModal: React.FC<{
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!results.length) return;
-    
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
@@ -2736,7 +2831,7 @@ const AddFriendModal: React.FC<{
         className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl relative overflow-hidden"
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
-        
+
         <div className="relative flex justify-between items-center mb-6">
           <div>
             <h2 className="text-xl font-black text-white">Adicionar amigo</h2>
@@ -2809,13 +2904,12 @@ const AddFriendModal: React.FC<{
             </div>
           ) : results.length > 0 ? (
             results.map((profile, index) => (
-              <div 
-                key={profile.uid} 
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                  index === selectedIndex 
-                    ? 'bg-white/[0.08] border-white/20' 
+              <div
+                key={profile.uid}
+                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
+                    ? 'bg-white/[0.08] border-white/20'
                     : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06]'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-white/10 overflow-hidden border border-white/10">
@@ -2860,7 +2954,7 @@ const AddFriendModal: React.FC<{
             </div>
           )}
         </div>
-        
+
         {results.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/5">
             <div className="text-[10px] text-white/30 text-center">

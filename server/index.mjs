@@ -731,6 +731,77 @@ app.get("/api/friends/status", steamPrivateLimiter, requireFirebaseUser, async (
   }
 });
 
+app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.params.uid || "").trim();
+  if (!friendUid || friendUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const currentSnap = await firestore.doc(`profiles/${req.firebaseUser.uid}`).get();
+    const isFriend = (Array.isArray(currentSnap.data()?.checkpointFriends)
+      ? currentSnap.data().checkpointFriends
+      : [])
+      .some((friend) => String(friend?.uid || "") === friendUid);
+
+    if (!isFriend) {
+      res.status(403).json({ error: "Perfil disponível apenas para amigos." });
+      return;
+    }
+
+    const profileSnap = await firestore.doc(`profiles/${friendUid}`).get();
+    if (!profileSnap.exists) {
+      res.status(404).json({ error: "Perfil não encontrado." });
+      return;
+    }
+
+    const profileData = profileSnap.data() || {};
+    const presence = resolvePresence(profileData.presence);
+    const gamesSnap = await firestore.collection(`users/${friendUid}/games`).limit(80).get();
+    const games = gamesSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        title: data.title || "Jogo",
+        image: data.image || "",
+        backgroundImage: data.backgroundImage || "",
+        cardImage: data.cardImage || "",
+        logoImage: data.logoImage || "",
+        category: data.category || "",
+        isFavorite: Boolean(data.isFavorite),
+        hoursPlayed: Number(data.hoursPlayed || 0),
+        launcherType: data.launcherType || "local",
+        totalAchievements: Number(data.totalAchievements || 0),
+        completedAchievements: Number(data.completedAchievements || 0),
+      };
+    });
+
+    res.json({
+      profile: {
+        uid: friendUid,
+        displayName: profileData.displayName || profileData.discordUsername || "Usuário",
+        photoURL: profileData.discordAvatar || profileData.photoURL || "",
+        steamId: profileData.steamId ? "connected" : "",
+        epicAccountId: profileData.epicAccountId ? "connected" : "",
+        discordId: profileData.discordId ? "connected" : "",
+        discordUsername: profileData.discordUsername || "",
+        discordAvatar: profileData.discordAvatar || "",
+        steamAvatar: profileData.steamAvatar || "",
+        steamUsername: profileData.steamUsername || "",
+        epicAvatar: profileData.epicAvatar || "",
+        epicUsername: profileData.epicUsername || "",
+        status: presence.status,
+        playing: presence.playing,
+      },
+      games,
+    });
+  } catch {
+    res.status(500).json({ error: "Erro ao carregar perfil do amigo." });
+  }
+});
+
 app.post("/api/friends/request", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const friendUid = String(req.body?.uid ?? "").trim();
   if (!friendUid || friendUid === req.firebaseUser.uid) {

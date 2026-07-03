@@ -11,6 +11,24 @@
   --launcher-tint: rgba(255, 255, 255, 0.09);
 }
 
+html[data-launcher-theme="playstation"] {
+  --launcher-accent: 37 99 235;
+  --launcher-accent-soft: rgba(37, 99, 235, 0.34);
+  --launcher-tint: rgba(30, 64, 175, 0.32);
+}
+
+html[data-launcher-theme="gamecube"] {
+  --launcher-accent: 124 58 237;
+  --launcher-accent-soft: rgba(124, 58, 237, 0.36);
+  --launcher-tint: rgba(76, 29, 149, 0.34);
+}
+
+html[data-launcher-theme="xbox360"] {
+  --launcher-accent: 132 204 22;
+  --launcher-accent-soft: rgba(132, 204, 22, 0.34);
+  --launcher-tint: rgba(77, 124, 15, 0.34);
+}
+
 html[data-launcher-theme="carbon"] {
   --launcher-accent: 148 163 184;
   --launcher-accent-soft: rgba(148, 163, 184, 0.34);

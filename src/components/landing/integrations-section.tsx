@@ -12,7 +12,7 @@ const integrations = [
   },
   {
     name: "Epic Games",
-    image: "/Epic-Games-Logo.png",
+    image: "https://img.icons8.com/windows/96/epic-games--v1.png",
     description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
 
   },
@@ -99,8 +99,8 @@ export function IntegrationsSection() {
                   ) : integration.image ? (
                     <img
                       src={integration.image}
-                      alt={integration.name}
-                      className="h-15 w-15 object-contain"
+                      alt="epic-games--v1"
+                      className="h-15 w-15 object-contain invert"
                     />
                   ) : (
                     <img src="/Checkpoint_Logo.png" alt="" className="h-16 w-16 object-contain opacity-80" />

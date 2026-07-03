@@ -170,9 +170,11 @@ export function HeroSection() {
                 <span className="flex items-center gap-3">
                   <FontAwesomeIcon icon={faSteam} className="text-3xl lg:text-4xl" />
                   <img
-                    src="/Epic-Games-Logo.png"
-                    alt="Epic Games"
-                    className="h-9 w-9 object-contain"
+                    width={96}
+                    height={96}
+                    src="https://img.icons8.com/windows/96/epic-games--v1.png"
+                    alt="epic-games--v1"
+                    className="h-9 w-9 object-contain invert"
                   />
                 </span>
               ),

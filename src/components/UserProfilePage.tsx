@@ -1,17 +1,9 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import {
-  Clock,
-  Trophy,
-  Star,
-  Gamepad2,
-  Zap,
-  Globe,
-  MessageCircle,
-  User,
-  TrendingUp,
-} from 'lucide-react';
-import type { Game, UserProfile } from '../types/domain';
+import React, { useMemo } from "react";
+import { motion } from "framer-motion";
+import { Clock, Gamepad2, Star, Trophy, TrendingUp, User } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
+import type { Game, UserProfile } from "../types/domain";
 
 interface UserProfilePageProps {
   userProfile: UserProfile | null;
@@ -19,430 +11,324 @@ interface UserProfilePageProps {
   games: Game[];
 }
 
-/* ─── Avatar do usuário — prioridade: discord > steam > firebase > initials ─ */
-const UserAvatar: React.FC<{
-  profile: UserProfile | null;
-  firebasePhotoURL?: string | null;
-  size?: number;
-  className?: string;
-}> = ({ profile, firebasePhotoURL, size = 80, className = '' }) => {
-  const src =
-    profile?.discordAvatar ||
-    profile?.steamAvatar ||
-    firebasePhotoURL ||
-    null;
+const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <img
+    width={96}
+    height={96}
+    src="https://img.icons8.com/windows/96/epic-games--v1.png"
+    alt="epic-games--v1"
+    className={className}
+    style={{ filter: "invert(1)" }}
+  />
+);
 
-  const initials = (profile?.displayName || 'U')
-    .split(' ')
-    .map((w) => w[0])
+const avatarUrl = (profile: UserProfile | null, firebasePhotoURL?: string | null) =>
+  profile?.discordAvatar || profile?.steamAvatar || profile?.photoURL || firebasePhotoURL || "";
+
+const initialsFor = (name: string) =>
+  name
+    .split(" ")
+    .map((word) => word[0])
     .slice(0, 2)
-    .join('')
+    .join("")
     .toUpperCase();
 
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt="Avatar"
-        className={`rounded-full object-cover ${className}`}
-        style={{ width: size, height: size }}
-        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-      />
-    );
-  }
-
+const ProfileAvatar: React.FC<{
+  profile: UserProfile | null;
+  firebasePhotoURL?: string | null;
+  displayName: string;
+}> = ({ profile, firebasePhotoURL, displayName }) => {
+  const src = avatarUrl(profile, firebasePhotoURL);
   return (
-    <div
-      className={`rounded-full flex items-center justify-center font-black text-white/80 ${className}`}
-      style={{
-        width: size,
-        height: size,
-        background: 'linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05))',
-        border: '1px solid rgba(255,255,255,0.1)',
-        fontSize: size * 0.35,
-      }}
-    >
-      {initials}
+    <div className="relative h-[74px] w-[74px] shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06]">
+      {src ? (
+        <img src={src} alt="" className="h-full w-full object-cover grayscale" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-xl font-black text-white/70">
+          {initialsFor(displayName)}
+        </div>
+      )}
     </div>
   );
 };
 
-/* ─── Card de plataforma conectada ─────────────────────────── */
 const PlatformCard: React.FC<{
   name: string;
   connected: boolean;
-  avatar?: string;
   username?: string;
-  color: string;
+  avatar?: string;
   icon: React.ReactNode;
-}> = ({ name, connected, avatar, username, color, icon }) => (
+}> = ({ name, connected, username, avatar, icon }) => (
   <div
-    className="flex items-center gap-3 p-3 rounded-2xl border"
-    style={{
-      background: connected ? `${color}08` : 'rgba(255,255,255,0.02)',
-      borderColor: connected ? `${color}25` : 'rgba(255,255,255,0.06)',
-    }}
+    className={`flex items-center gap-3 rounded-2xl border p-3 ${
+      connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
+    }`}
   >
-    <div
-      className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0"
-      style={{ background: connected ? `${color}18` : 'rgba(255,255,255,0.06)' }}
-    >
-      {avatar ? (
-        <img src={avatar} alt={name} className="w-full h-full object-cover" />
-      ) : (
-        <span style={{ color: connected ? color : 'rgba(255,255,255,0.3)' }}>{icon}</span>
-      )}
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75">
+      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover grayscale" /> : icon}
     </div>
-    <div className="min-w-0">
-      <p className="text-xs font-black text-white">{name}</p>
-      <p className="text-[10px] truncate" style={{ color: connected ? color : 'rgba(255,255,255,0.3)' }}>
-        {connected ? (username || 'Conectado') : 'Não conectado'}
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-xs font-black text-white">{name}</p>
+      <p className="truncate text-[10px] text-white/40">
+        {connected ? username || "Conectado" : "Nao conectado"}
       </p>
     </div>
-    <div
-      className="w-2 h-2 rounded-full ml-auto flex-shrink-0"
-      style={{ background: connected ? '#22c55e' : 'rgba(255,255,255,0.15)' }}
-    />
+    <span className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-white" : "bg-white/15"}`} />
   </div>
 );
 
-/* ─── Componente principal ─────────────────────────────────── */
-const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, games }) => {
-  const displayName = userProfile?.displayName || user?.email?.split('@')[0] || 'Jogador';
+const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode }> = ({
+  icon,
+  label,
+  value,
+}) => (
+  <div className="flex min-h-[90px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.045] px-5">
+    <div className="mb-2 text-white/36">{icon}</div>
+    <div className="text-xl font-black text-white tabular-nums">{value}</div>
+    <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-white/32">{label}</div>
+  </div>
+);
 
-  /* Estatísticas */
+const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode; className?: string }> = ({
+  title,
+  icon,
+  children,
+  className = "",
+}) => (
+  <section className={`rounded-[26px] border border-white/10 bg-black/55 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.45)] ${className}`}>
+    <div className="mb-4 flex items-center gap-2">
+      {icon && <span className="text-white/40">{icon}</span>}
+      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">{title}</p>
+    </div>
+    {children}
+  </section>
+);
+
+const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, games }) => {
+  const displayName = userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
+  const email = userProfile?.email || user?.email || "";
+
   const stats = useMemo(() => {
-    const totalHours = games.reduce((acc, g) => acc + (g.hoursPlayed || 0), 0);
-    const totalAchievements = games.reduce((acc, g) => acc + (g.completedAchievements || 0), 0);
-    const totalPossible = games.reduce((acc, g) => acc + (g.totalAchievements || 0), 0);
-    const favorites = games.filter((g) => g.isFavorite).length;
-    const steamGames = games.filter((g) => g.launcherType === 'steam').length;
-    const epicGames = games.filter((g) => g.launcherType === 'epic').length;
-    const localGames = games.filter((g) => !g.launcherType || g.launcherType === 'local').length;
+    const totalHours = games.reduce((acc, game) => acc + (game.hoursPlayed || 0), 0);
+    const totalAchievements = games.reduce((acc, game) => acc + (game.completedAchievements || 0), 0);
+    const totalPossible = games.reduce((acc, game) => acc + (game.totalAchievements || 0), 0);
+    const favorites = games.filter((game) => game.isFavorite).length;
+    const steamGames = games.filter((game) => game.launcherType === "steam").length;
+    const epicGames = games.filter((game) => game.launcherType === "epic").length;
+    const localGames = games.filter((game) => !game.launcherType || game.launcherType === "local").length;
     return { totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
   }, [games]);
 
-  /* Jogos mais jogados */
   const topGames = useMemo(
     () =>
       [...games]
-        .filter((g) => (g.hoursPlayed || 0) > 0)
+        .filter((game) => (game.hoursPlayed || 0) > 0)
         .sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0))
         .slice(0, 5),
     [games],
   );
 
-  /* Jogos favoritos */
-  const favoriteGames = useMemo(
-    () => games.filter((g) => g.isFavorite).slice(0, 5),
-    [games],
-  );
-
-  /* Achievement progress */
+  const favoriteGames = useMemo(() => games.filter((game) => game.isFavorite).slice(0, 6), [games]);
   const achievementPercent =
-    stats.totalPossible > 0
-      ? Math.round((stats.totalAchievements / stats.totalPossible) * 100)
-      : 0;
+    stats.totalPossible > 0 ? Math.round((stats.totalAchievements / stats.totalPossible) * 100) : 0;
+  const maxHours = Math.max(topGames[0]?.hoursPlayed || 1, 1);
+  const libraryRows = [
+    { label: "Steam", value: stats.steamGames },
+    { label: "Epic Games", value: stats.epicGames },
+    { label: "Local", value: stats.localGames },
+  ];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18, filter: 'blur(6px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="flex-1 px-10 pb-14 pt-6 overflow-y-auto"
-      style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
+      initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="relative flex-1 overflow-y-auto px-8 pb-12 pt-6 thin-scrollbar"
     >
-      <div className="max-w-4xl mx-auto space-y-5">
-
-        {/* ── Header do perfil ── */}
-        <div
-          className="relative rounded-[28px] border border-white/10 overflow-hidden p-6"
-          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-        >
-          {/* background decorativo */}
-          <div
-            className="absolute inset-0 opacity-20 pointer-events-none"
-            style={{
-              background: 'radial-gradient(ellipse at 20% 50%, rgba(139,92,246,0.3) 0%, transparent 60%)',
-            }}
-          />
-
-          <div className="relative flex items-center gap-6">
-            {/* Avatar grande */}
-            <div className="relative flex-shrink-0">
-              <UserAvatar
-                profile={userProfile}
-                firebasePhotoURL={user?.photoURL}
-                size={80}
-                className="ring-2 ring-white/20"
-              />
-              {/* Status online */}
-              <div
-                className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center"
-                style={{ borderColor: '#0a0a0f', background: '#22c55e' }}
-              />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-black text-white tracking-tight mb-1">{displayName}</h1>
-
-              {/* Badges de plataformas conectadas */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {userProfile?.steamId && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-green-500/15 border border-green-500/25 text-green-400">
-                    <Zap className="w-2.5 h-2.5" /> Steam
-                  </span>
-                )}
-                {userProfile?.epicAccountId && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-500/15 border border-indigo-500/25 text-indigo-400">
-                    <Globe className="w-2.5 h-2.5" /> Epic
-                  </span>
-                )}
-                {userProfile?.discordId && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-violet-500/15 border border-violet-500/25 text-violet-400">
-                    <MessageCircle className="w-2.5 h-2.5" />
-                    {userProfile.discordUsername || 'Discord'}
-                  </span>
-                )}
-              </div>
-
-              {user?.email && (
-                <p className="text-[11px] text-white/30 mt-2">{user.email}</p>
-              )}
-            </div>
-
-            {/* Stats rápidas no lado direito */}
-            <div className="hidden md:grid grid-cols-3 gap-3 flex-shrink-0">
-              {[
-                { label: 'Jogos', value: games.length, icon: <Gamepad2 className="w-3.5 h-3.5" /> },
-                { label: 'Horas', value: `${stats.totalHours}h`, icon: <Clock className="w-3.5 h-3.5" /> },
-                { label: 'Favoritos', value: stats.favorites, icon: <Star className="w-3.5 h-3.5" /> },
-              ].map(({ label, value, icon }) => (
-                <div
-                  key={label}
-                  className="flex flex-col items-center gap-1 p-3 rounded-2xl border border-white/8"
-                  style={{ background: 'rgba(255,255,255,0.04)' }}
-                >
-                  <span className="text-white/40">{icon}</span>
-                  <span className="text-lg font-black text-white tabular-nums">{value}</span>
-                  <span className="text-[9px] uppercase tracking-widest text-white/35">{label}</span>
+      <div
+        className="pointer-events-none fixed inset-0 opacity-35"
+        style={{
+          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.32) 1.4px, transparent 1.4px)",
+          backgroundSize: "18px 18px",
+          maskImage: "linear-gradient(120deg, black, transparent 75%)",
+        }}
+      />
+      <div className="relative mx-auto max-w-6xl space-y-5">
+        <section className="rounded-[28px] border border-white/10 bg-black/70 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 items-center gap-5">
+              <ProfileAvatar profile={userProfile} firebasePhotoURL={user?.photoURL} displayName={displayName} />
+              <div className="min-w-0">
+                <h1 className="truncate text-3xl font-black tracking-tight text-white">{displayName}</h1>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {userProfile?.steamId && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
+                      <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> Steam
+                    </span>
+                  )}
+                  {userProfile?.epicAccountId && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
+                      <EpicIcon className="h-3 w-3" /> Epic
+                    </span>
+                  )}
+                  {userProfile?.discordId && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
+                      <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
+                      {userProfile.discordUsername || "Discord"}
+                    </span>
+                  )}
                 </div>
-              ))}
+                {email && <p className="mt-3 text-xs font-semibold text-white/28">{email}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard icon={<Gamepad2 className="h-4 w-4" />} label="Jogos" value={games.length} />
+              <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${stats.totalHours}h`} />
+              <StatCard icon={<Star className="h-4 w-4" />} label="Favoritos" value={stats.favorites} />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* ── Grid principal ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-          {/* Coluna esquerda — plataformas + achievements */}
-          <div className="space-y-4">
-
-            {/* Plataformas */}
-            <section
-              className="rounded-[24px] border border-white/10 p-5"
-              style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-            >
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/35 mb-3">Plataformas</p>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[285px_1fr]">
+          <div className="space-y-5">
+            <Section title="Plataformas">
               <div className="space-y-2">
                 <PlatformCard
                   name="Steam"
                   connected={Boolean(userProfile?.steamId)}
                   avatar={userProfile?.steamAvatar}
                   username={userProfile?.steamUsername || userProfile?.steamId}
-                  color="#67b676"
-                  icon={<Zap className="w-4 h-4" />}
+                  icon={<FontAwesomeIcon icon={faSteam} className="h-4 w-4" />}
                 />
                 <PlatformCard
                   name="Epic Games"
                   connected={Boolean(userProfile?.epicAccountId)}
                   avatar={userProfile?.epicAvatar}
-                  username={userProfile?.epicUsername || userProfile?.epicAccountId?.slice(0, 12) + '...'}
-                  color="#818cf8"
-                  icon={<Globe className="w-4 h-4" />}
+                  username={userProfile?.epicUsername || userProfile?.epicAccountId}
+                  icon={<EpicIcon className="h-5 w-5" />}
                 />
                 <PlatformCard
                   name="Discord"
                   connected={Boolean(userProfile?.discordId)}
                   avatar={userProfile?.discordAvatar}
                   username={userProfile?.discordUsername}
-                  color="#7c3aed"
-                  icon={<MessageCircle className="w-4 h-4" />}
+                  icon={<FontAwesomeIcon icon={faDiscord} className="h-4 w-4" />}
                 />
               </div>
-            </section>
+            </Section>
 
-            {/* Achievements */}
-            <section
-              className="rounded-[24px] border border-white/10 p-5"
-              style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-            >
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/35 mb-3">Conquistas</p>
-              <div className="flex items-end justify-between mb-2">
+            <Section title="Conquistas">
+              <div className="mb-3 flex items-end justify-between">
                 <div>
-                  <span className="text-3xl font-black text-white">{stats.totalAchievements}</span>
-                  <span className="text-sm text-white/35 ml-1">/ {stats.totalPossible}</span>
+                  <span className="text-4xl font-black text-white">{stats.totalAchievements}</span>
+                  <span className="ml-1 text-sm font-bold text-white/35">/ {stats.totalPossible}</span>
                 </div>
-                <span className="text-sm font-bold text-white/50">{achievementPercent}%</span>
+                <span className="text-sm font-black text-white/45">{achievementPercent}%</span>
               </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div className="h-2 overflow-hidden rounded-full bg-white/8">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${achievementPercent}%` }}
-                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-                  className="h-full rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24)' }}
+                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                  className="h-full rounded-full bg-white"
                 />
               </div>
-              <div className="flex items-center gap-1 mt-2">
-                <Trophy className="w-3 h-3 text-amber-400/70" />
-                <span className="text-[10px] text-white/35">{stats.totalAchievements} conquistas desbloqueadas</span>
-              </div>
-            </section>
+              <p className="mt-3 flex items-center gap-1.5 text-[10px] text-white/35">
+                <Trophy className="h-3 w-3" /> {stats.totalAchievements} conquistas desbloqueadas
+              </p>
+            </Section>
 
-            {/* Distribuição por plataforma */}
-            <section
-              className="rounded-[24px] border border-white/10 p-5"
-              style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-            >
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/35 mb-3">Biblioteca</p>
-              <div className="space-y-2">
-                {[
-                  { label: 'Steam', count: stats.steamGames, color: '#67b676', total: games.length },
-                  { label: 'Epic Games', count: stats.epicGames, color: '#818cf8', total: games.length },
-                  { label: 'Local', count: stats.localGames, color: 'rgba(255,255,255,0.4)', total: games.length },
-                ].map(({ label, count, color, total }) => (
-                  <div key={label}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[10px] text-white/50">{label}</span>
-                      <span className="text-[10px] font-bold text-white/50">{count}</span>
+            <Section title="Biblioteca">
+              <div className="space-y-3">
+                {libraryRows.map((row) => (
+                  <div key={row.label}>
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-white/45">
+                      <span>{row.label}</span>
+                      <span>{row.value}</span>
                     </div>
-                    <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }}
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-                        className="h-full rounded-full"
-                        style={{ background: color }}
+                        animate={{ width: games.length > 0 ? `${(row.value / games.length) * 100}%` : "0%" }}
+                        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+                        className="h-full rounded-full bg-white"
                       />
                     </div>
                   </div>
                 ))}
               </div>
-            </section>
+            </Section>
           </div>
 
-          {/* Coluna central/direita — jogos mais jogados */}
-          <div className="md:col-span-2 space-y-4">
-
-            {/* Jogos mais jogados */}
-            {topGames.length > 0 && (
-              <section
-                className="rounded-[24px] border border-white/10 p-5"
-                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <TrendingUp className="w-4 h-4 text-white/40" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/35">Mais jogados</p>
-                </div>
-                <div className="space-y-2">
-                  {topGames.map((game, i) => {
-                    const maxHours = topGames[0].hoursPlayed || 1;
+          <div className="space-y-5">
+            <Section title="Mais jogados" icon={<TrendingUp className="h-4 w-4" />} className="min-h-[346px]">
+              {topGames.length > 0 ? (
+                <div className="space-y-4">
+                  {topGames.map((game, index) => {
                     const pct = ((game.hoursPlayed || 0) / maxHours) * 100;
                     return (
-                      <div key={game.id} className="flex items-center gap-3">
-                        {/* Rank */}
-                        <span className="text-[11px] font-black text-white/25 w-4 text-right flex-shrink-0">
-                          {i + 1}
-                        </span>
-                        {/* Capa mini */}
-                        <div className="w-9 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-white/5">
+                      <div key={game.id} className="grid grid-cols-[20px_42px_1fr_auto] items-center gap-3">
+                        <span className="text-right text-xs font-black text-white/25">{index + 1}</span>
+                        <div className="h-12 w-9 overflow-hidden rounded-lg bg-white/8">
                           {(game.cardImage || game.image) && (
-                            <img
-                              src={game.cardImage || game.image}
-                              alt={game.title}
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover" />
                           )}
                         </div>
-                        {/* Info + barra */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="text-xs font-bold text-white truncate">{game.title}</p>
-                            <span className="text-[10px] text-white/40 flex-shrink-0 ml-2 flex items-center gap-0.5">
-                              <Clock className="w-2.5 h-2.5" />
-                              {game.hoursPlayed}h
-                            </span>
-                          </div>
-                          <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-white">{game.title}</p>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                             <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${pct}%` }}
-                              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.1 * i }}
-                              className="h-full rounded-full"
-                              style={{
-                                background: i === 0
-                                  ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
-                                  : 'rgba(255,255,255,0.3)',
-                              }}
+                              transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+                              className="h-full rounded-full bg-white"
                             />
                           </div>
                         </div>
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-white/35">
+                          <Clock className="h-3 w-3" /> {game.hoursPlayed || 0}h
+                        </span>
                       </div>
                     );
                   })}
                 </div>
-              </section>
-            )}
+              ) : (
+                <EmptyProfileState />
+              )}
+            </Section>
 
-            {/* Favoritos */}
-            {favoriteGames.length > 0 && (
-              <section
-                className="rounded-[24px] border border-white/10 p-5"
-                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(32px)' }}
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <Star className="w-4 h-4 text-amber-400/70" />
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/35">Favoritos</p>
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <Section title="Favoritos" icon={<Star className="h-4 w-4" />}>
+              {favoriteGames.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                   {favoriteGames.map((game) => (
-                    <div key={game.id} className="flex-shrink-0">
-                      <div className="w-16 h-22 rounded-xl overflow-hidden mb-1 bg-white/5">
+                    <div key={game.id} className="w-[74px] shrink-0">
+                      <div className="h-[90px] w-[74px] overflow-hidden rounded-xl bg-white/8">
                         {(game.cardImage || game.image) && (
-                          <img
-                            src={game.cardImage || game.image}
-                            alt={game.title}
-                            className="w-full h-full object-cover"
-                            style={{ height: '88px' }}
-                          />
+                          <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover" />
                         )}
                       </div>
-                      <p className="text-[9px] text-white/50 text-center truncate w-16">{game.title}</p>
+                      <p className="mt-2 truncate text-center text-[10px] text-white/45">{game.title}</p>
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
-
-            {/* Estado vazio */}
-            {topGames.length === 0 && favoriteGames.length === 0 && (
-              <section
-                className="rounded-[24px] border border-white/8 p-10 text-center"
-                style={{ background: 'rgba(0,0,0,0.25)' }}
-              >
-                <User className="w-10 h-10 mx-auto mb-4 text-white/20" />
-                <p className="text-sm font-bold text-white/40">Perfil em construção</p>
-                <p className="text-xs text-white/25 mt-1">
-                  Adicione e jogue jogos para ver suas estatísticas aqui.
-                </p>
-              </section>
-            )}
+              ) : (
+                <p className="py-8 text-center text-sm font-bold text-white/35">Nenhum favorito ainda.</p>
+              )}
+            </Section>
           </div>
         </div>
       </div>
     </motion.div>
   );
 };
+
+const EmptyProfileState: React.FC = () => (
+  <div className="flex h-56 flex-col items-center justify-center text-center">
+    <User className="mb-4 h-9 w-9 text-white/20" />
+    <p className="text-sm font-black text-white/40">Perfil em construcao</p>
+    <p className="mt-1 text-xs text-white/25">Jogue e favorite jogos para preencher esta area.</p>
+  </div>
+);
 
 export default UserProfilePage;

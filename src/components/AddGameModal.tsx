@@ -40,6 +40,17 @@ interface AddGameModalProps {
   onSaved?: () => void;
 }
 
+const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <img
+    width={96}
+    height={96}
+    src="https://img.icons8.com/windows/96/epic-games--v1.png"
+    alt="epic-games--v1"
+    className={className}
+    style={{ filter: "invert(1)" }}
+  />
+);
+
 const CATEGORIES = [
   { id: "ACTION", label: "Ação" },
   { id: "ADVENTURE", label: "Aventura" },
@@ -638,7 +649,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <div className="h-px bg-white/5" />
 
                 <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <Globe size={14} className="text-white/20" /> Epic Catalog ID ({copy.optional})
+                  <EpicIcon className="h-3.5 w-3.5 opacity-30" /> Epic Catalog ID ({copy.optional})
                 </label>
                 <input
                   value={formData.epicCatalogId || ""}

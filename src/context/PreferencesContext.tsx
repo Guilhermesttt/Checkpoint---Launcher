@@ -2,8 +2,8 @@
 import { useAuth } from "../auth/AuthProvider";
 
 export type LauncherLanguage = "pt-BR" | "en-US" | "es-ES";
-export type SoundTheme = "ps2" | "gamecube";
-export type VisualTheme = "checkpoint" | "carbon" | "neon" | "sunset";
+export type SoundTheme = "ps5" | "ps2" | "gamecube" | "xbox360";
+export type VisualTheme = "playstation" | "gamecube" | "xbox360" | "checkpoint" | "carbon" | "neon" | "sunset";
 
 interface PreferencesContextValue {
   language: LauncherLanguage;
@@ -33,6 +33,10 @@ const translations = {
     soundThemeHint: "Pacote de sons usado pela interface.",
     visualTheme: "Tema visual",
     visualThemeHint: "Skin de cores aplicada ao launcher.",
+    themes: "Temas",
+    themesHint: "Cada tema aplica visual e sons do mesmo pacote.",
+    playstationTheme: "PlayStation",
+    xbox360Theme: "Xbox 360",
     checkpointTheme: "Checkpoint",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
@@ -108,6 +112,10 @@ const translations = {
     soundThemeHint: "Sound pack used by the interface.",
     visualTheme: "Visual theme",
     visualThemeHint: "Color skin applied to the launcher.",
+    themes: "Themes",
+    themesHint: "Each theme applies matching visuals and sounds.",
+    playstationTheme: "PlayStation",
+    xbox360Theme: "Xbox 360",
     checkpointTheme: "Checkpoint",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
@@ -183,6 +191,10 @@ const translations = {
     soundThemeHint: "Paquete de sonidos usado por la interfaz.",
     visualTheme: "Tema visual",
     visualThemeHint: "Skin de colores aplicada al launcher.",
+    themes: "Temas",
+    themesHint: "Cada tema aplica visual y sonidos del mismo paquete.",
+    playstationTheme: "PlayStation",
+    xbox360Theme: "Xbox 360",
     checkpointTheme: "Checkpoint",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
@@ -263,7 +275,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [language, setLanguage] = useState<LauncherLanguage>("pt-BR");
   const [effectsVolume, setEffectsVolume] = useState(30);
   const [musicVolume, setMusicVolume] = useState(9);
-  const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps2");
+  const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
 
   useEffect(() => {
@@ -291,11 +303,14 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedMusicVolume != null && Number.isFinite(savedMusicVolume)) {
       setMusicVolume(clampVolume(savedMusicVolume));
     }
-    if (savedSoundTheme === "ps2" || savedSoundTheme === "gamecube") {
+    if (savedSoundTheme === "ps5" || savedSoundTheme === "ps2" || savedSoundTheme === "gamecube" || savedSoundTheme === "xbox360") {
       setSoundTheme(savedSoundTheme);
     }
     if (
       savedVisualTheme === "checkpoint" ||
+      savedVisualTheme === "playstation" ||
+      savedVisualTheme === "gamecube" ||
+      savedVisualTheme === "xbox360" ||
       savedVisualTheme === "carbon" ||
       savedVisualTheme === "neon" ||
       savedVisualTheme === "sunset"

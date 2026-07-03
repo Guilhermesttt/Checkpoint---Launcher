@@ -1,5 +1,7 @@
 ﻿import React from "react";
-import { Play, Star, Zap } from "lucide-react";
+import { Play, Star } from "lucide-react";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSteam } from '@fortawesome/free-brands-svg-icons';
 
 interface GameCardProps {
   title: string;
@@ -101,7 +103,7 @@ const GameCard: React.FC<GameCardProps> = ({
                   border: "1px solid rgba(103,182,118,0.35)",
                 }}
               >
-                <Zap className="w-2.5 h-2.5" style={{ color: "#67b676" }} />
+                <FontAwesomeIcon icon={faSteam} className="w-2.5 h-2.5" style={{ color: "#67b676" }} />
                 <span
                   className="text-[8px] font-black tracking-wider uppercase"
                   style={{ color: "#67b676" }}
