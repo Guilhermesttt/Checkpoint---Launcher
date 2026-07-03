@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useState,
   useEffect,
   useCallback,
@@ -421,6 +421,7 @@ const Home: React.FC = () => {
     [userProfile?.discordId],
   );
 
+
   useEffect(() => {
     if (!user?.uid) {
       setGames([]);
@@ -460,9 +461,11 @@ const Home: React.FC = () => {
       setLocalSocialStateLoaded(false);
       return;
     }
-    setSocialFriends(
-      JSON.parse(localStorage.getItem(`checkpoint_social_friends_${user.uid}`) || "[]"),
+    // Filter out any legacy demo/local friends — real friends come from Discord via Firestore
+    const stored: SocialFriend[] = JSON.parse(
+      localStorage.getItem(`checkpoint_social_friends_${user.uid}`) || "[]",
     );
+    setSocialFriends(stored.filter((f) => f.source?.startsWith("discord")));
     setPriceAlerts(
       JSON.parse(localStorage.getItem(`checkpoint_price_alerts_${user.uid}`) || "[]"),
     );
@@ -940,21 +943,6 @@ const Home: React.FC = () => {
     });
   };
 
-  const addDemoFriend = () => {
-    const names = ["Rafa", "Nina", "Kai", "Duda", "Leo"];
-    const sampleGame = games[socialFriends.length % Math.max(games.length, 1)]?.title;
-    setSocialFriends((current) => [
-      {
-        id: crypto.randomUUID(),
-        name: `${names[current.length % names.length]}#${String(1000 + current.length).padStart(4, "0")}`,
-        status: current.length % 2 === 0 ? "playing" : "online",
-        playing: sampleGame,
-        source: "local",
-      },
-      ...current,
-    ]);
-  };
-
   const removeFriend = (id: string) => {
     setSocialFriends((current) => current.filter((friend) => friend.id !== id));
   };
@@ -1376,9 +1364,9 @@ const Home: React.FC = () => {
               t={t}
               discordConnected={Boolean(resolvedDiscordId)}
               discordUsername={userProfile?.discordUsername}
+              discordAvatar={userProfile?.discordAvatar}
               friends={socialFriends}
               onConnectDiscord={connectDiscord}
-              onAddDemoFriend={addDemoFriend}
               onRemoveFriend={removeFriend}
             />
           ) : activeCategory === "DEALS" ? (
@@ -2018,21 +2006,22 @@ const FriendsPage: React.FC<{
   t: ReturnType<typeof usePreferences>["t"];
   discordConnected: boolean;
   discordUsername?: string;
+  discordAvatar?: string;
   friends: SocialFriend[];
   onConnectDiscord: () => void;
-  onAddDemoFriend: () => void;
   onRemoveFriend: (id: string) => void;
 }> = ({
   t,
   discordConnected,
   discordUsername,
+  discordAvatar,
   friends,
   onConnectDiscord,
-  onAddDemoFriend,
   onRemoveFriend,
 }) => {
     const [friendSearch, setFriendSearch] = useState("");
     const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
+    const playingCount = friends.filter((friend) => friend.status === "playing").length;
     const normalizedSearch = friendSearch.trim().toLowerCase();
     const visibleFriends = normalizedSearch
       ? friends.filter(
@@ -2044,31 +2033,57 @@ const FriendsPage: React.FC<{
 
     return (
       <SystemPageShell eyebrow="Social" title={t("friends")}>
-        <div className="flex justify-end mb-5">
-          <button
-            type="button"
-            onClick={discordConnected ? onAddDemoFriend : onConnectDiscord}
-            className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
+        {/* Discord connection banner */}
+        {!discordConnected && (
+          <div
+            className="flex items-center justify-between rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5"
           >
-            {discordConnected ? "Adicionar fixado" : t("connectDiscord")}
-          </button>
-        </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">{t("connectDiscord")}</p>
+                <p className="text-[10px] text-white/40 mt-0.5">
+                  Seus amigos do Discord aparecem automaticamente ao conectar.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onConnectDiscord}
+              className="h-10 px-5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              {t("connectDiscord")}
+            </button>
+          </div>
+        )}
 
         <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-          <SettingsHeader
-            icon={<MessageCircle className="w-5 h-5 text-white/70" />}
-            title={t("discordFriends")}
-            description={
-              discordConnected
-                ? `${discordUsername || "Discord"} conectado. ${onlineCount} online.`
-                : "Conecte o Discord para preparar presença, convites e amigos fixados."
-            }
-          />
+          <div className="flex items-center gap-4 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
+              {discordAvatar ? (
+                <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <MessageCircle className="w-5 h-5 text-white/60" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-white">
+                {discordConnected ? (discordUsername || "Discord") : "Discord"}
+              </p>
+              <p className="text-[10px] text-white/40">
+                {discordConnected
+                  ? "Amigos sincronizados automaticamente ao conectar."
+                  : "Não conectado"}
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
               { label: "Online", value: onlineCount },
-              { label: "Jogando", value: friends.filter((friend) => friend.status === "playing").length },
-              { label: "Fixados", value: friends.length },
+              { label: "Jogando", value: playingCount },
+              { label: "Total", value: friends.length },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
@@ -2082,30 +2097,36 @@ const FriendsPage: React.FC<{
           </div>
         </section>
 
-        <div className="mb-5">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-            <input
-              value={friendSearch}
-              onChange={(event) => setFriendSearch(event.target.value)}
-              placeholder="Pesquisar amigos..."
-              className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
-            />
+        {friends.length > 0 && (
+          <div className="mb-5">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                value={friendSearch}
+                onChange={(event) => setFriendSearch(event.target.value)}
+                placeholder="Pesquisar amigos..."
+                className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {visibleFriends.length === 0 ? (
             <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
               <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
               <p className="text-sm font-bold text-white/70">
-                {friends.length === 0 ? "Nenhum amigo encontrado ainda." : "Nenhum amigo nessa busca."}
+                {!discordConnected
+                  ? "Conecte o Discord para ver seus amigos aqui."
+                  : friends.length === 0
+                    ? "Nenhum amigo encontrado na sua conta do Discord."
+                    : "Nenhum amigo corresponde à busca."}
               </p>
-              <p className="mt-2 text-xs text-white/35">
-                {friends.length === 0
-                  ? "Conecte o Discord com permissão de amigos ou adicione fixados locais."
-                  : "Tente buscar por outro nome."}
-              </p>
+              {discordConnected && friends.length === 0 && (
+                <p className="mt-2 text-xs text-white/35">
+                  Os amigos são sincronizados automaticamente quando você conecta o Discord.
+                </p>
+              )}
             </div>
           ) : (
             visibleFriends.map((friend) => (
@@ -2122,7 +2143,7 @@ const FriendsPage: React.FC<{
                     <p className="text-sm font-bold text-white truncate">{friend.name}</p>
                     <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
                       {friend.source === "discord"
-                        ? "Discord conectado"
+                        ? "Você · Discord conectado"
                         : friend.source === "discord_friend"
                           ? "Amigo do Discord"
                           : friend.status === "playing"
@@ -2131,15 +2152,6 @@ const FriendsPage: React.FC<{
                     </p>
                   </div>
                 </div>
-                {!friend.source?.startsWith("discord") && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveFriend(friend.id)}
-                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
-                  >
-                    Remover
-                  </button>
-                )}
               </div>
             ))
           )}
@@ -2147,7 +2159,6 @@ const FriendsPage: React.FC<{
       </SystemPageShell>
     );
   };
-
 const PriceAlertsPage: React.FC<{
   t: ReturnType<typeof usePreferences>["t"];
   games: Game[];
