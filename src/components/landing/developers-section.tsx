@@ -4,8 +4,8 @@ import { Code2, Terminal, BookOpen, GitBranch } from "lucide-react";
 const devFeatures = [
   {
     icon: Code2,
-    title: "Open Source",
-    description: "Código aberto no GitHub. Contribua, faça fork, adapte para suas necessidades.",
+    title: "Base Proprietária",
+    description: "Produto fechado, com direção visual e técnica controladas para a plataforma.",
     href: "https://github.com",
   },
   {
@@ -22,8 +22,8 @@ const devFeatures = [
   },
   {
     icon: GitBranch,
-    title: "Contribua",
-    description: "PRs são bem-vindos! Ajude a construir o melhor launcher de jogos open source.",
+    title: "Roadmap Interno",
+    description: "Evolução contínua do launcher com integrações, interface e pipeline próprios.",
     href: "https://github.com",
   },
 ];
@@ -59,7 +59,7 @@ export function DevelopersSection() {
             <p className={`text-lg text-muted-foreground leading-relaxed mb-8 transition-all duration-1000 delay-200 ${
               isVisible ? "opacity-100" : "opacity-0"
             }`}>
-              Stack moderna, código limpo e bem estruturado. Explore, contribua ou use como base para seus próprios projetos.
+              Stack moderna, código limpo e uma base pensada para evolução interna do produto.
             </p>
 
             <a

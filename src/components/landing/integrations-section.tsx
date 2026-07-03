@@ -9,12 +9,17 @@ const integrations = [
     description: "Sincronização automática da sua biblioteca original",
     color: "from-blue-500/10",
     iconColor: "text-white",
+    statusLabel: "Disponível e funcionando",
+    statusClassName: "text-green-500",
+    dotClassName: "bg-green-500",
   },
   {
     name: "Epic Games",
     image: "https://img.icons8.com/windows/96/epic-games--v1.png",
     description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
-
+    statusLabel: "Disponível em análise",
+    statusClassName: "text-yellow-400",
+    dotClassName: "bg-yellow-400",
   },
   {
     name: "Jogos Locais",
@@ -22,6 +27,9 @@ const integrations = [
     description: "Adicione e organize jogos instalados manualmente",
     color: "from-green-500/10",
     iconColor: "text-green-500",
+    statusLabel: "Disponível e funcionando",
+    statusClassName: "text-green-500",
+    dotClassName: "bg-green-500",
   },
 ];
 
@@ -112,9 +120,9 @@ export function IntegrationsSection() {
                 <p className="text-sm text-muted-foreground">
                   {integration.description}
                 </p>
-                <div className="mt-6 flex items-center gap-2 text-xs font-mono text-green-500">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  Disponível e funcionando
+                <div className={`mt-6 flex items-center gap-2 text-xs font-mono ${integration.statusClassName}`}>
+                  <span className={`w-2 h-2 rounded-full animate-pulse ${integration.dotClassName}`} />
+                  {integration.statusLabel}
                 </div>
               </div>
             );

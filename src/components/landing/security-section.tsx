@@ -22,9 +22,9 @@ const securityPoints = [
   },
   {
     icon: Shield,
-    title: "Open Source Friendly",
+    title: "Transparência de Dados",
     description:
-      "Código auditável e transparência sobre como seus dados são usados.",
+      "Políticas claras sobre sincronização, armazenamento e uso dos dados conectados à sua conta.",
   },
 ];
 
