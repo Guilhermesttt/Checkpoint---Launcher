@@ -84,10 +84,12 @@ import {
 } from "../services/discord";
 import {
   acceptCheckpointFriendRequest,
+  getCheckpointFriendStatuses,
   rejectCheckpointFriendRequest,
   removeCheckpointFriend,
   searchCheckpointFriends,
   sendCheckpointFriendRequest,
+  updateCheckpointPresence,
 } from "../services/checkpointFriends";
 import type { Game } from "../types/domain";
 import {
@@ -383,6 +385,8 @@ const Home: React.FC = () => {
     useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [socialFriends, setSocialFriends] = useState<SocialFriend[]>([]);
+  const [incomingFriendRequests, setIncomingFriendRequests] = useState<CheckpointFriendRequest[]>([]);
+  const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [localSocialStateLoaded, setLocalSocialStateLoaded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -400,6 +404,8 @@ const Home: React.FC = () => {
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
 
   const lastWheelTime = useRef<number>(0);
+  const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
+  const previousOutgoingRequestsRef = useRef<Set<string> | null>(null);
 
   const { notify } = useNotification();
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
@@ -489,6 +495,98 @@ const Home: React.FC = () => {
   }, [localSocialStateLoaded, socialFriends, user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+
+    const heartbeat = () => {
+      updateCheckpointPresence(
+        currentPresenceGame ? "playing" : "online",
+        currentPresenceGame || undefined,
+      ).catch(() => undefined);
+    };
+
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 45_000);
+    return () => window.clearInterval(interval);
+  }, [currentPresenceGame, user?.uid]);
+
+  useEffect(() => {
+    const handleGameLaunch = (event: Event) => {
+      const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
+      if (title) setCurrentPresenceGame(title);
+    };
+
+    window.addEventListener("checkpoint:game-launch", handleGameLaunch);
+    return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
+  }, []);
+
+  useEffect(() => {
+    if (!currentPresenceGame) return;
+    const timeout = window.setTimeout(() => setCurrentPresenceGame(null), 3 * 60 * 60 * 1000);
+    return () => window.clearTimeout(timeout);
+  }, [currentPresenceGame]);
+
+  useEffect(() => {
+    if (!user?.uid || (userProfile?.checkpointFriends ?? []).length === 0) return;
+
+    const syncFriendStatuses = async () => {
+      try {
+        const statuses = await getCheckpointFriendStatuses();
+        if (statuses.length === 0) return;
+        setSocialFriends((current) => {
+          const statusById = new Map(statuses.map((friend) => [friend.uid, friend]));
+          return current.map((friend) => {
+            if (!friend.id.startsWith("cp-friend:")) return friend;
+            const uid = friend.id.split(":")[1];
+            const status = statusById.get(uid);
+            if (!status) return friend;
+            return {
+              ...friend,
+              name: status.displayName || friend.name,
+              avatar: status.photoURL || friend.avatar,
+              status: status.status || "offline",
+              playing: status.playing || undefined,
+            };
+          });
+        });
+      } catch {
+        // Presence is opportunistic; the friend list still works without it.
+      }
+    };
+
+    syncFriendStatuses();
+    const interval = window.setInterval(syncFriendStatuses, 30_000);
+    return () => window.clearInterval(interval);
+  }, [user?.uid, userProfile?.checkpointFriends]);
+
+  useEffect(() => {
+    setIncomingFriendRequests(userProfile?.checkpointFriendRequestsIncoming ?? []);
+  }, [userProfile?.checkpointFriendRequestsIncoming]);
+
+  useEffect(() => {
+    const currentFriends = new Set((userProfile?.checkpointFriends ?? []).map((friend) => friend.uid));
+    const currentOutgoing = new Set(
+      (userProfile?.checkpointFriendRequestsOutgoing ?? []).map((request) => request.uid),
+    );
+    const previousFriends = previousCheckpointFriendsRef.current;
+    const previousOutgoing = previousOutgoingRequestsRef.current;
+
+    if (previousFriends && previousOutgoing) {
+      const acceptedFriend = (userProfile?.checkpointFriends ?? []).find(
+        (friend) => !previousFriends.has(friend.uid) && previousOutgoing.has(friend.uid),
+      );
+      if (acceptedFriend) {
+        notify(
+          `${acceptedFriend.displayName} aceitou seu pedido. Agora voces sao amigos.`,
+          "success",
+        );
+      }
+    }
+
+    previousCheckpointFriendsRef.current = currentFriends;
+    previousOutgoingRequestsRef.current = currentOutgoing;
+  }, [notify, userProfile?.checkpointFriendRequestsOutgoing, userProfile?.checkpointFriends]);
+
+  useEffect(() => {
     if (!localSocialStateLoaded) return;
     if (!resolvedDiscordId) {
       setSocialFriends((current) =>
@@ -517,7 +615,8 @@ const Home: React.FC = () => {
       const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map(f => ({
         id: `cp-friend:${f.uid}`,
         name: f.displayName,
-        status: "online",
+        status: f.status || "offline",
+        playing: f.playing || undefined,
         avatar: f.photoURL || undefined,
         source: "checkpoint",
       }));
@@ -989,22 +1088,38 @@ const Home: React.FC = () => {
   };
 
   const handleAcceptCheckpointFriendRequest = async (uid: string) => {
+    const request = incomingFriendRequests.find((item) => item.uid === uid);
     try {
-      await acceptCheckpointFriendRequest(uid);
-      notify("Solicitação aceita.", "success");
+      const acceptedFriend = await acceptCheckpointFriendRequest(uid);
+      const friendName = acceptedFriend?.displayName || request?.displayName || "Usuario";
+      const nextFriend: SocialFriend = {
+        id: `cp-friend:${acceptedFriend?.uid || uid}`,
+        name: friendName,
+        status: acceptedFriend?.status || "offline",
+        playing: acceptedFriend?.playing || undefined,
+        avatar: acceptedFriend?.photoURL || request?.photoURL || undefined,
+        source: "checkpoint",
+      };
+      setIncomingFriendRequests((current) => current.filter((item) => item.uid !== uid));
+      setSocialFriends((current) => [
+        nextFriend,
+        ...current.filter((friend) => friend.id !== nextFriend.id),
+      ]);
+      notify(`${friendName} agora e seu amigo no Checkpoint.`, "success");
       await refreshProfile();
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Erro ao aceitar solicitação.", "error");
+      notify(e instanceof Error ? e.message : "Erro ao aceitar solicitacao.", "error");
     }
   };
 
   const handleRejectCheckpointFriendRequest = async (uid: string) => {
     try {
       await rejectCheckpointFriendRequest(uid);
-      notify("Solicitação rejeitada.", "success");
+      setIncomingFriendRequests((current) => current.filter((item) => item.uid !== uid));
+      notify("Solicitacao rejeitada.", "success");
       await refreshProfile();
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Erro ao rejeitar solicitação.", "error");
+      notify(e instanceof Error ? e.message : "Erro ao rejeitar solicitacao.", "error");
     }
   };
 
@@ -1427,7 +1542,7 @@ const Home: React.FC = () => {
               discordUsername={userProfile?.discordUsername}
               discordAvatar={userProfile?.discordAvatar}
               friends={socialFriends}
-              incomingRequests={userProfile?.checkpointFriendRequestsIncoming ?? []}
+              incomingRequests={incomingFriendRequests}
               onConnectDiscord={connectDiscord}
               onRemoveFriend={removeFriend}
               onAcceptRequest={handleAcceptCheckpointFriendRequest}
@@ -2295,7 +2410,7 @@ const FriendsPage: React.FC<{
                           ? "Amigo do Discord"
                           : friend.status === "playing"
                             ? `Jogando ${friend.playing || "agora"}`
-                            : friend.status}
+                            : friend.status === "online" ? "Online" : "Offline"}
                     </p>
                   </div>
                 </div>

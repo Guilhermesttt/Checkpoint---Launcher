@@ -613,13 +613,28 @@ const publicProfile = (id, data = {}) => ({
   photoURL: data.discordAvatar || data.photoURL || "",
   discordAvatar: data.discordAvatar || "",
   discordUsername: data.discordUsername || "",
+  status: resolvePresence(data.presence).status,
+  playing: resolvePresence(data.presence).playing,
 });
 
 const compactFriendProfile = (profile) => ({
   uid: profile.uid,
   displayName: profile.displayName,
   photoURL: profile.photoURL || null,
+  status: profile.status || "offline",
+  playing: profile.playing || null,
 });
+
+const resolvePresence = (presence = {}) => {
+  const updatedAtMs = Date.parse(String(presence.updatedAt || ""));
+  const isFresh = Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < 2 * 60 * 1000;
+  if (!isFresh) return { status: "offline", playing: null };
+  const currentGameTitle = String(presence.currentGameTitle || "").trim();
+  if (presence.status === "playing" && currentGameTitle) {
+    return { status: "playing", playing: currentGameTitle };
+  }
+  return { status: "online", playing: null };
+};
 
 const withUniqueProfile = (items, profile, extra = {}) => [
   { ...compactFriendProfile(profile), ...extra },
@@ -663,6 +678,56 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
     res.json({ users: Array.from(found.values()).slice(0, 25) });
   } catch {
     res.status(500).json({ error: "Erro ao buscar usuários." });
+  }
+});
+
+app.post("/api/presence", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const requestedStatus = String(req.body?.status || "online");
+  const status = requestedStatus === "playing" ? "playing" : "online";
+  const currentGameTitle = String(req.body?.currentGameTitle || "").trim().slice(0, 120);
+
+  try {
+    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
+      {
+        presence: {
+          status,
+          currentGameTitle: status === "playing" ? currentGameTitle : "",
+          updatedAt: new Date().toISOString(),
+        },
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao atualizar presença." });
+  }
+});
+
+app.get("/api/friends/status", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  try {
+    const firestore = getFirestore();
+    const profileSnap = await firestore.doc(`profiles/${req.firebaseUser.uid}`).get();
+    const friendRefs = (Array.isArray(profileSnap.data()?.checkpointFriends)
+      ? profileSnap.data().checkpointFriends
+      : [])
+      .map((friend) => String(friend?.uid || "").trim())
+      .filter(Boolean)
+      .slice(0, 250);
+
+    if (friendRefs.length === 0) {
+      res.json({ friends: [] });
+      return;
+    }
+
+    const snaps = await Promise.all(friendRefs.map((uid) => firestore.doc(`profiles/${uid}`).get()));
+    res.json({
+      friends: snaps
+        .filter((snap) => snap.exists)
+        .map((snap) => compactFriendProfile(publicProfile(snap.id, snap.data()))),
+    });
+  } catch {
+    res.status(500).json({ error: "Erro ao consultar presença dos amigos." });
   }
 });
 

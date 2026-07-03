@@ -44,6 +44,8 @@ export interface UserProfile {
   discordId?: string;
   discordUsername?: string;
   discordAvatar?: string;
+  status?: "online" | "playing" | "offline";
+  playing?: string | null;
   discordFriends?: Array<{
     id: string;
     username: string;
@@ -54,6 +56,8 @@ export interface UserProfile {
     uid: string;
     displayName: string;
     photoURL?: string | null;
+    status?: "online" | "playing" | "offline";
+    playing?: string | null;
   }>;
   checkpointFriendRequestsIncoming?: Array<{
     uid: string;

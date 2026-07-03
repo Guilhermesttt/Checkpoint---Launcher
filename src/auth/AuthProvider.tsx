@@ -5,7 +5,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../Firebase";
 import type { UserProfile } from "../types/domain";
 
@@ -32,6 +32,8 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   discordId: data?.discordId,
   discordUsername: data?.discordUsername,
   discordAvatar: data?.discordAvatar,
+  status: data?.status,
+  playing: data?.playing,
   discordFriends: data?.discordFriends,
   checkpointFriends: data?.checkpointFriends,
   checkpointFriendRequestsIncoming: data?.checkpointFriendRequestsIncoming,
@@ -147,6 +149,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    return onSnapshot(doc(db, "profiles", user.uid), (snap) => {
+      const data = snap.data() as Partial<UserProfile> | undefined;
+      if (data) setUserProfile(toProfile(user.uid, data));
+    });
+  }, [user?.uid]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

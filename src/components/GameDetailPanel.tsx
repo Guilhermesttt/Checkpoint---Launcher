@@ -103,7 +103,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setIsLaunching(true);
     setLaunchError(null);
     playSound("play");
-    window.dispatchEvent(new Event("checkpoint:game-launch"));
+      window.dispatchEvent(new CustomEvent("checkpoint:game-launch", {
+        detail: { title: game.title },
+      }));
     setTimeout(async () => {
       try {
         if (user?.uid) {
