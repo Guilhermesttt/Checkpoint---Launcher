@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 const Landing = lazy(() => import("./Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const AppRoot = lazy(() => import("./App"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 const routeFallback = (
   <div className="flex min-h-screen items-center justify-center bg-[#050507] text-sm font-bold text-white/50">
@@ -27,6 +28,22 @@ const router = createBrowserRouter([
     element: (
       <Suspense fallback={routeFallback}>
         <Login />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/privacy-policy",
+    element: (
+      <Suspense fallback={routeFallback}>
+        <PrivacyPolicy />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/privacy",
+    element: (
+      <Suspense fallback={routeFallback}>
+        <PrivacyPolicy />
       </Suspense>
     ),
   },
