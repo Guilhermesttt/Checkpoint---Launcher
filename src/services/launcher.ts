@@ -1,8 +1,8 @@
 import type { Game } from "../types/domain";
 
 export const launchGame = async (game: Game): Promise<void> => {
-  if (!game.executablePath && !game.epicCatalogId) {
-    throw new Error("Jogo sem caminho de execução ou Epic Catalog ID configurado.");
+  if (!game.executablePath && !game.epicCatalogId && !game.epicStoreUrl) {
+    throw new Error("Jogo sem caminho de execucao ou link da loja configurado.");
   }
 
   // Steam
@@ -16,7 +16,13 @@ export const launchGame = async (game: Game): Promise<void> => {
   // Epic Games
   if (game.launcherType === "epic" || game.epicCatalogId) {
     const epicId = game.executablePath ?? game.epicCatalogId;
-    if (!epicId) throw new Error("Epic Catalog ID não encontrado para esse jogo.");
+    if (!epicId) {
+      if (game.epicStoreUrl) {
+        window.location.assign(game.epicStoreUrl);
+        return;
+      }
+      throw new Error("Link da Epic Games nao encontrado para esse jogo.");
+    }
     window.location.assign(`com.epicgames.launcher://apps/${epicId}?action=launch&silent=true`);
     return;
   }

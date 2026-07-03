@@ -300,7 +300,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         )}
                         {game.launcherType === "epic" && (
                           <span className="text-[10px] text-white/30 uppercase tracking-widest">
-                            Catalog ID <span className="text-white/60 ml-1">{game.epicCatalogId || "---"}</span>
+                            Epic Store <span className="text-white/60 ml-1">{game.epicStoreUrl ? "Loja" : "Launcher"}</span>
                           </span>
                         )}
                         <span className="h-1 w-1 rounded-full bg-white/10" />

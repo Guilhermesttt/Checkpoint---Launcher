@@ -1756,6 +1756,8 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
           pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
           pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]);
         const cardImage = pickEpicImage(keyImages, ["tall", "thumbnail", "box"]) || image;
+        const slug = String(item?.productSlug ?? item?.urlSlug ?? "").replace(/\/home$/, "").trim();
+        const productUrl = slug ? `https://store.epicgames.com/pt-BR/p/${slug}` : "";
 
         return {
           id: catalogId,
@@ -1763,10 +1765,12 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
           name: String(item.title).trim(),
           title: String(item.title).trim(),
           image,
+          backgroundImage: image,
           tiny_image: cardImage,
           cardImage,
           description: String(item?.description ?? "").trim(),
-          productSlug: String(item?.productSlug ?? item?.urlSlug ?? "").trim(),
+          productSlug: slug,
+          productUrl,
         };
       });
 

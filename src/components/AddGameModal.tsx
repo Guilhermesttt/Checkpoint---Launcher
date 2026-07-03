@@ -29,7 +29,6 @@ import {
 } from "../services/steam";
 import {
   searchEpicGames,
-  fetchEpicAppDetailsResult,
 } from "../services/epic";
 import { apiUrl } from "../services/api";
 
@@ -75,6 +74,7 @@ type GameFormData = {
   executablePath: string;
   steamAppId?: string;
   epicCatalogId?: string;
+  epicStoreUrl?: string;
   sizeGB?: number;
   releaseDate?: string;
   developer?: string;
@@ -207,6 +207,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           executablePath: gameToEdit.executablePath || "",
           steamAppId: gameToEdit.steamAppId || "",
           epicCatalogId: gameToEdit.epicCatalogId || "",
+          epicStoreUrl: gameToEdit.epicStoreUrl || "",
           sizeGB: gameToEdit.sizeGB,
           releaseDate: gameToEdit.releaseDate || "",
           developer: gameToEdit.developer || "",
@@ -279,6 +280,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           executablePath: appId,
           steamAppId: appId,
           epicCatalogId: "",
+          epicStoreUrl: "",
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
               ? Math.round(d.sizeGB)
@@ -309,46 +311,32 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
-  const normalizeEpicLaunchValue = (value: string) => {
-    const trimmed = value.trim();
-    const match = trimmed.match(/com\.epicgames\.launcher:\/\/apps\/([^?]+)/i);
-    return match?.[1] || trimmed;
-  };
-
   const handleSelectEpicGame = async (game: any) => {
     playSound("select");
-    const catalogId = String(game.launchId || game.id);
     setLoading(true);
     try {
-      const details = await fetchEpicAppDetailsResult(catalogId, game.namespace);
-      if (details.ok) {
-        const d = details.data;
-        setFormData((prev) => ({
-          ...prev,
-          title: d.title || game.name,
-          image: d.backgroundImage || game.image || game.tiny_image || "",
-          cardImage: d.cardImage || game.cardImage || game.tiny_image || "",
-          backgroundImage: d.backgroundImage || game.image || "",
-          logoImage: d.logoImage || "",
-          description: d.description || game.description || "",
-          aboutTheGame: d.aboutTheGame || d.description || game.description || "",
-          launcherType: "epic",
-          executablePath: catalogId,
-          steamAppId: "",
-          epicCatalogId: catalogId,
-          sizeGB:
-            typeof d.sizeGB === "number" && d.sizeGB > 0
-              ? Math.round(d.sizeGB)
-              : undefined,
-          releaseDate: d.releaseDate || "",
-          developer: d.developer || "",
-          publisher: d.publisher || "",
-          tags: d.tags || [],
-          trailerUrl: d.trailerUrl || "",
-          screenshots: d.screenshots || [],
-          source: "manual",
-        }));
-      }
+      setFormData((prev) => ({
+        ...prev,
+        title: game.title || game.name || "",
+        image: game.image || game.backgroundImage || game.cardImage || game.tiny_image || "",
+        cardImage: game.cardImage || game.tiny_image || game.image || "",
+        backgroundImage: game.backgroundImage || game.image || "",
+        logoImage: game.logoImage || "",
+        description: game.description || "",
+        aboutTheGame: game.aboutTheGame || game.description || "",
+        launcherType: "epic",
+        executablePath: "",
+        steamAppId: "",
+        epicCatalogId: "",
+        epicStoreUrl: game.productUrl || "",
+        releaseDate: game.releaseDate || "",
+        developer: game.developer || "",
+        publisher: game.publisher || "",
+        tags: game.tags || [],
+        trailerUrl: "",
+        screenshots: game.screenshots || [],
+        source: "manual",
+      }));
       setSearchResults([]);
       setSearchQuery("");
     } finally {
@@ -370,6 +358,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       launcherType: "local",
       executablePath: browserPath,
       steamAppId: "",
+      epicCatalogId: "",
+      epicStoreUrl: "",
       source: "manual",
     }));
     playSound("select");
@@ -500,6 +490,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       launcherType: "local",
                       steamAppId: "",
                       epicCatalogId: "",
+                      epicStoreUrl: "",
                       executablePath:
                         prev.launcherType === "steam" || prev.launcherType === "epic"
                           ? ""
@@ -522,6 +513,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       ...prev,
                       launcherType: "steam",
                       executablePath: prev.steamAppId || "",
+                      epicStoreUrl: "",
                       source: "manual",
                     }));
                   }}
@@ -539,7 +531,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "epic",
-                      executablePath: prev.epicCatalogId || "",
+                      executablePath: "",
                       source: "manual",
                     }));
                   }}
@@ -653,27 +645,16 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </AnimatePresence>
                 </div>
 
-                <div className="h-px bg-white/5" />
-
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <EpicIcon className="h-3.5 w-3.5 opacity-30" /> Epic Catalog ID ({copy.optional})
-                </label>
-                <input
-                  value={formData.epicCatalogId || ""}
-                  onChange={(e) => {
-                    const epicValue = normalizeEpicLaunchValue(e.target.value);
-                    setFormData((prev) => ({
-                      ...prev,
-                      epicCatalogId: epicValue,
-                      executablePath: epicValue,
-                    }));
-                  }}
-                  placeholder="Ex: 963138e4ac8f49c58c149b41c2ee0491"
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
-                />
-                <p className="text-[10px] leading-relaxed text-white/28">
-                  Você pode encontrar o Catalog ID na URL do jogo na Epic Games Store ou nas propriedades do atalho do launcher.
-                </p>
+                {formData.epicStoreUrl && (
+                  <a
+                    href={formData.epicStoreUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/70"
+                  >
+                    <EpicIcon className="h-3.5 w-3.5 opacity-50" /> Ver na Epic Games Store
+                  </a>
+                )}
               </div>
             )}
 

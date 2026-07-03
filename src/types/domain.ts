@@ -17,6 +17,7 @@ export interface Game {
   launcherType?: LauncherType;
   steamAppId?: string;
   epicCatalogId?: string;
+  epicStoreUrl?: string;
   steamPlaytimeMinutes?: number;
   steamLastPlayedAt?: string;
   source?: "manual" | "steam" | "epic";
