@@ -454,6 +454,7 @@ const Home: React.FC = () => {
     profile: UserProfile;
     games: Game[];
   } | null>(null);
+  const [pendingDeleteGame, setPendingDeleteGame] = useState<Game | null>(null);
   const [friendProfileLoadingId, setFriendProfileLoadingId] = useState<string | null>(null);
   const [localSocialStateLoaded, setLocalSocialStateLoaded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -1396,8 +1397,9 @@ const Home: React.FC = () => {
 
   const handleMenuAction = async (action: string, game: Game) => {
     if (action === "delete") {
-      if (!window.confirm(`Remover "${game.title}"?`) || !user?.uid) return;
-      await deleteDoc(userGameDocRef(user.uid, game.id));
+      setPendingDeleteGame(game);
+      closeCtx(true);
+      return;
     } else if (action === "favorite" && user?.uid) {
       await updateDoc(userGameDocRef(user.uid, game.id), {
         isFavorite: !game.isFavorite,
@@ -2083,6 +2085,33 @@ const Home: React.FC = () => {
           </React.Suspense>
         )}
       </ModalShell>
+
+      <ConfirmationModal
+        isOpen={Boolean(pendingDeleteGame)}
+        title="Remover jogo"
+        description={
+          pendingDeleteGame
+            ? `Tem certeza que deseja remover "${pendingDeleteGame.title}" da sua biblioteca?`
+            : ""
+        }
+        confirmLabel="Remover"
+        onClose={() => setPendingDeleteGame(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteGame || !user?.uid) {
+            setPendingDeleteGame(null);
+            return;
+          }
+          try {
+            await deleteDoc(userGameDocRef(user.uid, pendingDeleteGame.id));
+            notify("Jogo removido da biblioteca.", "success");
+          } catch (e) {
+            notify(e instanceof Error ? e.message : "Erro ao remover jogo.", "error");
+          } finally {
+            setPendingDeleteGame(null);
+          }
+        }}
+        playSound={playSound}
+      />
 
       <ConfirmationModal
         isOpen={signOutModalOpen}
