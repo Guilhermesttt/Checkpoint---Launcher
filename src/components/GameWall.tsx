@@ -6,13 +6,10 @@ import {
   Layers, 
   MousePointer2, 
   Search,
-  Filter,
-  Shuffle,
   Eye,
   EyeOff
 } from 'lucide-react';
 import type { Game } from '../types/domain';
-import { useGameColor } from '../hooks/useGameColor';
 
 type ViewMode = 'wall' | 'shelf' | 'grid' | 'carousel';
 type SortMode = 'alphabetical' | 'recent' | 'playtime' | 'random' | 'category';
@@ -162,10 +159,9 @@ const GameWall: React.FC<GameWallProps> = ({
   const [hoveredGame, setHoveredGame] = useState<Game | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [showControls, setShowControls] = useState(true);
-  const [rotationSpeed, setRotationSpeed] = useState(0.5);
+  const [rotationSpeed] = useState(0.5);
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const mousePosition = useRef({ x: 0, y: 0 });
   const autoRotation = useRef(0);
 
   // Filter and sort games
@@ -182,7 +178,7 @@ const GameWall: React.FC<GameWallProps> = ({
           new Date(b.lastPlayedAt || 0).getTime() - new Date(a.lastPlayedAt || 0).getTime()
         );
       case 'playtime':
-        return filtered.sort((a, b) => (b.playtimeHours || 0) - (a.playtimeHours || 0));
+        return filtered.sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0));
       case 'random':
         return filtered.sort(() => Math.random() - 0.5);
       case 'category':
@@ -191,7 +187,6 @@ const GameWall: React.FC<GameWallProps> = ({
         return filtered;
     }
   }, [games, searchFilter, sortMode]);
-
   // Calculate 3D positions for games
   const gamePositions = useMemo(() => {
     const positions: Array<{
@@ -288,22 +283,6 @@ const GameWall: React.FC<GameWallProps> = ({
     return () => clearInterval(interval);
   }, [viewMode, rotationSpeed]);
 
-  // Mouse tracking for parallax effects
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      
-      const rect = containerRef.current.getBoundingClientRect();
-      mousePosition.current = {
-        x: (e.clientX - rect.left) / rect.width - 0.5,
-        y: (e.clientY - rect.top) / rect.height - 0.5
-      };
-    };
-    
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
   const handleGameHover = (game: Game | null) => {
     setHoveredGame(game);
     onGameHover?.(game);
@@ -394,7 +373,6 @@ const GameWall: React.FC<GameWallProps> = ({
           <Eye className="w-5 h-5" />
         </button>
       )}
-
       {/* Game Wall Container */}
       <div 
         ref={containerRef}
@@ -454,22 +432,56 @@ const GameWall: React.FC<GameWallProps> = ({
                 {hoveredGame.launcherType === 'steam' ? 'Steam' : 
                  hoveredGame.launcherType === 'epic' ? 'Epic Games' : 'Local'}
               </span>
-              {hoveredGame.playtimeHours && (
-                <span className="text-white/60 text-xs">
-                  {Math.floor(hoveredGame.playtimeHours)}h jogado
-                </span>
-              )}
+              <button
+                onClick={() => onGameSelect(hoveredGame)}
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs transition-colors"
+              >
+                Jogar
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Stats */}
-      <div className="absolute bottom-4 left-4 bg-black/40 backdrop-blur-md border border-white/10 rounded-xl px-4 py-2">
-        <span className="text-white/60 text-sm">
-          {filteredGames.length} de {games.length} jogos
-        </span>
+      {/* Stats Panel */}
+      <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-4 py-2 z-40">
+        <div className="flex items-center gap-4 text-sm text-white/70">
+          <span>{filteredGames.length} jogos</span>
+          <span>•</span>
+          <span>Modo: {
+            viewMode === 'wall' ? '3D Wall' :
+            viewMode === 'shelf' ? 'Estante' :
+            viewMode === 'grid' ? 'Grade' :
+            'Carrossel'
+          }</span>
+          {searchFilter && (
+            <>
+              <span>•</span>
+              <span>Filtro: "{searchFilter}"</span>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Empty State */}
+      {filteredGames.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-24 h-24 mx-auto mb-4 bg-white/10 rounded-2xl flex items-center justify-center">
+              <Search className="w-8 h-8 text-white/40" />
+            </div>
+            <h3 className="text-white/60 text-lg font-medium mb-2">
+              {searchFilter ? 'Nenhum jogo encontrado' : 'Nenhum jogo disponível'}
+            </h3>
+            <p className="text-white/40 text-sm">
+              {searchFilter 
+                ? `Tente buscar por outro termo que não "${searchFilter}"`
+                : 'Adicione alguns jogos para começar'
+              }
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

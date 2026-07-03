@@ -188,7 +188,7 @@ const Sidebar: React.FC<{
   onAddGame: () => void;
   onSignOut: () => void;
   settingsLabel: string;
-  playSound: (t: "select" | "back" | "navigate") => void;
+  playSound: (t: SoundEffectType) => void;
 }> = ({
   activeCategory,
   onCategory,
@@ -497,7 +497,7 @@ const Home: React.FC = () => {
     };
     
     initializeRichPresence();
-  }, [resolvedDiscordId, user?.uid, setBrowsingActivity, setRichPresenceEnabled]);
+  }, [resolvedDiscordId, user?.uid]);
 
   // Discord Rich Presence: Atualizar quando jogo atual mudar
   useEffect(() => {
@@ -517,7 +517,7 @@ const Home: React.FC = () => {
     if (playingGame) {
       setGameActivity(playingGame, 'playing');
     }
-  }, [currentPresenceGame, games, isRichPresenceEnabled, setGameActivity, setBrowsingActivity]);
+  }, [currentPresenceGame, games, isRichPresenceEnabled]);
 
   // Discord Rich Presence: Limpar quando sair ou desconectar Discord
   useEffect(() => {
@@ -525,7 +525,7 @@ const Home: React.FC = () => {
       clearActivity();
       setRichPresenceEnabled(false);
     }
-  }, [resolvedDiscordId, user?.uid, clearActivity, setRichPresenceEnabled]);
+  }, [resolvedDiscordId, user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -587,7 +587,7 @@ const Home: React.FC = () => {
 
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
-  }, [games, setGameActivity, isRichPresenceEnabled]);
+  }, [games, isRichPresenceEnabled]);
 
   useEffect(() => {
     const handleGameLaunch = (event: Event) => {
@@ -911,7 +911,7 @@ const Home: React.FC = () => {
     const categoryLabel = categoryConfig?.label;
 
     const filtered =
-      activeCategory === "ALL"
+      activeCategory === "ALL" || activeCategory === "WALL"
         ? ordered
         : activeCategory === "FAVORITES"
           ? ordered.filter((g) => g.isFavorite)
@@ -1709,7 +1709,10 @@ const Home: React.FC = () => {
                   games={displayGames}
                   onGameSelect={openDetails}
                   onGameHover={(game) => {
-                    // Opcional: implementar hover effects
+                    // Atualizar Discord Rich Presence quando hover em jogo
+                    if (game && isRichPresenceEnabled()) {
+                      discordRichPresence.setGameActivity(game, 'menu');
+                    }
                   }}
                   selectedGame={selectedGame}
                   className="h-full"
@@ -3015,230 +3018,6 @@ const VolumeSettingsCard: React.FC<{
   </section>
 );
 
-const SettingsPage: React.FC<{
-  language: LauncherLanguage;
-  volume: number;
-  onLanguageChange: (language: LauncherLanguage) => void;
-  onVolumeChange: (volume: number) => void;
-  onPreviewSound: () => void;
-}> = ({
-  language,
-  volume,
-  onLanguageChange,
-  onVolumeChange,
-  onPreviewSound,
-}) => (
-    (() => {
-      const copy = {
-        "pt-BR": {
-          eyebrow: "Sistema",
-          title: "Ajustes",
-          language: "Idioma",
-          languageHint: "Preferência visual salva neste dispositivo.",
-          sound: "Efeitos sonoros",
-          soundHint: "Volume de navegação, seleção e retorno.",
-          test: "Testar",
-          mute: "Mudo",
-          max: "Máximo",
-        },
-        "en-US": {
-          eyebrow: "System",
-          title: "Settings",
-          language: "Language",
-          languageHint: "Visual preference saved on this device.",
-          sound: "Sound effects",
-          soundHint: "Navigation, selection and back volume.",
-          test: "Test",
-          mute: "Mute",
-          max: "Max",
-        },
-        "es-ES": {
-          eyebrow: "Sistema",
-          title: "Ajustes",
-          language: "Idioma",
-          languageHint: "Preferencia visual guardada en este dispositivo.",
-          sound: "Efectos sonoros",
-          soundHint: "Volumen de navegación, selección y retorno.",
-          test: "Probar",
-          mute: "Silencio",
-          max: "Máximo",
-        },
-      }[language];
-
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
-        >
-          <div className="max-w-5xl">
-            <div className="mb-10">
-              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
-                {copy.eyebrow}
-              </p>
-              <h1 className="text-5xl font-black tracking-tight text-white uppercase">
-                {copy.title}
-              </h1>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
-              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-                    <Languages className="w-5 h-5 text-white/70" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white">{copy.language}</h2>
-                    <p className="text-xs text-white/40">
-                      {copy.languageHint}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {LANGUAGE_OPTIONS.map((option) => {
-                    const active = language === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        onClick={() => onLanguageChange(option.id)}
-                        className="text-left rounded-2xl border p-4 transition-all"
-                        style={{
-                          background: active
-                            ? "rgba(255,255,255,0.13)"
-                            : "rgba(255,255,255,0.04)",
-                          borderColor: active
-                            ? "rgba(255,255,255,0.28)"
-                            : "rgba(255,255,255,0.08)",
-                        }}
-                      >
-                        <span className="block text-sm font-bold text-white">
-                          {option.label}
-                        </span>
-                        <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
-                          {option.hint}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-                    <Volume2 className="w-5 h-5 text-white/70" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white">{copy.sound}</h2>
-                    <p className="text-xs text-white/40">
-                      {copy.soundHint}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-end justify-between gap-5 mb-5">
-                  <div>
-                    <span className="text-6xl font-light text-white tabular-nums">
-                      {volume}
-                    </span>
-                    <span className="ml-1 text-sm font-bold text-white/35">%</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={onPreviewSound}
-                    className="h-10 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
-                  >
-                    {copy.test}
-                  </button>
-                </div>
-
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={volume}
-                  onChange={(e) => onVolumeChange(Number(e.target.value))}
-                  className="w-full accent-white"
-                />
-                <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
-                  <span>{copy.mute}</span>
-                  <span>{copy.max}</span>
-                </div>
-              </section>
-
-              {/* Nova seção: Discord Rich Presence */}
-              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-10 w-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
-                    <MessageCircle className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white">Discord Rich Presence</h2>
-                    <p className="text-xs text-white/40">
-                      Mostrar jogo atual no seu status do Discord
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/5">
-                  <div>
-                    <p className="text-sm font-bold text-white">Ativar Rich Presence</p>
-                    <p className="text-xs text-white/40 mt-1">
-                      {resolvedDiscordId 
-                        ? "Discord conectado - Rich Presence disponível" 
-                        : "Conecte o Discord para usar Rich Presence"
-                      }
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRichPresenceEnabled(!isRichPresenceEnabled())}
-                    disabled={!resolvedDiscordId}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${
-                      isRichPresenceEnabled() 
-                        ? 'bg-indigo-500' 
-                        : 'bg-white/20'
-                    } ${!resolvedDiscordId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    <div
-                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                        isRichPresenceEnabled() ? 'translate-x-6' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {isRichPresenceEnabled() && (
-                  <div className="mt-4 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                        <span className="text-xs font-bold text-indigo-300">CP</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white">
-                          {currentPresenceGame || "Navegando na biblioteca"}
-                        </p>
-                        <p className="text-xs text-indigo-300">
-                          {currentPresenceGame ? "Jogando via Checkpoint" : "Escolhendo o próximo jogo"}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-white/40">
-                      Preview de como aparece no Discord
-                    </p>
-                  </div>
-                )}
-              </section>
-            </div>
-          </div>
-        </motion.div>
-      );
-    })()
-  );
 
 const EmptyState: React.FC<{
   searchTerm: string;
