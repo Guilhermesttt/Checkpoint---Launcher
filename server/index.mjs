@@ -606,6 +606,121 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+const publicProfile = (id, data = {}) => ({
+  uid: String(data.uid || id),
+  email: data.email || "",
+  displayName: data.displayName || data.email?.split("@")[0] || "User",
+  photoURL: data.discordAvatar || data.photoURL || "",
+  discordAvatar: data.discordAvatar || "",
+  discordUsername: data.discordUsername || "",
+});
+
+app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const term = String(req.query.q ?? "").trim();
+  if (term.length < 2) {
+    res.status(400).json({ error: "Informe pelo menos 2 caracteres." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const found = new Map();
+    const normalizedTerm = term.toLowerCase();
+
+    if (term.includes("@")) {
+      const emailSnap = await firestore
+        .collection("profiles")
+        .where("email", "==", term)
+        .limit(10)
+        .get();
+      emailSnap.forEach((doc) => found.set(doc.id, publicProfile(doc.id, doc.data())));
+    }
+
+    const allProfilesSnap = await firestore.collection("profiles").limit(250).get();
+    allProfilesSnap.forEach((doc) => {
+      if (doc.id === req.firebaseUser.uid) return;
+      const data = doc.data();
+      const name = String(data.displayName || data.discordUsername || data.email || "").toLowerCase();
+      if (name.includes(normalizedTerm)) {
+        found.set(doc.id, publicProfile(doc.id, data));
+      }
+    });
+
+    res.json({ users: Array.from(found.values()).slice(0, 25) });
+  } catch {
+    res.status(500).json({ error: "Erro ao buscar usuários." });
+  }
+});
+
+app.post("/api/friends/add", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.body?.uid ?? "").trim();
+  if (!friendUid || friendUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const friendSnap = await firestore.doc(`profiles/${friendUid}`).get();
+    if (!friendSnap.exists) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+
+    const friend = publicProfile(friendSnap.id, friendSnap.data());
+    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const profileSnap = await profileRef.get();
+    const currentFriends = Array.isArray(profileSnap.data()?.checkpointFriends)
+      ? profileSnap.data().checkpointFriends
+      : [];
+    const nextFriends = [
+      {
+        uid: friend.uid,
+        displayName: friend.displayName,
+        photoURL: friend.photoURL || null,
+      },
+      ...currentFriends.filter((item) => item?.uid !== friend.uid),
+    ].slice(0, 250);
+
+    await profileRef.set(
+      {
+        checkpointFriends: nextFriends,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    res.json({ friend });
+  } catch {
+    res.status(500).json({ error: "Erro ao adicionar amigo." });
+  }
+});
+
+app.post("/api/friends/remove", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.body?.uid ?? "").trim();
+  if (!friendUid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const profileRef = getFirestore().doc(`profiles/${req.firebaseUser.uid}`);
+    const profileSnap = await profileRef.get();
+    const currentFriends = Array.isArray(profileSnap.data()?.checkpointFriends)
+      ? profileSnap.data().checkpointFriends
+      : [];
+    await profileRef.set(
+      {
+        checkpointFriends: currentFriends.filter((item) => item?.uid !== friendUid),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao remover amigo." });
+  }
+});
+
 app.post("/auth/steam/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
   cleanupPendingStates();
   const token = crypto.randomUUID();

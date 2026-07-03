@@ -57,6 +57,7 @@ import Stepper, { Step } from "../components/ReactBits/Stepper";
 import GlassButton from "../components/ui/GlassButton";
 import ModalShell from "../components/ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
+import type { UserProfile } from "../types/domain";
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects, type SoundEffectType } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
@@ -81,6 +82,11 @@ import {
   disconnectDiscordAccount,
   getDiscordLinkUrl,
 } from "../services/discord";
+import {
+  addCheckpointFriend,
+  removeCheckpointFriend,
+  searchCheckpointFriends,
+} from "../services/checkpointFriends";
 import type { Game } from "../types/domain";
 import {
   profileDocRef,
@@ -149,7 +155,7 @@ interface SocialFriend {
   status: "online" | "playing" | "offline";
   playing?: string;
   avatar?: string;
-  source?: "discord" | "discord_friend" | "local";
+  source?: "discord" | "discord_friend" | "local" | "checkpoint";
 }
 
 interface PriceAlert {
@@ -387,6 +393,7 @@ const Home: React.FC = () => {
   }, []);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
 
   const lastWheelTime = useRef<number>(0);
 
@@ -465,7 +472,7 @@ const Home: React.FC = () => {
     const stored: SocialFriend[] = JSON.parse(
       localStorage.getItem(`checkpoint_social_friends_${user.uid}`) || "[]",
     );
-    setSocialFriends(stored.filter((f) => f.source?.startsWith("discord")));
+    setSocialFriends(stored.filter((f) => f.source?.startsWith("discord") || f.source === "checkpoint"));
     setPriceAlerts(
       JSON.parse(localStorage.getItem(`checkpoint_price_alerts_${user.uid}`) || "[]"),
     );
@@ -503,17 +510,25 @@ const Home: React.FC = () => {
           avatar: friend.avatar || undefined,
           source: "discord_friend",
         }));
-      const remoteIds = new Set([discordSelf.id, ...remoteFriends.map((friend) => friend.id)]);
+      const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map(f => ({
+        id: `cp-friend:${f.uid}`,
+        name: f.displayName,
+        status: "online",
+        avatar: f.photoURL || undefined,
+        source: "checkpoint",
+      }));
+      const remoteIds = new Set([discordSelf.id, ...remoteFriends.map((friend) => friend.id), ...cpFriends.map(f => f.id)]);
       const localFriends = current.filter(
-        (friend) => !friend.source?.startsWith("discord") && !remoteIds.has(friend.id),
+        (friend) => !friend.source?.startsWith("discord") && friend.source !== "checkpoint" && !remoteIds.has(friend.id),
       );
-      return [discordSelf, ...remoteFriends, ...localFriends];
+      return [discordSelf, ...remoteFriends, ...cpFriends, ...localFriends];
     });
   }, [
     localSocialStateLoaded,
     resolvedDiscordId,
     userProfile?.discordAvatar,
     userProfile?.discordFriends,
+    userProfile?.checkpointFriends,
     userProfile?.discordUsername,
   ]);
 
@@ -943,8 +958,30 @@ const Home: React.FC = () => {
     });
   };
 
-  const removeFriend = (id: string) => {
-    setSocialFriends((current) => current.filter((friend) => friend.id !== id));
+  const removeFriend = async (id: string) => {
+    if (id.startsWith("cp-friend:") && user?.uid) {
+      const friendUid = id.split(":")[1];
+      try {
+        await removeCheckpointFriend(friendUid);
+        await refreshProfile();
+      } catch (e) {
+        notify(e instanceof Error ? e.message : "Erro ao remover amigo do Checkpoint.", "error");
+      }
+    } else {
+      setSocialFriends((current) => current.filter((friend) => friend.id !== id));
+    }
+  };
+
+  const handleAddCheckpointFriend = async (friendProfile: UserProfile) => {
+    if (!user?.uid) return;
+    try {
+      await addCheckpointFriend(friendProfile.uid);
+      notify("Amigo adicionado com sucesso!", "success");
+      await refreshProfile();
+      setIsAddFriendModalOpen(false);
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Erro ao adicionar amigo.", "error");
+    }
   };
 
   const addPriceAlert = (game: Game) => {
@@ -1368,6 +1405,7 @@ const Home: React.FC = () => {
               friends={socialFriends}
               onConnectDiscord={connectDiscord}
               onRemoveFriend={removeFriend}
+              onAddFriendClick={() => setIsAddFriendModalOpen(true)}
             />
           ) : activeCategory === "DEALS" ? (
             <PriceAlertsPage
@@ -1618,6 +1656,13 @@ const Home: React.FC = () => {
           gameToEdit={editingGame}
         />
       </React.Suspense>
+
+      <AddFriendModal
+        isOpen={isAddFriendModalOpen}
+        onClose={() => setIsAddFriendModalOpen(false)}
+        onAddFriend={handleAddCheckpointFriend}
+        t={t}
+      />
 
       <ConfirmationModal
         isOpen={signOutModalOpen}
@@ -2010,6 +2055,7 @@ const FriendsPage: React.FC<{
   friends: SocialFriend[];
   onConnectDiscord: () => void;
   onRemoveFriend: (id: string) => void;
+  onAddFriendClick: () => void;
 }> = ({
   t,
   discordConnected,
@@ -2018,6 +2064,7 @@ const FriendsPage: React.FC<{
   friends,
   onConnectDiscord,
   onRemoveFriend,
+  onAddFriendClick,
 }) => {
     const [friendSearch, setFriendSearch] = useState("");
     const onlineCount = friends.filter((friend) => friend.status !== "offline").length;
@@ -2060,24 +2107,33 @@ const FriendsPage: React.FC<{
         )}
 
         <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-          <div className="flex items-center gap-4 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
-              {discordAvatar ? (
-                <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <MessageCircle className="w-5 h-5 text-white/60" />
-              )}
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
+                {discordAvatar ? (
+                  <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <MessageCircle className="w-5 h-5 text-white/60" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white">
+                  {discordConnected ? (discordUsername || "Discord") : "Discord"}
+                </p>
+                <p className="text-[10px] text-white/40">
+                  {discordConnected
+                    ? "Amigos sincronizados automaticamente ao conectar."
+                    : "Não conectado"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold text-white">
-                {discordConnected ? (discordUsername || "Discord") : "Discord"}
-              </p>
-              <p className="text-[10px] text-white/40">
-                {discordConnected
-                  ? "Amigos sincronizados automaticamente ao conectar."
-                  : "Não conectado"}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onAddFriendClick}
+              className="h-10 px-5 rounded-xl bg-white hover:bg-white/90 text-black text-[10px] font-black uppercase tracking-wider transition-all"
+            >
+              + Adicionar Amigo
+            </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {[
@@ -2152,6 +2208,15 @@ const FriendsPage: React.FC<{
                     </p>
                   </div>
                 </div>
+                {!friend.source?.startsWith("discord") && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFriend(friend.id)}
+                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10 shrink-0"
+                  >
+                    Remover
+                  </button>
+                )}
               </div>
             ))
           )}
@@ -2159,6 +2224,116 @@ const FriendsPage: React.FC<{
       </SystemPageShell>
     );
   };
+const AddFriendModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onAddFriend: (profile: UserProfile) => void;
+  t: ReturnType<typeof usePreferences>["t"];
+}> = ({ isOpen, onClose, onAddFriend, t }) => {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<UserProfile[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch("");
+      setResults([]);
+    }
+  }, [isOpen]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!search.trim()) return;
+    setSearching(true);
+    setResults([]);
+    try {
+      setResults(await searchCheckpointFriends(search.trim()));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+        <div className="relative flex justify-between items-center mb-6">
+          <h2 className="text-xl font-black text-white">Adicionar Amigo</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSearch} className="relative mb-6">
+          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Nome ou Email exato..."
+            className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-12 pr-24 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.05]"
+          />
+          <button
+            type="submit"
+            disabled={searching || !search.trim()}
+            className="absolute right-2 top-2 bottom-2 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-white/90"
+          >
+            {searching ? "..." : "Buscar"}
+          </button>
+        </form>
+
+        <div className="space-y-3 min-h-[100px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          {searching ? (
+            <div className="text-center py-8 text-sm text-white/40">Buscando...</div>
+          ) : results.length > 0 ? (
+            results.map(profile => (
+              <div key={profile.uid} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white/10 overflow-hidden">
+                    {profile.photoURL ? (
+                      <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-white/50" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-white">{profile.displayName || "Usuário"}</div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-widest">{profile.email}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onAddFriend(profile)}
+                  className="h-8 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-wider transition-all"
+                >
+                  Adicionar
+                </button>
+              </div>
+            ))
+          ) : search.trim() && !searching ? (
+            <div className="text-center py-8 text-sm text-white/40">Nenhum usuário encontrado.</div>
+          ) : null}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const PriceAlertsPage: React.FC<{
   t: ReturnType<typeof usePreferences>["t"];
   games: Game[];

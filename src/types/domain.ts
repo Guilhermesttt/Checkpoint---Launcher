@@ -50,6 +50,11 @@ export interface UserProfile {
     avatar?: string;
     relationshipType?: number | null;
   }>;
+  checkpointFriends?: Array<{
+    uid: string;
+    displayName: string;
+    photoURL?: string | null;
+  }>;
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
