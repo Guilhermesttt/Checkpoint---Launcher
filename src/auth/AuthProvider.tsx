@@ -34,6 +34,8 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   discordAvatar: data?.discordAvatar,
   discordFriends: data?.discordFriends,
   checkpointFriends: data?.checkpointFriends,
+  checkpointFriendRequestsIncoming: data?.checkpointFriendRequestsIncoming,
+  checkpointFriendRequestsOutgoing: data?.checkpointFriendRequestsOutgoing,
   createdAt: data?.createdAt,
   updatedAt: data?.updatedAt,
   lastSteamSyncAt: data?.lastSteamSyncAt,

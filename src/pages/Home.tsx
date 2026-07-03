@@ -83,9 +83,11 @@ import {
   getDiscordLinkUrl,
 } from "../services/discord";
 import {
-  addCheckpointFriend,
+  acceptCheckpointFriendRequest,
+  rejectCheckpointFriendRequest,
   removeCheckpointFriend,
   searchCheckpointFriends,
+  sendCheckpointFriendRequest,
 } from "../services/checkpointFriends";
 import type { Game } from "../types/domain";
 import {
@@ -157,6 +159,8 @@ interface SocialFriend {
   avatar?: string;
   source?: "discord" | "discord_friend" | "local" | "checkpoint";
 }
+
+type CheckpointFriendRequest = NonNullable<UserProfile["checkpointFriendRequestsIncoming"]>[number];
 
 interface PriceAlert {
   id: string;
@@ -975,12 +979,32 @@ const Home: React.FC = () => {
   const handleAddCheckpointFriend = async (friendProfile: UserProfile) => {
     if (!user?.uid) return;
     try {
-      await addCheckpointFriend(friendProfile.uid);
-      notify("Amigo adicionado com sucesso!", "success");
+      await sendCheckpointFriendRequest(friendProfile.uid);
+      notify("Solicitação enviada.", "success");
       await refreshProfile();
       setIsAddFriendModalOpen(false);
     } catch (e) {
-      notify(e instanceof Error ? e.message : "Erro ao adicionar amigo.", "error");
+      notify(e instanceof Error ? e.message : "Erro ao enviar solicitação.", "error");
+    }
+  };
+
+  const handleAcceptCheckpointFriendRequest = async (uid: string) => {
+    try {
+      await acceptCheckpointFriendRequest(uid);
+      notify("Solicitação aceita.", "success");
+      await refreshProfile();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Erro ao aceitar solicitação.", "error");
+    }
+  };
+
+  const handleRejectCheckpointFriendRequest = async (uid: string) => {
+    try {
+      await rejectCheckpointFriendRequest(uid);
+      notify("Solicitação rejeitada.", "success");
+      await refreshProfile();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Erro ao rejeitar solicitação.", "error");
     }
   };
 
@@ -1403,8 +1427,11 @@ const Home: React.FC = () => {
               discordUsername={userProfile?.discordUsername}
               discordAvatar={userProfile?.discordAvatar}
               friends={socialFriends}
+              incomingRequests={userProfile?.checkpointFriendRequestsIncoming ?? []}
               onConnectDiscord={connectDiscord}
               onRemoveFriend={removeFriend}
+              onAcceptRequest={handleAcceptCheckpointFriendRequest}
+              onRejectRequest={handleRejectCheckpointFriendRequest}
               onAddFriendClick={() => setIsAddFriendModalOpen(true)}
             />
           ) : activeCategory === "DEALS" ? (
@@ -2053,8 +2080,11 @@ const FriendsPage: React.FC<{
   discordUsername?: string;
   discordAvatar?: string;
   friends: SocialFriend[];
+  incomingRequests: CheckpointFriendRequest[];
   onConnectDiscord: () => void;
   onRemoveFriend: (id: string) => void;
+  onAcceptRequest: (uid: string) => void;
+  onRejectRequest: (uid: string) => void;
   onAddFriendClick: () => void;
 }> = ({
   t,
@@ -2062,8 +2092,11 @@ const FriendsPage: React.FC<{
   discordUsername,
   discordAvatar,
   friends,
+  incomingRequests,
   onConnectDiscord,
   onRemoveFriend,
+  onAcceptRequest,
+  onRejectRequest,
   onAddFriendClick,
 }) => {
     const [friendSearch, setFriendSearch] = useState("");
@@ -2092,7 +2125,7 @@ const FriendsPage: React.FC<{
               <div>
                 <p className="text-sm font-bold text-white">{t("connectDiscord")}</p>
                 <p className="text-[10px] text-white/40 mt-0.5">
-                  Seus amigos do Discord aparecem automaticamente ao conectar.
+                  Use o Discord como identidade e avatar nos Amigos do Checkpoint.
                 </p>
               </div>
             </div>
@@ -2122,8 +2155,8 @@ const FriendsPage: React.FC<{
                 </p>
                 <p className="text-[10px] text-white/40">
                   {discordConnected
-                    ? "Amigos sincronizados automaticamente ao conectar."
-                    : "Não conectado"}
+                    ? "Identidade conectada para mostrar nome e avatar."
+                    : "Nao conectado"}
                 </p>
               </div>
             </div>
@@ -2132,7 +2165,7 @@ const FriendsPage: React.FC<{
               onClick={onAddFriendClick}
               className="h-10 px-5 rounded-xl bg-white hover:bg-white/90 text-black text-[10px] font-black uppercase tracking-wider transition-all"
             >
-              + Adicionar Amigo
+              + Adicionar amigo
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -2152,6 +2185,64 @@ const FriendsPage: React.FC<{
             ))}
           </div>
         </section>
+
+        {incomingRequests.length > 0 && (
+          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <p className="text-sm font-black text-white">Solicitacoes recebidas</p>
+                <p className="text-[10px] text-white/40 mt-0.5">
+                  Aceite ou rejeite quem quer adicionar voce no Checkpoint.
+                </p>
+              </div>
+              <span className="h-8 min-w-8 rounded-xl bg-white/10 px-3 flex items-center justify-center text-xs font-black text-white">
+                {incomingRequests.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {incomingRequests.map((request) => (
+                <div
+                  key={request.uid}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center overflow-hidden">
+                      {request.photoURL ? (
+                        <img src={request.photoURL} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Users className="w-4 h-4 text-white/70" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">
+                        {request.displayName || "Usuario"}
+                      </p>
+                      <p className="text-[10px] uppercase tracking-widest text-white/35">
+                        Quer ser seu amigo
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onRejectRequest(request.uid)}
+                      className="h-9 px-3 rounded-lg text-[10px] font-black uppercase text-red-300/80 hover:bg-red-500/10"
+                    >
+                      Rejeitar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAcceptRequest(request.uid)}
+                      className="h-9 px-3 rounded-lg bg-white text-black text-[10px] font-black uppercase hover:bg-white/90"
+                    >
+                      Aceitar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {friends.length > 0 && (
           <div className="mb-5">
@@ -2173,14 +2264,14 @@ const FriendsPage: React.FC<{
               <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
               <p className="text-sm font-bold text-white/70">
                 {!discordConnected
-                  ? "Conecte o Discord para ver seus amigos aqui."
+                  ? "Conecte o Discord para usar nome e avatar no perfil social."
                   : friends.length === 0
-                    ? "Nenhum amigo encontrado na sua conta do Discord."
+                    ? "Nenhum amigo do Checkpoint ainda."
                     : "Nenhum amigo corresponde à busca."}
               </p>
               {discordConnected && friends.length === 0 && (
                 <p className="mt-2 text-xs text-white/35">
-                  Os amigos são sincronizados automaticamente quando você conecta o Discord.
+                  Clique em Adicionar amigo para enviar uma solicitação.
                 </p>
               )}
             </div>
@@ -2267,7 +2358,7 @@ const AddFriendModal: React.FC<{
       >
         <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
         <div className="relative flex justify-between items-center mb-6">
-          <h2 className="text-xl font-black text-white">Adicionar Amigo</h2>
+          <h2 className="text-xl font-black text-white">Adicionar amigo</h2>
           <button
             type="button"
             onClick={onClose}
@@ -2321,7 +2412,7 @@ const AddFriendModal: React.FC<{
                   onClick={() => onAddFriend(profile)}
                   className="h-8 px-4 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-wider transition-all"
                 >
-                  Adicionar
+                  Enviar
                 </button>
               </div>
             ))

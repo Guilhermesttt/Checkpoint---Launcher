@@ -615,6 +615,20 @@ const publicProfile = (id, data = {}) => ({
   discordUsername: data.discordUsername || "",
 });
 
+const compactFriendProfile = (profile) => ({
+  uid: profile.uid,
+  displayName: profile.displayName,
+  photoURL: profile.photoURL || null,
+});
+
+const withUniqueProfile = (items, profile, extra = {}) => [
+  { ...compactFriendProfile(profile), ...extra },
+  ...(Array.isArray(items) ? items : []).filter((item) => item?.uid !== profile.uid),
+];
+
+const withoutProfileUid = (items, uid) =>
+  (Array.isArray(items) ? items : []).filter((item) => item?.uid !== uid);
+
 app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const term = String(req.query.q ?? "").trim();
   if (term.length < 2) {
@@ -649,6 +663,216 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
     res.json({ users: Array.from(found.values()).slice(0, 25) });
   } catch {
     res.status(500).json({ error: "Erro ao buscar usuários." });
+  }
+});
+
+app.post("/api/friends/request", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.body?.uid ?? "").trim();
+  if (!friendUid || friendUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const friendRef = firestore.doc(`profiles/${friendUid}`);
+    const [profileSnap, friendSnap] = await Promise.all([profileRef.get(), friendRef.get()]);
+    if (!profileSnap.exists || !friendSnap.exists) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+
+    const profileData = profileSnap.data() || {};
+    const friendData = friendSnap.data() || {};
+    const alreadyFriends = Array.isArray(profileData.checkpointFriends)
+      && profileData.checkpointFriends.some((item) => item?.uid === friendUid);
+    if (alreadyFriends) {
+      res.status(409).json({ error: "Usuário já está na sua lista de amigos." });
+      return;
+    }
+
+    const currentProfile = publicProfile(profileSnap.id, profileData);
+    const friend = publicProfile(friendSnap.id, friendData);
+    const createdAt = new Date().toISOString();
+    await profileRef.set(
+      {
+        checkpointFriendRequestsOutgoing: withUniqueProfile(
+          profileData.checkpointFriendRequestsOutgoing,
+          friend,
+          { createdAt },
+        ).slice(0, 250),
+        updatedAt: createdAt,
+      },
+      { merge: true },
+    );
+    await friendRef.set(
+      {
+        checkpointFriendRequestsIncoming: withUniqueProfile(
+          friendData.checkpointFriendRequestsIncoming,
+          currentProfile,
+          { createdAt },
+        ).slice(0, 250),
+        updatedAt: createdAt,
+      },
+      { merge: true },
+    );
+    res.json({ request: compactFriendProfile(friend) });
+  } catch {
+    res.status(500).json({ error: "Erro ao enviar solicitação." });
+  }
+});
+
+app.post("/api/friends/accept", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const requesterUid = String(req.body?.uid ?? "").trim();
+  if (!requesterUid || requesterUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const requesterRef = firestore.doc(`profiles/${requesterUid}`);
+    const [profileSnap, requesterSnap] = await Promise.all([profileRef.get(), requesterRef.get()]);
+    if (!profileSnap.exists || !requesterSnap.exists) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+
+    const profileData = profileSnap.data() || {};
+    const requesterData = requesterSnap.data() || {};
+    const hasRequest = Array.isArray(profileData.checkpointFriendRequestsIncoming)
+      && profileData.checkpointFriendRequestsIncoming.some((item) => item?.uid === requesterUid);
+    if (!hasRequest) {
+      res.status(404).json({ error: "Solicitação não encontrada." });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const currentProfile = publicProfile(profileSnap.id, profileData);
+    const requesterProfile = publicProfile(requesterSnap.id, requesterData);
+    await profileRef.set(
+      {
+        checkpointFriends: withUniqueProfile(profileData.checkpointFriends, requesterProfile).slice(0, 250),
+        checkpointFriendRequestsIncoming: withoutProfileUid(
+          profileData.checkpointFriendRequestsIncoming,
+          requesterUid,
+        ),
+        checkpointFriendRequestsOutgoing: withoutProfileUid(
+          profileData.checkpointFriendRequestsOutgoing,
+          requesterUid,
+        ),
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    await requesterRef.set(
+      {
+        checkpointFriends: withUniqueProfile(requesterData.checkpointFriends, currentProfile).slice(0, 250),
+        checkpointFriendRequestsIncoming: withoutProfileUid(
+          requesterData.checkpointFriendRequestsIncoming,
+          req.firebaseUser.uid,
+        ),
+        checkpointFriendRequestsOutgoing: withoutProfileUid(
+          requesterData.checkpointFriendRequestsOutgoing,
+          req.firebaseUser.uid,
+        ),
+        updatedAt: now,
+      },
+      { merge: true },
+    );
+    res.json({ friend: compactFriendProfile(requesterProfile) });
+  } catch {
+    res.status(500).json({ error: "Erro ao aceitar solicitação." });
+  }
+});
+
+app.post("/api/friends/reject", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const requesterUid = String(req.body?.uid ?? "").trim();
+  if (!requesterUid || requesterUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const requesterRef = firestore.doc(`profiles/${requesterUid}`);
+    const [profileSnap, requesterSnap] = await Promise.all([profileRef.get(), requesterRef.get()]);
+    const now = new Date().toISOString();
+    if (profileSnap.exists) {
+      const profileData = profileSnap.data() || {};
+      await profileRef.set(
+        {
+          checkpointFriendRequestsIncoming: withoutProfileUid(
+            profileData.checkpointFriendRequestsIncoming,
+            requesterUid,
+          ),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+    }
+    if (requesterSnap.exists) {
+      const requesterData = requesterSnap.data() || {};
+      await requesterRef.set(
+        {
+          checkpointFriendRequestsOutgoing: withoutProfileUid(
+            requesterData.checkpointFriendRequestsOutgoing,
+            req.firebaseUser.uid,
+          ),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+    }
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao rejeitar solicitação." });
+  }
+});
+
+app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.body?.uid ?? "").trim();
+  if (!friendUid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const friendRef = firestore.doc(`profiles/${friendUid}`);
+    const [profileSnap, friendSnap] = await Promise.all([profileRef.get(), friendRef.get()]);
+    const now = new Date().toISOString();
+    if (profileSnap.exists) {
+      const data = profileSnap.data() || {};
+      await profileRef.set(
+        {
+          checkpointFriends: withoutProfileUid(data.checkpointFriends, friendUid),
+          checkpointFriendRequestsIncoming: withoutProfileUid(data.checkpointFriendRequestsIncoming, friendUid),
+          checkpointFriendRequestsOutgoing: withoutProfileUid(data.checkpointFriendRequestsOutgoing, friendUid),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+    }
+    if (friendSnap.exists) {
+      const data = friendSnap.data() || {};
+      await friendRef.set(
+        {
+          checkpointFriends: withoutProfileUid(data.checkpointFriends, req.firebaseUser.uid),
+          checkpointFriendRequestsIncoming: withoutProfileUid(data.checkpointFriendRequestsIncoming, req.firebaseUser.uid),
+          checkpointFriendRequestsOutgoing: withoutProfileUid(data.checkpointFriendRequestsOutgoing, req.firebaseUser.uid),
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+    }
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao remover amigo." });
   }
 });
 

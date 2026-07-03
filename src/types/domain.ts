@@ -55,6 +55,18 @@ export interface UserProfile {
     displayName: string;
     photoURL?: string | null;
   }>;
+  checkpointFriendRequestsIncoming?: Array<{
+    uid: string;
+    displayName: string;
+    photoURL?: string | null;
+    createdAt?: string;
+  }>;
+  checkpointFriendRequestsOutgoing?: Array<{
+    uid: string;
+    displayName: string;
+    photoURL?: string | null;
+    createdAt?: string;
+  }>;
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
