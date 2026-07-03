@@ -1,4 +1,5 @@
 import { Clock3, Flame, Heart, PlayCircle, Users2 } from "lucide-react";
+import type { TranslationKey } from "../context/PreferencesContext";
 import type { Game } from "../types/domain";
 
 interface FriendPresenceSnapshot {
@@ -22,10 +23,11 @@ interface HomeOverviewPanelsProps {
   recentActivity: ActivityItem[];
   onOpenGame: (game: Game) => void;
   onOpenFriends: () => void;
+  t: (key: TranslationKey) => string;
 }
 
-const formatTimeAgo = (date?: string) => {
-  if (!date) return "sem registro";
+const formatTimeAgo = (date: string | undefined, t: (key: TranslationKey) => string) => {
+  if (!date) return t("overviewNoRecord");
   const diffMs = Date.now() - new Date(date).getTime();
   const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
 
@@ -51,6 +53,7 @@ export function HomeOverviewPanels({
   recentActivity,
   onOpenGame,
   onOpenFriends,
+  t,
 }: HomeOverviewPanelsProps) {
   const primaryGame = continuePlaying[0];
   const topFavorites = favoriteGames.slice(0, 3);
@@ -68,10 +71,10 @@ export function HomeOverviewPanels({
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
-                  Continuar
+                  {t("overviewContinue")}
                 </p>
                 <p className="text-base font-black tracking-tight text-white">
-                  Retomar sessão
+                  {t("overviewResumeSession")}
                 </p>
               </div>
             </div>
@@ -99,18 +102,18 @@ export function HomeOverviewPanels({
                     {platformLabel(primaryGame)}
                   </span>
                   <span className="text-[10px] font-black uppercase tracking-wider text-white/30">
-                    {formatTimeAgo(primaryGame.lastPlayedAt || primaryGame.steamLastPlayedAt)}
+                    {formatTimeAgo(primaryGame.lastPlayedAt || primaryGame.steamLastPlayedAt, t)}
                   </span>
                 </div>
                 <p className="truncate text-sm font-black text-white">{primaryGame.title}</p>
                 <p className="mt-0.5 text-[11px] text-white/40">
-                  {primaryGame.hoursPlayed || 0}h jogadas
+                  {primaryGame.hoursPlayed || 0}{t("overviewHoursPlayed")}
                 </p>
               </div>
             </button>
           ) : (
             <div className="rounded-[20px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-center">
-              <p className="text-sm font-bold text-white/60">Seu próximo retorno aparece aqui.</p>
+              <p className="text-sm font-bold text-white/60">{t("overviewNextReturn")}</p>
             </div>
           )}
         </section>
@@ -123,10 +126,10 @@ export function HomeOverviewPanels({
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
-                  Amigos
+                  {t("overviewFriends")}
                 </p>
                 <p className="text-base font-black tracking-tight text-white">
-                  Jogando agora
+                  {t("overviewPlayingNow")}
                 </p>
               </div>
             </div>
@@ -135,7 +138,7 @@ export function HomeOverviewPanels({
               onClick={onOpenFriends}
               className="rounded-full border border-white/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-white/55 transition-all hover:border-white/20 hover:text-white"
             >
-              Social
+              {t("overviewSocial")}
             </button>
           </div>
 
@@ -159,14 +162,14 @@ export function HomeOverviewPanels({
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-black text-white">{friend.name}</p>
                     <p className="truncate text-[10px] uppercase tracking-widest text-white/35">
-                      {friend.playing ? friend.playing : "Online"}
+                      {friend.playing ? friend.playing : t("overviewOnline")}
                     </p>
                   </div>
                 </div>
               ))
             ) : (
               <div className="rounded-[16px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-4 text-center">
-                <p className="text-sm font-bold text-white/60">Ninguém em jogo agora.</p>
+                <p className="text-sm font-bold text-white/60">{t("overviewNobodyPlaying")}</p>
               </div>
             )}
           </div>
@@ -179,10 +182,10 @@ export function HomeOverviewPanels({
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
-                Pulso
+                {t("overviewPulse")}
               </p>
               <p className="text-base font-black tracking-tight text-white">
-                Resumo rápido
+                {t("overviewQuickSummary")}
               </p>
             </div>
           </div>
@@ -191,14 +194,14 @@ export function HomeOverviewPanels({
             <div className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
               <div className="mb-1 flex items-center gap-2 text-white/40">
                 <Heart className="h-3.5 w-3.5" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Favoritos</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">{t("overviewFavorites")}</span>
               </div>
               <p className="text-xl font-black text-white">{favoriteGames.length}</p>
             </div>
             <div className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2.5">
               <div className="mb-1 flex items-center gap-2 text-white/40">
                 <Clock3 className="h-3.5 w-3.5" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Atividade</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">{t("overviewActivity")}</span>
               </div>
               <p className="text-xl font-black text-white">{recentActivity.length}</p>
             </div>
@@ -217,7 +220,7 @@ export function HomeOverviewPanels({
               ))
             ) : (
               <div className="rounded-[16px] border border-dashed border-white/10 bg-white/[0.03] px-4 py-4 text-center">
-                <p className="text-sm font-bold text-white/60">Sem novidades recentes.</p>
+                <p className="text-sm font-bold text-white/60">{t("overviewNoRecentNews")}</p>
               </div>
             )}
           </div>

@@ -607,7 +607,7 @@ app.get("/health", (_req, res) => {
 });
 
 const publicProfile = (id, data = {}) => ({
-  uid: String(data.uid || id),
+  uid: String(id || data.uid || ""),
   email: data.email || "",
   displayName: data.displayName || data.email?.split("@")[0] || "User",
   photoURL: data.discordAvatar || data.photoURL || "",
@@ -662,7 +662,10 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
         .where("email", "==", term)
         .limit(10)
         .get();
-      emailSnap.forEach((doc) => found.set(doc.id, publicProfile(doc.id, doc.data())));
+      emailSnap.forEach((doc) => {
+        if (doc.id === req.firebaseUser.uid) return;
+        found.set(doc.id, publicProfile(doc.id, doc.data()));
+      });
     }
 
     const allProfilesSnap = await firestore.collection("profiles").limit(250).get();
@@ -675,7 +678,12 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
       }
     });
 
-    res.json({ users: Array.from(found.values()).slice(0, 25) });
+    const users = Array.from(found.values())
+      .filter((profile) => profile.uid && profile.uid !== req.firebaseUser.uid)
+      .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index)
+      .slice(0, 25);
+
+    res.json({ users });
   } catch {
     res.status(500).json({ error: "Erro ao buscar usuários." });
   }
@@ -825,6 +833,19 @@ app.post("/api/friends/request", steamPrivateLimiter, requireFirebaseUser, async
       && profileData.checkpointFriends.some((item) => item?.uid === friendUid);
     if (alreadyFriends) {
       res.status(409).json({ error: "Usuário já está na sua lista de amigos." });
+      return;
+    }
+
+    const hasOutgoingRequest = Array.isArray(profileData.checkpointFriendRequestsOutgoing)
+      && profileData.checkpointFriendRequestsOutgoing.some((item) => item?.uid === friendUid);
+    if (hasOutgoingRequest) {
+      res.status(409).json({ error: "Solicitacao ja enviada para este usuario." });
+      return;
+    }
+    const hasIncomingRequest = Array.isArray(profileData.checkpointFriendRequestsIncoming)
+      && profileData.checkpointFriendRequestsIncoming.some((item) => item?.uid === friendUid);
+    if (hasIncomingRequest) {
+      res.status(409).json({ error: "Este usuario ja enviou uma solicitacao para voce." });
       return;
     }
 

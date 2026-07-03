@@ -479,6 +479,18 @@ const Home: React.FC = () => {
 
   const { notify } = useNotification();
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
+  const checkpointFriendIds = useMemo(
+    () => new Set((userProfile?.checkpointFriends ?? []).map((friend) => friend.uid)),
+    [userProfile?.checkpointFriends],
+  );
+  const outgoingFriendRequestIds = useMemo(
+    () => new Set((userProfile?.checkpointFriendRequestsOutgoing ?? []).map((request) => request.uid)),
+    [userProfile?.checkpointFriendRequestsOutgoing],
+  );
+  const incomingFriendRequestIds = useMemo(
+    () => new Set((userProfile?.checkpointFriendRequestsIncoming ?? []).map((request) => request.uid)),
+    [userProfile?.checkpointFriendRequestsIncoming],
+  );
   const {
     language: launcherLanguage,
     effectsVolume,
@@ -1041,8 +1053,10 @@ const Home: React.FC = () => {
     friendsPlayingNow.forEach((friend) => {
       items.push({
         id: `friend-${friend.id}`,
-        title: `${friend.name} entrou em jogo`,
-        detail: friend.playing ? `Agora está jogando ${friend.playing}.` : "Está online no Checkpoint.",
+        title: `${friend.name} ${t("activityFriendPlaying")}`,
+        detail: friend.playing
+          ? `${t("activityFriendPlayingDetail")} ${friend.playing}.`
+          : t("activityFriendOnlineDetail"),
         tone: "success",
       });
     });
@@ -1050,8 +1064,8 @@ const Home: React.FC = () => {
     continuePlayingGames.forEach((game) => {
       items.push({
         id: `game-${game.id}`,
-        title: `Você voltou para ${game.title}`,
-        detail: `${game.hoursPlayed || 0}h registradas na biblioteca.`,
+        title: `${t("activityReturnedTo")} ${game.title}`,
+        detail: `${game.hoursPlayed || 0}${t("activityLibraryHours")}`,
         tone: "accent",
       });
     });
@@ -1059,14 +1073,14 @@ const Home: React.FC = () => {
     favoriteShowcaseGames.slice(0, 2).forEach((game) => {
       items.push({
         id: `favorite-${game.id}`,
-        title: `${game.title} segue entre seus favoritos`,
-        detail: "Bom candidato para voltar a jogar em uma sessão rápida.",
+        title: `${game.title} ${t("activityFavoriteStill")}`,
+        detail: t("activityFavoriteHint"),
         tone: "muted",
       });
     });
 
     return items.slice(0, 5);
-  }, [continuePlayingGames, favoriteShowcaseGames, friendsPlayingNow]);
+  }, [continuePlayingGames, favoriteShowcaseGames, friendsPlayingNow, t]);
   const dominantColor = useGameColor(
     currentGame?.cardImage || currentGame?.image,
   );
@@ -1376,6 +1390,7 @@ const Home: React.FC = () => {
       setIsAddFriendModalOpen(false);
     } catch (e) {
       notify(e instanceof Error ? e.message : "Erro ao enviar solicitação.", "error");
+      throw e;
     }
   };
 
@@ -1843,7 +1858,10 @@ const Home: React.FC = () => {
               friendProfileLoadingId={friendProfileLoadingId}
               onAcceptRequest={handleAcceptCheckpointFriendRequest}
               onRejectRequest={handleRejectCheckpointFriendRequest}
-              onAddFriendClick={() => setIsAddFriendModalOpen(true)}
+              onAddFriendClick={() => {
+                playSound("select");
+                setIsAddFriendModalOpen(true);
+              }}
             />
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
@@ -2023,6 +2041,7 @@ const Home: React.FC = () => {
                   recentActivity={recentOverviewActivity}
                   onOpenGame={openDetails}
                   onOpenFriends={() => setActiveCategory("FRIENDS")}
+                  t={t}
                 />
               )}
               <AnimatePresence mode="popLayout" initial={false}>
@@ -2121,6 +2140,11 @@ const Home: React.FC = () => {
         isOpen={isAddFriendModalOpen}
         onClose={() => setIsAddFriendModalOpen(false)}
         onAddFriend={handleAddCheckpointFriend}
+        currentUserUid={user?.uid ?? ""}
+        friendIds={checkpointFriendIds}
+        outgoingRequestIds={outgoingFriendRequestIds}
+        incomingRequestIds={incomingFriendRequestIds}
+        playSound={playSound}
         t={t}
       />
 
@@ -2666,7 +2690,7 @@ const FriendsPage: React.FC<{
                 onClick={onAddFriendClick}
                 className="h-10 px-5 rounded-xl bg-white hover:bg-white/90 text-black text-[10px] font-black uppercase tracking-wider transition-all"
               >
-                + Adicionar amigo
+                + {t("addFriendTitle")}
               </button>
               {!discordConnected && (
                 <button
@@ -2783,7 +2807,7 @@ const FriendsPage: React.FC<{
               </p>
               {discordConnected && friends.length === 0 && (
                 <p className="mt-2 text-xs text-white/35">
-                  Clique em Adicionar amigo para enviar uma solicitação.
+                  {t("addFriendEmptyHint")}
                 </p>
               )}
             </div>
@@ -2849,13 +2873,63 @@ const AddFriendModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onAddFriend: (profile: UserProfile) => void;
+  currentUserUid: string;
+  friendIds: Set<string>;
+  outgoingRequestIds: Set<string>;
+  incomingRequestIds: Set<string>;
+  playSound: (type: SoundEffectType) => void;
   t: ReturnType<typeof usePreferences>["t"];
-}> = ({ isOpen, onClose, onAddFriend, t }) => {
+}> = ({
+  isOpen,
+  onClose,
+  onAddFriend,
+  currentUserUid,
+  friendIds,
+  outgoingRequestIds,
+  incomingRequestIds,
+  playSound,
+  t,
+}) => {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [sendingUid, setSendingUid] = useState<string | null>(null);
+
+  const getProfileAction = (profile: UserProfile) => {
+    if (profile.uid === currentUserUid) {
+      return { label: t("addFriendYou"), disabled: true };
+    }
+    if (friendIds.has(profile.uid)) {
+      return { label: t("addFriendAlreadyFriend"), disabled: true };
+    }
+    if (outgoingRequestIds.has(profile.uid)) {
+      return { label: t("addFriendPending"), disabled: true };
+    }
+    if (incomingRequestIds.has(profile.uid)) {
+      return { label: t("addFriendRespond"), disabled: true };
+    }
+    if (sendingUid === profile.uid) {
+      return { label: "...", disabled: true };
+    }
+    return { label: t("addFriendSend"), disabled: false };
+  };
+
+  const handleSendRequest = async (profile: UserProfile) => {
+    const action = getProfileAction(profile);
+    if (action.disabled) return;
+
+    playSound("select");
+    setSendingUid(profile.uid);
+    try {
+      await onAddFriend(profile);
+      setResults((current) => current.filter((item) => item.uid !== profile.uid));
+      setSelectedIndex(0);
+    } finally {
+      setSendingUid(null);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -2879,13 +2953,17 @@ const AddFriendModal: React.FC<{
     e.preventDefault();
     if (!search.trim()) return;
 
+    playSound("search");
     setSearching(true);
     setResults([]);
     setSelectedIndex(0);
 
     try {
       const searchResults = await searchCheckpointFriends(search.trim());
-      setResults(searchResults);
+      const uniqueResults = searchResults
+        .filter((profile) => profile.uid && profile.uid !== currentUserUid)
+        .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index);
+      setResults(uniqueResults);
 
       // Adicionar à lista de pesquisas recentes
       const newRecent = [search.trim(), ...recentSearches.filter(s => s !== search.trim())].slice(0, 5);
@@ -2903,19 +2981,27 @@ const AddFriendModal: React.FC<{
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      playSound("navigate");
       setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      playSound("navigate");
       setSelectedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === 'Enter' && results[selectedIndex]) {
       e.preventDefault();
-      onAddFriend(results[selectedIndex]);
+      handleSendRequest(results[selectedIndex]);
     }
   };
 
   const clearRecentSearches = () => {
+    playSound("back");
     setRecentSearches([]);
     localStorage.removeItem('checkpoint_recent_friend_searches');
+  };
+
+  const handleClose = () => {
+    playSound("back");
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -2932,12 +3018,13 @@ const AddFriendModal: React.FC<{
 
         <div className="relative flex justify-between items-center mb-6">
           <div>
-            <h2 className="text-xl font-black text-white">Adicionar amigo</h2>
-            <p className="text-xs text-white/40 mt-1">Busque por nome de usuário ou email</p>
+            <h2 className="text-xl font-black text-white">{t("addFriendTitle")}</h2>
+            <p className="text-xs text-white/40 mt-1">{t("addFriendHint")}</p>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            onMouseEnter={() => playSound("hover")}
             className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -2951,15 +3038,16 @@ const AddFriendModal: React.FC<{
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Digite o nome ou email do usuário..."
+            placeholder={t("addFriendSearchPlaceholder")}
             className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-12 pr-24 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.05]"
           />
           <button
             type="submit"
             disabled={searching || !search.trim()}
+            onMouseEnter={() => playSound("hover")}
             className="absolute right-2 top-2 bottom-2 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-white/90 disabled:hover:bg-white"
           >
-            {searching ? "..." : "Buscar"}
+            {searching ? "..." : t("addFriendSearchButton")}
           </button>
         </form>
 
@@ -2967,13 +3055,14 @@ const AddFriendModal: React.FC<{
         {recentSearches.length > 0 && !search && !results.length && (
           <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white/70">Pesquisas recentes</h3>
+              <h3 className="text-sm font-bold text-white/70">{t("addFriendRecentSearches")}</h3>
               <button
                 type="button"
                 onClick={clearRecentSearches}
+                onMouseEnter={() => playSound("hover")}
                 className="text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider"
               >
-                Limpar
+                {t("addFriendClear")}
               </button>
             </div>
             <div className="space-y-2">
@@ -2981,7 +3070,11 @@ const AddFriendModal: React.FC<{
                 <button
                   key={index}
                   type="button"
-                  onClick={() => setSearch(recentSearch)}
+                  onClick={() => {
+                    playSound("navigate");
+                    setSearch(recentSearch);
+                  }}
+                  onMouseEnter={() => playSound("hover")}
                   className="w-full text-left p-2 rounded-lg hover:bg-white/5 text-sm text-white/60 hover:text-white transition-colors"
                 >
                   <Search className="inline w-3 h-3 mr-2 text-white/30" />
@@ -2997,58 +3090,69 @@ const AddFriendModal: React.FC<{
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin mx-auto mb-3"></div>
-                <div className="text-sm text-white/40">Buscando usuários...</div>
+                <div className="text-sm text-white/40">{t("addFriendSearching")}</div>
               </div>
             </div>
           ) : results.length > 0 ? (
-            results.map((profile, index) => (
-              <div
-                key={profile.uid}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
-                    ? 'bg-white/[0.08] border-white/20'
-                    : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06]'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-white/10 overflow-hidden border border-white/10">
-                    {profile.photoURL ? (
-                      <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Users className="w-6 h-6 text-white/50" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-white">{profile.displayName || "Usuário"}</div>
-                    <div className="text-[11px] text-white/40">{profile.email}</div>
-                    {profile.status && (
-                      <div className="text-[10px] text-white/30 uppercase tracking-wider mt-1">
-                        {profile.status === "online" ? "🟢 Online" : profile.status === "playing" ? `🎮 Jogando ${profile.playing || ""}` : "⚫ Offline"}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onAddFriend(profile)}
-                  className="h-10 px-6 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-black uppercase tracking-wider transition-all hover:scale-105 active:scale-95"
+            results.map((profile, index) => {
+              const action = getProfileAction(profile);
+
+              return (
+                <div
+                  key={profile.uid}
+                  onMouseEnter={() => playSound("hover")}
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
+                      ? 'bg-white/[0.08] border-white/20'
+                      : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06]'
+                    }`}
                 >
-                  Enviar
-                </button>
-              </div>
-            ))
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="w-12 h-12 shrink-0 rounded-full bg-white/10 overflow-hidden border border-white/10">
+                      {profile.photoURL ? (
+                        <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Users className="w-6 h-6 text-white/50" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-bold text-sm text-white">{profile.displayName || "Usuario"}</div>
+                      <div className="truncate text-[11px] text-white/40">{profile.email}</div>
+                      {profile.status && (
+                        <div className="text-[10px] text-white/30 uppercase tracking-wider mt-1">
+                          {profile.status === "online"
+                            ? t("addFriendOnline")
+                            : profile.status === "playing"
+                              ? `${t("addFriendPlaying")} ${profile.playing || ""}`
+                              : t("addFriendOffline")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSendRequest(profile)}
+                    onMouseEnter={() => playSound("hover")}
+                    disabled={action.disabled}
+                    className="h-10 min-w-[94px] px-5 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-wider transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {action.label}
+                  </button>
+                </div>
+              );
+            })
           ) : search.trim() && !searching ? (
             <div className="text-center py-12">
               <Users className="w-12 h-12 mx-auto mb-4 text-white/20" />
-              <div className="text-sm text-white/40 mb-2">Nenhum usuário encontrado</div>
-              <div className="text-xs text-white/30">Verifique se o nome ou email está correto</div>
+              <div className="text-sm text-white/40 mb-2">{t("addFriendNoResults")}</div>
+              <div className="text-xs text-white/30">{t("addFriendNoResultsHint")}</div>
             </div>
           ) : (
             <div className="text-center py-12">
               <Search className="w-12 h-12 mx-auto mb-4 text-white/20" />
-              <div className="text-sm text-white/40 mb-2">Busque por amigos</div>
-              <div className="text-xs text-white/30">Digite o nome ou email para encontrar usuários</div>
+              <div className="text-sm text-white/40 mb-2">{t("addFriendEmpty")}</div>
+              <div className="text-xs text-white/30">{t("addFriendEmptyHint")}</div>
             </div>
           )}
         </div>
@@ -3056,7 +3160,7 @@ const AddFriendModal: React.FC<{
         {results.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/5">
             <div className="text-[10px] text-white/30 text-center">
-              Use ↑↓ para navegar, Enter para enviar solicitação
+              {t("addFriendKeyboardHint")}
             </div>
           </div>
         )}
