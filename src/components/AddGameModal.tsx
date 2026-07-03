@@ -18,6 +18,7 @@ import ModalShell from "./ui/ModalShell";
 import GameCard from "./GameCard";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
+import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import { useNotification } from "./NotificationCenter";
 import {
   userGamesCollectionRef,
@@ -44,8 +45,8 @@ const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
   <img
     width={96}
     height={96}
-    src="https://img.icons8.com/windows/96/epic-games--v1.png"
-    alt="epic-games--v1"
+    src={EPIC_GAMES_ICON_PATH}
+    alt="Epic Games"
     className={className}
     style={{ filter: "invert(1)" }}
   />

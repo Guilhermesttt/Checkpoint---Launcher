@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
+import { EPIC_GAMES_ICON_PATH } from "../../constants/assets";
 
 const integrations = [
   {
@@ -15,7 +16,7 @@ const integrations = [
   },
   {
     name: "Epic Games",
-    image: "https://img.icons8.com/windows/96/epic-games--v1.png",
+    image: EPIC_GAMES_ICON_PATH,
     description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
     statusLabel: "Disponível em análise",
     statusClassName: "text-yellow-400",
@@ -107,7 +108,7 @@ export function IntegrationsSection() {
                   ) : integration.image ? (
                     <img
                       src={integration.image}
-                      alt="epic-games--v1"
+                      alt="Epic Games"
                       className="h-15 w-15 object-contain invert"
                     />
                   ) : (

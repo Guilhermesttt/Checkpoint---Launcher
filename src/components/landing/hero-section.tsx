@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
+import { EPIC_GAMES_ICON_PATH } from "../../constants/assets";
 
 const words = ["organizar", "lançar", "descobrir", "jogar"];
 
@@ -172,8 +173,8 @@ export function HeroSection() {
                   <img
                     width={96}
                     height={96}
-                    src="https://img.icons8.com/windows/96/epic-games--v1.png"
-                    alt="epic-games--v1"
+                    src={EPIC_GAMES_ICON_PATH}
+                    alt="Epic Games"
                     className="h-9 w-9 object-contain invert"
                   />
                 </span>

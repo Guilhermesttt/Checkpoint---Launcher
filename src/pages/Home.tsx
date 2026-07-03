@@ -53,6 +53,7 @@ import ContextMenu from "../components/ContextMenu";
 import DynamicBackground from "../components/DynamicBackground";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
 import { useNotification } from "../components/NotificationCenter";
 import Stepper, { Step } from "../components/ReactBits/Stepper";
 import GlassButton from "../components/ui/GlassButton";
@@ -101,6 +102,7 @@ import {
   userGameDocRef,
   userGamesCollectionRef,
 } from "../services/firestorePaths";
+import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
@@ -118,8 +120,8 @@ const EpicBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties 
   <img
     width={96}
     height={96}
-    src="https://img.icons8.com/windows/96/epic-games--v1.png"
-    alt="epic-games--v1"
+    src={EPIC_GAMES_ICON_PATH}
+    alt="Epic Games"
     className={className}
     style={{ filter: "invert(1)", ...style }}
   />
@@ -1008,6 +1010,63 @@ const Home: React.FC = () => {
       ? Math.min(Math.max(selectedIndex, 0), displayGames.length - 1)
       : 0;
   const currentGame = displayGames[canonicalIndex];
+  const continuePlayingGames = useMemo(
+    () =>
+      [...games]
+        .filter((game) => Boolean(game.lastPlayedAt || game.steamLastPlayedAt || game.hoursPlayed))
+        .sort((a, b) => {
+          const aPlayed = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
+          const bPlayed = new Date(b.lastPlayedAt || b.steamLastPlayedAt || 0).getTime();
+          if (aPlayed !== bPlayed) return bPlayed - aPlayed;
+          return (b.hoursPlayed || 0) - (a.hoursPlayed || 0);
+        })
+        .slice(0, 3),
+    [games],
+  );
+  const favoriteShowcaseGames = useMemo(
+    () =>
+      [...games]
+        .filter((game) => game.isFavorite)
+        .sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0))
+        .slice(0, 4),
+    [games],
+  );
+  const friendsPlayingNow = useMemo(
+    () => socialFriends.filter((friend) => friend.status === "playing").slice(0, 4),
+    [socialFriends],
+  );
+  const recentOverviewActivity = useMemo(() => {
+    const items: Array<{ id: string; title: string; detail: string; tone: "accent" | "success" | "muted" }> = [];
+
+    friendsPlayingNow.forEach((friend) => {
+      items.push({
+        id: `friend-${friend.id}`,
+        title: `${friend.name} entrou em jogo`,
+        detail: friend.playing ? `Agora está jogando ${friend.playing}.` : "Está online no Checkpoint.",
+        tone: "success",
+      });
+    });
+
+    continuePlayingGames.forEach((game) => {
+      items.push({
+        id: `game-${game.id}`,
+        title: `Você voltou para ${game.title}`,
+        detail: `${game.hoursPlayed || 0}h registradas na biblioteca.`,
+        tone: "accent",
+      });
+    });
+
+    favoriteShowcaseGames.slice(0, 2).forEach((game) => {
+      items.push({
+        id: `favorite-${game.id}`,
+        title: `${game.title} segue entre seus favoritos`,
+        detail: "Bom candidato para voltar a jogar em uma sessão rápida.",
+        tone: "muted",
+      });
+    });
+
+    return items.slice(0, 5);
+  }, [continuePlayingGames, favoriteShowcaseGames, friendsPlayingNow]);
   const dominantColor = useGameColor(
     currentGame?.cardImage || currentGame?.image,
   );
@@ -1844,7 +1903,7 @@ const Home: React.FC = () => {
           ) : (
             <>
               <motion.div
-                className="px-10 pb-7 shrink-0"
+                className="px-10 pb-4 shrink-0"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
@@ -1860,7 +1919,7 @@ const Home: React.FC = () => {
                   >
                     <div className="min-w-0 flex-1">
                       <p
-                        className="text-[10px] font-black uppercase tracking-[0.28em] mb-2.5"
+                        className="mb-2 text-[10px] font-black uppercase tracking-[0.28em]"
                         style={{ color: "rgba(255,255,255,0.25)" }}
                       >
                         {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1}
@@ -1869,7 +1928,7 @@ const Home: React.FC = () => {
                       <h1
                         className="font-black tracking-tighter text-white uppercase leading-none"
                         style={{
-                          fontSize: "clamp(2.8rem, 5.5vw, 5.5rem)",
+                          fontSize: "clamp(2.5rem, 5vw, 4.8rem)",
                           textShadow: "0 8px 48px rgba(0,0,0,0.85)",
                           maxWidth: "75vw",
                           overflow: "hidden",
@@ -1879,7 +1938,7 @@ const Home: React.FC = () => {
                       >
                         {currentGame?.title}
                       </h1>
-                      <div className="flex items-center gap-4 mt-3.5 flex-wrap">
+                      <div className="mt-2.5 flex items-center gap-4 flex-wrap">
                         {currentGame?.launcherType === "steam" && (
                           <span
                             className="flex items-center gap-1.5 text-[11px] font-bold"
@@ -1907,7 +1966,7 @@ const Home: React.FC = () => {
                     <button
                       onClick={() => currentGame && openDetails(currentGame)}
                       onMouseEnter={() => playSound("hover")}
-                      className="shrink-0 flex items-center gap-3 px-8 py-4 rounded-full font-black text-[13px] tracking-wider uppercase relative overflow-hidden group transition-all duration-500"
+                      className="relative shrink-0 flex items-center gap-3 overflow-hidden rounded-full px-7 py-3 font-black text-[12px] tracking-wider uppercase transition-all duration-500 group"
                       style={{
                         background: "var(--game-color, rgba(255,255,255,1))",
                         color: "var(--game-text-color, #08080f)",
@@ -1955,10 +2014,20 @@ const Home: React.FC = () => {
                 </AnimatePresence>
               </motion.div>
 
-              <div className="shrink-0 pb-14">
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.div
-                    key={activeCategory}
+            <div className="shrink-0 pb-14">
+              {activeCategory === "ALL" && (
+                <HomeOverviewPanels
+                  continuePlaying={continuePlayingGames}
+                  favoriteGames={favoriteShowcaseGames}
+                  friendsPlaying={friendsPlayingNow}
+                  recentActivity={recentOverviewActivity}
+                  onOpenGame={openDetails}
+                  onOpenFriends={() => setActiveCategory("FRIENDS")}
+                />
+              )}
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.div
+                  key={activeCategory}
                     initial={{ opacity: 0, y: 28 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 14 }}

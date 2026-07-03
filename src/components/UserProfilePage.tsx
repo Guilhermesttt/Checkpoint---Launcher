@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Clock, Gamepad2, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
+import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { Game, UserProfile } from "../types/domain";
 
 interface UserProfilePageProps {
@@ -15,8 +16,8 @@ const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
   <img
     width={96}
     height={96}
-    src="https://img.icons8.com/windows/96/epic-games--v1.png"
-    alt="epic-games--v1"
+    src={EPIC_GAMES_ICON_PATH}
+    alt="Epic Games"
     className={className}
     style={{ filter: "invert(1)" }}
   />
