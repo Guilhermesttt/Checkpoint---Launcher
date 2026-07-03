@@ -17,6 +17,7 @@ const AppContent: React.FC = () => {
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const musicFadeRef = React.useRef<number | null>(null);
   const musicStartTimerRef = React.useRef<number | null>(null);
+  const pendingMusicStartRef = React.useRef(false);
 
   const clearMusicFade = React.useCallback(() => {
     if (musicFadeRef.current) {
@@ -61,8 +62,12 @@ const AppContent: React.FC = () => {
     audio.volume = 0;
     audio
       .play()
-      .then(() => fadeMusicTo(musicVolume / 100, 1800))
+      .then(() => {
+        pendingMusicStartRef.current = false;
+        fadeMusicTo(musicVolume / 100, 1800);
+      })
       .catch(() => {
+        pendingMusicStartRef.current = true;
         return;
       });
   }, [fadeMusicTo, musicVolume]);
@@ -113,6 +118,22 @@ const AppContent: React.FC = () => {
     return () =>
       window.removeEventListener("checkpoint:game-launch", stopBackgroundMusic);
   }, [stopBackgroundMusic]);
+
+  React.useEffect(() => {
+    if (!user?.uid) return;
+    const retryMusicStart = () => {
+      if (pendingMusicStartRef.current || !musicRef.current || musicRef.current.paused) {
+        startBackgroundMusic();
+      }
+    };
+
+    window.addEventListener("pointerdown", retryMusicStart);
+    window.addEventListener("keydown", retryMusicStart);
+    return () => {
+      window.removeEventListener("pointerdown", retryMusicStart);
+      window.removeEventListener("keydown", retryMusicStart);
+    };
+  }, [startBackgroundMusic, user?.uid]);
 
   React.useEffect(() => {
     const audio = musicRef.current;

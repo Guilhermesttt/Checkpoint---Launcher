@@ -261,20 +261,20 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const [language, setLanguage] = useState<LauncherLanguage>("pt-BR");
-  const [effectsVolume, setEffectsVolume] = useState(35);
-  const [musicVolume, setMusicVolume] = useState(8);
+  const [effectsVolume, setEffectsVolume] = useState(30);
+  const [musicVolume, setMusicVolume] = useState(9);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps2");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
 
   useEffect(() => {
     if (!user?.uid) return;
     const savedLanguage = localStorage.getItem(prefKey(user.uid, "language"));
-    const savedEffectsVolume = Number(
-      localStorage.getItem(prefKey(user.uid, "effects_volume")),
-    );
-    const savedMusicVolume = Number(
-      localStorage.getItem(prefKey(user.uid, "music_volume")),
-    );
+    const savedEffectsVolumeRaw = localStorage.getItem(prefKey(user.uid, "effects_volume"));
+    const savedMusicVolumeRaw = localStorage.getItem(prefKey(user.uid, "music_volume"));
+    const savedEffectsVolume =
+      savedEffectsVolumeRaw == null ? null : Number(savedEffectsVolumeRaw);
+    const savedMusicVolume =
+      savedMusicVolumeRaw == null ? null : Number(savedMusicVolumeRaw);
     const savedSoundTheme = localStorage.getItem(prefKey(user.uid, "sound_theme"));
     const savedVisualTheme = localStorage.getItem(prefKey(user.uid, "visual_theme"));
 
@@ -285,10 +285,10 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     ) {
       setLanguage(savedLanguage);
     }
-    if (Number.isFinite(savedEffectsVolume)) {
+    if (savedEffectsVolume != null && Number.isFinite(savedEffectsVolume)) {
       setEffectsVolume(clampVolume(savedEffectsVolume));
     }
-    if (Number.isFinite(savedMusicVolume)) {
+    if (savedMusicVolume != null && Number.isFinite(savedMusicVolume)) {
       setMusicVolume(clampVolume(savedMusicVolume));
     }
     if (savedSoundTheme === "ps2" || savedSoundTheme === "gamecube") {

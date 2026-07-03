@@ -148,6 +148,8 @@ interface SocialFriend {
   name: string;
   status: "online" | "playing" | "offline";
   playing?: string;
+  avatar?: string;
+  source?: "discord" | "local";
 }
 
 interface PriceAlert {
@@ -372,6 +374,7 @@ const Home: React.FC = () => {
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [socialFriends, setSocialFriends] = useState<SocialFriend[]>([]);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [localSocialStateLoaded, setLocalSocialStateLoaded] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -454,6 +457,7 @@ const Home: React.FC = () => {
     if (!user?.uid) {
       setSocialFriends([]);
       setPriceAlerts([]);
+      setLocalSocialStateLoaded(false);
       return;
     }
     setSocialFriends(
@@ -462,17 +466,47 @@ const Home: React.FC = () => {
     setPriceAlerts(
       JSON.parse(localStorage.getItem(`checkpoint_price_alerts_${user.uid}`) || "[]"),
     );
+    setLocalSocialStateLoaded(true);
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !localSocialStateLoaded) return;
     localStorage.setItem(`checkpoint_social_friends_${user.uid}`, JSON.stringify(socialFriends));
-  }, [socialFriends, user?.uid]);
+  }, [localSocialStateLoaded, socialFriends, user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!localSocialStateLoaded) return;
+    if (!resolvedDiscordId) {
+      setSocialFriends((current) =>
+        current.filter((friend) => friend.source !== "discord"),
+      );
+      return;
+    }
+
+    setSocialFriends((current) => {
+      const discordFriend: SocialFriend = {
+        id: `discord:${resolvedDiscordId}`,
+        name: userProfile?.discordUsername || "Discord",
+        status: "online",
+        avatar: userProfile?.discordAvatar || undefined,
+        source: "discord",
+      };
+      const withoutDiscord = current.filter(
+        (friend) => friend.id !== discordFriend.id && friend.source !== "discord",
+      );
+      return [discordFriend, ...withoutDiscord];
+    });
+  }, [
+    localSocialStateLoaded,
+    resolvedDiscordId,
+    userProfile?.discordAvatar,
+    userProfile?.discordUsername,
+  ]);
+
+  useEffect(() => {
+    if (!user?.uid || !localSocialStateLoaded) return;
     localStorage.setItem(`checkpoint_price_alerts_${user.uid}`, JSON.stringify(priceAlerts));
-  }, [priceAlerts, user?.uid]);
+  }, [localSocialStateLoaded, priceAlerts, user?.uid]);
 
   useEffect(() => {
     const migrate = async () => {
@@ -904,6 +938,7 @@ const Home: React.FC = () => {
         name: `${names[current.length % names.length]}#${String(1000 + current.length).padStart(4, "0")}`,
         status: current.length % 2 === 0 ? "playing" : "online",
         playing: sampleGame,
+        source: "local",
       },
       ...current,
     ]);
@@ -1995,7 +2030,7 @@ const FriendsPage: React.FC<{
             onClick={discordConnected ? onAddDemoFriend : onConnectDiscord}
             className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
           >
-            {discordConnected ? "Fixar amigo" : t("connectDiscord")}
+            {discordConnected ? "Adicionar fixado" : t("connectDiscord")}
           </button>
         </div>
 
@@ -2040,23 +2075,33 @@ const FriendsPage: React.FC<{
             friends.map((friend) => (
               <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center">
-                    <MessageCircle className="w-4 h-4 text-white/70" />
+                  <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center overflow-hidden">
+                    {friend.avatar ? (
+                      <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <MessageCircle className="w-4 h-4 text-white/70" />
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-white truncate">{friend.name}</p>
                     <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
-                      {friend.status === "playing" ? `Jogando ${friend.playing || "agora"}` : friend.status}
+                    {friend.source === "discord"
+                      ? "Discord conectado"
+                      : friend.status === "playing"
+                        ? `Jogando ${friend.playing || "agora"}`
+                        : friend.status}
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onRemoveFriend(friend.id)}
-                  className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
-                >
-                  Remover
-                </button>
+                {friend.source !== "discord" && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFriend(friend.id)}
+                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
+                  >
+                    Remover
+                  </button>
+                )}
               </div>
             ))
           )}
