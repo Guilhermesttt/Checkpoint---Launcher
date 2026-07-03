@@ -1756,8 +1756,12 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
           pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
           pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]);
         const cardImage = pickEpicImage(keyImages, ["tall", "thumbnail", "box"]) || image;
-        const slug = String(item?.productSlug ?? item?.urlSlug ?? "").replace(/\/home$/, "").trim();
-        const productUrl = slug ? `https://store.epicgames.com/pt-BR/p/${slug}` : "";
+        const slug = String(item?.productSlug ?? item?.urlSlug ?? "")
+          .replace(/^\/?([a-z]{2}-[A-Z]{2}\/)?p\//, "")
+          .replace(/\/home$/, "")
+          .replace(/^\/+|\/+$/g, "")
+          .trim();
+        const productUrl = slug ? `https://store.epicgames.com/p/${slug}` : "";
 
         return {
           id: catalogId,
