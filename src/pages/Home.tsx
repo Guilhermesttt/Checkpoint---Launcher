@@ -104,6 +104,7 @@ import {
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
 const GameWall = React.lazy(() => import("../components/GameWall"));
+const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
 
 const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
@@ -111,6 +112,7 @@ const CATEGORIES = [
   { id: "FRIENDS", label: "Amigos", Icon: Users },
   { id: "DEALS", label: "Ofertas", Icon: BadgeDollarSign },
   { id: "WALL", label: "Game Wall", Icon: Layers },
+  { id: "PROFILE", label: "Perfil", Icon: User },
   { id: "STEAM", label: "Steam", Icon: Zap },
   { id: "EPIC", label: "Epic", Icon: Globe },
   { id: "LOCAL", label: "Local", Icon: Gamepad2 },
@@ -127,7 +129,7 @@ const CATEGORIES = [
 ];
 
 const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL", "WALL"].includes(id),
+  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL", "WALL", "PROFILE"].includes(id),
 );
 
 const normalizeCategory = (v?: string) =>
@@ -1682,6 +1684,10 @@ const Home: React.FC = () => {
               }}
               onSyncSteam={handleSyncSteam}
               onSyncEpic={handleSyncEpic}
+              steamAvatar={userProfile?.steamAvatar}
+              steamUsername={userProfile?.steamUsername}
+              epicAvatar={userProfile?.epicAvatar}
+              epicUsername={userProfile?.epicUsername}
             />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
@@ -1716,9 +1722,22 @@ const Home: React.FC = () => {
                   }}
                   selectedGame={selectedGame}
                   className="h-full"
+                  playSound={playSound}
                 />
               </React.Suspense>
             </div>
+          ) : activeCategory === "PROFILE" ? (
+            <React.Suspense fallback={
+              <div className="flex items-center justify-center flex-1">
+                <div className="text-white/40">Carregando perfil...</div>
+              </div>
+            }>
+              <UserProfilePage
+                userProfile={userProfile}
+                user={user}
+                games={games}
+              />
+            </React.Suspense>
           ) : activeCategory === "DEALS" ? (
             <PriceAlertsPage
               t={t}
@@ -2094,6 +2113,10 @@ const SettingsPageV2: React.FC<{
   onDisconnectDiscord: () => void;
   onSyncSteam: () => void;
   onSyncEpic: () => void;
+  steamAvatar?: string;
+  steamUsername?: string;
+  epicAvatar?: string;
+  epicUsername?: string;
 }> = ({
   language,
   effectsVolume,
@@ -2125,6 +2148,10 @@ const SettingsPageV2: React.FC<{
   onDisconnectDiscord,
   onSyncSteam,
   onSyncEpic,
+  steamAvatar,
+  steamUsername,
+  epicAvatar,
+  epicUsername,
 }) => (
     <SystemPageShell eyebrow={t("system")} title={t("settings")}>
       <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
@@ -2136,13 +2163,17 @@ const SettingsPageV2: React.FC<{
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-white/60" />
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
+                {steamAvatar ? (
+                  <img src={steamAvatar} alt="Steam" className="w-full h-full object-cover" />
+                ) : (
+                  <Zap className="w-4 h-4 text-white/60" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Steam</p>
-                <p className="text-[10px] text-white/40">
-                  {steamConnected ? t("connected") : t("notConnected")}
+                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
+                  {steamConnected ? (steamUsername || t("connected")) : t("notConnected")}
                 </p>
               </div>
             </div>
@@ -2175,13 +2206,17 @@ const SettingsPageV2: React.FC<{
 
           <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                <Globe className="w-4 h-4 text-white/60" />
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
+                {epicAvatar ? (
+                  <img src={epicAvatar} alt="Epic" className="w-full h-full object-cover" />
+                ) : (
+                  <Globe className="w-4 h-4 text-white/60" />
+                )}
               </div>
               <div>
                 <p className="text-sm font-bold text-white">Epic Games</p>
-                <p className="text-[10px] text-white/40">
-                  {epicConnected ? t("connected") : t("notConnected")}
+                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
+                  {epicConnected ? (epicUsername || t("connected")) : t("notConnected")}
                 </p>
               </div>
             </div>

@@ -44,6 +44,10 @@ export interface UserProfile {
   discordId?: string;
   discordUsername?: string;
   discordAvatar?: string;
+  steamAvatar?: string;
+  steamUsername?: string;
+  epicAvatar?: string;
+  epicUsername?: string;
   status?: "online" | "playing" | "offline";
   playing?: string | null;
   discordFriends?: Array<{
