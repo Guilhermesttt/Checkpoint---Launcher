@@ -2,6 +2,7 @@
 import { Play, Star } from "lucide-react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSteam } from '@fortawesome/free-brands-svg-icons';
+import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 
 interface GameCardProps {
   title: string;
@@ -11,6 +12,7 @@ interface GameCardProps {
   onContextMenu?: (e: React.MouseEvent) => void;
   isFavorite?: boolean;
   isSteam?: boolean;
+  isEpic?: boolean;
 }
 
 const GameCard: React.FC<GameCardProps> = ({
@@ -21,7 +23,31 @@ const GameCard: React.FC<GameCardProps> = ({
   onContextMenu,
   isFavorite = false,
   isSteam = false,
+  isEpic = false,
 }) => {
+  const platformBadge = isSteam
+    ? {
+        label: "Steam",
+        color: "#67b676",
+        border: "rgba(103,182,118,0.35)",
+        icon: <FontAwesomeIcon icon={faSteam} className="w-2.5 h-2.5" style={{ color: "#67b676" }} />,
+      }
+    : isEpic
+      ? {
+          label: "Epic",
+          color: "#f5f5f5",
+          border: "rgba(255,255,255,0.3)",
+          icon: (
+            <img
+              src={EPIC_GAMES_ICON_PATH}
+              alt=""
+              className="w-2.5 h-2.5 object-contain"
+              style={{ filter: "invert(1)" }}
+            />
+          ),
+        }
+      : null;
+
   return (
     <div
       onClick={onClick}
@@ -95,24 +121,24 @@ const GameCard: React.FC<GameCardProps> = ({
           )}
 
           <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">
-            {isSteam && (
+            {platformBadge && (
               <div
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full"
                 style={{
                   background: "rgba(0,0,0,0.55)",
-                  border: "1px solid rgba(103,182,118,0.35)",
+                  border: `1px solid ${platformBadge.border}`,
                 }}
               >
-                <FontAwesomeIcon icon={faSteam} className="w-2.5 h-2.5" style={{ color: "#67b676" }} />
+                {platformBadge.icon}
                 <span
                   className="text-[8px] font-black tracking-wider uppercase"
-                  style={{ color: "#67b676" }}
+                  style={{ color: platformBadge.color }}
                 >
-                  Steam
+                  {platformBadge.label}
                 </span>
               </div>
             )}
-            {!isSteam && <div />}
+            {!platformBadge && <div />}
             {isFavorite && (
               <div
                 className="w-6 h-6 rounded-full flex items-center justify-center"

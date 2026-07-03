@@ -15,7 +15,7 @@ export const launchGame = async (game: Game): Promise<void> => {
 
   // Epic Games
   if (game.launcherType === "epic" || game.epicCatalogId) {
-    const epicId = game.epicCatalogId ?? game.executablePath;
+    const epicId = game.executablePath ?? game.epicCatalogId;
     if (!epicId) throw new Error("Epic Catalog ID não encontrado para esse jogo.");
     window.location.assign(`com.epicgames.launcher://apps/${epicId}?action=launch&silent=true`);
     return;

@@ -49,7 +49,8 @@ const GameCardSlot = React.memo(
           title={game.title}
           image={game.cardImage || game.image}
           isActive={isActive}
-          isSteam={game.source === "steam"}
+          isSteam={game.source === "steam" || game.launcherType === "steam"}
+          isEpic={game.source === "epic" || game.launcherType === "epic"}
           isFavorite={game.isFavorite}
           onClick={handleClick}
           onContextMenu={handleContextMenu}
@@ -63,6 +64,7 @@ const GameCardSlot = React.memo(
     prev.game.cardImage === next.game.cardImage &&
     prev.game.image === next.game.image &&
     prev.game.source === next.game.source &&
+    prev.game.launcherType === next.game.launcherType &&
     prev.game.isFavorite === next.game.isFavorite &&
     prev.index === next.index &&
     prev.isActive === next.isActive,

@@ -380,6 +380,34 @@ const EPIC_CATALOG_ITEM_QUERY = `
   }
 `;
 
+const EPIC_SEARCH_STORE_QUERY = `
+  query searchStoreQuery($keywords: String, $locale: String, $country: String!, $count: Int, $start: Int) {
+    Catalog {
+      searchStore(keywords: $keywords, locale: $locale, country: $country, count: $count, start: $start) {
+        elements {
+          id
+          namespace
+          title
+          description
+          productSlug
+          urlSlug
+          seller {
+            name
+          }
+          keyImages {
+            type
+            url
+          }
+          customAttributes {
+            key
+            value
+          }
+        }
+      }
+    }
+  }
+`;
+
 const pickEpicImage = (images, preferredTypes) => {
   if (!Array.isArray(images) || images.length === 0) return "";
   const normalized = images.filter((image) => typeof image?.url === "string" && image.url);
@@ -446,13 +474,27 @@ const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
     )
     .map((image) => image.url);
 
+  const namespace = String(ownedEntry?.namespace ?? catalogItem?.namespace ?? epicSandboxId ?? "");
+  const catalogId = String(ownedEntry?.itemId ?? catalogItem?.id ?? "");
+  const artifactId = String(
+    ownedEntry?.artifactId ??
+      ownedEntry?.artifact_id ??
+      ownedEntry?.appName ??
+      ownedEntry?.app_name ??
+      "",
+  ).trim();
+  const launchId =
+    namespace && catalogId && artifactId
+      ? encodeURIComponent(`${namespace}:${catalogId}:${artifactId}`)
+      : catalogId;
+
   return {
-    namespace: String(ownedEntry?.namespace ?? catalogItem?.namespace ?? epicSandboxId ?? ""),
-    catalogId: String(ownedEntry?.itemId ?? catalogItem?.id ?? ""),
+    namespace,
+    catalogId,
     title:
       String(catalogItem?.title ?? "").trim() ||
       String(customAttributes?.productName ?? "").trim() ||
-      `Epic Item ${String(ownedEntry?.itemId ?? "").trim()}`,
+      `Epic Item ${catalogId}`,
     image:
       pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
       pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]),
@@ -461,7 +503,7 @@ const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
     logoImage: pickEpicImage(keyImages, ["logo"]),
     description:
       String(customAttributes?.shortDescription ?? "").trim() ||
-      `Importado da Epic Games. Catalog ID ${String(ownedEntry?.itemId ?? "").trim()}.`,
+      `Importado da Epic Games. Catalog ID ${catalogId}.`,
     aboutTheGame: String(customAttributes?.aboutThisGame ?? "").trim(),
     releaseDate: String(customAttributes?.releaseDate ?? "").trim(),
     developer:
@@ -477,7 +519,52 @@ const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
       : [],
     screenshots,
     offerSlug: String(catalogItem?.offers?.[0]?.urlSlug ?? "").trim(),
-    executablePath: String(ownedEntry?.itemId ?? "").trim(),
+    executablePath: launchId,
+  };
+};
+
+const buildEpicDetails = (catalogId, namespace, catalogItem) => {
+  const customAttributes = extractEpicCustomAttributes(catalogItem?.customAttributes);
+  const keyImages = Array.isArray(catalogItem?.keyImages) ? catalogItem.keyImages : [];
+  const screenshots = keyImages
+    .filter(
+      (image) =>
+        typeof image?.url === "string" &&
+        typeof image?.type === "string" &&
+        image.type.toLowerCase().includes("screenshot"),
+    )
+    .map((image) => image.url);
+
+  return {
+    catalogId,
+    namespace,
+    title:
+      String(catalogItem?.title ?? "").trim() ||
+      String(customAttributes?.productName ?? "").trim() ||
+      catalogId,
+    image:
+      pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
+      pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]),
+    backgroundImage: pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]),
+    cardImage: pickEpicImage(keyImages, ["tall", "thumbnail", "box"]),
+    logoImage: pickEpicImage(keyImages, ["logo"]),
+    description:
+      String(customAttributes?.shortDescription ?? "").trim() ||
+      String(catalogItem?.description ?? "").trim(),
+    aboutTheGame: String(customAttributes?.aboutThisGame ?? "").trim(),
+    releaseDate: String(customAttributes?.releaseDate ?? "").trim(),
+    developer:
+      String(customAttributes?.developerName ?? "").trim() ||
+      String(customAttributes?.developerDisplayName ?? "").trim(),
+    publisher:
+      String(customAttributes?.publisherName ?? "").trim() ||
+      String(customAttributes?.publisherDisplayName ?? "").trim(),
+    tags: Array.isArray(catalogItem?.categories)
+      ? catalogItem.categories
+          .map((category) => String(category?.path ?? "").split("/").pop())
+          .filter(Boolean)
+      : [],
+    screenshots,
   };
 };
 
@@ -1616,6 +1703,108 @@ const handleSteamSearch = async (req, res) => {
 
 app.get("/api/steam/search", steamPublicLimiter, handleSteamSearch);
 app.get("/api/steam/search-games", steamPublicLimiter, handleSteamSearch);
+
+app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
+  const query = String(req.query.query ?? "").trim();
+  if (query.length < 2) {
+    res.status(400).json({ error: "Query de busca muito curta." });
+    return;
+  }
+
+  try {
+    const response = await fetch(epicStoreGraphqlEndpoint, {
+      method: "POST",
+      headers: {
+        ...steamStoreFetchHeaders,
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json;charset=UTF-8",
+        "Origin": "https://store.epicgames.com",
+        "Referer": "https://store.epicgames.com/pt-BR/browse",
+      },
+      body: JSON.stringify({
+        query: EPIC_SEARCH_STORE_QUERY,
+        variables: {
+          keywords: query,
+          locale: "pt-BR",
+          country: "BR",
+          count: 12,
+          start: 0,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      res.status(502).json({
+        error: `Falha na busca Epic Games Store (status ${response.status}).`,
+      });
+      return;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+      res.status(502).json({ error: "GraphQL da Epic retornou erro na busca." });
+      return;
+    }
+
+    const items = (payload?.data?.Catalog?.searchStore?.elements ?? [])
+      .filter((item) => item?.id && item?.title)
+      .map((item) => {
+        const keyImages = Array.isArray(item?.keyImages) ? item.keyImages : [];
+        const namespace = String(item?.namespace ?? "").trim();
+        const catalogId = String(item?.id ?? "").trim();
+        const image =
+          pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
+          pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]);
+        const cardImage = pickEpicImage(keyImages, ["tall", "thumbnail", "box"]) || image;
+
+        return {
+          id: catalogId,
+          namespace,
+          name: String(item.title).trim(),
+          title: String(item.title).trim(),
+          image,
+          tiny_image: cardImage,
+          cardImage,
+          description: String(item?.description ?? "").trim(),
+          productSlug: String(item?.productSlug ?? item?.urlSlug ?? "").trim(),
+        };
+      });
+
+    res.json({ items });
+  } catch {
+    res.status(500).json({ error: "Erro interno ao buscar jogos da Epic Games Store." });
+  }
+});
+
+app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
+  const catalogId = String(req.query.catalogId ?? "").trim();
+  const namespace = String(req.query.namespace ?? epicSandboxId ?? "").trim();
+  if (!catalogId || !namespace) {
+    res.status(400).json({ error: "catalogId ou namespace invÃ¡lido." });
+    return;
+  }
+
+  const cacheKey = `epic_${namespace}_${catalogId}`;
+  const cached = appDetailsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    res.json(cached.data);
+    return;
+  }
+
+  try {
+    const catalogItem = await fetchEpicCatalogItem(namespace, catalogId);
+    if (!catalogItem) {
+      res.status(404).json({ error: "Detalhes nÃ£o encontrados para este item Epic." });
+      return;
+    }
+
+    const result = buildEpicDetails(catalogId, namespace, catalogItem);
+    appDetailsCache.set(cacheKey, { data: result, timestamp: Date.now() });
+    res.json(result);
+  } catch {
+    res.status(500).json({ error: "Erro interno ao buscar detalhes da Epic Games Store." });
+  }
+});
 
 app.get("/api/steam/app-size", steamPublicLimiter, async (req, res) => {
   const appId = String(req.query.appId ?? "").trim();

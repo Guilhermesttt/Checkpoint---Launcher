@@ -24,6 +24,7 @@ const clean = (obj: any) => {
 
 export interface EpicAppDetails {
   catalogId: string;
+  namespace?: string;
   title?: string;
   cardImage?: string;
   backgroundImage?: string;
@@ -195,23 +196,30 @@ export const syncEpicLibraryToFirestore = async (
 
 // Placeholder search and details functions for Epic Games (to be connected to real backend)
 export const searchEpicGames = async (query: string) => {
-  // This will call /api/epic/search on your backend
-  return { items: [] };
+  const response = await fetch(
+    apiUrl(`/api/epic/search?query=${encodeURIComponent(query)}`),
+  );
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Falha ao buscar jogos na Epic Games.");
+  }
+  return (await response.json()) as { items: any[] };
 };
 
 export const fetchEpicAppDetailsResult = async (
-  catalogId: string
+  catalogId: string,
+  namespaceOverride?: string,
 ): Promise<EpicAppDetailsFetchResult> => {
-  // This will call /api/epic/app-details?catalogId=... on your backend
-  return {
-    ok: true,
-    data: {
-      catalogId,
-      title: catalogId,
-      description: "",
-      aboutTheGame: "",
-      backgroundImage: "",
-      cardImage: "",
-    },
-  };
+  const parts = decodeURIComponent(catalogId).split(":");
+  const namespace = namespaceOverride || (parts.length >= 2 ? parts[0] : "");
+  const itemId = parts.length >= 2 ? parts[1] : catalogId;
+  const params = new URLSearchParams({ catalogId: itemId });
+  if (namespace) params.set("namespace", namespace);
+
+  const response = await fetch(apiUrl(`/api/epic/app-details?${params}`));
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, message: payload.error || "Falha ao buscar detalhes da Epic Games." };
+  }
+  return { ok: true, data: (await response.json()) as EpicAppDetails };
 };

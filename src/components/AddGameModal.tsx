@@ -309,23 +309,29 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
+  const normalizeEpicLaunchValue = (value: string) => {
+    const trimmed = value.trim();
+    const match = trimmed.match(/com\.epicgames\.launcher:\/\/apps\/([^?]+)/i);
+    return match?.[1] || trimmed;
+  };
+
   const handleSelectEpicGame = async (game: any) => {
     playSound("select");
-    const catalogId = String(game.id);
+    const catalogId = String(game.launchId || game.id);
     setLoading(true);
     try {
-      const details = await fetchEpicAppDetailsResult(catalogId);
+      const details = await fetchEpicAppDetailsResult(catalogId, game.namespace);
       if (details.ok) {
         const d = details.data;
         setFormData((prev) => ({
           ...prev,
           title: d.title || game.name,
-          image: d.backgroundImage || "",
-          cardImage: d.cardImage || "",
-          backgroundImage: d.backgroundImage || "",
+          image: d.backgroundImage || game.image || game.tiny_image || "",
+          cardImage: d.cardImage || game.cardImage || game.tiny_image || "",
+          backgroundImage: d.backgroundImage || game.image || "",
           logoImage: d.logoImage || "",
-          description: d.description || "",
-          aboutTheGame: d.aboutTheGame || d.description || "",
+          description: d.description || game.description || "",
+          aboutTheGame: d.aboutTheGame || d.description || game.description || "",
           launcherType: "epic",
           executablePath: catalogId,
           steamAppId: "",
@@ -654,13 +660,14 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 </label>
                 <input
                   value={formData.epicCatalogId || ""}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const epicValue = normalizeEpicLaunchValue(e.target.value);
                     setFormData((prev) => ({
                       ...prev,
-                      epicCatalogId: e.target.value,
-                      executablePath: e.target.value,
-                    }))
-                  }
+                      epicCatalogId: epicValue,
+                      executablePath: epicValue,
+                    }));
+                  }}
                   placeholder="Ex: 963138e4ac8f49c58c149b41c2ee0491"
                   className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
                 />
@@ -866,6 +873,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&q=80"
                   }
                   isActive={true}
+                  isSteam={formData.launcherType === "steam"}
+                  isEpic={formData.launcherType === "epic"}
                 />
               </div>
 
