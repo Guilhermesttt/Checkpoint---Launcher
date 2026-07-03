@@ -35,6 +35,7 @@ import {
   Bell,
   Palette,
   BadgeDollarSign,
+  Layers,
 } from "lucide-react";
 import {
   collection,
@@ -91,6 +92,7 @@ import {
   sendCheckpointFriendRequest,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
+import { discordRichPresence, useDiscordRichPresence } from "../services/discordRichPresence";
 import type { Game } from "../types/domain";
 import {
   profileDocRef,
@@ -101,12 +103,14 @@ import {
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
+const GameWall = React.lazy(() => import("../components/GameWall"));
 
 const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "FRIENDS", label: "Amigos", Icon: Users },
   { id: "DEALS", label: "Ofertas", Icon: BadgeDollarSign },
+  { id: "WALL", label: "Game Wall", Icon: Layers },
   { id: "STEAM", label: "Steam", Icon: Zap },
   { id: "EPIC", label: "Epic", Icon: Globe },
   { id: "LOCAL", label: "Local", Icon: Gamepad2 },
@@ -123,7 +127,7 @@ const CATEGORIES = [
 ];
 
 const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL"].includes(id),
+  ["ALL", "FAVORITES", "FRIENDS", "DEALS", "STEAM", "EPIC", "LOCAL", "WALL"].includes(id),
 );
 
 const normalizeCategory = (v?: string) =>
@@ -423,6 +427,13 @@ const Home: React.FC = () => {
     t,
   } = usePreferences();
   const { playSound } = useSoundEffects(effectsVolume / 100, soundTheme);
+  const { 
+    setGameActivity, 
+    setBrowsingActivity, 
+    clearActivity, 
+    setEnabled: setRichPresenceEnabled,
+    isEnabled: isRichPresenceEnabled 
+  } = useDiscordRichPresence();
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
   const resolvedSteamId = useMemo(
@@ -471,6 +482,51 @@ const Home: React.FC = () => {
     );
   }, [user?.uid, userProfile?.onboardingCompletedAt]);
 
+  // Discord Rich Presence: Inicialização
+  useEffect(() => {
+    const initializeRichPresence = async () => {
+      if (resolvedDiscordId && user?.uid) {
+        const success = await discordRichPresence.initialize();
+        if (success) {
+          // Habilitar automaticamente se Discord estiver conectado
+          setRichPresenceEnabled(true);
+          // Definir status inicial como "navegando"
+          await setBrowsingActivity();
+        }
+      }
+    };
+    
+    initializeRichPresence();
+  }, [resolvedDiscordId, user?.uid, setBrowsingActivity, setRichPresenceEnabled]);
+
+  // Discord Rich Presence: Atualizar quando jogo atual mudar
+  useEffect(() => {
+    if (!isRichPresenceEnabled() || !currentPresenceGame) {
+      if (isRichPresenceEnabled() && !currentPresenceGame) {
+        setBrowsingActivity();
+      }
+      return;
+    }
+
+    // Encontrar o jogo que está sendo jogado
+    const playingGame = games.find(game => 
+      game.title.toLowerCase().includes(currentPresenceGame.toLowerCase()) ||
+      currentPresenceGame.toLowerCase().includes(game.title.toLowerCase())
+    );
+
+    if (playingGame) {
+      setGameActivity(playingGame, 'playing');
+    }
+  }, [currentPresenceGame, games, isRichPresenceEnabled, setGameActivity, setBrowsingActivity]);
+
+  // Discord Rich Presence: Limpar quando sair ou desconectar Discord
+  useEffect(() => {
+    if (!resolvedDiscordId || !user?.uid) {
+      clearActivity();
+      setRichPresenceEnabled(false);
+    }
+  }, [resolvedDiscordId, user?.uid, clearActivity, setRichPresenceEnabled]);
+
   useEffect(() => {
     if (!user?.uid) {
       setSocialFriends([]);
@@ -508,6 +564,30 @@ const Home: React.FC = () => {
     const interval = window.setInterval(heartbeat, 45_000);
     return () => window.clearInterval(interval);
   }, [currentPresenceGame, user?.uid]);
+
+  useEffect(() => {
+    const handleGameLaunch = (event: Event) => {
+      const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
+      if (title) {
+        setCurrentPresenceGame(title);
+        
+        // Atualizar Discord Rich Presence imediatamente quando jogo é lançado
+        if (isRichPresenceEnabled()) {
+          const launchedGame = games.find(game => 
+            game.title.toLowerCase().includes(title.toLowerCase()) ||
+            title.toLowerCase().includes(game.title.toLowerCase())
+          );
+          
+          if (launchedGame) {
+            setGameActivity(launchedGame, 'playing');
+          }
+        }
+      }
+    };
+
+    window.addEventListener("checkpoint:game-launch", handleGameLaunch);
+    return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
+  }, [games, setGameActivity, isRichPresenceEnabled]);
 
   useEffect(() => {
     const handleGameLaunch = (event: Event) => {
@@ -1618,6 +1698,24 @@ const Home: React.FC = () => {
               onRejectRequest={handleRejectCheckpointFriendRequest}
               onAddFriendClick={() => setIsAddFriendModalOpen(true)}
             />
+          ) : activeCategory === "WALL" ? (
+            <div className="w-full h-full">
+              <React.Suspense fallback={
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-white/40">Carregando Game Wall...</div>
+                </div>
+              }>
+                <GameWall
+                  games={displayGames}
+                  onGameSelect={openDetails}
+                  onGameHover={(game) => {
+                    // Opcional: implementar hover effects
+                  }}
+                  selectedGame={selectedGame}
+                  className="h-full"
+                />
+              </React.Suspense>
+            </div>
           ) : activeCategory === "DEALS" ? (
             <PriceAlertsPage
               t={t}
@@ -3070,6 +3168,70 @@ const SettingsPage: React.FC<{
                   <span>{copy.mute}</span>
                   <span>{copy.max}</span>
                 </div>
+              </section>
+
+              {/* Nova seção: Discord Rich Presence */}
+              <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+                    <MessageCircle className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Discord Rich Presence</h2>
+                    <p className="text-xs text-white/40">
+                      Mostrar jogo atual no seu status do Discord
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/5">
+                  <div>
+                    <p className="text-sm font-bold text-white">Ativar Rich Presence</p>
+                    <p className="text-xs text-white/40 mt-1">
+                      {resolvedDiscordId 
+                        ? "Discord conectado - Rich Presence disponível" 
+                        : "Conecte o Discord para usar Rich Presence"
+                      }
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRichPresenceEnabled(!isRichPresenceEnabled())}
+                    disabled={!resolvedDiscordId}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      isRichPresenceEnabled() 
+                        ? 'bg-indigo-500' 
+                        : 'bg-white/20'
+                    } ${!resolvedDiscordId ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        isRichPresenceEnabled() ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {isRichPresenceEnabled() && (
+                  <div className="mt-4 p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
+                        <span className="text-xs font-bold text-indigo-300">CP</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">
+                          {currentPresenceGame || "Navegando na biblioteca"}
+                        </p>
+                        <p className="text-xs text-indigo-300">
+                          {currentPresenceGame ? "Jogando via Checkpoint" : "Escolhendo o próximo jogo"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-white/40">
+                      Preview de como aparece no Discord
+                    </p>
+                  </div>
+                )}
               </section>
             </div>
           </div>
