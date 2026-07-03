@@ -81,7 +81,7 @@ const GameCard3D: React.FC<GameCard3DProps> = ({
     >
       {/* Card Container */}
       <div 
-        className={`relative w-48 h-64 rounded-2xl overflow-hidden transition-all duration-300 ${
+        className={`relative w-44 h-60 rounded-2xl overflow-hidden transition-all duration-300 ${
           isSelected ? 'ring-4 ring-white/50' : ''
         } ${isHovered ? 'ring-2 ring-white/30' : ''}`}
         style={{
@@ -160,9 +160,23 @@ const GameWall: React.FC<GameWallProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const [showControls, setShowControls] = useState(true);
   const [rotationSpeed] = useState(0.5);
+  const [windowSize, setWindowSize] = useState({ 
+    width: window.innerWidth, 
+    height: window.innerHeight 
+  });
   
   const containerRef = useRef<HTMLDivElement>(null);
   const autoRotation = useRef(0);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Filter and sort games
   const filteredGames = useMemo(() => {
@@ -196,42 +210,58 @@ const GameWall: React.FC<GameWallProps> = ({
       scale: number;
     }> = [];
 
-    const containerWidth = 1200;
-    const containerHeight = 800;
+    // Use current window dimensions for responsive layout
+    const containerWidth = windowSize.width - 96; // Subtract sidebar width
+    const containerHeight = windowSize.height;
     
     filteredGames.forEach((game, index) => {
       let pos, rot, scale;
       
       switch (viewMode) {
         case 'wall':
-          // 3D Wall layout
-          const cols = Math.ceil(Math.sqrt(filteredGames.length));
+          // 3D Wall layout - centeralized and responsive
+          const cols = Math.min(Math.ceil(Math.sqrt(filteredGames.length)), 5); // Max 5 columns
           const rows = Math.ceil(filteredGames.length / cols);
           const col = index % cols;
           const row = Math.floor(index / cols);
           
+          // Center the grid in the container with proper spacing
+          const cardWidth = 180;
+          const cardHeight = 250;
+          const spacingX = 40;
+          const spacingY = 40;
+          const totalGridWidth = (cols * cardWidth) + ((cols - 1) * spacingX);
+          const totalGridHeight = (rows * cardHeight) + ((rows - 1) * spacingY);
+          
           pos = {
-            x: (col - cols / 2) * 200 + (containerWidth / 2),
-            y: (row - rows / 2) * 280 + (containerHeight / 2),
-            z: Math.sin(col * 0.5) * 100 + Math.cos(row * 0.5) * 50
+            x: (col * (cardWidth + spacingX)) - (totalGridWidth / 2) + (containerWidth / 2),
+            y: (row * (cardHeight + spacingY)) - (totalGridHeight / 2) + (containerHeight / 2),
+            z: Math.sin(col * 0.5) * 80 + Math.cos(row * 0.5) * 40
           };
           rot = {
-            x: Math.sin(index * 0.1) * 5,
-            y: Math.cos(index * 0.15) * 10,
+            x: Math.sin(index * 0.1) * 3,
+            y: Math.cos(index * 0.15) * 8,
             z: 0
           };
-          scale = 1 - Math.abs(pos.z) / 1000;
+          scale = 0.8 + (1 - Math.abs(pos.z) / 500) * 0.2;
           break;
           
         case 'shelf':
-          // Bookshelf layout
+          // Bookshelf layout - centered
+          const shelfCols = Math.min(Math.floor(containerWidth / 240), 6);
+          const shelfCol = index % shelfCols;
+          const shelfRow = Math.floor(index / shelfCols);
+          const shelfSpacingX = 30;
+          const shelfSpacingY = 50;
+          const shelfTotalWidth = (shelfCols * 210) + ((shelfCols - 1) * shelfSpacingX);
+          
           pos = {
-            x: (index % 6) * 200 + 100,
-            y: Math.floor(index / 6) * 280 + 150,
-            z: (Math.floor(index / 6) % 2) * 50
+            x: (shelfCol * (210 + shelfSpacingX)) - (shelfTotalWidth / 2) + (containerWidth / 2),
+            y: (shelfRow * (280 + shelfSpacingY)) - 200 + (containerHeight / 2),
+            z: (shelfRow % 2) * 30
           };
-          rot = { x: 0, y: 0, z: 0 };
-          scale = 0.9;
+          rot = { x: -5, y: 0, z: 0 };
+          scale = 0.85;
           break;
           
         case 'carousel':
@@ -252,25 +282,27 @@ const GameWall: React.FC<GameWallProps> = ({
           break;
           
         default:
-          // Grid layout
-          const gridCols = Math.ceil(Math.sqrt(filteredGames.length));
+          // Grid layout - centered and responsive
+          const gridCols = Math.min(Math.ceil(Math.sqrt(filteredGames.length)), 6);
           const gridCol = index % gridCols;
           const gridRow = Math.floor(index / gridCols);
+          const gridSpacing = 30;
+          const gridTotalWidth = (gridCols * 200) + ((gridCols - 1) * gridSpacing);
           
           pos = {
-            x: gridCol * 220 + 110,
-            y: gridRow * 300 + 150,
+            x: (gridCol * (200 + gridSpacing)) - (gridTotalWidth / 2) + (containerWidth / 2),
+            y: (gridRow * (280 + gridSpacing)) - 100 + (containerHeight / 2),
             z: 0
           };
           rot = { x: 0, y: 0, z: 0 };
-          scale = 1;
+          scale = 0.9;
       }
       
       positions.push({ game, position: pos, rotation: rot, scale });
     });
     
     return positions;
-  }, [filteredGames, viewMode, autoRotation.current]);
+  }, [filteredGames, viewMode, autoRotation.current, windowSize]);
 
   // Auto-rotation for carousel mode
   useEffect(() => {
@@ -402,10 +434,13 @@ const GameWall: React.FC<GameWallProps> = ({
       <AnimatePresence>
         {hoveredGame && (
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="absolute top-4 right-4 w-80 bg-black/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 z-40"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 bg-black/90 backdrop-blur-xl border border-white/30 rounded-2xl p-6 z-50 pointer-events-none"
+            style={{
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)'
+            }}
           >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-16 h-16 rounded-xl overflow-hidden">
@@ -422,19 +457,19 @@ const GameWall: React.FC<GameWallProps> = ({
             </div>
             
             {hoveredGame.description && (
-              <p className="text-white/80 text-sm leading-relaxed">
+              <p className="text-white/80 text-sm leading-relaxed mb-4">
                 {hoveredGame.description.slice(0, 150)}...
               </p>
             )}
             
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between pt-4 border-t border-white/10">
               <span className="text-white/60 text-xs">
                 {hoveredGame.launcherType === 'steam' ? 'Steam' : 
                  hoveredGame.launcherType === 'epic' ? 'Epic Games' : 'Local'}
               </span>
               <button
                 onClick={() => onGameSelect(hoveredGame)}
-                className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs transition-colors"
+                className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-bold transition-colors pointer-events-auto"
               >
                 Jogar
               </button>
