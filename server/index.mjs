@@ -92,7 +92,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const steamOpenIdEndpoint = "https://steamcommunity.com/openid/login";
 const epicAuthorizeEndpoint = "https://www.epicgames.com/id/authorize";
 const epicTokenEndpoint = "https://api.epicgames.dev/epic/oauth/v2/token";
-const epicOwnershipEndpointBase = "https://api.epicgames.dev/epic/ecom/v3/platforms/EPIC/identities";
+const epicEntitlementsEndpointBase = "https://api.epicgames.dev/epic/ecom/v4/identities";
 const epicStoreGraphqlEndpoint = "https://store.epicgames.com/graphql";
 const discordAuthorizeEndpoint = "https://discord.com/oauth2/authorize";
 const discordTokenEndpoint = "https://discord.com/api/oauth2/token";
@@ -227,6 +227,9 @@ const getEpicBasicAuthHeader = () => {
 const buildEpicTokenBody = (grantType, fields = {}) => {
   const body = new URLSearchParams();
   body.set("grant_type", grantType);
+  if (epicDeploymentId) {
+    body.set("deployment_id", epicDeploymentId);
+  }
   Object.entries(fields).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       body.set(key, String(value));
@@ -594,6 +597,71 @@ const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
     offerSlug: String(catalogItem?.offers?.[0]?.urlSlug ?? "").trim(),
     executablePath: launchId,
   };
+};
+
+const normalizeEpicEntitlement = (entitlement) => {
+  const namespace = String(
+    entitlement?.namespace ??
+      entitlement?.catalogNamespace ??
+      entitlement?.sandboxId ??
+      epicSandboxId ??
+      "",
+  ).trim();
+  const itemId = String(
+    entitlement?.catalogItemId ??
+      entitlement?.itemId ??
+      entitlement?.entitlementName ??
+      "",
+  ).trim();
+
+  if (!itemId) {
+    return null;
+  }
+
+  return {
+    namespace,
+    itemId,
+    artifactId: entitlement?.artifactId ?? entitlement?.artifact_id ?? "",
+    owned: true,
+  };
+};
+
+const extractEpicEntitlements = (payload) => {
+  if (Array.isArray(payload)) return payload;
+
+  const candidates = [
+    payload?.elements,
+    payload?.entitlements,
+    payload?.items,
+    payload?.data?.elements,
+    payload?.data?.entitlements,
+    payload?.data?.items,
+  ];
+
+  return candidates.find(Array.isArray) ?? null;
+};
+
+const epicEcomErrorMessage = (response, payload) => {
+  const errorCode = String(payload?.errorCode ?? payload?.error_code ?? "").trim();
+  const numericErrorCode = String(payload?.numericErrorCode ?? "").trim();
+  const detail = [errorCode, numericErrorCode ? `#${numericErrorCode}` : ""]
+    .filter(Boolean)
+    .join(" ");
+
+  if (
+    response.status === 403 &&
+    (errorCode.includes("client_restricted") || numericErrorCode === "46022")
+  ) {
+    return [
+      "A Epic recusou o Ecom para este client.",
+      "Confira se o produto tem Ecom/Epic Games Store habilitado, se EPIC_SANDBOX_ID e EPIC_DEPLOYMENT_ID pertencem ao mesmo produto do OAuth Client, e se o client tem acesso a Ecom.",
+      detail ? `Detalhe Epic: ${detail}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return `Falha ao consultar biblioteca da Epic Games (status ${response.status}${detail ? `, ${detail}` : ""}).`;
 };
 
 const buildEpicDetails = (catalogId, namespace, catalogItem) => {
@@ -1619,8 +1687,9 @@ app.get(
         resolvedAccessToken &&
         accessTokenExpiresAt &&
         Date.parse(accessTokenExpiresAt) > Date.now() + 60 * 1000;
+      const shouldRefreshForEcom = Boolean(epicDeploymentId && refreshToken);
 
-      if (!tokenStillValid) {
+      if (!tokenStillValid || shouldRefreshForEcom) {
         if (!refreshToken) {
           res
             .status(401)
@@ -1654,34 +1723,43 @@ app.get(
         return;
       }
 
-      const ownershipUrl = new URL(
-        `${epicOwnershipEndpointBase}/${encodeURIComponent(req.epicAccountId)}/ownership`,
+      const entitlementsUrl = new URL(
+        `${epicEntitlementsEndpointBase}/${encodeURIComponent(req.epicAccountId)}/entitlements`,
       );
-      ownershipUrl.searchParams.set("sandboxId", epicSandboxId);
+      entitlementsUrl.searchParams.set("sandboxId", epicSandboxId);
 
-      const ownershipResponse = await fetch(ownershipUrl.toString(), {
+      const entitlementsResponse = await fetch(entitlementsUrl.toString(), {
         headers: {
           Authorization: `Bearer ${resolvedAccessToken}`,
           Accept: "application/json",
         },
       });
 
-      const ownershipPayload = await ownershipResponse.json().catch(() => []);
-      if (!ownershipResponse.ok) {
+      const entitlementsPayload = await entitlementsResponse.json().catch(() => []);
+      if (!entitlementsResponse.ok) {
+        console.error("Epic Ecom entitlements request failed", {
+          status: entitlementsResponse.status,
+          statusText: entitlementsResponse.statusText,
+          errorCode: entitlementsPayload?.errorCode ?? entitlementsPayload?.error_code,
+          numericErrorCode: entitlementsPayload?.numericErrorCode,
+          message: entitlementsPayload?.errorMessage ?? entitlementsPayload?.message,
+          sandboxId: epicSandboxId,
+          hasDeploymentId: Boolean(epicDeploymentId),
+        });
         res.status(502).json({
-          error: `Falha ao consultar ownership da Epic Games (status ${ownershipResponse.status}).`,
+          error: epicEcomErrorMessage(entitlementsResponse, entitlementsPayload),
         });
         return;
       }
 
-      if (!Array.isArray(ownershipPayload)) {
+      const entitlements = extractEpicEntitlements(entitlementsPayload);
+
+      if (!entitlements) {
         res.status(502).json({ error: "Resposta inválida da Epic Games." });
         return;
       }
 
-      const ownedEntries = ownershipPayload.filter(
-        (entry) => entry?.owned && String(entry?.itemId ?? "").trim(),
-      );
+      const ownedEntries = entitlements.map(normalizeEpicEntitlement).filter(Boolean);
 
       const enrichedGames = [];
       const CHUNK_SIZE = 8;
