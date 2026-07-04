@@ -345,6 +345,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     playSound("select");
     setLoading(true);
     try {
+      const catalogId = String(game.id || game.catalogId || "").trim();
+      const namespace = String(game.namespace || "").trim();
+      const launchId = namespace && catalogId ? `${namespace}:${catalogId}` : catalogId;
+
       setFormData((prev) => ({
         ...prev,
         title: game.title || game.name || "",
@@ -355,9 +359,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         description: game.description || "",
         aboutTheGame: game.aboutTheGame || game.description || "",
         launcherType: "epic",
-        executablePath: "",
+        executablePath: launchId,
         steamAppId: "",
-        epicCatalogId: "",
+        epicCatalogId: catalogId,
         epicStoreUrl: game.productUrl || "",
         releaseDate: game.releaseDate || "",
         developer: game.developer || "",

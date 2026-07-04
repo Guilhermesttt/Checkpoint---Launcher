@@ -27,12 +27,13 @@ const buildEpicLaunchUri = (game: Game): string | null => {
   const decodedCatalogId = catalogId ? safeDecodeURIComponent(catalogId) : "";
 
   // Epic's launch URI needs SandboxID:CatalogID:ArtifactID. A plain catalogId
-  // opens the launcher but cannot reliably start the game.
-  if (!decodedLaunchId.includes(":") || decodedLaunchId === decodedCatalogId) {
-    return null;
-  }
+  // is still sent through the desktop launcher instead of opening the web store.
+  const epicAppId =
+    decodedLaunchId.includes(":") || decodedLaunchId === decodedCatalogId
+      ? encodeURIComponent(decodedLaunchId)
+      : launchId;
 
-  return `${EPIC_LAUNCH_URI_PREFIX}${encodeURIComponent(decodedLaunchId)}?action=launch&silent=true`;
+  return `${EPIC_LAUNCH_URI_PREFIX}${epicAppId}?action=launch&silent=true`;
 };
 
 export const launchGame = async (game: Game): Promise<void> => {
@@ -56,13 +57,8 @@ export const launchGame = async (game: Game): Promise<void> => {
       return;
     }
 
-    if (game.epicStoreUrl) {
-      window.location.assign(game.epicStoreUrl);
-      return;
-    }
-
     throw new Error(
-      "ID completo da Epic Games nao encontrado. Sincronize a biblioteca da Epic para importar o identificador de launcher.",
+      "ID da Epic Games nao encontrado. Sincronize a biblioteca da Epic para importar o identificador de launcher.",
     );
   }
 
