@@ -167,11 +167,6 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                       <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> Steam
                     </span>
                   )}
-                  {userProfile?.epicAccountId && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
-                      <EpicIcon className="h-3 w-3" /> Epic
-                    </span>
-                  )}
                   {userProfile?.discordId && (
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
                       <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
@@ -204,9 +199,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                 />
                 <PlatformCard
                   name="Epic Games"
-                  connected={Boolean(userProfile?.epicAccountId)}
-                  avatar={userProfile?.epicAvatar}
-                  username={userProfile?.epicUsername || userProfile?.epicAccountId}
+                  connected={stats.epicGames > 0}
+                  username={stats.epicGames > 0 ? `${stats.epicGames} jogos catalogados` : "Catálogo e atalhos"}
                   icon={<EpicIcon className="h-5 w-5" />}
                 />
                 <PlatformCard

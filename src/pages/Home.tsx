@@ -76,11 +76,6 @@ import {
   syncSteamLibraryToFirestore,
 } from "../services/steam";
 import {
-  disconnectEpicAccount,
-  getEpicLinkUrl,
-  syncEpicLibraryToFirestore,
-} from "../services/epic";
-import {
   disconnectDiscordAccount,
   getDiscordLinkUrl,
 } from "../services/discord";
@@ -146,6 +141,7 @@ const CATEGORIES = [
   { id: "HORROR", label: "Terror", Icon: Zap },
   { id: "STRATEGY", label: "Estratégia", Icon: Trophy },
   { id: "FIGHTING", label: "Luta", Icon: Swords },
+
 ];
 
 const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
@@ -170,39 +166,39 @@ const APP_THEME_OPTIONS: Array<{
   soundTheme: SoundTheme;
   visualTheme: VisualTheme;
 }> = [
-  {
-    id: "default",
-    label: "Padrao",
-    hint: "Visual Checkpoint + sons PS5",
-    swatch: "rgb(255 255 255)",
-    soundTheme: "ps5",
-    visualTheme: "checkpoint",
-  },
-  {
-    id: "playstation",
-    label: "PlayStation",
-    hint: "Azul frio + sons PS2",
-    swatch: "rgb(37 99 235)",
-    soundTheme: "ps2",
-    visualTheme: "playstation",
-  },
-  {
-    id: "gamecube",
-    label: "GameCube",
-    hint: "Roxo Nintendo + sons GameCube",
-    swatch: "rgb(124 58 237)",
-    soundTheme: "gamecube",
-    visualTheme: "gamecube",
-  },
-  {
-    id: "xbox360",
-    label: "Xbox 360",
-    hint: "Verde Xbox + sons Metro UI",
-    swatch: "rgb(132 204 22)",
-    soundTheme: "xbox360",
-    visualTheme: "xbox360",
-  },
-];
+    {
+      id: "default",
+      label: "Padrao",
+      hint: "Visual Checkpoint + sons PS5",
+      swatch: "rgb(255 255 255)",
+      soundTheme: "ps5",
+      visualTheme: "checkpoint",
+    },
+    {
+      id: "playstation",
+      label: "PlayStation",
+      hint: "Azul frio + sons PS2",
+      swatch: "rgb(37 99 235)",
+      soundTheme: "ps2",
+      visualTheme: "playstation",
+    },
+    {
+      id: "gamecube",
+      label: "GameCube",
+      hint: "Roxo Nintendo + sons GameCube",
+      swatch: "rgb(124 58 237)",
+      soundTheme: "gamecube",
+      visualTheme: "gamecube",
+    },
+    {
+      id: "xbox360",
+      label: "Xbox 360",
+      hint: "Verde Xbox + sons Metro UI",
+      swatch: "rgb(132 204 22)",
+      soundTheme: "xbox360",
+      visualTheme: "xbox360",
+    },
+  ];
 
 interface SocialFriend {
   id: string;
@@ -435,15 +431,11 @@ const Home: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [steamSyncing, setSteamSyncing] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
-  const [epicSyncing, setEpicSyncing] = useState(false);
-  const [epicConnecting, setEpicConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [disconnectSteamModalOpen, setDisconnectSteamModalOpen] =
-    useState(false);
-  const [disconnectEpicModalOpen, setDisconnectEpicModalOpen] =
     useState(false);
   const [disconnectDiscordModalOpen, setDisconnectDiscordModalOpen] =
     useState(false);
@@ -517,10 +509,6 @@ const Home: React.FC = () => {
   const resolvedSteamId = useMemo(
     () => userProfile?.steamId || undefined,
     [userProfile?.steamId],
-  );
-  const resolvedEpicAccountId = useMemo(
-    () => userProfile?.epicAccountId || undefined,
-    [userProfile?.epicAccountId],
   );
   const resolvedDiscordId = useMemo(
     () => userProfile?.discordId || undefined,
@@ -646,36 +634,26 @@ const Home: React.FC = () => {
   useEffect(() => {
     const handleGameLaunch = (event: Event) => {
       const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
-      if (title) {
-        setCurrentPresenceGame(title);
+      if (!title) return;
 
-        // Atualizar Discord Rich Presence imediatamente quando jogo é lançado
-        if (isRichPresenceEnabled()) {
-          const launchedGame = games.find(game =>
+      setCurrentPresenceGame(title);
+
+      if (isRichPresenceEnabled()) {
+        const launchedGame = games.find(
+          (game) =>
             game.title.toLowerCase().includes(title.toLowerCase()) ||
-            title.toLowerCase().includes(game.title.toLowerCase())
-          );
+            title.toLowerCase().includes(game.title.toLowerCase()),
+        );
 
-          if (launchedGame) {
-            setGameActivity(launchedGame, 'playing');
-          }
+        if (launchedGame) {
+          setGameActivity(launchedGame, "playing");
         }
       }
     };
 
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
-  }, [games, isRichPresenceEnabled]);
-
-  useEffect(() => {
-    const handleGameLaunch = (event: Event) => {
-      const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
-      if (title) setCurrentPresenceGame(title);
-    };
-
-    window.addEventListener("checkpoint:game-launch", handleGameLaunch);
-    return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
-  }, []);
+  }, [games, isRichPresenceEnabled, setGameActivity]);
 
   useEffect(() => {
     if (!currentPresenceGame) return;
@@ -913,11 +891,8 @@ const Home: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const steamStatus = params.get("steamStatus");
-    const epicStatus = params.get("epicStatus");
-    const epicReason = params.get("epicReason");
-    const epicAction = params.get("epicAction");
     const discordStatus = params.get("discordStatus");
-    if ((!steamStatus && !epicStatus && !discordStatus) || !user?.uid) return;
+    if ((!steamStatus && !discordStatus) || !user?.uid) return;
 
     if (steamStatus === "ok") {
       localStorage.removeItem(steamDiscKey(user.uid));
@@ -933,56 +908,6 @@ const Home: React.FC = () => {
       };
       notify(
         labels[steamStatus] ?? "Não foi possível conectar com a Steam.",
-        "error",
-      );
-    }
-
-    if (epicStatus === "ok") {
-      notify("Conta Epic Games conectada com sucesso.", "success");
-      void refreshProfile();
-    } else if (epicStatus) {
-      const labels: Record<string, string> = {
-        invalid_state: "Estado inválido.",
-        denied: "Autorização da Epic Games cancelada.",
-        missing_code: "Código de retorno da Epic Games não recebido.",
-        missing_id: "Conta Epic Games não retornou identificador.",
-        client_not_configured: "Credenciais da Epic Games não configuradas no backend.",
-        server_not_configured: "Backend Firebase Admin não configurado.",
-        token_error: "A Epic Games recusou a troca do código de autenticação.",
-        error: "Erro inesperado.",
-      };
-      const reasonLabels: Record<string, string> = {
-        invalid_client:
-          "A Epic recusou as credenciais. Confira EPIC_CLIENT_ID e EPIC_CLIENT_SECRET do OAuth Client aprovado.",
-        invalid_grant:
-          "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
-        redirect_uri_mismatch:
-          "Redirect URL da Epic diferente da URL usada pelo backend.",
-        "errors.com.epicgames.oauth.corrective_action_required":
-          "A Epic exige uma ação na conta ou no consentimento. Entre no site da Epic com essa conta, aceite pendências/termos e confira se os escopos aprovados batem com EPIC_OAUTH_SCOPE.",
-        "errors.com.epicgames.oauth.invalid_client":
-          "A Epic recusou as credenciais. Confira EPIC_CLIENT_ID e EPIC_CLIENT_SECRET do OAuth Client aprovado.",
-        "errors.com.epicgames.oauth.invalid_grant":
-          "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
-      };
-      const actionLabels: Record<string, string> = {
-        EULA_ACCEPTANCE:
-          "A Epic está exigindo aceite de termos/EULA nessa conta. Entre no site da Epic com essa conta, aceite a pendência e tente conectar novamente.",
-        TERMS_ACCEPTANCE:
-          "A Epic está exigindo aceite de termos nessa conta. Entre no site da Epic com essa conta, aceite a pendência e tente conectar novamente.",
-        ACCOUNT_RECOVERY:
-          "A Epic está exigindo recuperação/verificação da conta antes de liberar o login OAuth.",
-      };
-      const epicTokenMessage =
-        epicStatus === "token_error" && epicReason
-          ? epicAction
-            ? actionLabels[epicAction] ||
-              `A Epic exige uma ação na conta antes de autenticar (${epicAction}).`
-            : reasonLabels[epicReason] ||
-              `A Epic recusou a troca do código (${epicReason}).`
-          : labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.";
-      notify(
-        epicTokenMessage,
         "error",
       );
     }
@@ -1122,7 +1047,6 @@ const Home: React.FC = () => {
     Boolean(contextMenu) ||
     signOutModalOpen ||
     disconnectSteamModalOpen ||
-    disconnectEpicModalOpen ||
     disconnectDiscordModalOpen;
 
   useImagePreloader(
@@ -1285,72 +1209,6 @@ const Home: React.FC = () => {
           "error",
         );
         setSteamConnecting(false);
-      }
-    });
-  };
-
-  const handleSyncEpic = async () => {
-    if (!user?.uid || !resolvedEpicAccountId) {
-      notify("Conecte sua conta Epic para sincronizar.", "info");
-      return;
-    }
-    const healthy = await isBackendHealthy();
-    if (!healthy) {
-      notify("Backend Epic offline.", "error");
-      return;
-    }
-    setIsLoading(true);
-    setEpicSyncing(true);
-    try {
-      const count = await syncEpicLibraryToFirestore(
-        user.uid,
-        resolvedEpicAccountId,
-      );
-      notify(
-        count === 0
-          ? "Nenhum jogo retornado. Verifique se o perfil é público."
-          : `${count} jogos importados/atualizados.`,
-        count === 0 ? "info" : "success",
-      );
-      await refreshProfile();
-    } catch (e) {
-      notify(
-        e instanceof Error ? e.message : "Falha na sincronização Epic.",
-        "error",
-      );
-    } finally {
-      setEpicSyncing(false);
-      setIsLoading(false);
-    }
-  };
-
-  const connectEpic = () => {
-    if (!user?.uid) return;
-    playSound("select");
-    setEpicConnecting(true);
-
-    notify(
-      "Iniciando conexão com Epic Games. Isso pode levar alguns segundos se o servidor estiver acordando...",
-      "info",
-    );
-
-    isBackendHealthy().then(async (h) => {
-      if (!h) {
-        notify(
-          "O servidor Epic Games demorou demais para responder. Tente novamente em instantes.",
-          "error",
-        );
-        setEpicConnecting(false);
-        return;
-      }
-      try {
-        window.location.href = await getEpicLinkUrl();
-      } catch (e) {
-        notify(
-          e instanceof Error ? e.message : "Não foi possível conectar com a Epic Games.",
-          "error",
-        );
-        setEpicConnecting(false);
       }
     });
   };
@@ -1550,33 +1408,6 @@ const Home: React.FC = () => {
       notify("Steam desconectada e biblioteca atualizada.", "success");
     } catch {
       notify("Erro ao desconectar conta Steam.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDisconnectEpic = async () => {
-    if (!user?.uid) return;
-    playSound("back");
-    setIsLoading(true);
-    try {
-      await disconnectEpicAccount();
-      const snap = await getDocs(
-        query(
-          userGamesCollectionRef(user.uid),
-          where("launcherType", "==", "epic"),
-        ),
-      );
-      if (snap.docs.length > 0) {
-        const b = writeBatch(db);
-        snap.docs.forEach((d) => b.delete(d.ref));
-        await b.commit();
-      }
-      await refreshProfile();
-      setSelectedIndex(0);
-      notify("Epic Games desconectada e biblioteca atualizada.", "success");
-    } catch {
-      notify("Erro ao desconectar conta Epic Games.", "error");
     } finally {
       setIsLoading(false);
     }
@@ -1848,32 +1679,23 @@ const Home: React.FC = () => {
               onPreviewSound={() => playSound("select")}
               t={t}
               steamConnected={Boolean(resolvedSteamId)}
-              epicConnected={Boolean(resolvedEpicAccountId)}
               discordConnected={Boolean(resolvedDiscordId)}
               discordUsername={userProfile?.discordUsername}
               discordAvatar={userProfile?.discordAvatar}
               steamConnecting={steamConnecting}
-              epicConnecting={epicConnecting}
               discordConnecting={discordConnecting}
               steamSyncing={steamSyncing}
-              epicSyncing={epicSyncing}
               onConnectSteam={connectSteam}
-              onConnectEpic={connectEpic}
               onConnectDiscord={connectDiscord}
               onDisconnectSteam={() => {
                 playSound("back");
                 setDisconnectSteamModalOpen(true);
-              }}
-              onDisconnectEpic={() => {
-                playSound("back");
-                setDisconnectEpicModalOpen(true);
               }}
               onDisconnectDiscord={() => {
                 playSound("back");
                 setDisconnectDiscordModalOpen(true);
               }}
               onSyncSteam={handleSyncSteam}
-              onSyncEpic={handleSyncEpic}
             />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
@@ -2064,21 +1886,21 @@ const Home: React.FC = () => {
                 </AnimatePresence>
               </motion.div>
 
-            <div className="shrink-0 pb-14">
-              {activeCategory === "ALL" && (
-                <HomeOverviewPanels
-                  continuePlaying={continuePlayingGames}
-                  favoriteGames={favoriteShowcaseGames}
-                  friendsPlaying={friendsPlayingNow}
-                  recentActivity={recentOverviewActivity}
-                  onOpenGame={openDetails}
-                  onOpenFriends={() => setActiveCategory("FRIENDS")}
-                  t={t}
-                />
-              )}
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.div
-                  key={activeCategory}
+              <div className="shrink-0 pb-14">
+                {activeCategory === "ALL" && (
+                  <HomeOverviewPanels
+                    continuePlaying={continuePlayingGames}
+                    favoriteGames={favoriteShowcaseGames}
+                    friendsPlaying={friendsPlayingNow}
+                    recentActivity={recentOverviewActivity}
+                    onOpenGame={openDetails}
+                    onOpenFriends={() => setActiveCategory("FRIENDS")}
+                    t={t}
+                  />
+                )}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.div
+                    key={activeCategory}
                     initial={{ opacity: 0, y: 28 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 14 }}
@@ -2265,19 +2087,6 @@ const Home: React.FC = () => {
       />
 
       <ConfirmationModal
-        isOpen={disconnectEpicModalOpen}
-        title={t("disconnectEpicTitle")}
-        description={t("disconnectEpicDescription")}
-        confirmLabel={t("confirm")}
-        onClose={() => setDisconnectEpicModalOpen(false)}
-        onConfirm={async () => {
-          setDisconnectEpicModalOpen(false);
-          await handleDisconnectEpic();
-        }}
-        playSound={playSound}
-      />
-
-      <ConfirmationModal
         isOpen={disconnectDiscordModalOpen}
         title={t("disconnectDiscordTitle")}
         description={t("disconnectDiscordDescription")}
@@ -2339,23 +2148,17 @@ const SettingsPageV2: React.FC<{
   onPreviewSound: () => void;
   t: ReturnType<typeof usePreferences>["t"];
   steamConnected: boolean;
-  epicConnected: boolean;
   discordConnected: boolean;
   discordUsername?: string;
   discordAvatar?: string;
   steamConnecting: boolean;
-  epicConnecting: boolean;
   discordConnecting: boolean;
   steamSyncing: boolean;
-  epicSyncing: boolean;
   onConnectSteam: () => void;
-  onConnectEpic: () => void;
   onConnectDiscord: () => void;
   onDisconnectSteam: () => void;
-  onDisconnectEpic: () => void;
   onDisconnectDiscord: () => void;
   onSyncSteam: () => void;
-  onSyncEpic: () => void;
 }> = ({
   language,
   effectsVolume,
@@ -2370,23 +2173,17 @@ const SettingsPageV2: React.FC<{
   onPreviewSound,
   t,
   steamConnected,
-  epicConnected,
   discordConnected,
   discordUsername,
   discordAvatar,
   steamConnecting,
-  epicConnecting,
   discordConnecting,
   steamSyncing,
-  epicSyncing,
   onConnectSteam,
-  onConnectEpic,
   onConnectDiscord,
   onDisconnectSteam,
-  onDisconnectEpic,
   onDisconnectDiscord,
   onSyncSteam,
-  onSyncEpic,
 }) => {
     const activeAppTheme =
       visualTheme === "checkpoint"
@@ -2398,203 +2195,181 @@ const SettingsPageV2: React.FC<{
             : "playstation";
 
     return (
-    <SystemPageShell eyebrow={t("system")} title={t("settings")}>
-      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-        <SettingsHeader
-          icon={<Globe className="w-5 h-5 text-white/70" />}
-          title={t("connectedAccounts")}
-          description={t("connectedAccountsHint")}
-        />
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                <SteamBrandIcon className="w-4 h-4 text-white/60" />
+      <SystemPageShell eyebrow={t("system")} title={t("settings")}>
+        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
+          <SettingsHeader
+            icon={<Globe className="w-5 h-5 text-white/70" />}
+            title={t("connectedAccounts")}
+            description={t("connectedAccountsHint")}
+          />
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <SteamBrandIcon className="w-4 h-4 text-white/60" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Steam</p>
+                  <p className="text-[10px] text-white/40">
+                    {steamConnected ? t("connected") : t("notConnected")}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-bold text-white">Steam</p>
-                <p className="text-[10px] text-white/40">
-                  {steamConnected ? t("connected") : t("notConnected")}
-                </p>
-              </div>
-            </div>
-            {steamConnected ? (
-              <div className="flex items-center gap-2">
+              {steamConnected ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={onSyncSteam}
+                    disabled={steamSyncing}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                  >
+                    {steamSyncing ? t("syncing") : t("sync")}
+                  </button>
+                  <button
+                    onClick={onDisconnectSteam}
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
+                  >
+                    {t("unlink")}
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={onSyncSteam}
-                  disabled={steamSyncing}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                  onClick={onConnectSteam}
+                  disabled={steamConnecting}
+                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
                 >
-                  {steamSyncing ? t("syncing") : t("sync")}
+                  {steamConnecting ? t("connecting") : t("connectSteam")}
                 </button>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                  <EpicBrandIcon className="w-4 h-4 opacity-70" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Epic Games</p>
+                  <p className="text-[10px] text-white/40">
+                    Catálogo e atalhos, sem sync de conta
+                  </p>
+                </div>
+              </div>
+              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/45">
+                Assistido
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
+                  {discordAvatar ? (
+                    <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <DiscordBrandIcon className="w-4 h-4 text-white/60" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">Discord</p>
+                  <p className="text-[10px] text-white/40 truncate max-w-[140px]">
+                    {discordConnected ? discordUsername || t("connected") : t("notConnected")}
+                  </p>
+                </div>
+              </div>
+              {discordConnected ? (
                 <button
-                  onClick={onDisconnectSteam}
+                  onClick={onDisconnectDiscord}
                   className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
                 >
                   {t("unlink")}
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={onConnectSteam}
-                disabled={steamConnecting}
-                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              >
-                {steamConnecting ? t("connecting") : t("connectSteam")}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                <EpicBrandIcon className="w-4 h-4 opacity-70" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Epic Games</p>
-                <p className="text-[10px] text-white/40">
-                  {epicConnected ? t("connected") : t("notConnected")}
-                </p>
-              </div>
-            </div>
-            {epicConnected ? (
-              <div className="flex items-center gap-2">
+              ) : (
                 <button
-                  onClick={onSyncEpic}
-                  disabled={epicSyncing}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
+                  onClick={onConnectDiscord}
+                  disabled={discordConnecting}
+                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
                 >
-                  {epicSyncing ? t("syncing") : t("sync")}
+                  {discordConnecting ? t("connecting") : t("connectDiscord")}
                 </button>
-                <button
-                  onClick={onDisconnectEpic}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-                >
-                  {t("unlink")}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={onConnectEpic}
-                disabled={epicConnecting}
-                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              >
-                {epicConnecting ? t("connecting") : t("connectEpic")}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
-                {discordAvatar ? (
-                  <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <DiscordBrandIcon className="w-4 h-4 text-white/60" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-white">Discord</p>
-                <p className="text-[10px] text-white/40 truncate max-w-[140px]">
-                  {discordConnected ? discordUsername || t("connected") : t("notConnected")}
-                </p>
-              </div>
+              )}
             </div>
-            {discordConnected ? (
-              <button
-                onClick={onDisconnectDiscord}
-                className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-              >
-                {t("unlink")}
-              </button>
-            ) : (
-              <button
-                onClick={onConnectDiscord}
-                disabled={discordConnecting}
-                className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-              >
-                {discordConnecting ? t("connecting") : t("connectDiscord")}
-              </button>
-            )}
-          </div>
 
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+            <SettingsHeader
+              icon={<Languages className="w-5 h-5 text-white/70" />}
+              title={t("language")}
+              description={t("languageHint")}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {LANGUAGE_OPTIONS.map((option) => (
+                <SettingsChoice
+                  key={option.id}
+                  active={language === option.id}
+                  label={option.label}
+                  hint={option.hint}
+                  onClick={() => onLanguageChange(option.id)}
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
+            <SettingsHeader
+              icon={<Settings className="w-5 h-5 text-white/70" />}
+              title={t("themes")}
+              description={t("themesHint")}
+            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {APP_THEME_OPTIONS.map((option) => (
+                <SettingsChoice
+                  key={option.id}
+                  active={activeAppTheme === option.id}
+                  label={
+                    option.id === "default"
+                      ? t("defaultTheme")
+                      : option.id === "playstation"
+                        ? t("playstationTheme")
+                        : option.id === "gamecube"
+                          ? t("gamecubeTheme")
+                          : t("xbox360Theme")
+                  }
+                  hint={option.hint}
+                  swatch={option.swatch}
+                  onClick={() => {
+                    onVisualThemeChange(option.visualTheme);
+                    onSoundThemeChange(option.soundTheme);
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+
+          <VolumeSettingsCard
+            title={t("soundEffects")}
+            description={t("soundEffectsHint")}
+            value={effectsVolume}
+            max={100}
+            actionLabel={t("test")}
+            onAction={onPreviewSound}
+            onChange={onEffectsVolumeChange}
+            t={t}
+          />
+
+          <VolumeSettingsCard
+            title={t("music")}
+            description={t("musicHint")}
+            value={musicVolume}
+            max={35}
+            onChange={onMusicVolumeChange}
+            t={t}
+          />
         </div>
-      </section>
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-          <SettingsHeader
-            icon={<Languages className="w-5 h-5 text-white/70" />}
-            title={t("language")}
-            description={t("languageHint")}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {LANGUAGE_OPTIONS.map((option) => (
-              <SettingsChoice
-                key={option.id}
-                active={language === option.id}
-                label={option.label}
-                hint={option.hint}
-                onClick={() => onLanguageChange(option.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-          <SettingsHeader
-            icon={<Settings className="w-5 h-5 text-white/70" />}
-            title={t("themes")}
-            description={t("themesHint")}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {APP_THEME_OPTIONS.map((option) => (
-              <SettingsChoice
-                key={option.id}
-                active={activeAppTheme === option.id}
-                label={
-                  option.id === "default"
-                    ? t("defaultTheme")
-                    : option.id === "playstation"
-                      ? t("playstationTheme")
-                      : option.id === "gamecube"
-                        ? t("gamecubeTheme")
-                        : t("xbox360Theme")
-                }
-                hint={option.hint}
-                swatch={option.swatch}
-                onClick={() => {
-                  onVisualThemeChange(option.visualTheme);
-                  onSoundThemeChange(option.soundTheme);
-                }}
-              />
-            ))}
-          </div>
-        </section>
-
-        <VolumeSettingsCard
-          title={t("soundEffects")}
-          description={t("soundEffectsHint")}
-          value={effectsVolume}
-          max={100}
-          actionLabel={t("test")}
-          onAction={onPreviewSound}
-          onChange={onEffectsVolumeChange}
-          t={t}
-        />
-
-        <VolumeSettingsCard
-          title={t("music")}
-          description={t("musicHint")}
-          value={musicVolume}
-          max={35}
-          onChange={onMusicVolumeChange}
-          t={t}
-        />
-      </div>
-    </SystemPageShell>
-  );
-};
+      </SystemPageShell>
+    );
+  };
 
 const SystemPageShell: React.FC<{
   eyebrow: string;
@@ -2885,13 +2660,13 @@ const FriendsPage: React.FC<{
                     {friendProfileLoadingId === friend.id ? "Abrindo..." : "Perfil"}
                   </button>
                   {!friend.source?.startsWith("discord") && (
-                  <button
-                    type="button"
-                    onClick={() => onRemoveFriend(friend.id)}
-                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10 shrink-0"
-                  >
-                    Remover
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveFriend(friend.id)}
+                      className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10 shrink-0"
+                    >
+                      Remover
+                    </button>
                   )}
                 </div>
               </div>
@@ -2922,284 +2697,284 @@ const AddFriendModal: React.FC<{
   playSound,
   t,
 }) => {
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<UserProfile[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [sendingUid, setSendingUid] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
+    const [results, setResults] = useState<UserProfile[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [sendingUid, setSendingUid] = useState<string | null>(null);
 
-  const getProfileAction = (profile: UserProfile) => {
-    if (profile.uid === currentUserUid) {
-      return { label: t("addFriendYou"), disabled: true };
-    }
-    if (friendIds.has(profile.uid)) {
-      return { label: t("addFriendAlreadyFriend"), disabled: true };
-    }
-    if (outgoingRequestIds.has(profile.uid)) {
-      return { label: t("addFriendPending"), disabled: true };
-    }
-    if (incomingRequestIds.has(profile.uid)) {
-      return { label: t("addFriendRespond"), disabled: true };
-    }
-    if (sendingUid === profile.uid) {
-      return { label: "...", disabled: true };
-    }
-    return { label: t("addFriendSend"), disabled: false };
-  };
+    const getProfileAction = (profile: UserProfile) => {
+      if (profile.uid === currentUserUid) {
+        return { label: t("addFriendYou"), disabled: true };
+      }
+      if (friendIds.has(profile.uid)) {
+        return { label: t("addFriendAlreadyFriend"), disabled: true };
+      }
+      if (outgoingRequestIds.has(profile.uid)) {
+        return { label: t("addFriendPending"), disabled: true };
+      }
+      if (incomingRequestIds.has(profile.uid)) {
+        return { label: t("addFriendRespond"), disabled: true };
+      }
+      if (sendingUid === profile.uid) {
+        return { label: "...", disabled: true };
+      }
+      return { label: t("addFriendSend"), disabled: false };
+    };
 
-  const handleSendRequest = async (profile: UserProfile) => {
-    const action = getProfileAction(profile);
-    if (action.disabled) return;
+    const handleSendRequest = async (profile: UserProfile) => {
+      const action = getProfileAction(profile);
+      if (action.disabled) return;
 
-    playSound("select");
-    setSendingUid(profile.uid);
-    try {
-      await onAddFriend(profile);
-      setResults((current) => current.filter((item) => item.uid !== profile.uid));
-      setSelectedIndex(0);
-    } finally {
-      setSendingUid(null);
-    }
-  };
+      playSound("select");
+      setSendingUid(profile.uid);
+      try {
+        await onAddFriend(profile);
+        setResults((current) => current.filter((item) => item.uid !== profile.uid));
+        setSelectedIndex(0);
+      } finally {
+        setSendingUid(null);
+      }
+    };
 
-  useEffect(() => {
-    if (!isOpen) {
-      setSearch("");
-      setResults([]);
-      setSelectedIndex(0);
-    } else {
-      // Carregar pesquisas recentes do localStorage
-      const stored = localStorage.getItem('checkpoint_recent_friend_searches');
-      if (stored) {
-        try {
-          setRecentSearches(JSON.parse(stored).slice(0, 5)); // Máximo 5 pesquisas recentes
-        } catch {
-          setRecentSearches([]);
+    useEffect(() => {
+      if (!isOpen) {
+        setSearch("");
+        setResults([]);
+        setSelectedIndex(0);
+      } else {
+        // Carregar pesquisas recentes do localStorage
+        const stored = localStorage.getItem('checkpoint_recent_friend_searches');
+        if (stored) {
+          try {
+            setRecentSearches(JSON.parse(stored).slice(0, 5)); // Máximo 5 pesquisas recentes
+          } catch {
+            setRecentSearches([]);
+          }
         }
       }
-    }
-  }, [isOpen]);
+    }, [isOpen]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!search.trim()) return;
-
-    playSound("search");
-    setSearching(true);
-    setResults([]);
-    setSelectedIndex(0);
-
-    try {
-      const searchResults = await searchCheckpointFriends(search.trim());
-      const uniqueResults = searchResults
-        .filter((profile) => profile.uid && profile.uid !== currentUserUid)
-        .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index);
-      setResults(uniqueResults);
-
-      // Adicionar à lista de pesquisas recentes
-      const newRecent = [search.trim(), ...recentSearches.filter(s => s !== search.trim())].slice(0, 5);
-      setRecentSearches(newRecent);
-      localStorage.setItem('checkpoint_recent_friend_searches', JSON.stringify(newRecent));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!results.length) return;
-
-    if (e.key === 'ArrowDown') {
+    const handleSearch = async (e: React.FormEvent) => {
       e.preventDefault();
-      playSound("navigate");
-      setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      playSound("navigate");
-      setSelectedIndex(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && results[selectedIndex]) {
-      e.preventDefault();
-      handleSendRequest(results[selectedIndex]);
-    }
-  };
+      if (!search.trim()) return;
 
-  const clearRecentSearches = () => {
-    playSound("back");
-    setRecentSearches([]);
-    localStorage.removeItem('checkpoint_recent_friend_searches');
-  };
+      playSound("search");
+      setSearching(true);
+      setResults([]);
+      setSelectedIndex(0);
 
-  const handleClose = () => {
-    playSound("back");
-    onClose();
-  };
+      try {
+        const searchResults = await searchCheckpointFriends(search.trim());
+        const uniqueResults = searchResults
+          .filter((profile) => profile.uid && profile.uid !== currentUserUid)
+          .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index);
+        setResults(uniqueResults);
 
-  if (!isOpen) return null;
+        // Adicionar à lista de pesquisas recentes
+        const newRecent = [search.trim(), ...recentSearches.filter(s => s !== search.trim())].slice(0, 5);
+        setRecentSearches(newRecent);
+        localStorage.setItem('checkpoint_recent_friend_searches', JSON.stringify(newRecent));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setSearching(false);
+      }
+    };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl relative overflow-hidden"
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (!results.length) return;
 
-        <div className="relative flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-xl font-black text-white">{t("addFriendTitle")}</h2>
-            <p className="text-xs text-white/40 mt-1">{t("addFriendHint")}</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            onMouseEnter={() => playSound("hover")}
-            className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        playSound("navigate");
+        setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        playSound("navigate");
+        setSelectedIndex(prev => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && results[selectedIndex]) {
+        e.preventDefault();
+        handleSendRequest(results[selectedIndex]);
+      }
+    };
 
-        <form onSubmit={handleSearch} className="relative mb-4">
-          <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t("addFriendSearchPlaceholder")}
-            className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-12 pr-24 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.05]"
-          />
-          <button
-            type="submit"
-            disabled={searching || !search.trim()}
-            onMouseEnter={() => playSound("hover")}
-            className="absolute right-2 top-2 bottom-2 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-white/90 disabled:hover:bg-white"
-          >
-            {searching ? "..." : t("addFriendSearchButton")}
-          </button>
-        </form>
+    const clearRecentSearches = () => {
+      playSound("back");
+      setRecentSearches([]);
+      localStorage.removeItem('checkpoint_recent_friend_searches');
+    };
 
-        {/* Pesquisas recentes */}
-        {recentSearches.length > 0 && !search && !results.length && (
-          <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-bold text-white/70">{t("addFriendRecentSearches")}</h3>
-              <button
-                type="button"
-                onClick={clearRecentSearches}
-                onMouseEnter={() => playSound("hover")}
-                className="text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider"
-              >
-                {t("addFriendClear")}
-              </button>
+    const handleClose = () => {
+      playSound("back");
+      onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
+
+          <div className="relative flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-xl font-black text-white">{t("addFriendTitle")}</h2>
+              <p className="text-xs text-white/40 mt-1">{t("addFriendHint")}</p>
             </div>
-            <div className="space-y-2">
-              {recentSearches.map((recentSearch, index) => (
+            <button
+              type="button"
+              onClick={handleClose}
+              onMouseEnter={() => playSound("hover")}
+              className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSearch} className="relative mb-4">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t("addFriendSearchPlaceholder")}
+              className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-12 pr-24 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.05]"
+            />
+            <button
+              type="submit"
+              disabled={searching || !search.trim()}
+              onMouseEnter={() => playSound("hover")}
+              className="absolute right-2 top-2 bottom-2 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-white/90 disabled:hover:bg-white"
+            >
+              {searching ? "..." : t("addFriendSearchButton")}
+            </button>
+          </form>
+
+          {/* Pesquisas recentes */}
+          {recentSearches.length > 0 && !search && !results.length && (
+            <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-white/70">{t("addFriendRecentSearches")}</h3>
                 <button
-                  key={index}
                   type="button"
-                  onClick={() => {
-                    playSound("navigate");
-                    setSearch(recentSearch);
-                  }}
+                  onClick={clearRecentSearches}
                   onMouseEnter={() => playSound("hover")}
-                  className="w-full text-left p-2 rounded-lg hover:bg-white/5 text-sm text-white/60 hover:text-white transition-colors"
+                  className="text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider"
                 >
-                  <Search className="inline w-3 h-3 mr-2 text-white/30" />
-                  {recentSearch}
+                  {t("addFriendClear")}
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-3 min-h-[100px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-          {searching ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin mx-auto mb-3"></div>
-                <div className="text-sm text-white/40">{t("addFriendSearching")}</div>
+              </div>
+              <div className="space-y-2">
+                {recentSearches.map((recentSearch, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      playSound("navigate");
+                      setSearch(recentSearch);
+                    }}
+                    onMouseEnter={() => playSound("hover")}
+                    className="w-full text-left p-2 rounded-lg hover:bg-white/5 text-sm text-white/60 hover:text-white transition-colors"
+                  >
+                    <Search className="inline w-3 h-3 mr-2 text-white/30" />
+                    {recentSearch}
+                  </button>
+                ))}
               </div>
             </div>
-          ) : results.length > 0 ? (
-            results.map((profile, index) => {
-              const action = getProfileAction(profile);
+          )}
 
-              return (
-                <div
-                  key={profile.uid}
-                  onMouseEnter={() => playSound("hover")}
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
+          <div className="space-y-3 min-h-[100px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            {searching ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin mx-auto mb-3"></div>
+                  <div className="text-sm text-white/40">{t("addFriendSearching")}</div>
+                </div>
+              </div>
+            ) : results.length > 0 ? (
+              results.map((profile, index) => {
+                const action = getProfileAction(profile);
+
+                return (
+                  <div
+                    key={profile.uid}
+                    onMouseEnter={() => playSound("hover")}
+                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
                       ? 'bg-white/[0.08] border-white/20'
                       : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06]'
-                    }`}
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="w-12 h-12 shrink-0 rounded-full bg-white/10 overflow-hidden border border-white/10">
-                      {profile.photoURL ? (
-                        <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Users className="w-6 h-6 text-white/50" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate font-bold text-sm text-white">{profile.displayName || "Usuario"}</div>
-                      <div className="truncate text-[11px] text-white/40">{profile.email}</div>
-                      {profile.status && (
-                        <div className="text-[10px] text-white/30 uppercase tracking-wider mt-1">
-                          {profile.status === "online"
-                            ? t("addFriendOnline")
-                            : profile.status === "playing"
-                              ? `${t("addFriendPlaying")} ${profile.playing || ""}`
-                              : t("addFriendOffline")}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSendRequest(profile)}
-                    onMouseEnter={() => playSound("hover")}
-                    disabled={action.disabled}
-                    className="h-10 min-w-[94px] px-5 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-wider transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                      }`}
                   >
-                    {action.label}
-                  </button>
-                </div>
-              );
-            })
-          ) : search.trim() && !searching ? (
-            <div className="text-center py-12">
-              <Users className="w-12 h-12 mx-auto mb-4 text-white/20" />
-              <div className="text-sm text-white/40 mb-2">{t("addFriendNoResults")}</div>
-              <div className="text-xs text-white/30">{t("addFriendNoResultsHint")}</div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Search className="w-12 h-12 mx-auto mb-4 text-white/20" />
-              <div className="text-sm text-white/40 mb-2">{t("addFriendEmpty")}</div>
-              <div className="text-xs text-white/30">{t("addFriendEmptyHint")}</div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="w-12 h-12 shrink-0 rounded-full bg-white/10 overflow-hidden border border-white/10">
+                        {profile.photoURL ? (
+                          <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Users className="w-6 h-6 text-white/50" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate font-bold text-sm text-white">{profile.displayName || "Usuario"}</div>
+                        <div className="truncate text-[11px] text-white/40">{profile.email}</div>
+                        {profile.status && (
+                          <div className="text-[10px] text-white/30 uppercase tracking-wider mt-1">
+                            {profile.status === "online"
+                              ? t("addFriendOnline")
+                              : profile.status === "playing"
+                                ? `${t("addFriendPlaying")} ${profile.playing || ""}`
+                                : t("addFriendOffline")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSendRequest(profile)}
+                      onMouseEnter={() => playSound("hover")}
+                      disabled={action.disabled}
+                      className="h-10 min-w-[94px] px-5 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-wider transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      {action.label}
+                    </button>
+                  </div>
+                );
+              })
+            ) : search.trim() && !searching ? (
+              <div className="text-center py-12">
+                <Users className="w-12 h-12 mx-auto mb-4 text-white/20" />
+                <div className="text-sm text-white/40 mb-2">{t("addFriendNoResults")}</div>
+                <div className="text-xs text-white/30">{t("addFriendNoResultsHint")}</div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Search className="w-12 h-12 mx-auto mb-4 text-white/20" />
+                <div className="text-sm text-white/40 mb-2">{t("addFriendEmpty")}</div>
+                <div className="text-xs text-white/30">{t("addFriendEmptyHint")}</div>
+              </div>
+            )}
+          </div>
+
+          {results.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="text-[10px] text-white/30 text-center">
+                {t("addFriendKeyboardHint")}
+              </div>
             </div>
           )}
-        </div>
-
-        {results.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <div className="text-[10px] text-white/30 text-center">
-              {t("addFriendKeyboardHint")}
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </div>
-  );
-};
+        </motion.div>
+      </div>
+    );
+  };
 
 const PriceAlertsPage: React.FC<{
   t: ReturnType<typeof usePreferences>["t"];

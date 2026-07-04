@@ -17,7 +17,7 @@ const integrations = [
   {
     name: "Epic Games",
     image: EPIC_GAMES_ICON_PATH,
-    description: "Conecte sua conta Epic e puxe seus jogos para a biblioteca",
+    description: "Busque jogos no catálogo da Epic para preencher capas, descrições e links",
     statusLabel: "Disponível em análise",
     statusClassName: "text-yellow-400",
     dotClassName: "bg-yellow-400",
@@ -80,8 +80,8 @@ export function IntegrationsSection() {
                 : "opacity-0 translate-y-4"
                 }`}
             >
-              O Checkpoint reúne Steam, Epic Games e jogos locais em uma única
-              interface premium, sem você precisar abrir vários launchers.
+              O Checkpoint reúne Steam, entradas assistidas da Epic e jogos locais
+              em uma única interface premium para organizar sua biblioteca.
             </p>
           </div>
         </div>

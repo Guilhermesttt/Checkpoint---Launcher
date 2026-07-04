@@ -50,6 +50,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
   const heroImage = game.backgroundImage || game.image;
   const coverImage = game.cardImage || game.image || game.backgroundImage;
+  const hasEpicLaunchShortcut =
+    game.launcherType === "epic" &&
+    String(game.executablePath || game.epicCatalogId || "")
+      .split(":")
+      .filter(Boolean).length >= 3;
   const safeAboutHtml = DOMPurify.sanitize(
     game.aboutTheGame ||
     game.description ||
@@ -300,14 +305,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         )}
                         {game.launcherType === "epic" && (
                           <span className="text-[10px] text-white/30 uppercase tracking-widest">
-                            Epic Store <span className="text-white/60 ml-1">{game.epicStoreUrl ? "Loja" : "Launcher"}</span>
+                            Epic <span className="text-white/60 ml-1">{hasEpicLaunchShortcut ? "Atalho" : "Loja"}</span>
                           </span>
                         )}
                         <span className="h-1 w-1 rounded-full bg-white/10" />
                         <span className="text-[10px] text-white/30 uppercase tracking-widest">
                           Fonte <span className="text-white/60 ml-1">{
                             game.source === "steam" ? "Sync Steam" :
-                            game.source === "epic" ? "Sync Epic" : "Manual"
+                            game.source === "epic" ? "Catálogo Epic" : "Manual"
                           }</span>
                         </span>
                       </motion.div>

@@ -41,14 +41,11 @@ export interface UserProfile {
   displayName?: string | null;
   photoURL?: string | null;
   steamId?: string;
-  epicAccountId?: string;
   discordId?: string;
   discordUsername?: string;
   discordAvatar?: string;
   steamAvatar?: string;
   steamUsername?: string;
-  epicAvatar?: string;
-  epicUsername?: string;
   status?: "online" | "playing" | "offline";
   playing?: string | null;
   discordFriends?: Array<{
@@ -79,7 +76,6 @@ export interface UserProfile {
   createdAt?: string;
   updatedAt?: string;
   lastSteamSyncAt?: string;
-  lastEpicSyncAt?: string;
   gamesMigratedAt?: string;
   onboardingCompletedAt?: string;
 }

@@ -234,6 +234,8 @@ export const syncSteamLibraryToFirestore = async (
     const assets = buildSteamAssets(owned.appid);
     const details = detailsCache.get(appIdStr);
     const achievements = achievementsCache.get(appIdStr);
+    const coverImage = details?.cardImage || assets.cardImage;
+    const backgroundImage = details?.backgroundImage || assets.image;
     const normalizedHours = Math.round((owned.playtime_forever ?? 0) / 60);
     const steamLastPlayedAt =
       owned.rtime_last_played && owned.rtime_last_played > 0
@@ -245,9 +247,9 @@ export const syncSteamLibraryToFirestore = async (
 
     const mapped: Omit<Game, "id"> = {
       title: details?.title || owned.name || `Steam App ${owned.appid}`,
-      image: details?.backgroundImage || assets.image,
-      backgroundImage: details?.backgroundImage || assets.image,
-      cardImage: details?.cardImage || assets.cardImage,
+      image: coverImage,
+      backgroundImage,
+      cardImage: coverImage,
       logoImage: details?.logoImage || "",
       category: "STEAM",
       description: resolvedDescription,

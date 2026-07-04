@@ -38,11 +38,7 @@ const backendPublicUrl = (
   process.env.BACKEND_PUBLIC_URL ?? `http://localhost:${port}`
 ).replace(/\/$/, "");
 const steamApiKey = process.env.STEAM_API_KEY?.trim();
-const epicClientId = process.env.EPIC_CLIENT_ID?.trim();
-const epicClientSecret = process.env.EPIC_CLIENT_SECRET?.trim();
-const epicOauthScope = process.env.EPIC_OAUTH_SCOPE?.trim() || "basic_profile";
 const epicSandboxId = process.env.EPIC_SANDBOX_ID?.trim();
-const epicDeploymentId = process.env.EPIC_DEPLOYMENT_ID?.trim();
 const discordClientId = process.env.DISCORD_CLIENT_ID?.trim();
 const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
 const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
@@ -90,23 +86,18 @@ app.use(express.json({ limit: "128kb" }));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const steamOpenIdEndpoint = "https://steamcommunity.com/openid/login";
-const epicAuthorizeEndpoint = "https://www.epicgames.com/id/authorize";
-const epicTokenEndpoint = "https://api.epicgames.dev/epic/oauth/v2/token";
-const epicEntitlementsEndpointBase = "https://api.epicgames.dev/epic/ecom/v4/identities";
 const epicStoreGraphqlEndpoint = "https://store.epicgames.com/graphql";
 const discordAuthorizeEndpoint = "https://discord.com/oauth2/authorize";
 const discordTokenEndpoint = "https://discord.com/api/oauth2/token";
 const discordCurrentUserEndpoint = "https://discord.com/api/users/@me";
 const discordRelationshipsEndpoint = "https://discord.com/api/users/@me/relationships";
 const pendingStates = new Map();
-const pendingEpicStates = new Map();
 const pendingDiscordStates = new Map();
 
 const appDetailsCache = new Map();
 const achievementsCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
-const EPIC_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 
 const steamAuthLimiter = rateLimit({
@@ -133,9 +124,6 @@ const steamPrivateLimiter = rateLimit({
 const buildSteamReturnTo = (token) =>
   `${backendPublicUrl}/auth/steam/callback?token=${encodeURIComponent(token)}`;
 
-const buildEpicRedirectUri = () =>
-  process.env.EPIC_REDIRECT_URI?.trim() || `${backendPublicUrl}/auth/epic/callback`;
-
 const buildDiscordRedirectUri = () =>
   (
     process.env.DISCORD_REDIRECT_URI?.trim() ||
@@ -147,15 +135,6 @@ const cleanupPendingStates = () => {
   for (const [token, pending] of pendingStates.entries()) {
     if (now - pending.createdAt > STEAM_AUTH_STATE_TTL) {
       pendingStates.delete(token);
-    }
-  }
-};
-
-const cleanupPendingEpicStates = () => {
-  const now = Date.now();
-  for (const [state, pending] of pendingEpicStates.entries()) {
-    if (now - pending.createdAt > EPIC_AUTH_STATE_TTL) {
-      pendingEpicStates.delete(state);
     }
   }
 };
@@ -190,19 +169,6 @@ const buildSteamOpenIdUrl = (token) => {
   return openIdUrl.toString();
 };
 
-const buildEpicAuthorizeUrl = (state) => {
-  if (!epicClientId) {
-    throw new Error("EPIC_CLIENT_ID não configurado no backend.");
-  }
-  const authorizeUrl = new URL(epicAuthorizeEndpoint);
-  authorizeUrl.searchParams.set("client_id", epicClientId);
-  authorizeUrl.searchParams.set("response_type", "code");
-  authorizeUrl.searchParams.set("scope", epicOauthScope);
-  authorizeUrl.searchParams.set("redirect_uri", buildEpicRedirectUri());
-  authorizeUrl.searchParams.set("state", state);
-  return authorizeUrl.toString();
-};
-
 const buildDiscordAuthorizeUrl = (state) => {
   if (!discordClientId) {
     throw new Error("DISCORD_CLIENT_ID nao configurado no backend.");
@@ -215,101 +181,6 @@ const buildDiscordAuthorizeUrl = (state) => {
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("prompt", "consent");
   return authorizeUrl.toString();
-};
-
-const getEpicBasicAuthHeader = () => {
-  if (!epicClientId || !epicClientSecret) {
-    throw new Error("Credenciais Epic Games não configuradas no backend.");
-  }
-  return `Basic ${Buffer.from(`${epicClientId}:${epicClientSecret}`).toString("base64")}`;
-};
-
-const buildEpicTokenBody = (grantType, fields = {}) => {
-  const body = new URLSearchParams();
-  body.set("grant_type", grantType);
-  if (epicDeploymentId) {
-    body.set("deployment_id", epicDeploymentId);
-  }
-  Object.entries(fields).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      body.set(key, String(value));
-    }
-  });
-  return body;
-};
-
-const privateProfileDoc = (uid) => getFirestore().doc(`privateProfiles/${uid}`);
-
-const persistEpicSession = async (uid, tokenPayload) => {
-  const expiresIn = Number(tokenPayload?.expires_in ?? 0);
-  const accessToken = String(tokenPayload?.access_token ?? "").trim();
-  const refreshToken = String(tokenPayload?.refresh_token ?? "").trim();
-
-  await privateProfileDoc(uid).set(
-    {
-      epicAccessToken: accessToken,
-      epicAccessTokenExpiresAt:
-        Number.isFinite(expiresIn) && expiresIn > 0
-          ? new Date(Date.now() + expiresIn * 1000).toISOString()
-          : "",
-      epicRefreshToken: refreshToken,
-      epicTokenUpdatedAt: new Date().toISOString(),
-    },
-    { merge: true },
-  );
-};
-
-const requestEpicToken = async (grantType, fields = {}) => {
-  const response = await fetch(epicTokenEndpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: getEpicBasicAuthHeader(),
-    },
-    body: buildEpicTokenBody(grantType, fields),
-  });
-  const payload = await response.json().catch(() => ({}));
-  return { response, payload };
-};
-
-const maskIdentifier = (value) => {
-  const text = String(value ?? "").trim();
-  if (!text) return "";
-  if (text.length <= 8) return "configured";
-  return `${text.slice(0, 4)}...${text.slice(-4)}`;
-};
-
-const epicErrorReason = (payload) =>
-  String(
-    payload?.errorCode ??
-      payload?.error_code ??
-      payload?.error ??
-      payload?.message ??
-      "token_error",
-  )
-    .trim()
-    .replace(/[^a-zA-Z0-9_.-]/g, "_")
-    .slice(0, 120);
-
-const epicCorrectiveAction = (payload) =>
-  String(payload?.metadata?.correctiveAction ?? "")
-    .trim()
-    .replace(/[^a-zA-Z0-9_.-]/g, "_")
-    .slice(0, 120);
-
-const logEpicTokenError = (context, response, payload) => {
-  console.error("Epic OAuth token request failed", {
-    context,
-    status: response.status,
-    statusText: response.statusText,
-    reason: epicErrorReason(payload),
-    message: payload?.message,
-    metadata: payload?.metadata,
-    errorDescription: payload?.error_description,
-    redirectUri: buildEpicRedirectUri(),
-    hasDeploymentId: Boolean(epicDeploymentId),
-    scope: epicOauthScope,
-  });
 };
 
 const requestDiscordToken = async (code) => {
@@ -538,132 +409,6 @@ const postEpicGraphql = async (query, variables) => {
   }
 };
 
-const buildEpicLibraryGame = (ownedEntry, catalogItem) => {
-  const customAttributes = extractEpicCustomAttributes(catalogItem?.customAttributes);
-  const keyImages = Array.isArray(catalogItem?.keyImages) ? catalogItem.keyImages : [];
-  const screenshots = keyImages
-    .filter(
-      (image) =>
-        typeof image?.url === "string" &&
-        typeof image?.type === "string" &&
-        image.type.toLowerCase().includes("screenshot"),
-    )
-    .map((image) => image.url);
-
-  const namespace = String(ownedEntry?.namespace ?? catalogItem?.namespace ?? epicSandboxId ?? "");
-  const catalogId = String(ownedEntry?.itemId ?? catalogItem?.id ?? "");
-  const artifactId = String(
-    ownedEntry?.artifactId ??
-      ownedEntry?.artifact_id ??
-      ownedEntry?.appName ??
-      ownedEntry?.app_name ??
-      "",
-  ).trim();
-  const launchId =
-    namespace && catalogId && artifactId
-      ? encodeURIComponent(`${namespace}:${catalogId}:${artifactId}`)
-      : catalogId;
-
-  return {
-    namespace,
-    catalogId,
-    title:
-      String(catalogItem?.title ?? "").trim() ||
-      String(customAttributes?.productName ?? "").trim() ||
-      `Epic Item ${catalogId}`,
-    image:
-      pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]) ||
-      pickEpicImage(keyImages, ["thumbnail", "dieselgameboxtall"]),
-    backgroundImage: pickEpicImage(keyImages, ["wide", "hero", "vault", "offerimagewide"]),
-    cardImage: pickEpicImage(keyImages, ["tall", "thumbnail", "box"]),
-    logoImage: pickEpicImage(keyImages, ["logo"]),
-    description:
-      String(customAttributes?.shortDescription ?? "").trim() ||
-      `Importado da Epic Games. Catalog ID ${catalogId}.`,
-    aboutTheGame: String(customAttributes?.aboutThisGame ?? "").trim(),
-    releaseDate: String(customAttributes?.releaseDate ?? "").trim(),
-    developer:
-      String(customAttributes?.developerName ?? "").trim() ||
-      String(customAttributes?.developerDisplayName ?? "").trim(),
-    publisher:
-      String(customAttributes?.publisherName ?? "").trim() ||
-      String(customAttributes?.publisherDisplayName ?? "").trim(),
-    tags: Array.isArray(catalogItem?.categories)
-      ? catalogItem.categories
-          .map((category) => String(category?.path ?? "").split("/").pop())
-          .filter(Boolean)
-      : [],
-    screenshots,
-    offerSlug: String(catalogItem?.offers?.[0]?.urlSlug ?? "").trim(),
-    executablePath: launchId,
-  };
-};
-
-const normalizeEpicEntitlement = (entitlement) => {
-  const namespace = String(
-    entitlement?.namespace ??
-      entitlement?.catalogNamespace ??
-      entitlement?.sandboxId ??
-      epicSandboxId ??
-      "",
-  ).trim();
-  const itemId = String(
-    entitlement?.catalogItemId ??
-      entitlement?.itemId ??
-      entitlement?.entitlementName ??
-      "",
-  ).trim();
-
-  if (!itemId) {
-    return null;
-  }
-
-  return {
-    namespace,
-    itemId,
-    artifactId: entitlement?.artifactId ?? entitlement?.artifact_id ?? "",
-    owned: true,
-  };
-};
-
-const extractEpicEntitlements = (payload) => {
-  if (Array.isArray(payload)) return payload;
-
-  const candidates = [
-    payload?.elements,
-    payload?.entitlements,
-    payload?.items,
-    payload?.data?.elements,
-    payload?.data?.entitlements,
-    payload?.data?.items,
-  ];
-
-  return candidates.find(Array.isArray) ?? null;
-};
-
-const epicEcomErrorMessage = (response, payload) => {
-  const errorCode = String(payload?.errorCode ?? payload?.error_code ?? "").trim();
-  const numericErrorCode = String(payload?.numericErrorCode ?? "").trim();
-  const detail = [errorCode, numericErrorCode ? `#${numericErrorCode}` : ""]
-    .filter(Boolean)
-    .join(" ");
-
-  if (
-    response.status === 403 &&
-    (errorCode.includes("client_restricted") || numericErrorCode === "46022")
-  ) {
-    return [
-      "A Epic recusou o Ecom para este client.",
-      "Confira se o produto tem Ecom/Epic Games Store habilitado, se EPIC_SANDBOX_ID e EPIC_DEPLOYMENT_ID pertencem ao mesmo produto do OAuth Client, e se o client tem acesso a Ecom.",
-      detail ? `Detalhe Epic: ${detail}.` : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
-
-  return `Falha ao consultar biblioteca da Epic Games (status ${response.status}${detail ? `, ${detail}` : ""}).`;
-};
-
 const buildEpicDetails = (catalogId, namespace, catalogItem) => {
   const customAttributes = extractEpicCustomAttributes(catalogItem?.customAttributes);
   const keyImages = Array.isArray(catalogItem?.keyImages) ? catalogItem.keyImages : [];
@@ -808,46 +553,8 @@ const requireLinkedSteamId = async (req, res, next) => {
   }
 };
 
-const requireLinkedEpicAccountId = async (req, res, next) => {
-  const epicAccountId = String(req.query.epicAccountId ?? "").trim();
-  if (!epicAccountId) {
-    res.status(400).json({ error: "epicAccountId inválido." });
-    return;
-  }
-
-  try {
-    const uid = req.firebaseUser.uid;
-    const profileSnap = await getFirestore().doc(`profiles/${uid}`).get();
-    const linkedEpicAccountId = String(profileSnap.data()?.epicAccountId ?? "").trim();
-    if (linkedEpicAccountId !== epicAccountId) {
-      res.status(403).json({ error: "Epic Account ID não pertence ao usuário autenticado." });
-      return;
-    }
-    req.epicAccountId = epicAccountId;
-    next();
-  } catch {
-    res.status(500).json({ error: "Erro ao validar vínculo Epic Games." });
-  }
-};
-
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
-});
-
-app.get("/api/epic/oauth-config", (_req, res) => {
-  res.json({
-    authorizeEndpoint: epicAuthorizeEndpoint,
-    tokenEndpoint: epicTokenEndpoint,
-    redirectUri: buildEpicRedirectUri(),
-    scope: epicOauthScope,
-    hasClientId: Boolean(epicClientId),
-    hasClientSecret: Boolean(epicClientSecret),
-    clientId: maskIdentifier(epicClientId),
-    hasSandboxId: Boolean(epicSandboxId),
-    hasDeploymentId: Boolean(epicDeploymentId),
-    backendPublicUrl,
-    frontendUrl,
-  });
 });
 
 const publicProfile = (id, data = {}) => ({
@@ -1036,14 +743,11 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
         displayName: profileData.displayName || profileData.discordUsername || "Usuário",
         photoURL: profileData.discordAvatar || profileData.photoURL || "",
         steamId: profileData.steamId ? "connected" : "",
-        epicAccountId: profileData.epicAccountId ? "connected" : "",
         discordId: profileData.discordId ? "connected" : "",
         discordUsername: profileData.discordUsername || "",
         discordAvatar: profileData.discordAvatar || "",
         steamAvatar: profileData.steamAvatar || "",
         steamUsername: profileData.steamUsername || "",
-        epicAvatar: profileData.epicAvatar || "",
-        epicUsername: profileData.epicUsername || "",
         status: presence.status,
         playing: presence.playing,
       },
@@ -1357,29 +1061,6 @@ app.post("/auth/steam/start", steamAuthLimiter, requireFirebaseUser, (req, res) 
   res.json({ url: buildSteamOpenIdUrl(token) });
 });
 
-app.post("/auth/epic/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
-  cleanupPendingEpicStates();
-  if (!epicClientId || !epicClientSecret) {
-    res.status(500).json({ error: "Credenciais Epic Games não configuradas no backend." });
-    return;
-  }
-
-  const state = crypto.randomUUID();
-  pendingEpicStates.set(state, {
-    firebaseUid: req.firebaseUser.uid,
-    createdAt: Date.now(),
-  });
-
-  try {
-    res.json({ url: buildEpicAuthorizeUrl(state) });
-  } catch (error) {
-    pendingEpicStates.delete(state);
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Falha ao iniciar autenticação Epic.",
-    });
-  }
-});
-
 app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
   cleanupPendingDiscordStates();
   if (!discordClientId || !discordClientSecret) {
@@ -1452,89 +1133,6 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
     res.redirect(`${frontendUrl}/app?${params.toString()}`);
   } catch {
     res.redirect(`${frontendUrl}/app?steamStatus=error`);
-  }
-});
-
-app.get("/auth/epic/callback", steamAuthLimiter, async (req, res) => {
-  cleanupPendingEpicStates();
-  const state = String(req.query.state ?? "");
-  const pending = pendingEpicStates.get(state);
-  if (!pending) {
-    res.redirect(`${frontendUrl}/app?epicStatus=invalid_state`);
-    return;
-  }
-  pendingEpicStates.delete(state);
-
-  const oauthError = String(req.query.error ?? "").trim();
-  if (oauthError) {
-    res.redirect(`${frontendUrl}/app?epicStatus=denied`);
-    return;
-  }
-
-  const code = String(req.query.code ?? "").trim();
-  if (!code) {
-    res.redirect(`${frontendUrl}/app?epicStatus=missing_code`);
-    return;
-  }
-
-  if (!epicClientId || !epicClientSecret) {
-    res.redirect(`${frontendUrl}/app?epicStatus=client_not_configured`);
-    return;
-  }
-
-  if (getApps().length === 0) {
-    res.redirect(`${frontendUrl}/app?epicStatus=server_not_configured`);
-    return;
-  }
-
-  try {
-    const { response: tokenResponse, payload: tokenPayload } = await requestEpicToken(
-      "authorization_code",
-      {
-        code,
-        redirect_uri: buildEpicRedirectUri(),
-      },
-    );
-
-    if (!tokenResponse.ok) {
-      const reason = epicErrorReason(tokenPayload);
-      const correctiveAction = epicCorrectiveAction(tokenPayload);
-      logEpicTokenError("authorization_code", tokenResponse, tokenPayload);
-      const params = new URLSearchParams({
-        epicStatus: "token_error",
-        epicReason: reason,
-      });
-      if (correctiveAction) {
-        params.set("epicAction", correctiveAction);
-      }
-      res.redirect(`${frontendUrl}/app?${params.toString()}`);
-      return;
-    }
-
-    const epicAccountId = String(
-      tokenPayload?.account_id ??
-        tokenPayload?.accountId ??
-        tokenPayload?.sub ??
-        "",
-    ).trim();
-
-    if (!epicAccountId) {
-      res.redirect(`${frontendUrl}/app?epicStatus=missing_id`);
-      return;
-    }
-
-    await persistEpicSession(pending.firebaseUid, tokenPayload);
-    await getFirestore().doc(`profiles/${pending.firebaseUid}`).set(
-      {
-        epicAccountId,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
-
-    res.redirect(`${frontendUrl}/app?epicStatus=ok`);
-  } catch {
-    res.redirect(`${frontendUrl}/app?epicStatus=error`);
   }
 });
 
@@ -1630,22 +1228,6 @@ app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, asyn
   }
 });
 
-app.post("/api/epic/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
-  try {
-    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
-      {
-        epicAccountId: "",
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
-    await privateProfileDoc(req.firebaseUser.uid).delete().catch(() => {});
-    res.json({ ok: true });
-  } catch {
-    res.status(500).json({ error: "Erro ao desconectar Epic Games." });
-  }
-});
-
 app.post("/api/discord/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
     await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
@@ -1663,134 +1245,6 @@ app.post("/api/discord/disconnect", steamPrivateLimiter, requireFirebaseUser, as
     res.status(500).json({ error: "Erro ao desconectar Discord." });
   }
 });
-
-app.get(
-  "/api/epic/library",
-  steamPrivateLimiter,
-  requireFirebaseUser,
-  requireLinkedEpicAccountId,
-  async (req, res) => {
-    if (!epicSandboxId) {
-      res.status(500).json({ error: "EPIC_SANDBOX_ID não configurado no backend." });
-      return;
-    }
-
-    try {
-      const privateSnap = await privateProfileDoc(req.firebaseUser.uid).get();
-      const session = privateSnap.data() ?? {};
-      const accessToken = String(session?.epicAccessToken ?? "").trim();
-      const accessTokenExpiresAt = String(session?.epicAccessTokenExpiresAt ?? "").trim();
-      const refreshToken = String(session?.epicRefreshToken ?? "").trim();
-
-      let resolvedAccessToken = accessToken;
-      const tokenStillValid =
-        resolvedAccessToken &&
-        accessTokenExpiresAt &&
-        Date.parse(accessTokenExpiresAt) > Date.now() + 60 * 1000;
-      const shouldRefreshForEcom = Boolean(epicDeploymentId && refreshToken);
-
-      if (!tokenStillValid || shouldRefreshForEcom) {
-        if (!refreshToken) {
-          res
-            .status(401)
-            .json({ error: "Sessão Epic Games expirada. Conecte a conta novamente." });
-          return;
-        }
-
-        const { response: refreshResponse, payload: refreshPayload } = await requestEpicToken(
-          "refresh_token",
-          {
-            refresh_token: refreshToken,
-          },
-        );
-
-        if (!refreshResponse.ok) {
-          logEpicTokenError("refresh_token", refreshResponse, refreshPayload);
-          res
-            .status(401)
-            .json({ error: "Sessão Epic Games expirada. Conecte a conta novamente." });
-          return;
-        }
-
-        await persistEpicSession(req.firebaseUser.uid, refreshPayload);
-        resolvedAccessToken = String(refreshPayload?.access_token ?? "").trim();
-      }
-
-      if (!resolvedAccessToken) {
-        res
-          .status(401)
-          .json({ error: "Não foi possível obter token de acesso da Epic Games." });
-        return;
-      }
-
-      const entitlementsUrl = new URL(
-        `${epicEntitlementsEndpointBase}/${encodeURIComponent(req.epicAccountId)}/entitlements`,
-      );
-      entitlementsUrl.searchParams.set("sandboxId", epicSandboxId);
-
-      const entitlementsResponse = await fetch(entitlementsUrl.toString(), {
-        headers: {
-          Authorization: `Bearer ${resolvedAccessToken}`,
-          Accept: "application/json",
-        },
-      });
-
-      const entitlementsPayload = await entitlementsResponse.json().catch(() => []);
-      if (!entitlementsResponse.ok) {
-        console.error("Epic Ecom entitlements request failed", {
-          status: entitlementsResponse.status,
-          statusText: entitlementsResponse.statusText,
-          errorCode: entitlementsPayload?.errorCode ?? entitlementsPayload?.error_code,
-          numericErrorCode: entitlementsPayload?.numericErrorCode,
-          message: entitlementsPayload?.errorMessage ?? entitlementsPayload?.message,
-          sandboxId: epicSandboxId,
-          hasDeploymentId: Boolean(epicDeploymentId),
-        });
-        res.status(502).json({
-          error: epicEcomErrorMessage(entitlementsResponse, entitlementsPayload),
-        });
-        return;
-      }
-
-      const entitlements = extractEpicEntitlements(entitlementsPayload);
-
-      if (!entitlements) {
-        res.status(502).json({ error: "Resposta inválida da Epic Games." });
-        return;
-      }
-
-      const ownedEntries = entitlements.map(normalizeEpicEntitlement).filter(Boolean);
-
-      const enrichedGames = [];
-      const CHUNK_SIZE = 8;
-      for (let i = 0; i < ownedEntries.length; i += CHUNK_SIZE) {
-        const chunk = ownedEntries.slice(i, i + CHUNK_SIZE);
-        const chunkResults = await Promise.all(
-          chunk.map(async (entry) => {
-            try {
-              const catalogItem = await fetchEpicCatalogItem(
-                String(entry.namespace ?? epicSandboxId),
-                String(entry.itemId),
-              );
-              return buildEpicLibraryGame(entry, catalogItem);
-            } catch {
-              return buildEpicLibraryGame(entry, null);
-            }
-          }),
-        );
-        enrichedGames.push(...chunkResults);
-      }
-
-      res.json({
-        epicAccountId: req.epicAccountId,
-        gameCount: enrichedGames.length,
-        games: enrichedGames,
-      });
-    } catch {
-      res.status(500).json({ error: "Erro interno ao consultar biblioteca Epic Games." });
-    }
-  },
-);
 
 app.get("/api/steam/library", steamPrivateLimiter, requireFirebaseUser, requireLinkedSteamId, async (req, res) => {
   if (!steamApiKey) {
@@ -2130,7 +1584,8 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
     const result = {
       appId,
       title: data?.name ?? null,
-      cardImage: data?.header_image ?? null,
+      cardImage: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`,
+       headerImage: data?.header_image ?? null,
       backgroundImage: data?.background_raw ?? data?.background ?? null,
       logoImage: data?.capsule_imagev5 ?? data?.capsule_image ?? null,
       description: data?.short_description ?? null,

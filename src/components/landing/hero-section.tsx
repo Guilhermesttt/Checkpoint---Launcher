@@ -142,7 +142,7 @@ export function HeroSection() {
 
           <div className={`transition-all duration-700 delay-300 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <p className="text-xl text-white/50 leading-relaxed mb-10 max-w-xl">
-              Conecte Steam e Epic Games, adicione jogos locais e acesse tudo em um launcher bonito com estética de console premium.
+              Sincronize Steam, enriqueça jogos da Epic com capas e detalhes, adicione jogos locais e organize tudo em um hub com estética de console premium.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
@@ -179,7 +179,7 @@ export function HeroSection() {
                   />
                 </span>
               ),
-              label: "Steam e Epic integradas",
+              label: "Steam library + Epic catalog",
             },
             { value: "<1s", label: "para lançar um jogo" },
           ].map((stat) => (

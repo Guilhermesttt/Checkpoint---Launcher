@@ -6,7 +6,7 @@ const features = [
     number: "01",
     icon: Gamepad2,
     title: "Biblioteca Unificada",
-    description: "Reúna todos os seus jogos - Steam, Epic e locais - em uma única interface elegante. Chega de abrir múltiplos launchers.",
+    description: "Reúna Steam, jogos locais e entradas assistidas da Epic em uma única interface elegante. Organize tudo sem depender de APIs fechadas.",
     stats: { value: "∞", label: "jogos suportados" },
   },
   {

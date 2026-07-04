@@ -28,7 +28,6 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   displayName: data?.displayName ?? null,
   photoURL: data?.photoURL ?? null,
   steamId: data?.steamId,
-  epicAccountId: data?.epicAccountId,
   discordId: data?.discordId,
   discordUsername: data?.discordUsername,
   discordAvatar: data?.discordAvatar,
@@ -41,7 +40,6 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   createdAt: data?.createdAt,
   updatedAt: data?.updatedAt,
   lastSteamSyncAt: data?.lastSteamSyncAt,
-  lastEpicSyncAt: data?.lastEpicSyncAt,
   gamesMigratedAt: data?.gamesMigratedAt,
   onboardingCompletedAt: data?.onboardingCompletedAt,
 });

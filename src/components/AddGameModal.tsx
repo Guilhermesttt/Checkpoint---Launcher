@@ -28,6 +28,7 @@ import {
   fetchSteamAppDetailsResult,
 } from "../services/steam";
 import {
+  fetchEpicAppDetailsResult,
   searchEpicGames,
 } from "../services/epic";
 import { apiUrl } from "../services/api";
@@ -57,9 +58,19 @@ const CATEGORIES = [
   { id: "RACING", label: "Corrida" },
   { id: "RPG", label: "RPG" },
   { id: "SHOOTER", label: "FPS" },
+  { id: "ARCADE", label: "Arcade" },
+  { id: "FIGHTING", label: "Luta" },
+  { id: "ROLE_PLAYING", label: "Role Playing" },
+  { id: "Multiplayer", label: "Multiplayer" },
   { id: "SPORTS", label: "Esportes" },
   { id: "HORROR", label: "Terror" },
+  { id: "STRATEGY", label: "Estratégia" },
+  { id: "SIMULATION", label: "Simulação" },
+  { id: "PUZZLE", label: "Quebra-Cabeça" },
+  { id: "CASUAL", label: "Casual" },
 ];
+
+
 
 type GameFormData = {
   title: string;
@@ -83,6 +94,7 @@ type GameFormData = {
   trailerUrl?: string;
   screenshots?: string[];
   source?: "manual" | "steam" | "epic";
+  hasGame?: boolean;
 };
 
 const removeUndefined = (data: Record<string, unknown>) =>
@@ -217,6 +229,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           trailerUrl: gameToEdit.trailerUrl || "",
           screenshots: gameToEdit.screenshots || [],
           source: gameToEdit.source || "manual",
+          hasGame: gameToEdit.hasGame ?? false,
         });
       } else {
         setFormData({
@@ -228,6 +241,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           launcherType: "local",
           executablePath: "",
           source: "manual",
+          hasGame: false,
         });
       }
     }
@@ -274,18 +288,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       const details = await fetchSteamAppDetailsResult(appId);
       if (details.ok) {
         const d = details.data;
+        const steamCover =
+          d.cardImage ||
+          `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`;
+        const steamWallpaper =
+          d.backgroundImage ||
+          `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
         setFormData((prev) => ({
           ...prev,
           title: d.title || game.name,
-          image:
-            d.backgroundImage ||
-            `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`,
-          cardImage:
-            d.cardImage ||
-            `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`,
-          backgroundImage:
-            d.backgroundImage ||
-            `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`,
+          image: steamCover,
+          cardImage: steamCover,
+          backgroundImage: steamWallpaper,
           logoImage: d.logoImage || "",
           description: d.description || "",
           aboutTheGame: d.aboutTheGame || d.description || "",
@@ -348,28 +362,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       const catalogId = String(game.id || game.catalogId || "").trim();
       const namespace = String(game.namespace || "").trim();
       const launchId = namespace && catalogId ? `${namespace}:${catalogId}` : catalogId;
+      const details =
+        catalogId && namespace
+          ? await fetchEpicAppDetailsResult(catalogId, namespace).catch(() => null)
+          : null;
+      const d = details?.ok ? details.data : null;
 
       setFormData((prev) => ({
         ...prev,
-        title: game.title || game.name || "",
-        image: game.image || game.backgroundImage || game.cardImage || game.tiny_image || "",
-        cardImage: game.cardImage || game.tiny_image || game.image || "",
-        backgroundImage: game.backgroundImage || game.image || "",
-        logoImage: game.logoImage || "",
-        description: game.description || "",
-        aboutTheGame: game.aboutTheGame || game.description || "",
+        title: d?.title || game.title || game.name || "",
+        image: d?.cardImage || game.cardImage || game.tiny_image || game.image || "",
+        cardImage: d?.cardImage || game.cardImage || game.tiny_image || game.image || "",
+        backgroundImage: d?.backgroundImage || game.backgroundImage || game.image || "",
+        logoImage: d?.logoImage || game.logoImage || "",
+        description: d?.description || game.description || "",
+        aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
         launcherType: "epic",
         executablePath: launchId,
         steamAppId: "",
         epicCatalogId: catalogId,
         epicStoreUrl: game.productUrl || "",
-        releaseDate: game.releaseDate || "",
-        developer: game.developer || "",
-        publisher: game.publisher || "",
-        tags: game.tags || [],
-        trailerUrl: "",
-        screenshots: game.screenshots || [],
-        source: "manual",
+        releaseDate: d?.releaseDate || game.releaseDate || "",
+        developer: d?.developer || game.developer || "",
+        publisher: d?.publisher || game.publisher || "",
+        tags: d?.tags || game.tags || [],
+        trailerUrl: d?.trailerUrl || "",
+        screenshots: d?.screenshots || game.screenshots || [],
+        source: "epic",
+        hasGame: false,
       }));
       setSearchResults([]);
       setSearchQuery("");
@@ -445,7 +465,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     playSound("select");
     try {
       const image =
-        formData.image || formData.backgroundImage || formData.cardImage || "";
+        formData.cardImage || formData.image || formData.backgroundImage || "";
       const data = removeUndefined({
         ...formData,
         image,
@@ -456,11 +476,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           ...data,
           ...(formData.launcherType !== "steam"
             ? {
-                steamPlaytimeMinutes: deleteField(),
-                steamLastPlayedAt: deleteField(),
-                totalAchievements: deleteField(),
-                completedAchievements: deleteField(),
-              }
+              steamPlaytimeMinutes: deleteField(),
+              steamLastPlayedAt: deleteField(),
+              totalAchievements: deleteField(),
+              completedAchievements: deleteField(),
+            }
             : {}),
         });
         notify("Jogo atualizado!", "success");
@@ -532,11 +552,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       source: "manual",
                     }));
                   }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                    formData.launcherType === "local"
-                      ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                      : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "local"
+                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                    }`}
                 >
                   {copy.local}
                 </button>
@@ -551,11 +570,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       source: "manual",
                     }));
                   }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                    formData.launcherType === "steam"
-                      ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                      : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "steam"
+                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                    }`}
                 >
                   {copy.steam}
                 </button>
@@ -569,11 +587,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       source: "manual",
                     }));
                   }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                    formData.launcherType === "epic"
-                      ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                      : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "epic"
+                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                    }`}
                 >
                   {copy.epic}
                 </button>
@@ -690,6 +707,27 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
             )}
 
+            {(formData.epicCatalogId || formData.steamAppId) && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('select')
+                    setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }))
+                  }}
+
+                  className={`w-full px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border flex items-center justify-center gap-2 ${formData.hasGame
+                    ? "bg-emerald-500/90 text-black border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                    : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                    }`}
+                >
+                  {formData.hasGame ? "✓ Tenho esse jogo" : "Confirmar que possuo este jogo"}
+                </button>
+              </div>
+            )}
+
+
+
             <div className="h-px bg-white/5" />
 
             <div className="grid grid-cols-1 gap-6">
@@ -703,7 +741,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     setFormData({ ...formData, title: e.target.value })
                   }
                   placeholder={copy.titlePlaceholder}
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-white/30 transition-all"
+                  className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-white/30 transition-all"
                 />
               </div>
 
@@ -719,11 +757,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                         playSound("navigate");
                         setFormData({ ...formData, category: cat.id });
                       }}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                        formData.category === cat.id
-                          ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                          : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                      }`}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.category === cat.id
+                        ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                        : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
+                        }`}
                     >
                       {cat.label}
                     </button>
@@ -743,7 +780,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       setFormData({ ...formData, cardImage: e.target.value })
                     }
                     placeholder="https://..."
-                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                    className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -778,7 +815,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       })
                     }
                     placeholder="https://..."
-                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                    className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -822,7 +859,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     >
                       {copy.chooseExe}
                     </button>
-                    <div className="min-w-0 flex-1 rounded-2xl bg-white/[0.03] border border-white/10 px-4 py-3">
+                    <div className="min-w-0 flex-1 rounded-2xl bg-white/0.03 border border-white/10 px-4 py-3">
                       <p className="truncate text-xs text-white/70">
                         {formData.executablePath || copy.noExecutable}
                       </p>
@@ -836,11 +873,17 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             </div>
 
             <button
-              disabled={loading || !formData.title}
+              disabled={
+                loading ||
+                !formData.title ||
+                ((formData.launcherType === "epic" ||
+                  formData.launcherType === "steam") &&
+                  !formData.hasGame)
+              }
               onClick={handleSubmit}
               className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-[#e0e0e0] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.1)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
               {loading ? (
                 <RefreshCw size={18} className="animate-spin" />
               ) : (
