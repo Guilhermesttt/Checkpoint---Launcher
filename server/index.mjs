@@ -227,9 +227,6 @@ const getEpicBasicAuthHeader = () => {
 const buildEpicTokenBody = (grantType, fields = {}) => {
   const body = new URLSearchParams();
   body.set("grant_type", grantType);
-  if (epicDeploymentId) {
-    body.set("deployment_id", epicDeploymentId);
-  }
   Object.entries(fields).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       body.set(key, String(value));
@@ -298,6 +295,7 @@ const logEpicTokenError = (context, response, payload) => {
     statusText: response.statusText,
     reason: epicErrorReason(payload),
     message: payload?.message,
+    metadata: payload?.metadata,
     errorDescription: payload?.error_description,
     redirectUri: buildEpicRedirectUri(),
     hasDeploymentId: Boolean(epicDeploymentId),
