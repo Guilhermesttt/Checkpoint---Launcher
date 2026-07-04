@@ -134,10 +134,7 @@ const buildSteamReturnTo = (token) =>
   `${backendPublicUrl}/auth/steam/callback?token=${encodeURIComponent(token)}`;
 
 const buildEpicRedirectUri = () =>
-  (process.env.EPIC_REDIRECT_URI?.trim() || `${backendPublicUrl}/auth/epic/callback`).replace(
-    /\/$/,
-    "",
-  );
+  process.env.EPIC_REDIRECT_URI?.trim() || `${backendPublicUrl}/auth/epic/callback`;
 
 const buildDiscordRedirectUri = () =>
   (
@@ -230,6 +227,12 @@ const getEpicBasicAuthHeader = () => {
 const buildEpicTokenBody = (grantType, fields = {}) => {
   const body = new URLSearchParams();
   body.set("grant_type", grantType);
+  if (epicClientId) {
+    body.set("client_id", epicClientId);
+  }
+  if (epicClientSecret) {
+    body.set("client_secret", epicClientSecret);
+  }
   if (epicDeploymentId) {
     body.set("deployment_id", epicDeploymentId);
   }
@@ -273,6 +276,32 @@ const requestEpicToken = async (grantType, fields = {}) => {
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
+};
+
+const epicErrorReason = (payload) =>
+  String(
+    payload?.errorCode ??
+      payload?.error_code ??
+      payload?.error ??
+      payload?.message ??
+      "token_error",
+  )
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, "_")
+    .slice(0, 120);
+
+const logEpicTokenError = (context, response, payload) => {
+  console.error("Epic OAuth token request failed", {
+    context,
+    status: response.status,
+    statusText: response.statusText,
+    reason: epicErrorReason(payload),
+    message: payload?.message,
+    errorDescription: payload?.error_description,
+    redirectUri: buildEpicRedirectUri(),
+    hasDeploymentId: Boolean(epicDeploymentId),
+    scope: epicOauthScope,
+  });
 };
 
 const requestDiscordToken = async (code) => {
@@ -1379,7 +1408,13 @@ app.get("/auth/epic/callback", steamAuthLimiter, async (req, res) => {
     );
 
     if (!tokenResponse.ok) {
-      res.redirect(`${frontendUrl}/app?epicStatus=token_error`);
+      const reason = epicErrorReason(tokenPayload);
+      logEpicTokenError("authorization_code", tokenResponse, tokenPayload);
+      const params = new URLSearchParams({
+        epicStatus: "token_error",
+        epicReason: reason,
+      });
+      res.redirect(`${frontendUrl}/app?${params.toString()}`);
       return;
     }
 
@@ -1576,6 +1611,7 @@ app.get(
         );
 
         if (!refreshResponse.ok) {
+          logEpicTokenError("refresh_token", refreshResponse, refreshPayload);
           res
             .status(401)
             .json({ error: "Sessão Epic Games expirada. Conecte a conta novamente." });

@@ -914,6 +914,7 @@ const Home: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const steamStatus = params.get("steamStatus");
     const epicStatus = params.get("epicStatus");
+    const epicReason = params.get("epicReason");
     const discordStatus = params.get("discordStatus");
     if ((!steamStatus && !epicStatus && !discordStatus) || !user?.uid) return;
 
@@ -949,8 +950,23 @@ const Home: React.FC = () => {
         token_error: "A Epic Games recusou a troca do código de autenticação.",
         error: "Erro inesperado.",
       };
+      const reasonLabels: Record<string, string> = {
+        invalid_client:
+          "A Epic recusou as credenciais. Confira EPIC_CLIENT_ID e EPIC_CLIENT_SECRET do OAuth Client aprovado.",
+        invalid_grant:
+          "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
+        redirect_uri_mismatch:
+          "Redirect URL da Epic diferente da URL usada pelo backend.",
+        "errors.com.epicgames.oauth.invalid_client":
+          "A Epic recusou as credenciais. Confira EPIC_CLIENT_ID e EPIC_CLIENT_SECRET do OAuth Client aprovado.",
+        "errors.com.epicgames.oauth.invalid_grant":
+          "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
+      };
       notify(
-        labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.",
+        epicStatus === "token_error" && epicReason
+          ? reasonLabels[epicReason] ||
+              `A Epic recusou a troca do código (${epicReason}).`
+          : labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.",
         "error",
       );
     }
