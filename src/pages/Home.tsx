@@ -915,6 +915,7 @@ const Home: React.FC = () => {
     const steamStatus = params.get("steamStatus");
     const epicStatus = params.get("epicStatus");
     const epicReason = params.get("epicReason");
+    const epicAction = params.get("epicAction");
     const discordStatus = params.get("discordStatus");
     if ((!steamStatus && !epicStatus && !discordStatus) || !user?.uid) return;
 
@@ -964,11 +965,24 @@ const Home: React.FC = () => {
         "errors.com.epicgames.oauth.invalid_grant":
           "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
       };
-      notify(
+      const actionLabels: Record<string, string> = {
+        EULA_ACCEPTANCE:
+          "A Epic está exigindo aceite de termos/EULA nessa conta. Entre no site da Epic com essa conta, aceite a pendência e tente conectar novamente.",
+        TERMS_ACCEPTANCE:
+          "A Epic está exigindo aceite de termos nessa conta. Entre no site da Epic com essa conta, aceite a pendência e tente conectar novamente.",
+        ACCOUNT_RECOVERY:
+          "A Epic está exigindo recuperação/verificação da conta antes de liberar o login OAuth.",
+      };
+      const epicTokenMessage =
         epicStatus === "token_error" && epicReason
-          ? reasonLabels[epicReason] ||
+          ? epicAction
+            ? actionLabels[epicAction] ||
+              `A Epic exige uma ação na conta antes de autenticar (${epicAction}).`
+            : reasonLabels[epicReason] ||
               `A Epic recusou a troca do código (${epicReason}).`
-          : labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.",
+          : labels[epicStatus] ?? "Não foi possível conectar com a Epic Games.";
+      notify(
+        epicTokenMessage,
         "error",
       );
     }

@@ -288,6 +288,12 @@ const epicErrorReason = (payload) =>
     .replace(/[^a-zA-Z0-9_.-]/g, "_")
     .slice(0, 120);
 
+const epicCorrectiveAction = (payload) =>
+  String(payload?.metadata?.correctiveAction ?? "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_.-]/g, "_")
+    .slice(0, 120);
+
 const logEpicTokenError = (context, response, payload) => {
   console.error("Epic OAuth token request failed", {
     context,
@@ -1424,11 +1430,15 @@ app.get("/auth/epic/callback", steamAuthLimiter, async (req, res) => {
 
     if (!tokenResponse.ok) {
       const reason = epicErrorReason(tokenPayload);
+      const correctiveAction = epicCorrectiveAction(tokenPayload);
       logEpicTokenError("authorization_code", tokenResponse, tokenPayload);
       const params = new URLSearchParams({
         epicStatus: "token_error",
         epicReason: reason,
       });
+      if (correctiveAction) {
+        params.set("epicAction", correctiveAction);
+      }
       res.redirect(`${frontendUrl}/app?${params.toString()}`);
       return;
     }
