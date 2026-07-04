@@ -957,6 +957,8 @@ const Home: React.FC = () => {
           "A Epic recusou o código. Confira se a Redirect URL cadastrada é exatamente a mesma do backend.",
         redirect_uri_mismatch:
           "Redirect URL da Epic diferente da URL usada pelo backend.",
+        "errors.com.epicgames.oauth.corrective_action_required":
+          "A Epic exige uma ação na conta ou no consentimento. Entre no site da Epic com essa conta, aceite pendências/termos e confira se os escopos aprovados batem com EPIC_OAUTH_SCOPE.",
         "errors.com.epicgames.oauth.invalid_client":
           "A Epic recusou as credenciais. Confira EPIC_CLIENT_ID e EPIC_CLIENT_SECRET do OAuth Client aprovado.",
         "errors.com.epicgames.oauth.invalid_grant":

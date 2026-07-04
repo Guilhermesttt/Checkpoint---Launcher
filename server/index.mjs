@@ -227,12 +227,6 @@ const getEpicBasicAuthHeader = () => {
 const buildEpicTokenBody = (grantType, fields = {}) => {
   const body = new URLSearchParams();
   body.set("grant_type", grantType);
-  if (epicClientId) {
-    body.set("client_id", epicClientId);
-  }
-  if (epicClientSecret) {
-    body.set("client_secret", epicClientSecret);
-  }
   if (epicDeploymentId) {
     body.set("deployment_id", epicDeploymentId);
   }
@@ -276,6 +270,13 @@ const requestEpicToken = async (grantType, fields = {}) => {
   });
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
+};
+
+const maskIdentifier = (value) => {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (text.length <= 8) return "configured";
+  return `${text.slice(0, 4)}...${text.slice(-4)}`;
 };
 
 const epicErrorReason = (payload) =>
@@ -759,6 +760,22 @@ const requireLinkedEpicAccountId = async (req, res, next) => {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/api/epic/oauth-config", (_req, res) => {
+  res.json({
+    authorizeEndpoint: epicAuthorizeEndpoint,
+    tokenEndpoint: epicTokenEndpoint,
+    redirectUri: buildEpicRedirectUri(),
+    scope: epicOauthScope,
+    hasClientId: Boolean(epicClientId),
+    hasClientSecret: Boolean(epicClientSecret),
+    clientId: maskIdentifier(epicClientId),
+    hasSandboxId: Boolean(epicSandboxId),
+    hasDeploymentId: Boolean(epicDeploymentId),
+    backendPublicUrl,
+    frontendUrl,
+  });
 });
 
 const publicProfile = (id, data = {}) => ({
