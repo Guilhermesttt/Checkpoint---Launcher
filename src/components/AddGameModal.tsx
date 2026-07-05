@@ -32,11 +32,12 @@ import {
   searchEpicGames,
 } from "../services/epic";
 import { apiUrl } from "../services/api";
+import type { SoundEffectType } from "../hooks/useSoundEffects";
 
 interface AddGameModalProps {
   isOpen: boolean;
   onClose: (silent?: boolean) => void;
-  playSound: (type: "select" | "back" | "navigate") => void;
+  playSound: (type: SoundEffectType) => void;
   gameToEdit?: any | null;
   onSaved?: () => void;
 }
@@ -303,11 +304,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           logoImage: d.logoImage || "",
           description: d.description || "",
           aboutTheGame: d.aboutTheGame || d.description || "",
-          launcherType: "steam",
-          executablePath: appId,
-          steamAppId: appId,
-          epicCatalogId: "",
-          epicStoreUrl: "",
+          launcherType: prev.launcherType === "local" ? "local" : "steam",
+          executablePath:
+            prev.launcherType === "local" ? prev.executablePath : appId,
+          steamAppId: prev.launcherType === "local" ? "" : appId,
+          epicCatalogId: prev.launcherType === "local" ? prev.epicCatalogId : "",
+          epicStoreUrl: prev.launcherType === "local" ? prev.epicStoreUrl : "",
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
               ? Math.round(d.sizeGB)
@@ -597,7 +599,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
             </div>
 
-            {formData.launcherType === "steam" && (
+            {(formData.launcherType === "steam" || formData.launcherType === "local") && (
               <div className="space-y-4">
                 <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
                   <Search size={14} className="text-white/20" /> {copy.steamSearch}

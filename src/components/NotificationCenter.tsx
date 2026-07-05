@@ -49,27 +49,39 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   return (
     <NotificationContext.Provider value={value}>
       {children}
-      <div className="fixed right-4 top-4 z-200 flex w-full max-w-sm flex-col gap-2 pointer-events-none">
-        <AnimatePresence>
+      <div className="fixed right-6 bottom-6 z-200 flex w-full max-w-sm flex-col-reverse gap-3 pointer-events-none">
+        <AnimatePresence mode="popLayout">
           {items.map((item) => (
             <motion.div
               key={item.id}
-              initial={{ opacity: 0, x: 24, scale: 0.98 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 24, scale: 0.98 }}
-              className={`pointer-events-auto liquid-glass-dark rounded-2xl border ${ringByType[item.type]} shadow-2xl p-3`}
+              layout
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.9, transition: { duration: 0.15 } }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="pointer-events-auto bg-[#0a0a0c]/80 backdrop-blur-2xl rounded-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5 pr-4 flex items-center gap-3"
             >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5">{iconByType[item.type]}</div>
-                <p className="text-sm text-white/85 flex-1">{item.message}</p>
-                <button
-                  type="button"
-                  onClick={() => dismiss(item.id)}
-                  className="text-white/45 hover:text-white/80 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+              <div
+                className={`flex items-center justify-center w-8 h-8 rounded-full ${
+                  item.type === "success"
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : item.type === "error"
+                    ? "bg-rose-500/20 text-rose-400"
+                    : "bg-blue-500/20 text-blue-400"
+                }`}
+              >
+                {item.type === "success" && <CheckCircle2 size={16} strokeWidth={2.5} />}
+                {item.type === "error" && <AlertCircle size={16} strokeWidth={2.5} />}
+                {item.type === "info" && <Info size={16} strokeWidth={2.5} />}
               </div>
+              <p className="text-[13px] font-semibold text-white/90 flex-1">{item.message}</p>
+              <button
+                type="button"
+                onClick={() => dismiss(item.id)}
+                className="ml-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded-full p-1 transition-all"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </button>
             </motion.div>
           ))}
         </AnimatePresence>

@@ -13,6 +13,8 @@ import ps5PlaySoundEffect from "../sounds/PS5_Sounds/deck_ui_achievement_toast.w
 import ps5GameBootSound from "../sounds/PS5_Sounds/deck_ui_launch_game.wav";
 import ps5SearchSound from "../sounds/PS5_Sounds/deck_ui_show_modal.wav";
 import ps5DetailOpenSound from "../sounds/PS5_Sounds/deck_ui_into_game_detail.wav";
+import ps5MessageToastSound from "../sounds/PS5_Sounds/deck_ui_message_toast.wav";
+import ps5AchievementUnlockSound from "../sounds/PS5_Sounds/Achievment_Unlock.mp3";
 
 import ps2NavigateSound from "../sounds/PS2-System-Sounds/deck_ui_navigation.wav";
 import ps2ClickSound from "../sounds/PS2-System-Sounds/deck_ui_toast.wav";
@@ -67,6 +69,9 @@ const soundThemes = {
     boot: ps5GameBootSound,
     search: ps5SearchSound,
     detailOpen: ps5DetailOpenSound,
+    friendRequest: ps5MessageToastSound,
+    showModal: ps5SearchSound,
+    overlayAchievement: ps5AchievementUnlockSound,
   },
   ps2: {
     navigate: ps2NavigateSound,
@@ -82,6 +87,9 @@ const soundThemes = {
     boot: ps2GameBootSound,
     search: ps2SearchSound,
     detailOpen: ps2DetailOpenSound,
+    friendRequest: ps5MessageToastSound,
+    showModal: ps2SearchSound,
+    overlayAchievement: ps5AchievementUnlockSound,
   },
   gamecube: {
     navigate: gcNavigateSound,
@@ -97,6 +105,9 @@ const soundThemes = {
     boot: gcGameBootSound,
     search: gcSearchSound,
     detailOpen: gcDetailOpenSound,
+    friendRequest: ps5MessageToastSound,
+    showModal: gcSearchSound,
+    overlayAchievement: ps5AchievementUnlockSound,
   },
   xbox360: {
     navigate: xbNavigateSound,
@@ -112,6 +123,9 @@ const soundThemes = {
     boot: xbGameBootSound,
     search: xbSearchSound,
     detailOpen: xbDetailOpenSound,
+    friendRequest: ps5MessageToastSound,
+    showModal: xbSearchSound,
+    overlayAchievement: ps5AchievementUnlockSound,
   },
 };
 

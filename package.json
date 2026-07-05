@@ -10,9 +10,10 @@
   "scripts": {
     "dev": "vite",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
-    "electron:dev": "concurrently -k \"cross-env FRONTEND_URL=http://127.0.0.1:5173 BACKEND_PUBLIC_URL=http://localhost:8787 DISCORD_REDIRECT_URI=http://localhost:8787/auth/discord/callback GOOGLE_REDIRECT_URI=http://localhost:8787/auth/google/callback npm run server\" \"npm run dev -- --host 127.0.0.1 --strictPort\" \"wait-on http://127.0.0.1:5173 http://localhost:8787/health && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-electron-dev.ps1\"",
+    "electron:dev": "node scripts/electron-dev.cjs",
     "build": "tsc -b && vite build",
-    "dist": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-win-installer.ps1",
+    "dist": "node scripts/build-portable.cjs",
+    "dist:windows": "node scripts/build-portable.cjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node ./server/index.mjs"
@@ -25,16 +26,17 @@
     },
     "files": [
       "dist/**/*",
+      "src/sounds/**/*",
       "electron/**/*",
       "assets/**/*",
-      "server/**/*",
       "package.json"
     ],
     "asar": true,
+    "asarUnpack": [],
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        "nsis"
+        "dir"
       ]
     },
     "nsis": {

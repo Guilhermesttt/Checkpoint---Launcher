@@ -50,7 +50,6 @@ import DynamicBackground from "../components/DynamicBackground";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
-import LocalGameScanner from "../components/LocalGameScanner";
 import {
   AddFriendModal,
   ConfirmationModal,
@@ -432,7 +431,6 @@ const Home: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isLocalScannerOpen, setIsLocalScannerOpen] = useState(false);
   const [steamSyncing, setSteamSyncing] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -472,6 +470,7 @@ const Home: React.FC = () => {
   const lastWheelTime = useRef<number>(0);
   const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
   const previousOutgoingRequestsRef = useRef<Set<string> | null>(null);
+  const previousIncomingRequestsRef = useRef<Set<string> | null>(null);
   const previousSteamIdRef = useRef<string | undefined>(undefined);
   const previousDiscordIdRef = useRef<string | undefined>(undefined);
   const didInitConnectionRefs = useRef(false);
@@ -667,6 +666,7 @@ const Home: React.FC = () => {
       if (!title) return;
 
       setCurrentPresenceGame(title);
+      void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
 
       if (isRichPresenceEnabled()) {
         const launchedGame = games.find(
@@ -728,6 +728,11 @@ const Home: React.FC = () => {
               // Notificar quando amigo começa a jogar
               if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing) {
                 notify(`${newFriend.name} começou a jogar ${newFriend.playing}`, "success");
+                void window.electronAPI?.showFriendPlayingOverlay({
+                  playerName: newFriend.name,
+                  gameTitle: newFriend.playing,
+                  avatarUrl: newFriend.avatar || null,
+                });
               }
             }
 
@@ -801,6 +806,30 @@ const Home: React.FC = () => {
   useEffect(() => {
     setIncomingFriendRequests(userProfile?.checkpointFriendRequestsIncoming ?? []);
   }, [userProfile?.checkpointFriendRequestsIncoming]);
+
+  useEffect(() => {
+    const currentIncoming = userProfile?.checkpointFriendRequestsIncoming ?? [];
+    const currentIncomingIds = new Set(currentIncoming.map((request) => request.uid));
+
+    if (!previousIncomingRequestsRef.current) {
+      previousIncomingRequestsRef.current = currentIncomingIds;
+      return;
+    }
+
+    const previousIncomingIds = previousIncomingRequestsRef.current;
+    const freshRequest = currentIncoming.find((request) => !previousIncomingIds.has(request.uid));
+
+    if (freshRequest) {
+      notify(`${freshRequest.displayName} enviou um pedido de amizade.`, "info");
+      playSound("friendRequest");
+      void window.electronAPI?.showFriendRequestOverlay({
+        playerName: freshRequest.displayName,
+        avatarUrl: freshRequest.photoURL || null,
+      });
+    }
+
+    previousIncomingRequestsRef.current = currentIncomingIds;
+  }, [notify, playSound, userProfile?.checkpointFriendRequestsIncoming]);
 
   useEffect(() => {
     const currentFriends = new Set((userProfile?.checkpointFriends ?? []).map((friend) => friend.uid));
@@ -1073,7 +1102,6 @@ const Home: React.FC = () => {
   );
   const isAnyModalOpen =
     isAddModalOpen ||
-    isLocalScannerOpen ||
     isDetailOpen ||
     Boolean(contextMenu) ||
     signOutModalOpen ||
@@ -1399,6 +1427,12 @@ const Home: React.FC = () => {
     [openDetails, playSound],
   );
 
+  const openAddGameModal = useCallback((gameToEdit?: Game | null) => {
+    playSound("showModal");
+    setEditingGame(gameToEdit ?? null);
+    setIsAddModalOpen(true);
+  }, [playSound]);
+
   const closeCtx = (silent = false) => {
     setContextMenu(null);
     if (!silent) playSound("back");
@@ -1414,8 +1448,7 @@ const Home: React.FC = () => {
         isFavorite: !game.isFavorite,
       });
     } else if (action === "edit") {
-      setEditingGame(game);
-      setIsAddModalOpen(true);
+      openAddGameModal(game);
       closeCtx(true);
       return;
     }
@@ -1508,7 +1541,7 @@ const Home: React.FC = () => {
         onSync={handleSyncSteam}
         onConnect={connectSteam}
         onDisconnect={() => setDisconnectSteamModalOpen(true)}
-        onAddGame={() => setIsAddModalOpen(true)}
+        onAddGame={() => openAddGameModal()}
         onSignOut={() => setSignOutModalOpen(true)}
         settingsLabel={t("settings")}
         playSound={playSound}
@@ -1607,8 +1640,7 @@ const Home: React.FC = () => {
             <div className="flex items-center gap-1 p-1 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
               <button
                 onClick={() => {
-                  setIsAddModalOpen(true);
-                  playSound("select");
+                  openAddGameModal();
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
               >
@@ -1617,24 +1649,6 @@ const Home: React.FC = () => {
                   {t("new")}
                 </span>
               </button>
-
-              {hasLocalScanner && (
-                <>
-                  <div className="w-px h-4 bg-white/10" />
-                  <button
-                    onClick={() => {
-                      setIsLocalScannerOpen(true);
-                      playSound("select");
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
-                  >
-                    <Search className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-white/40 group-hover:text-white transition-colors">
-                      Buscar no PC
-                    </span>
-                  </button>
-                </>
-              )}
 
               <div className="w-px h-4 bg-white/10" />
 
@@ -1764,6 +1778,14 @@ const Home: React.FC = () => {
                 setDisconnectDiscordModalOpen(true);
               }}
               onSyncSteam={handleSyncSteam}
+              onTestOverlayWelcome={() => {
+                playSound("select");
+                void window.electronAPI?.testOverlayWelcome();
+              }}
+              onTestOverlayAchievement={() => {
+                playSound("select");
+                void window.electronAPI?.testOverlayAchievement();
+              }}
             />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
@@ -1815,14 +1837,14 @@ const Home: React.FC = () => {
               {onboardingCompleted ? (
                 <EmptyState
                   searchTerm={searchTerm}
-                  onAddGame={() => setIsAddModalOpen(true)}
+                  onAddGame={() => openAddGameModal()}
                   onConnect={connectSteam}
                   steamConnected={Boolean(resolvedSteamId)}
                 />
               ) : (
                 <EmptyLibraryOnboarding
                   onConnectSteam={connectSteam}
-                  onOpenAddGame={() => setIsAddModalOpen(true)}
+                  onOpenAddGame={() => openAddGameModal()}
                   onComplete={async () => {
                     if (!user?.uid) return;
                     localStorage.setItem(
@@ -2058,23 +2080,6 @@ const Home: React.FC = () => {
           gameToEdit={editingGame}
         />
       </React.Suspense>
-
-      {isLocalScannerOpen && user?.uid && (
-        <LocalGameScanner
-          uid={user.uid}
-          onClose={() => setIsLocalScannerOpen(false)}
-          onImported={(count) => {
-            notify(
-              count === 1
-                ? "1 jogo local importado."
-                : `${count} jogos locais importados.`,
-              "success",
-            );
-            setActiveCategory("LOCAL");
-            setIsLocalScannerOpen(false);
-          }}
-        />
-      )}
 
       <AddFriendModal
         isOpen={isAddFriendModalOpen}

@@ -1,17 +1,48 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog } = require("electron");
-const { spawn } = require("node:child_process");
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen } = require("electron");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
+const { createAchievementBridge } = require("./achievement-bridge.cjs");
 
-const PORT = process.env.PORT || "8787";
-const APP_URL = `http://localhost:${PORT}`;
+// Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
+// se um dia você quiser apontar pra outro ambiente sem mexer no código.
+const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
+const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
+
+// Em modo dev o ELECTRON_START_URL aponta para o Vite (porta diferente)
+const DEV_ORIGIN = process.env.ELECTRON_START_URL
+  ? (() => {
+    try {
+      const u = new URL(process.env.ELECTRON_START_URL);
+      return `${u.protocol}//${u.host}`;
+    } catch {
+      return null;
+    }
+  })()
+  : null;
+
+const APP_ORIGIN = (() => {
+  try {
+    const u = new URL(APP_URL);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return APP_URL;
+  }
+})();
+
 const STARTUP_LOG_FILE = "desktop-startup.log";
 
+// Render free tier "dorme" após inatividade; cold start pode levar bastante tempo.
+const HEALTH_CHECK_MAX_ATTEMPTS = 120; // 120 * 500ms = ~60s de tolerância
+const HEALTH_CHECK_INTERVAL_MS = 500;
+
 let mainWindow;
-let serverStarted = false;
-let serverProcess = null;
+let overlayWindow;
+let achievementBridge;
 let startupErrorShown = false;
+
+const overlayIconUrl = () =>
+  `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -45,10 +76,11 @@ const appendStartupLog = (message, error) => {
 const isLocalAppUrl = (rawUrl) => {
   try {
     const url = new URL(rawUrl);
-    return (
-      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
-      url.port === PORT
-    );
+    const origin = `${url.protocol}//${url.host}`;
+    // Aceita tanto a origem do backend de produção quanto do Vite em modo dev
+    const backendOk = origin === APP_ORIGIN;
+    const devOk = DEV_ORIGIN ? origin === DEV_ORIGIN : false;
+    return backendOk || devOk;
   } catch {
     return false;
   }
@@ -103,60 +135,15 @@ const fetchHealth = async () => {
   }
 };
 
-const startBundledServer = async () => {
-  if (process.env.ELECTRON_START_URL || serverStarted || (await fetchHealth())) {
-    serverStarted = true;
-    return;
-  }
-
-  const serverEntry = path.join(app.getAppPath(), "server", "bootstrap.cjs");
-  serverProcess = spawn(process.execPath, [serverEntry], {
-    cwd: app.getAppPath(),
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      PORT,
-      FRONTEND_URL: APP_URL,
-      BACKEND_PUBLIC_URL: APP_URL,
-      DISCORD_REDIRECT_URI: `${APP_URL}/auth/discord/callback`,
-      GOOGLE_REDIRECT_URI: `${APP_URL}/auth/google/callback`,
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  });
-
-  serverProcess.stdout?.on("data", (chunk) => {
-    const text = String(chunk);
-    appendStartupLog(`[desktop server][stdout] ${text.trimEnd()}`);
-    process.stdout.write(`[desktop server] ${text}`);
-  });
-  serverProcess.stderr?.on("data", (chunk) => {
-    const text = String(chunk);
-    appendStartupLog(`[desktop server][stderr] ${text.trimEnd()}`);
-    process.stderr.write(`[desktop server] ${text}`);
-  });
-  serverProcess.on("exit", (code, signal) => {
-    serverStarted = false;
-    serverProcess = null;
-    appendStartupLog(`Desktop backend exited (code=${code}, signal=${signal ?? "none"}).`);
-  });
-  serverProcess.on("error", (error) => {
-    appendStartupLog("Desktop backend failed to start.", error);
-  });
-
-  serverStarted = true;
-};
-
 const waitForServer = async () => {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
+  for (let attempt = 0; attempt < HEALTH_CHECK_MAX_ATTEMPTS; attempt += 1) {
     if (await fetchHealth()) return;
-    if (serverProcess && serverProcess.exitCode !== null) {
-      throw new Error(`Backend desktop encerrou antes do health check (exit ${serverProcess.exitCode}).`);
-    }
-    await sleep(250);
+    await sleep(HEALTH_CHECK_INTERVAL_MS);
   }
 
-  throw new Error(`Backend nao respondeu em ${APP_URL}/health.`);
+  throw new Error(
+    `Backend nao respondeu em ${APP_URL}/health apos ${(HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS) / 1000}s. Verifique sua conexao com a internet.`,
+  );
 };
 
 const loadMainWindow = async () => {
@@ -196,17 +183,15 @@ const showFatalStartupError = (error) => {
 };
 
 const createWindow = async () => {
-  await startBundledServer();
-
   if (!process.env.ELECTRON_START_URL) {
     await waitForServer();
   }
 
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 1024,
-    minHeight: 640,
+    width: 1600,
+    height: 900,
+    minWidth: 1280,
+    minHeight: 720,
     backgroundColor: "#05070a",
     icon: path.join(app.getAppPath(), "assets", "icon.png"),
     show: false,
@@ -300,6 +285,92 @@ const createWindow = async () => {
   await loadMainWindow();
 };
 
+const syncOverlayBounds = () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    return;
+  }
+
+  const display = screen.getPrimaryDisplay();
+  overlayWindow.setBounds(display.bounds);
+};
+
+const createOverlayWindow = () => {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    return overlayWindow;
+  }
+
+  overlayWindow = new BrowserWindow({
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    focusable: false,
+    hasShadow: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, "overlay-preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayWindow.setAlwaysOnTop(true, "screen-saver");
+  syncOverlayBounds();
+  overlayWindow.loadFile(path.join(__dirname, "overlay.html"));
+  overlayWindow.once("ready-to-show", () => {
+    overlayWindow.showInactive();
+  });
+  overlayWindow.on("closed", () => {
+    overlayWindow = null;
+  });
+
+  return overlayWindow;
+};
+
+const sendOverlayEvent = (channel, payload) => {
+  createOverlayWindow();
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    throw new Error("Overlay indisponivel.");
+  }
+
+  overlayWindow.webContents.send(channel, payload);
+};
+
+const playOverlaySound = (sound) => {
+  createOverlayWindow();
+  if (!overlayWindow || overlayWindow.isDestroyed()) {
+    throw new Error("Overlay indisponivel.");
+  }
+
+  overlayWindow.webContents.send("overlay:play-sound", { sound });
+};
+
+const startAchievementBridge = async () => {
+  achievementBridge = createAchievementBridge({
+    userDataPath: app.getPath("userData"),
+    logger: console,
+    onAchievementUnlocked: (payload) => {
+      sendOverlayEvent("achievement:unlock", payload);
+      playOverlaySound("achievement-unlock");
+    },
+  });
+
+  return achievementBridge.start();
+};
+
 ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) {
@@ -346,6 +417,66 @@ ipcMain.handle("shell:open-external", async (_event, url) => {
     throw new Error("Protocolo nao permitido.");
   }
   await shell.openExternal(rawUrl);
+});
+
+ipcMain.handle("overlay:test-welcome", async () => {
+  sendOverlayEvent("overlay:social", {
+    kind: "game-start",
+    title: "Divirta-se",
+    description: "O overlay esta ativo enquanto voce joga.",
+  });
+});
+
+ipcMain.handle("overlay:test-achievement", async () => {
+  sendOverlayEvent("achievement:unlock", {
+    gameId: "checkpoint-lab",
+    achievementId: "overlay-smoke-test",
+    achievement: {
+      id: "overlay-smoke-test",
+      name: "Primeiro Abate",
+      description: "Teste visual do overlay do Checkpoint.",
+      icon: overlayIconUrl(),
+    },
+    unlockedAt: new Date().toISOString(),
+    duplicate: false,
+  });
+  playOverlaySound("achievement-unlock");
+});
+
+ipcMain.handle("overlay:show-game-start", async (_event, payload) => {
+  const gameTitle = String(payload?.gameTitle || "").trim();
+  sendOverlayEvent("overlay:social", {
+    kind: "game-start",
+    title: "Divirta-se",
+    description: gameTitle
+      ? `Voce esta jogando agora ${gameTitle}`
+      : "O overlay esta ativo enquanto voce joga.",
+  });
+});
+
+ipcMain.handle("overlay:show-friend-playing", async (_event, payload) => {
+  const playerName = String(payload?.playerName || "").trim() || "Jogador";
+  const gameTitle = String(payload?.gameTitle || "").trim() || "agora";
+  const avatarUrl = String(payload?.avatarUrl || "").trim();
+
+  sendOverlayEvent("overlay:social", {
+    kind: "friend-playing",
+    title: playerName,
+    description: `Esta jogando agora ${gameTitle}`,
+    avatarUrl: avatarUrl || overlayIconUrl(),
+  });
+});
+
+ipcMain.handle("overlay:show-friend-request", async (_event, payload) => {
+  const playerName = String(payload?.playerName || "").trim() || "Jogador";
+  const avatarUrl = String(payload?.avatarUrl || "").trim();
+
+  sendOverlayEvent("overlay:social", {
+    kind: "friend-request",
+    title: playerName,
+    description: "Enviou um pedido de amizade",
+    avatarUrl: avatarUrl || overlayIconUrl(),
+  });
 });
 
 // Patterns that suggest the exe is NOT an actual game (installer, updater, etc.)
@@ -430,6 +561,11 @@ ipcMain.handle("game:scan-local", async (_event) => {
 
 app.whenReady().then(async () => {
   try {
+    createOverlayWindow();
+    screen.on("display-metrics-changed", syncOverlayBounds);
+    screen.on("display-added", syncOverlayBounds);
+    screen.on("display-removed", syncOverlayBounds);
+    await startAchievementBridge();
     await createWindow();
   } catch (error) {
     showFatalStartupError(error);
@@ -447,6 +583,7 @@ app.on("second-instance", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
+    createOverlayWindow();
     createWindow();
   }
 });
@@ -458,8 +595,13 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  if (serverProcess && !serverProcess.killed) {
-    serverProcess.kill();
+  screen.removeListener("display-metrics-changed", syncOverlayBounds);
+  screen.removeListener("display-added", syncOverlayBounds);
+  screen.removeListener("display-removed", syncOverlayBounds);
+  if (achievementBridge) {
+    achievementBridge.stop().catch((error) => {
+      appendStartupLog("Failed to stop achievement bridge.", error);
+    });
   }
 });
 

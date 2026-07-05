@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline';" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Checkpoint Overlay</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --overlay-font-display: "Outfit", "Segoe UI", sans-serif;
+      --overlay-font-body: "Outfit", "Segoe UI", sans-serif;
+      --overlay-width: min(392px, calc(100vw - 32px));
+      --accent: 255 255 255;
+      --accent-soft: rgba(255, 255, 255, 0.14);
+      --green: rgb(var(--accent));
+      --green-soft: rgba(255, 255, 255, 0.14);
+      --yellow: rgb(var(--accent));
+      --yellow-soft: rgba(255, 255, 255, 0.14);
+      --card-duration: 4200ms;
+    }
+
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    body {
+      pointer-events: none;
+      font-family: var(--overlay-font-body);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    #achievement-stack,
+    #social-stack {
+      position: fixed;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #achievement-stack {
+      top: 18px;
+      right: 18px;
+      width: var(--overlay-width);
+    }
+
+    #social-stack {
+      left: 18px;
+      bottom: 56px;
+      width: var(--overlay-width);
+    }
+
+    /* ---------- card shell ---------- */
+
+    .overlay-card {
+      container-type: inline-size;
+      container-name: overlay;
+      position: relative;
+      width: var(--overlay-width);
+      aspect-ratio: 447 / 157;
+      opacity: 0;
+      animation: overlay-in 480ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      animation-delay: var(--stagger, 0ms);
+    }
+
+    .overlay-card.is-leaving {
+      animation: overlay-out 260ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    }
+
+    .overlay-shell {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 4cqw;
+      padding: 6.2cqw 6.2cqw;
+      border-radius: 4.2cqw;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+        linear-gradient(180deg, rgba(12, 12, 12, 0.98) 0%, rgba(2, 2, 2, 0.98) 100%);
+      overflow: hidden;
+    }
+
+    .achievement-card .overlay-shell {
+      border: 1.6px solid rgba(255, 255, 255, 0.1);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 3.4cqw rgba(255, 255, 255, 0.08),
+        0 8px 26px rgba(0, 0, 0, 0.55);
+    }
+
+    .social-card .overlay-shell {
+      border: 1.6px solid rgba(255, 255, 255, 0.1);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 3.4cqw rgba(255, 255, 255, 0.08),
+        0 8px 26px rgba(0, 0, 0, 0.55);
+    }
+
+    .overlay-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg,
+          transparent 20%,
+          rgba(255, 255, 255, 0.14) 35%,
+          transparent 50%);
+      transform: translateX(-120%);
+      animation: shine-sweep 1100ms ease-out 1;
+      animation-delay: calc(var(--stagger, 0ms) + 260ms);
+      pointer-events: none;
+    }
+
+    /* ---------- icon column ---------- */
+
+    .overlay-icon {
+      position: relative;
+      flex: 0 0 auto;
+      width: 19cqw;
+      min-width: 46px;
+      max-width: 92px;
+      aspect-ratio: 1;
+      align-self: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .overlay-icon::before {
+      content: "";
+      position: absolute;
+      inset: -12%;
+      border-radius: 26%;
+      opacity: 0;
+      pointer-events: none;
+      animation: icon-ring-burst 750ms ease-out 1;
+      animation-delay: calc(var(--stagger, 0ms) + 140ms);
+    }
+
+    .achievement-card .overlay-icon::before {
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.12);
+    }
+
+    .social-card .overlay-icon::before {
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 0 16px rgba(255, 255, 255, 0.12);
+    }
+
+    .icon-ring {
+      position: absolute;
+      inset: -22%;
+      animation: ring-spin 9s linear infinite;
+      pointer-events: none;
+    }
+
+    .icon-ring svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .icon-avatar {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      animation: icon-breathe 2200ms ease-in-out infinite;
+      animation-delay: calc(var(--stagger, 0ms) + 500ms);
+    }
+
+    .achievement-card .icon-avatar {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .icon-avatar img {
+      width: 70%;
+      height: 70%;
+      object-fit: contain;
+    }
+
+    .icon-avatar.is-photo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .icon-avatar.is-logo img {
+      width: 72%;
+      height: 72%;
+      object-fit: contain;
+    }
+
+    .icon-avatar svg {
+      width: 52%;
+      height: 52%;
+      color: rgba(255, 255, 255, 0.92);
+      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.12));
+    }
+
+    /* ---------- content column ---------- */
+
+    .overlay-content {
+      flex: 1 1 auto;
+      min-width: 0;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .overlay-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .achievement-eyebrow,
+    .social-badge {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      border-radius: 10px;
+      font-family: var(--overlay-font-display);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      white-space: nowrap;
+    }
+
+    .achievement-eyebrow {
+      color: rgba(255, 255, 255, 0.62);
+      font-size: clamp(9px, 2.3cqw, 11px);
+      line-height: 1;
+      text-shadow: none;
+    }
+
+    .social-badge {
+      gap: 8px;
+      margin-bottom: 1.6cqw;
+      padding: 1.8cqw 3.1cqw;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.78);
+      font-size: clamp(10px, 2.5cqw, 12px);
+      line-height: 1;
+      letter-spacing: 0.03em;
+      animation: badge-breathe 2200ms ease-in-out infinite;
+    }
+
+    .social-badge::before {
+      content: "";
+      width: 0;
+      height: 0;
+      border-top: 6px solid transparent;
+      border-bottom: 6px solid transparent;
+      border-left: 10px solid rgba(255, 255, 255, 0.78);
+      animation: triangle-glow 1600ms ease-in-out infinite;
+    }
+
+    .achievement-title,
+    .social-title {
+      margin: 0;
+      color: #ffffff;
+      font-family: var(--overlay-font-display);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+    }
+
+    .achievement-title {
+      margin-top: 1.8cqw;
+      font-size: clamp(15px, 4.3cqw, 20px);
+    }
+
+    .social-title {
+      font-size: clamp(15px, 4.5cqw, 21px);
+    }
+
+    .achievement-description,
+    .social-description {
+      margin: 1.2cqw 0 0;
+      color: rgba(255, 255, 255, 0.5);
+      font-family: var(--overlay-font-body);
+      font-size: clamp(10px, 2.45cqw, 13px);
+      line-height: 1.28;
+    }
+
+    /* ---------- dismiss-timer progress bar ---------- */
+
+    .overlay-progress {
+      height: 3px;
+      width: 100%;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+    }
+
+    .achievement-card .overlay-progress {
+      color: var(--yellow);
+    }
+
+    .social-card .overlay-progress {
+      color: var(--green);
+    }
+
+    .overlay-progress::after {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 100%;
+      transform-origin: left;
+      background: linear-gradient(90deg, currentColor, rgba(255, 255, 255, 0.04));
+      animation: progress-drain linear forwards;
+      animation-duration: var(--card-duration);
+    }
+
+    /* ---------- keyframes ---------- */
+
+    @keyframes overlay-in {
+      0% {
+        opacity: 0;
+        transform: translateY(18px) scale(0.92);
+      }
+
+      60% {
+        opacity: 1;
+        transform: translateY(-3px) scale(1.03);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes overlay-out {
+      from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+
+      to {
+        opacity: 0;
+        transform: translateY(-12px) scale(0.96);
+        filter: blur(2px);
+      }
+    }
+
+    @keyframes icon-ring-burst {
+      0% {
+        opacity: 0.9;
+        transform: scale(0.7);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(1.4);
+      }
+    }
+
+    @keyframes ring-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @keyframes icon-breathe {
+
+      0%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.06);
+      }
+    }
+
+    @keyframes shine-sweep {
+      from {
+        transform: translateX(-120%);
+      }
+
+      to {
+        transform: translateX(120%);
+      }
+    }
+
+    @keyframes progress-drain {
+      from {
+        transform: scaleX(1);
+      }
+
+      to {
+        transform: scaleX(0);
+      }
+    }
+
+    @keyframes badge-breathe {
+
+      0%,
+      100% {
+        transform: translateY(0);
+        box-shadow: 0 0 18px rgba(31, 209, 79, 0.14);
+      }
+
+      50% {
+        transform: translateY(-1px);
+        box-shadow: 0 0 26px rgba(31, 209, 79, 0.2);
+      }
+    }
+
+    @keyframes triangle-glow {
+
+      0%,
+      100% {
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.12));
+      }
+
+      50% {
+        filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.18));
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="achievement-stack"></div>
+  <div id="social-stack"></div>
+  <script>
+    const achievementStack = document.getElementById("achievement-stack");
+    const socialStack = document.getElementById("social-stack");
+    const checkpointIconUrl = new URL("../assets/icon.png", window.location.href).toString();
+    const overlaySoundMap = {
+      "achievement-unlock": new URL("../src/sounds/PS5_Sounds/Achievment_Unlock.mp3", window.location.href).toString(),
+    };
+
+    const scheduleRemoval = (node, duration = 4800) => {
+      setTimeout(() => {
+        node.classList.add("is-leaving");
+        setTimeout(() => node.remove(), 220);
+      }, duration);
+    };
+
+    const playOverlaySound = (sound) => {
+      const src = overlaySoundMap[sound];
+      if (!src) return;
+      const audio = new Audio(src);
+      audio.volume = 0.22;
+      audio.play().catch(() => {});
+    };
+
+    const applyStagger = (stack, card) => {
+      const visibleSiblings = stack.querySelectorAll(".overlay-card:not(.is-leaving)").length;
+      card.style.setProperty("--stagger", `${Math.min(visibleSiblings, 3) * 60}ms`);
+    };
+
+    const reticleSvg = () => `
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="50" r="42" stroke="rgba(255,255,255,0.72)" stroke-width="2.5" opacity="0.82" />
+          <circle cx="50" cy="50" r="34" stroke="rgba(255,255,255,0.22)" stroke-width="1.4" opacity="0.55" />
+          <line x1="50" y1="2" x2="50" y2="12" stroke="rgba(255,255,255,0.62)" stroke-width="3" stroke-linecap="round" />
+          <line x1="50" y1="88" x2="50" y2="98" stroke="rgba(255,255,255,0.62)" stroke-width="3" stroke-linecap="round" />
+          <line x1="2" y1="50" x2="12" y2="50" stroke="rgba(255,255,255,0.62)" stroke-width="3" stroke-linecap="round" />
+          <line x1="88" y1="50" x2="98" y2="50" stroke="rgba(255,255,255,0.62)" stroke-width="3" stroke-linecap="round" />
+          <line x1="21" y1="21" x2="27" y2="27" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+          <line x1="79" y1="21" x2="73" y2="27" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+          <line x1="21" y1="79" x2="27" y2="73" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+          <line x1="79" y1="79" x2="73" y2="73" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+        </svg>
+      `;
+
+    const trophySvg = () => `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+          <path d="M4 22h16"></path>
+          <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path>
+          <path d="M12 2a5 5 0 0 0-5 5v4c0 .32.03.63.08.94h9.84c.05-.31.08-.62.08-.94V7a5 5 0 0 0-5-5z"></path>
+        </svg>
+      `;
+
+    const createIconColumn = ({ ring, avatarSrc, avatarSvg, isPhoto, isLogo }) => {
+      const icon = document.createElement("div");
+      icon.className = "overlay-icon";
+
+      if (ring) {
+        const ringEl = document.createElement("div");
+        ringEl.className = "icon-ring";
+        ringEl.innerHTML = reticleSvg();
+        icon.appendChild(ringEl);
+      }
+
+      const avatar = document.createElement("div");
+      avatar.className = "icon-avatar" + (isPhoto ? " is-photo" : "") + (isLogo ? " is-logo" : "");
+
+      if (avatarSrc) {
+        const img = document.createElement("img");
+        img.src = avatarSrc;
+        img.alt = "";
+        avatar.appendChild(img);
+      } else if (avatarSvg) {
+        avatar.innerHTML = avatarSvg;
+      }
+
+      icon.appendChild(avatar);
+      return icon;
+    };
+
+    const createProgressBar = () => {
+      const bar = document.createElement("div");
+      bar.className = "overlay-progress";
+      return bar;
+    };
+
+    const socialBadgeLabel = (kind) => {
+      if (kind === "friend-request") return "Pedido de amizade";
+      if (kind === "friend-playing") return "Amigo jogando";
+      return "Jogo iniciado";
+    };
+
+    const enqueueAchievement = (payload) => {
+      const duration = 4200;
+      const card = document.createElement("article");
+      card.className = "overlay-card achievement-card";
+      card.style.setProperty("--card-duration", `${duration}ms`);
+      applyStagger(achievementStack, card);
+
+      const shell = document.createElement("div");
+      shell.className = "overlay-shell";
+
+      shell.appendChild(createIconColumn({ avatarSvg: trophySvg() }));
+
+      const content = document.createElement("div");
+      content.className = "overlay-content";
+
+      const text = document.createElement("div");
+      text.className = "overlay-text";
+
+      const eyebrow = document.createElement("div");
+      eyebrow.className = "achievement-eyebrow";
+      eyebrow.textContent = payload.duplicate ? "ACHIEVEMENT ATUALIZADO" : "ACHIEVEMENT DESBLOQUEADO";
+
+      const title = document.createElement("h2");
+      title.className = "achievement-title";
+      title.textContent = payload.achievement?.name || payload.achievementId;
+
+      const description = document.createElement("p");
+      description.className = "achievement-description";
+      description.textContent =
+        payload.achievement?.description || `Conquista registrada para ${payload.gameId}.`;
+
+      text.appendChild(eyebrow);
+      text.appendChild(title);
+      text.appendChild(description);
+      content.appendChild(text);
+      content.appendChild(createProgressBar());
+      shell.appendChild(content);
+      card.appendChild(shell);
+      achievementStack.appendChild(card);
+      scheduleRemoval(card, duration);
+    };
+
+    const enqueueSocial = (payload) => {
+      const duration = payload.kind === "game-start" ? 5200 : 4600;
+      const card = document.createElement("article");
+      card.className = "overlay-card social-card";
+      card.style.setProperty("--card-duration", `${duration}ms`);
+      if (payload.kind === "game-start") {
+        card.classList.add("is-game-start");
+      }
+      applyStagger(socialStack, card);
+
+      const shell = document.createElement("div");
+      shell.className = "overlay-shell";
+
+      const isGameStart = payload.kind === "game-start";
+      shell.appendChild(
+        createIconColumn({
+          ring: true,
+          avatarSrc: isGameStart ? checkpointIconUrl : payload.avatarUrl || checkpointIconUrl,
+          isPhoto: !isGameStart && Boolean(payload.avatarUrl),
+          isLogo: isGameStart,
+        }),
+      );
+
+      const content = document.createElement("div");
+      content.className = "overlay-content";
+
+      const text = document.createElement("div");
+      text.className = "overlay-text";
+
+      const badge = document.createElement("div");
+      badge.className = "social-badge";
+      badge.textContent = socialBadgeLabel(payload.kind);
+
+      const title = document.createElement("h2");
+      title.className = "social-title";
+      title.textContent = payload.title || "Checkpoint Launcher";
+
+      const description = document.createElement("p");
+      description.className = "social-description";
+      description.textContent = payload.description || "Aproveite sua experiencia com o Checkpoint Launcher";
+
+      text.appendChild(badge);
+      text.appendChild(title);
+      text.appendChild(description);
+      content.appendChild(text);
+      content.appendChild(createProgressBar());
+      shell.appendChild(content);
+      card.appendChild(shell);
+      socialStack.appendChild(card);
+      scheduleRemoval(card, duration);
+    };
+
+    window.achievementOverlay.onUnlock(enqueueAchievement);
+    window.achievementOverlay.onWelcome(enqueueSocial);
+    window.achievementOverlay.onSocial(enqueueSocial);
+    window.achievementOverlay.onPlaySound(({ sound }) => playOverlaySound(sound));
+  </script>
+</body>
+
+</html>

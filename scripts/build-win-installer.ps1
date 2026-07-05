@@ -5,7 +5,7 @@ function Invoke-Builder {
     [string[]] $ExtraArgs = @()
   )
 
-  & npx.cmd electron-builder --win nsis @ExtraArgs
+  & npx.cmd --no-install electron-builder --win nsis @ExtraArgs
   return $LASTEXITCODE
 }
 

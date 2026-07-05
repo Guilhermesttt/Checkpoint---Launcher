@@ -1,8 +1,9 @@
-﻿import React from "react";
+import React from "react";
 import { Play, Star } from "lucide-react";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSteam } from '@fortawesome/free-brands-svg-icons';
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 interface GameCardProps {
   title: string;
@@ -25,35 +26,75 @@ const GameCard: React.FC<GameCardProps> = ({
   isSteam = false,
   isEpic = false,
 }) => {
-  const platformBadge = isSteam
-    ? {
+  // Motion values para o efeito 3D (não causam re-render)
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  // Springs para suavizar o movimento
+  const mouseXSpring = useSpring(x, { stiffness: 400, damping: 30 });
+  const mouseYSpring = useSpring(y, { stiffness: 400, damping: 30 });
+
+  // Transforma os valores de [-0.5, 0.5] para graus de rotação
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["12deg", "-12deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-12deg", "12deg"]);
+  
+  // Transformações para o brilho (glare)
+  const glareX = useTransform(mouseXSpring, [-0.5, 0.5], ["100%", "0%"]);
+  const glareY = useTransform(mouseYSpring, [-0.5, 0.5], ["100%", "0%"]);
+  const glareOpacity = useTransform(mouseXSpring, [-0.5, 0, 0.5], [0.3, 0, 0.3]);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isActive) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    x.set(mouseX / width - 0.5);
+    y.set(mouseY / height - 0.5);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  const platformBadge = React.useMemo(() => {
+    if (isSteam) {
+      return {
         label: "Steam",
         color: "#67b676",
         border: "rgba(103,182,118,0.35)",
         icon: <FontAwesomeIcon icon={faSteam} className="w-2.5 h-2.5" style={{ color: "#67b676" }} />,
-      }
-    : isEpic
-      ? {
-          label: "Epic",
-          color: "#f5f5f5",
-          border: "rgba(255,255,255,0.3)",
-          icon: (
-            <img
-              src={EPIC_GAMES_ICON_PATH}
-              alt=""
-              className="w-2.5 h-2.5 object-contain"
-              style={{ filter: "invert(1)" }}
-            />
-          ),
-        }
-      : null;
+      };
+    }
+    if (isEpic) {
+      return {
+        label: "Epic",
+        color: "#f5f5f5",
+        border: "rgba(255,255,255,0.3)",
+        icon: (
+          <img
+            src={EPIC_GAMES_ICON_PATH}
+            alt=""
+            className="w-2.5 h-2.5 object-contain"
+            style={{ filter: "invert(1)" }}
+          />
+        ),
+      };
+    }
+    return null;
+  }, [isSteam, isEpic]);
 
   return (
     <div
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       className="relative flex items-center justify-center cursor-pointer select-none"
-      style={{ width: 172, height: 260 }}
+      style={{ width: 172, height: 260, perspective: 1200 }}
     >
       {isActive && (
         <div
@@ -68,15 +109,17 @@ const GameCard: React.FC<GameCardProps> = ({
         />
       )}
 
-      <div
-        className="relative z-10"
+      <motion.div
+        className="relative z-10 origin-center"
         style={{
           width: 156,
           height: 236,
-          transform: isActive ? "translateY(-6px) scale(1)" : "scale(0.87)",
-          transition: "transform 220ms ease, opacity 220ms ease",
-          willChange: isActive ? "transform" : "auto",
+          rotateX: isActive ? rotateX : 0,
+          rotateY: isActive ? rotateY : 0,
+          scale: isActive ? 1.05 : 0.87,
+          transformStyle: "preserve-3d",
         }}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
         <div
           className={`
@@ -94,9 +137,7 @@ const GameCard: React.FC<GameCardProps> = ({
             src={image}
             alt={title}
             className="absolute inset-0 w-full h-full object-cover"
-            style={{
-            }}
-            loading={isActive ? "eager" : "lazy"}
+            loading="lazy"
             decoding="async"
           />
 
@@ -110,23 +151,38 @@ const GameCard: React.FC<GameCardProps> = ({
           />
 
           {isActive && (
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%)",
-                boxShadow: "inset 0 0 0 1px var(--game-color)",
-              }}
-            />
+            <>
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%)",
+                  boxShadow: "inset 0 0 0 1px var(--game-color)",
+                }}
+              />
+              <motion.div
+                className="absolute inset-0 pointer-events-none z-20 mix-blend-overlay"
+                style={{
+                  background: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, transparent 60%)",
+                  left: glareX,
+                  top: glareY,
+                  opacity: glareOpacity,
+                  width: "200%",
+                  height: "200%",
+                  transform: "translate(-50%, -50%)",
+                }}
+              />
+            </>
           )}
 
-          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between">
+          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between z-30" style={{ transform: "translateZ(20px)" }}>
             {platformBadge && (
               <div
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full"
                 style={{
                   background: "rgba(0,0,0,0.55)",
                   border: `1px solid ${platformBadge.border}`,
+                  backdropFilter: "blur(4px)",
                 }}
               >
                 {platformBadge.icon}
@@ -145,6 +201,7 @@ const GameCard: React.FC<GameCardProps> = ({
                 style={{
                   background: "rgba(251,191,36,0.15)",
                   border: "1px solid rgba(251,191,36,0.5)",
+                  backdropFilter: "blur(4px)",
                 }}
               >
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -153,9 +210,10 @@ const GameCard: React.FC<GameCardProps> = ({
           </div>
 
           <div
-            className={`absolute bottom-0 left-0 right-0 p-3 transition-all duration-400 ${
+            className={`absolute bottom-0 left-0 right-0 p-3 transition-all duration-400 z-30 ${
               isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
             }`}
+            style={{ transform: "translateZ(30px)" }}
           >
             <p
               className="text-[8px] font-black uppercase tracking-[0.22em] mb-1"
@@ -169,12 +227,13 @@ const GameCard: React.FC<GameCardProps> = ({
           </div>
 
           {isActive && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200 z-30" style={{ transform: "translateZ(40px)" }}>
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center"
                 style={{
                   background: "rgba(255,255,255,0.12)",
                   border: "1.5px solid rgba(255,255,255,0.3)",
+                  backdropFilter: "blur(8px)",
                 }}
               >
                 <Play
@@ -196,7 +255,7 @@ const GameCard: React.FC<GameCardProps> = ({
             }}
           />
         )}
-      </div>
+      </motion.div>
     </div>
   );
 };
