@@ -1,7 +1,7 @@
 import { Download, Monitor, ShieldCheck } from "lucide-react";
 
-const WINDOWS_PORTABLE_URL =
-  "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest/download/Checkpoint-Launcher-Windows.zip";
+const GITHUB_RELEASE_URL =
+  "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest";
 
 const DownloadPage = () => {
   return (
@@ -30,11 +30,13 @@ const DownloadPage = () => {
 
               <div className="mt-10 flex flex-wrap gap-4">
                 <a
-                  href={WINDOWS_PORTABLE_URL}
+                  href={GITHUB_RELEASE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
                 >
                   <Download className="h-4 w-4" />
-                  Baixar para Windows
+                  Ver release no GitHub
                 </a>
                 <a
                   href="/privacy-policy"
@@ -54,8 +56,7 @@ const DownloadPage = () => {
                   <div>
                     <h2 className="text-sm font-bold text-white">GitHub Releases</h2>
                     <p className="mt-1 text-sm text-white/45">
-                      O download agora aponta direto para o release mais recente publicado no
-                      GitHub.
+                      O botao abre a pagina do release mais recente publicado no GitHub.
                     </p>
                   </div>
                 </div>

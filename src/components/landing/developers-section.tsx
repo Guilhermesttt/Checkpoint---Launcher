@@ -1,12 +1,14 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { Code2, Terminal, BookOpen, GitBranch } from "lucide-react";
 
+const GITHUB_REPO_URL = "https://github.com/Guilhermesttt/Checkpoint---Launcher";
+
 const devFeatures = [
   {
     icon: Code2,
     title: "Base Proprietária",
     description: "Produto fechado, com direção visual e técnica controladas para a plataforma.",
-    href: "https://github.com",
+    href: GITHUB_REPO_URL,
   },
   {
     icon: Terminal,
@@ -24,7 +26,7 @@ const devFeatures = [
     icon: GitBranch,
     title: "Roadmap Interno",
     description: "Evolução contínua do launcher com integrações, interface e pipeline próprios.",
-    href: "https://github.com",
+    href: GITHUB_REPO_URL,
   },
 ];
 
@@ -63,7 +65,7 @@ export function DevelopersSection() {
             </p>
 
             <a
-              href="https://github.com"
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-3 px-6 py-3 border border-foreground/30 hover:border-foreground/60 hover:bg-foreground/5 rounded-full text-sm font-mono transition-all duration-700 ${
