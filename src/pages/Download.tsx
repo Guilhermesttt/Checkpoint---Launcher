@@ -1,6 +1,6 @@
 import { Download, Monitor, ShieldCheck } from "lucide-react";
 
-const WINDOWS_INSTALLER_URL = "/download/Checkpoint-Launcher-Setup.zip";
+const WINDOWS_INSTALLER_URL = "/download/Checkpoint-Launcher-Setup.exe";
 
 const DownloadPage = () => {
   return (
