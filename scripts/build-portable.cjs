@@ -5,7 +5,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const projectRoot = path.resolve(__dirname, "..");
-const packageJson = require(path.join(projectRoot, "package.json"));
 const pngToIco = require("png-to-ico");
 
 const run = (command, args, options = {}) => {
@@ -41,7 +40,7 @@ const cleanReleaseDirectories = () => {
     "win-unpacked.tmp",
     "builder-debug.yml",
     "builder-effective-config.yaml",
-    `Checkpoint-Launcher-${packageJson.version}-windows.zip`,
+    "Checkpoint-Launcher-Windows.zip",
   ]) {
     const target = path.join(projectRoot, "release", entryName);
     if (fs.existsSync(target)) {
@@ -73,10 +72,9 @@ const buildPortable = () => {
 };
 
 const zipPortable = () => {
-  const artifactBaseName = `Checkpoint-Launcher-${packageJson.version}-windows`;
   const releaseDir = path.join(projectRoot, "release");
   const unpackedDir = path.join(releaseDir, "win-unpacked");
-  const zipPath = path.join(releaseDir, `${artifactBaseName}.zip`);
+  const zipPath = path.join(releaseDir, "Checkpoint-Launcher-Windows.zip");
 
   if (!fs.existsSync(unpackedDir)) {
     throw new Error(`Windows folder not found: ${unpackedDir}`);
@@ -91,29 +89,18 @@ const zipPortable = () => {
   return { unpackedDir, zipPath };
 };
 
-const publishDownloadArtifacts = ({ unpackedDir, zipPath }) => {
-  const downloadDir = path.join(projectRoot, "public", "download");
-  fs.mkdirSync(downloadDir, { recursive: true });
-
-  const stableZipPath = path.join(downloadDir, "Checkpoint-Launcher-Windows.zip");
-  const versionedZipPath = path.join(downloadDir, path.basename(zipPath));
-
-  ensureFreshFile(stableZipPath);
-  ensureFreshFile(versionedZipPath);
-
-  fs.copyFileSync(zipPath, versionedZipPath);
-  fs.copyFileSync(zipPath, stableZipPath);
-
+const logArtifacts = ({ unpackedDir, zipPath }) => {
   console.log(`[build-portable] windows folder: ${path.relative(projectRoot, unpackedDir)}`);
   console.log(`[build-portable] windows zip: ${path.relative(projectRoot, zipPath)}`);
-  console.log(`[build-portable] published: ${path.relative(projectRoot, stableZipPath)}`);
+  console.log("[build-portable] upload the zip to GitHub Releases:");
+  console.log(`  ${path.basename(zipPath)}`);
 };
 
 const main = async () => {
   await regenerateWindowsIcon();
   buildPortable();
   const artifacts = zipPortable();
-  publishDownloadArtifacts(artifacts);
+  logArtifacts(artifacts);
 };
 
 main().catch((error) => {

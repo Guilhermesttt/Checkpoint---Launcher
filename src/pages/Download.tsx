@@ -1,6 +1,7 @@
 import { Download, Monitor, ShieldCheck } from "lucide-react";
 
-const WINDOWS_PORTABLE_URL = "/download/Checkpoint-Launcher-Windows.zip";
+const WINDOWS_PORTABLE_URL =
+  "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest/download/Checkpoint-Launcher-Windows.zip";
 
 const DownloadPage = () => {
   return (
@@ -51,10 +52,10 @@ const DownloadPage = () => {
                     <Monitor className="h-5 w-5 text-white/75" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Pasta pronta para Windows</h2>
+                    <h2 className="text-sm font-bold text-white">GitHub Releases</h2>
                     <p className="mt-1 text-sm text-white/45">
-                      Arquivo compactado com a pasta completa do launcher, com suporte a Steam,
-                      Epic e jogos `.exe`.
+                      O download agora aponta direto para o release mais recente publicado no
+                      GitHub.
                     </p>
                   </div>
                 </div>

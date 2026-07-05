@@ -12,6 +12,7 @@ dist
 dist-ssr
 release
 release-next
+public/download
 *.local
 
 # Editor directories and files
