@@ -1,14 +1,17 @@
 const { app, BrowserWindow, ipcMain, shell, Menu, dialog } = require("electron");
+const { spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const { pathToFileURL } = require("node:url");
 
 const PORT = process.env.PORT || "8787";
 const APP_URL = `http://localhost:${PORT}`;
+const STARTUP_LOG_FILE = "desktop-startup.log";
 
 let mainWindow;
 let serverStarted = false;
+let serverProcess = null;
+let startupErrorShown = false;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -19,6 +22,25 @@ Menu.setApplicationMenu(null);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
+
+const appendStartupLog = (message, error) => {
+  const timestamp = new Date().toISOString();
+  const lines = [`[${timestamp}] ${message}`];
+  if (error) {
+    lines.push(error instanceof Error ? error.stack || error.message : String(error));
+  }
+  const content = `${lines.join("\n")}\n`;
+
+  try {
+    const logPath = path.join(app.getPath("userData"), STARTUP_LOG_FILE);
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, content, "utf8");
+  } catch {
+    // Ignore logging failures.
+  }
+
+  console.error(content.trimEnd());
+};
 
 const isLocalAppUrl = (rawUrl) => {
   try {
@@ -83,27 +105,94 @@ const fetchHealth = async () => {
 
 const startBundledServer = async () => {
   if (process.env.ELECTRON_START_URL || serverStarted || (await fetchHealth())) {
+    serverStarted = true;
     return;
   }
 
-  process.env.PORT = PORT;
-  process.env.FRONTEND_URL = APP_URL;
-  process.env.BACKEND_PUBLIC_URL = APP_URL;
-  process.env.DISCORD_REDIRECT_URI = `${APP_URL}/auth/discord/callback`;
-  process.env.GOOGLE_REDIRECT_URI = `${APP_URL}/auth/google/callback`;
+  const serverEntry = path.join(app.getAppPath(), "server", "bootstrap.cjs");
+  serverProcess = spawn(process.execPath, [serverEntry], {
+    cwd: app.getAppPath(),
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      PORT,
+      FRONTEND_URL: APP_URL,
+      BACKEND_PUBLIC_URL: APP_URL,
+      DISCORD_REDIRECT_URI: `${APP_URL}/auth/discord/callback`,
+      GOOGLE_REDIRECT_URI: `${APP_URL}/auth/google/callback`,
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
 
-  const serverPath = path.join(app.getAppPath(), "server", "index.mjs");
-  await import(pathToFileURL(serverPath).href);
+  serverProcess.stdout?.on("data", (chunk) => {
+    const text = String(chunk);
+    appendStartupLog(`[desktop server][stdout] ${text.trimEnd()}`);
+    process.stdout.write(`[desktop server] ${text}`);
+  });
+  serverProcess.stderr?.on("data", (chunk) => {
+    const text = String(chunk);
+    appendStartupLog(`[desktop server][stderr] ${text.trimEnd()}`);
+    process.stderr.write(`[desktop server] ${text}`);
+  });
+  serverProcess.on("exit", (code, signal) => {
+    serverStarted = false;
+    serverProcess = null;
+    appendStartupLog(`Desktop backend exited (code=${code}, signal=${signal ?? "none"}).`);
+  });
+  serverProcess.on("error", (error) => {
+    appendStartupLog("Desktop backend failed to start.", error);
+  });
+
   serverStarted = true;
 };
 
 const waitForServer = async () => {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     if (await fetchHealth()) return;
+    if (serverProcess && serverProcess.exitCode !== null) {
+      throw new Error(`Backend desktop encerrou antes do health check (exit ${serverProcess.exitCode}).`);
+    }
     await sleep(250);
   }
 
   throw new Error(`Backend nao respondeu em ${APP_URL}/health.`);
+};
+
+const loadMainWindow = async () => {
+  const preferredUrl = process.env.ELECTRON_START_URL || APP_URL;
+  const fallbackUrl = process.env.ELECTRON_START_URL ? APP_URL : null;
+  const targets = fallbackUrl && fallbackUrl !== preferredUrl ? [preferredUrl, fallbackUrl] : [preferredUrl];
+
+  let lastError = null;
+  for (const target of targets) {
+    try {
+      await mainWindow.loadURL(target);
+      return;
+    } catch (error) {
+      lastError = error;
+      appendStartupLog(`Failed to load window URL: ${target}`, error);
+      await sleep(700);
+    }
+  }
+
+  throw lastError ?? new Error("Falha ao carregar a janela principal.");
+};
+
+const showFatalStartupError = (error) => {
+  if (startupErrorShown) {
+    return;
+  }
+  startupErrorShown = true;
+  appendStartupLog("Fatal desktop startup error.", error);
+  dialog.showErrorBox(
+    "Checkpoint Launcher",
+    [
+      "O app nao conseguiu iniciar.",
+      error instanceof Error ? error.message : String(error),
+      `Log: ${path.join(app.getPath("userData"), STARTUP_LOG_FILE)}`,
+    ].join("\n\n"),
+  );
 };
 
 const createWindow = async () => {
@@ -137,6 +226,30 @@ const createWindow = async () => {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+  });
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  }, 2500);
+
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedURL) => {
+      if (errorCode === -3) {
+        return;
+      }
+      appendStartupLog(
+        `Renderer failed to load URL ${validatedURL} (code=${errorCode}).`,
+        new Error(errorDescription),
+      );
+    },
+  );
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    appendStartupLog(
+      `Renderer process exited (${details.reason}).`,
+      details.exitCode ? new Error(`exitCode=${details.exitCode}`) : undefined,
+    );
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -184,7 +297,7 @@ const createWindow = async () => {
     shell.openExternal(url);
   });
 
-  await mainWindow.loadURL(process.env.ELECTRON_START_URL || APP_URL);
+  await loadMainWindow();
 };
 
 ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
@@ -315,7 +428,14 @@ ipcMain.handle("game:scan-local", async (_event) => {
   return results;
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(async () => {
+  try {
+    await createWindow();
+  } catch (error) {
+    showFatalStartupError(error);
+    app.quit();
+  }
+});
 
 app.on("second-instance", () => {
   if (!mainWindow) return;
@@ -335,4 +455,18 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  if (serverProcess && !serverProcess.killed) {
+    serverProcess.kill();
+  }
+});
+
+process.on("unhandledRejection", (reason) => {
+  appendStartupLog("Unhandled promise rejection in Electron main.", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  appendStartupLog("Uncaught exception in Electron main.", error);
 });
