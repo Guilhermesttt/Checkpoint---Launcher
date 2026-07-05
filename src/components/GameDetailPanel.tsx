@@ -52,7 +52,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const coverImage = game.cardImage || game.image || game.backgroundImage;
   const hasEpicLaunchShortcut =
     game.launcherType === "epic" &&
-    String(game.executablePath || game.epicCatalogId || "")
+    String(game.epicLaunchId || game.executablePath || game.epicCatalogId || "")
       .split(":")
       .filter(Boolean).length >= 3;
   const safeAboutHtml = DOMPurify.sanitize(

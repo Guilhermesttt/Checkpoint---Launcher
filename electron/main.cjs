@@ -40,6 +40,7 @@ let mainWindow;
 let overlayWindow;
 let achievementBridge;
 let startupErrorShown = false;
+let isQuitting = false;
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -280,6 +281,19 @@ const createWindow = async () => {
 
     event.preventDefault();
     shell.openExternal(url);
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
+
+    if (process.platform !== "darwin" && !isQuitting) {
+      isQuitting = true;
+      app.quit();
+    }
   });
 
   await loadMainWindow();
@@ -595,6 +609,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
   screen.removeListener("display-metrics-changed", syncOverlayBounds);
   screen.removeListener("display-added", syncOverlayBounds);
   screen.removeListener("display-removed", syncOverlayBounds);

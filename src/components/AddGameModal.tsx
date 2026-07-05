@@ -86,6 +86,7 @@ type GameFormData = {
   executablePath: string;
   steamAppId?: string;
   epicCatalogId?: string;
+  epicLaunchId?: string;
   epicStoreUrl?: string;
   sizeGB?: number;
   releaseDate?: string;
@@ -102,6 +103,9 @@ const removeUndefined = (data: Record<string, unknown>) =>
   Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined),
   );
+
+const isWindowsExecutablePath = (value: string) =>
+  /^(?:[a-zA-Z]:[\\/]|\\\\).+\.exe$/i.test(String(value || "").trim());
 
 const AddGameModal: React.FC<AddGameModalProps> = ({
   isOpen,
@@ -221,6 +225,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           executablePath: gameToEdit.executablePath || "",
           steamAppId: gameToEdit.steamAppId || "",
           epicCatalogId: gameToEdit.epicCatalogId || "",
+          epicLaunchId: gameToEdit.epicLaunchId || "",
           epicStoreUrl: gameToEdit.epicStoreUrl || "",
           sizeGB: gameToEdit.sizeGB,
           releaseDate: gameToEdit.releaseDate || "",
@@ -243,6 +248,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           executablePath: "",
           source: "manual",
           hasGame: false,
+          epicLaunchId: "",
         });
       }
     }
@@ -309,6 +315,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             prev.launcherType === "local" ? prev.executablePath : appId,
           steamAppId: prev.launcherType === "local" ? "" : appId,
           epicCatalogId: prev.launcherType === "local" ? prev.epicCatalogId : "",
+          epicLaunchId: prev.launcherType === "local" ? prev.epicLaunchId : "",
           epicStoreUrl: prev.launcherType === "local" ? prev.epicStoreUrl : "",
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
@@ -380,9 +387,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         description: d?.description || game.description || "",
         aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
         launcherType: "epic",
-        executablePath: launchId,
+        executablePath: isWindowsExecutablePath(prev.executablePath) ? prev.executablePath : "",
         steamAppId: "",
         epicCatalogId: catalogId,
+        epicLaunchId: launchId,
         epicStoreUrl: game.productUrl || "",
         releaseDate: d?.releaseDate || game.releaseDate || "",
         developer: d?.developer || game.developer || "",
@@ -415,8 +423,27 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       executablePath: browserPath,
       steamAppId: "",
       epicCatalogId: "",
+      epicLaunchId: "",
       epicStoreUrl: "",
       source: "manual",
+    }));
+    playSound("select");
+  };
+
+  const handleEpicExecutableSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const browserPath =
+      (file as File & { path?: string }).path ||
+      file.webkitRelativePath ||
+      file.name;
+
+    setFormData((prev) => ({
+      ...prev,
+      launcherType: "epic",
+      executablePath: browserPath,
+      source: prev.epicCatalogId ? "epic" : "manual",
     }));
     playSound("select");
   };
@@ -546,6 +573,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       launcherType: "local",
                       steamAppId: "",
                       epicCatalogId: "",
+                      epicLaunchId: "",
                       epicStoreUrl: "",
                       executablePath:
                         prev.launcherType === "steam" || prev.launcherType === "epic"
@@ -568,6 +596,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       ...prev,
                       launcherType: "steam",
                       executablePath: prev.steamAppId || "",
+                      epicLaunchId: "",
                       epicStoreUrl: "",
                       source: "manual",
                     }));
@@ -585,7 +614,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "epic",
-                      executablePath: "",
+                      executablePath:
+                        prev.launcherType === "epic" ? prev.executablePath : "",
                       source: "manual",
                     }));
                   }}
@@ -706,6 +736,36 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     <EpicIcon className="h-3.5 w-3.5 opacity-50" /> Ver na Epic Games Store
                   </a>
                 )}
+
+                <div className="space-y-4 pt-2">
+                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                    <FolderOpen size={14} className="text-white/20" /> {copy.executable}
+                  </label>
+                  <input
+                    ref={executableInputRef}
+                    type="file"
+                    accept=".exe,application/x-msdownload"
+                    className="hidden"
+                    onChange={handleEpicExecutableSelect}
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => executableInputRef.current?.click()}
+                      className="shrink-0 px-4 py-3 rounded-2xl bg-white/8 border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70 hover:bg-white/12 hover:text-white transition-all"
+                    >
+                      {copy.chooseExe}
+                    </button>
+                    <div className="min-w-0 flex-1 rounded-2xl bg-white/0.03 border border-white/10 px-4 py-3">
+                      <p className="truncate text-xs text-white/70">
+                        {formData.executablePath || copy.noExecutable}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-white/28">
+                    {copy.executableHint}
+                  </p>
+                </div>
               </div>
             )}
 

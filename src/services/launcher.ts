@@ -2,6 +2,8 @@ import type { Game } from "../types/domain";
 
 const EPIC_LAUNCH_URI_PREFIX = "com.epicgames.launcher://apps/";
 
+const WINDOWS_EXECUTABLE_PATH_REGEX = /^(?:[a-zA-Z]:[\\/]|\\\\).+\.exe$/i;
+
 const safeDecodeURIComponent = (value: string) => {
   try {
     return decodeURIComponent(value);
@@ -15,10 +17,16 @@ const hasCompleteEpicLaunchId = (value: string) =>
     .split(":")
     .filter(Boolean).length >= 3;
 
+const isWindowsExecutablePath = (value: string) =>
+  WINDOWS_EXECUTABLE_PATH_REGEX.test(String(value || "").trim());
+
 const buildEpicLaunchUri = (game: Game): string | null => {
-  const rawLaunchId = String(game.executablePath || "").trim();
+  const explicitLaunchId = String(game.epicLaunchId || "").trim();
+  const rawLaunchId = isWindowsExecutablePath(game.executablePath || "")
+    ? ""
+    : String(game.executablePath || "").trim();
   const catalogId = String(game.epicCatalogId || "").trim();
-  const launchId = rawLaunchId || catalogId;
+  const launchId = explicitLaunchId || rawLaunchId || catalogId;
 
   if (!launchId) {
     return null;
@@ -45,7 +53,7 @@ const buildEpicLaunchUri = (game: Game): string | null => {
 };
 
 export const launchGame = async (game: Game): Promise<void> => {
-  if (!game.executablePath && !game.epicCatalogId && !game.epicStoreUrl) {
+  if (!game.executablePath && !game.epicCatalogId && !game.epicLaunchId && !game.epicStoreUrl) {
     throw new Error("Jogo sem caminho de execucao ou link da loja configurado.");
   }
 
@@ -59,6 +67,18 @@ export const launchGame = async (game: Game): Promise<void> => {
 
   // Epic Games
   if (game.launcherType === "epic" || game.epicCatalogId) {
+    if (
+      (window as Window & {
+        electronAPI?: { launchExecutable?: (path: string) => Promise<void> };
+      }).electronAPI?.launchExecutable &&
+      isWindowsExecutablePath(game.executablePath || "")
+    ) {
+      await (window as Window & {
+        electronAPI?: { launchExecutable?: (path: string) => Promise<void> };
+      }).electronAPI?.launchExecutable?.(String(game.executablePath).trim());
+      return;
+    }
+
     const epicLaunchUri = buildEpicLaunchUri(game);
     if (epicLaunchUri) {
       window.location.assign(epicLaunchUri);
