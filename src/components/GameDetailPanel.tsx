@@ -20,6 +20,12 @@ interface GameDetailPanelProps {
   playSound: (type: SoundEffectType) => void;
 }
 
+// Tempo mínimo (ms) que a tela de "abrindo jogo" fica visível, só pra não piscar
+// caso o launchGame() resolva quase instantaneamente.
+const MIN_LAUNCH_SCREEN_MS = 1200;
+
+const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   game,
   isOpen,
@@ -27,7 +33,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   playSound,
 }) => {
   const { user } = useAuth();
-  const { t } = usePreferences();
+  const { t, language } = usePreferences();
   const { notify } = useNotification();
   const [isLaunching, setIsLaunching] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("JOGAR");
@@ -37,14 +43,215 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
+  const copy = {
+    "pt-BR": {
+      tabPlay: "JOGAR",
+      tabAbout: "SOBRE",
+      tabManage: "GERENCIAR",
+      steamLabel: "Steam",
+      epicLabel: "Epic Games",
+      localLabel: "PC Local",
+      library: "Biblioteca",
+      timePlayed: "TEMPO JOGADO",
+      lastSession: "ÚLTIMA SESSÃO",
+      neverStarted: "Ainda não iniciado",
+      achievements: "CONQUISTAS",
+      appId: "App ID",
+      epicShortcutLabel: "Epic",
+      epicShortcut: "Atalho direto",
+      epicStore: "Via loja",
+      source: "Fonte",
+      sourceSteamSync: "Sync Steam",
+      sourceEpicCatalog: "Catálogo Epic",
+      sourceManual: "Manual",
+      photoWall: "Mural de fotos",
+      viewGallery: "Ver Galeria",
+      noScreenshot: "Nenhuma captura",
+      about: "Sobre",
+      seeMore: "Ver mais →",
+      popularTags: "Marcadores Populares",
+      developer: "Desenvolvedor",
+      publisher: "Distribuidora",
+      releaseDate: "Data de Lançamento",
+      category: "Categoria",
+      notInformed: "Não informado",
+      management: "Gerenciamento",
+      verify: "Verificar",
+      createShortcut: "Criar Atalho",
+      remove: "Remover",
+      platform: "Plataforma",
+      noDescription: "Sem descrição disponível para este jogo.",
+      gallery: "GALERIA",
+      previous: "← Anterior",
+      next: "Próximo →",
+      removeGame: "Remover jogo",
+      cannotUndo: "Esta ação não pode ser desfeita",
+      confirmRemove: (title: string) => (
+        <>
+          Tem certeza que deseja remover{" "}
+          <span className="text-white font-semibold">{title}</span> da sua
+          biblioteca?
+        </>
+      ),
+      cancel: "Cancelar",
+      removing: "Removendo...",
+      close: "Fechar",
+      loginToRemove: "Você precisa estar logado para remover um jogo.",
+      removedSuccess: "Jogo removido.",
+      removeError: "Erro ao remover jogo.",
+      launchGenericError: "Falha ao iniciar o jogo.",
+    },
+    "en-US": {
+      tabPlay: "PLAY",
+      tabAbout: "ABOUT",
+      tabManage: "MANAGE",
+      steamLabel: "Steam",
+      epicLabel: "Epic Games",
+      localLabel: "Local PC",
+      library: "Library",
+      timePlayed: "TIME PLAYED",
+      lastSession: "LAST SESSION",
+      neverStarted: "Not started yet",
+      achievements: "ACHIEVEMENTS",
+      appId: "App ID",
+      epicShortcutLabel: "Epic",
+      epicShortcut: "Direct shortcut",
+      epicStore: "Via store",
+      source: "Source",
+      sourceSteamSync: "Steam sync",
+      sourceEpicCatalog: "Epic catalog",
+      sourceManual: "Manual",
+      photoWall: "Photo wall",
+      viewGallery: "View gallery",
+      noScreenshot: "No screenshot",
+      about: "About",
+      seeMore: "See more →",
+      popularTags: "Popular tags",
+      developer: "Developer",
+      publisher: "Publisher",
+      releaseDate: "Release date",
+      category: "Category",
+      notInformed: "Not informed",
+      management: "Management",
+      verify: "Verify",
+      createShortcut: "Create shortcut",
+      remove: "Remove",
+      platform: "Platform",
+      noDescription: "No description available for this game.",
+      gallery: "GALLERY",
+      previous: "← Previous",
+      next: "Next →",
+      removeGame: "Remove game",
+      cannotUndo: "This action cannot be undone",
+      confirmRemove: (title: string) => (
+        <>
+          Are you sure you want to remove{" "}
+          <span className="text-white font-semibold">{title}</span> from your
+          library?
+        </>
+      ),
+      cancel: "Cancel",
+      removing: "Removing...",
+      close: "Close",
+      loginToRemove: "You need to be logged in to remove a game.",
+      removedSuccess: "Game removed.",
+      removeError: "Error removing game.",
+      launchGenericError: "Failed to launch the game.",
+    },
+    "es-ES": {
+      tabPlay: "JUGAR",
+      tabAbout: "ACERCA DE",
+      tabManage: "GESTIONAR",
+      steamLabel: "Steam",
+      epicLabel: "Epic Games",
+      localLabel: "PC Local",
+      library: "Biblioteca",
+      timePlayed: "TIEMPO JUGADO",
+      lastSession: "ÚLTIMA SESIÓN",
+      neverStarted: "Aún no iniciado",
+      achievements: "LOGROS",
+      appId: "App ID",
+      epicShortcutLabel: "Epic",
+      epicShortcut: "Acceso directo",
+      epicStore: "Vía tienda",
+      source: "Fuente",
+      sourceSteamSync: "Sync Steam",
+      sourceEpicCatalog: "Catálogo Epic",
+      sourceManual: "Manual",
+      photoWall: "Mural de fotos",
+      viewGallery: "Ver galería",
+      noScreenshot: "Sin capturas",
+      about: "Acerca de",
+      seeMore: "Ver más →",
+      popularTags: "Etiquetas populares",
+      developer: "Desarrollador",
+      publisher: "Distribuidora",
+      releaseDate: "Fecha de lanzamiento",
+      category: "Categoría",
+      notInformed: "No informado",
+      management: "Gestión",
+      verify: "Verificar",
+      createShortcut: "Crear acceso directo",
+      remove: "Eliminar",
+      platform: "Plataforma",
+      noDescription: "Sin descripción disponible para este juego.",
+      gallery: "GALERÍA",
+      previous: "← Anterior",
+      next: "Siguiente →",
+      removeGame: "Eliminar juego",
+      cannotUndo: "Esta acción no se puede deshacer",
+      confirmRemove: (title: string) => (
+        <>
+          ¿Seguro que deseas eliminar{" "}
+          <span className="text-white font-semibold">{title}</span> de tu
+          biblioteca?
+        </>
+      ),
+      cancel: "Cancelar",
+      removing: "Eliminando...",
+      close: "Cerrar",
+      loginToRemove: "Debes iniciar sesión para eliminar un juego.",
+      removedSuccess: "Juego eliminado.",
+      removeError: "Error al eliminar el juego.",
+      launchGenericError: "No se pudo iniciar el juego.",
+    },
+  }[language];
+
+  const locale =
+    language === "en-US" ? "en-US" : language === "es-ES" ? "es-ES" : "pt-BR";
+
   React.useEffect(() => {
-    setActiveTab("JOGAR");
+    setActiveTab(copy.tabPlay);
     setLaunchError(null);
     setGalleryModalOpen(false);
     setCurrentGalleryIndex(0);
     setDeleteModalOpen(false);
     setIsDeleting(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
+
+  // Navegação por teclado na galeria: ← → para trocar imagem, Esc para fechar.
+  React.useEffect(() => {
+    if (!galleryModalOpen || !game?.screenshots?.length) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setGalleryModalOpen(false);
+        playSound("modalClose");
+      } else if (e.key === "ArrowLeft") {
+        setCurrentGalleryIndex((c) =>
+          c > 0 ? c - 1 : (game.screenshots?.length ?? 1) - 1,
+        );
+        playSound("navigate");
+      } else if (e.key === "ArrowRight") {
+        setCurrentGalleryIndex((c) =>
+          c < (game.screenshots?.length ?? 1) - 1 ? c + 1 : 0,
+        );
+        playSound("navigate");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [galleryModalOpen, game?.screenshots, playSound]);
 
   if (!game) return null;
 
@@ -56,21 +263,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       .split(":")
       .filter(Boolean).length >= 3;
   const safeAboutHtml = DOMPurify.sanitize(
-    game.aboutTheGame ||
-    game.description ||
-    "Sem descrição disponível para este jogo.",
+    game.aboutTheGame || game.description || copy.noDescription,
     {
-      ALLOWED_TAGS: [
-        "b",
-        "br",
-        "em",
-        "i",
-        "li",
-        "ol",
-        "p",
-        "strong",
-        "ul",
-      ],
+      ALLOWED_TAGS: ["b", "br", "em", "i", "li", "ol", "p", "strong", "ul"],
       ALLOWED_ATTR: [],
     },
   );
@@ -85,12 +280,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       ? game.steamLastPlayedAt || game.lastPlayedAt
       : game.lastPlayedAt;
   const lastSession = lastSessionSource
-    ? new Date(lastSessionSource).toLocaleDateString("pt-BR")
-    : "Ainda não iniciado";
+    ? new Date(lastSessionSource).toLocaleDateString(locale)
+    : copy.neverStarted;
   const platformLabel =
-    game.launcherType === "steam" ? "Steam" :
-    game.launcherType === "epic" ? "Epic Games" :
-    "Local";
+    game.launcherType === "steam"
+      ? copy.steamLabel
+      : game.launcherType === "epic"
+        ? copy.epicLabel
+        : copy.localLabel;
   const aboutPreview = (game.aboutTheGame || game.description || "")
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
@@ -102,49 +299,58 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return `${h}H ${m}M`;
   };
 
-  const handleLaunch = () => {
+  const handleLaunch = async () => {
     if (isLaunching) return;
 
     setIsLaunching(true);
     setLaunchError(null);
     playSound("play");
-      window.dispatchEvent(new CustomEvent("checkpoint:game-launch", {
+    window.dispatchEvent(
+      new CustomEvent("checkpoint:game-launch", {
         detail: { title: game.title },
-      }));
-    setTimeout(async () => {
-      try {
-        if (user?.uid) {
-          await updateDoc(userGameDocRef(user.uid, game.id), {
-            lastPlayedAt: new Date().toISOString(),
-          }).catch(() => {
-            return;
-          });
-        }
-        await launchGame(game);
-      } catch (error) {
-        setLaunchError(
-          error instanceof Error ? error.message : "Falha ao iniciar o jogo.",
-        );
-      } finally {
-        setIsLaunching(false);
+      }),
+    );
+
+    try {
+      const [result] = await Promise.allSettled([
+        launchGame(game),
+        wait(MIN_LAUNCH_SCREEN_MS),
+      ]);
+
+      if (user?.uid) {
+        updateDoc(userGameDocRef(user.uid, game.id), {
+          lastPlayedAt: new Date().toISOString(),
+        }).catch(() => {
+          return;
+        });
       }
-    }, 2200);
+
+      if (result.status === "rejected") {
+        throw result.reason;
+      }
+    } catch (error) {
+      setLaunchError(
+        error instanceof Error ? error.message : copy.launchGenericError,
+      );
+    } finally {
+      setIsLaunching(false);
+    }
   };
 
   const handleDeleteGame = async () => {
     if (!user?.uid) {
-      notify("Você precisa estar logado para remover um jogo.", "error");
+      notify(copy.loginToRemove, "error");
       return;
     }
     if (isDeleting) return;
     setIsDeleting(true);
     try {
       await deleteDoc(userGameDocRef(user.uid, game.id));
-      notify("Jogo removido.", "success");
+      notify(copy.removedSuccess, "success");
       setDeleteModalOpen(false);
       onClose();
     } catch {
-      notify("Erro ao remover jogo.", "error");
+      notify(copy.removeError, "error");
     } finally {
       setIsDeleting(false);
     }
@@ -192,32 +398,33 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               <div className="flex items-center gap-1 mb-7">
                 <NavTab
                   icon="←"
+                  ariaLabel={copy.close}
                   onClick={() => {
                     playSound("back");
                     onClose();
                   }}
                 />
                 <NavTab
-                  label="JOGAR"
-                  active={activeTab === "JOGAR"}
+                  label={copy.tabPlay}
+                  active={activeTab === copy.tabPlay}
                   onClick={() => {
-                    setActiveTab("JOGAR");
+                    setActiveTab(copy.tabPlay);
                     playSound("navigate");
                   }}
                 />
                 <NavTab
-                  label="SOBRE"
-                  active={activeTab === "SOBRE"}
+                  label={copy.tabAbout}
+                  active={activeTab === copy.tabAbout}
                   onClick={() => {
-                    setActiveTab("SOBRE");
+                    setActiveTab(copy.tabAbout);
                     playSound("navigate");
                   }}
                 />
                 <NavTab
-                  label="GERENCIAR"
-                  active={activeTab === "GERENCIAR"}
+                  label={copy.tabManage}
+                  active={activeTab === copy.tabManage}
                   onClick={() => {
-                    setActiveTab("GERENCIAR");
+                    setActiveTab(copy.tabManage);
                     playSound("navigate");
                   }}
                 />
@@ -230,12 +437,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 className="flex items-center gap-2 mb-4"
               >
                 <span className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase">
-                  {game.launcherType === "steam" ? "Steam" :
-                   game.launcherType === "epic" ? "Epic Games" : "PC Local"}
+                  {platformLabel}
                 </span>
                 <span className="h-1 w-1 rounded-full bg-white/20" />
                 <span className="text-[10px] font-bold tracking-[0.3em] text-white/30 uppercase">
-                  {game.category || "Biblioteca"}
+                  {game.category || copy.library}
                 </span>
               </motion.div>
 
@@ -265,13 +471,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               >
                 <StatItem
                   icon={<Clock className="w-4 h-4" />}
-                  label="TEMPO JOGADO"
+                  label={copy.timePlayed}
                   value={formatHours(game.hoursPlayed)}
                   isEmpty={!game.hoursPlayed}
                 />
                 <StatItem
                   icon={<CalendarClock className="w-4 h-4" />}
-                  label="ÚLTIMA SESSÃO"
+                  label={copy.lastSession}
                   value={lastSession}
                   isEmpty={!lastSessionSource}
                 />
@@ -279,12 +485,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   total={achievementsTotal}
                   done={achievementsDone}
                   percent={achievementPercent}
+                  label={copy.achievements}
                 />
               </motion.div>
 
               <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar pr-4 -mr-4 pb-4">
                 <AnimatePresence mode="wait">
-                  {activeTab === "JOGAR" && (
+                  {activeTab === copy.tabPlay && (
                     <motion.div
                       key="play-content"
                       initial={{ opacity: 0, y: 20 }}
@@ -300,20 +507,32 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       >
                         {game.launcherType === "steam" && (
                           <span className="text-[10px] text-white/30 uppercase tracking-widest">
-                            App ID <span className="text-white/60 ml-1">{game.steamAppId || "---"}</span>
+                            {copy.appId}{" "}
+                            <span className="text-white/60 ml-1">
+                              {game.steamAppId || "---"}
+                            </span>
                           </span>
                         )}
                         {game.launcherType === "epic" && (
                           <span className="text-[10px] text-white/30 uppercase tracking-widest">
-                            Epic <span className="text-white/60 ml-1">{hasEpicLaunchShortcut ? "Atalho" : "Loja"}</span>
+                            {copy.epicShortcutLabel}{" "}
+                            <span className="text-white/60 ml-1">
+                              {hasEpicLaunchShortcut
+                                ? copy.epicShortcut
+                                : copy.epicStore}
+                            </span>
                           </span>
                         )}
                         <span className="h-1 w-1 rounded-full bg-white/10" />
                         <span className="text-[10px] text-white/30 uppercase tracking-widest">
-                          Fonte <span className="text-white/60 ml-1">{
-                            game.source === "steam" ? "Sync Steam" :
-                            game.source === "epic" ? "Catálogo Epic" : "Manual"
-                          }</span>
+                          {copy.source}{" "}
+                          <span className="text-white/60 ml-1">
+                            {game.source === "steam"
+                              ? copy.sourceSteamSync
+                              : game.source === "epic"
+                                ? copy.sourceEpicCatalog
+                                : copy.sourceManual}
+                          </span>
                         </span>
                       </motion.div>
 
@@ -323,7 +542,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         viewport={{ once: false, amount: 0.2 }}
                       >
                         <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4 flex items-center gap-2">
-                          <Camera className="w-3 h-3" /> Mural de fotos
+                          <Camera className="w-3 h-3" /> {copy.photoWall}
                         </h3>
                         {game.screenshots && game.screenshots.length > 0 ? (
                           <div
@@ -336,18 +555,22 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           >
                             <img
                               src={game.screenshots[game.screenshots.length - 1]}
+                              alt=""
                               className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105 will-change-transform"
                             />
                             <div className="absolute inset-0 bg-linear-to-t from-[#050507]/90 via-transparent to-transparent flex items-end p-4 opacity-100 group-hover:opacity-0 transition-opacity duration-300">
                               <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
-                                <Camera className="w-3 h-3" /> Ver Galeria ({game.screenshots.length})
+                                <Camera className="w-3 h-3" /> {copy.viewGallery} (
+                                {game.screenshots.length})
                               </span>
                             </div>
                           </div>
                         ) : (
                           <div className="rounded-xl premium-glass flex flex-col items-center justify-center gap-2 text-white/30 h-[220px]">
                             <Camera className="w-6 h-6 opacity-50" />
-                            <span className="text-[10px] uppercase tracking-widest font-bold">Nenhuma captura</span>
+                            <span className="text-[10px] uppercase tracking-widest font-bold">
+                              {copy.noScreenshot}
+                            </span>
                           </div>
                         )}
                       </motion.div>
@@ -360,16 +583,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         >
                           <div className="flex items-center justify-between mb-4">
                             <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase">
-                              Sobre
+                              {copy.about}
                             </h3>
                             <button
                               onClick={() => {
-                                setActiveTab("SOBRE");
+                                setActiveTab(copy.tabAbout);
                                 playSound("navigate");
                               }}
                               className="text-[10px] font-bold text-white/40 hover:text-white uppercase tracking-widest transition-colors"
                             >
-                              Ver mais →
+                              {copy.seeMore}
                             </button>
                           </div>
                           <p className="text-white/60 text-sm leading-relaxed line-clamp-3">
@@ -392,7 +615,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     </motion.div>
                   )}
 
-                  {activeTab === "SOBRE" && (
+                  {activeTab === copy.tabAbout && (
                     <motion.div
                       key="about-content"
                       initial={{ opacity: 0, y: 20 }}
@@ -405,19 +628,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           initial={{ opacity: 0, y: 30 }}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: false, amount: 0.05 }}
-                          transition={{
-                            duration: 0.6,
-                            ease: [0.16, 1, 0.3, 1],
-                          }}
+                          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                         >
                           <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
-                            Sobre
+                            {copy.about}
                           </h3>
                           <div
                             className="text-white/70 leading-relaxed text-sm prose prose-invert prose-p:my-0 pb-2"
-                            dangerouslySetInnerHTML={{
-                              __html: safeAboutHtml,
-                            }}
+                            dangerouslySetInnerHTML={{ __html: safeAboutHtml }}
                           />
                         </motion.div>
 
@@ -425,27 +643,28 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           initial={{ opacity: 0, y: 30 }}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: false, amount: 0.2 }}
-                          transition={{
-                            duration: 0.6,
-                            ease: [0.16, 1, 0.3, 1],
-                          }}
+                          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                           className="grid grid-cols-2 gap-y-6 gap-x-12 pt-6 border-t border-white/5"
                         >
                           <TechnicalDetail
-                            label="Desenvolvedor"
+                            label={copy.developer}
                             value={game.developer}
+                            fallback={copy.notInformed}
                           />
                           <TechnicalDetail
-                            label="Distribuidora"
+                            label={copy.publisher}
                             value={game.publisher}
+                            fallback={copy.notInformed}
                           />
                           <TechnicalDetail
-                            label="Data de Lançamento"
+                            label={copy.releaseDate}
                             value={game.releaseDate}
+                            fallback={copy.notInformed}
                           />
                           <TechnicalDetail
-                            label="Categoria"
+                            label={copy.category}
                             value={game.category}
+                            fallback={copy.notInformed}
                           />
                         </motion.div>
 
@@ -454,13 +673,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                             initial={{ opacity: 0, y: 30 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: false, amount: 0.2 }}
-                            transition={{
-                              duration: 0.6,
-                              ease: [0.16, 1, 0.3, 1],
-                            }}
+                            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                           >
                             <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-3">
-                              Marcadores Populares
+                              {copy.popularTags}
                             </h3>
                             <div className="flex flex-wrap gap-2">
                               {game.tags.slice(0, 10).map((tag, i) => (
@@ -478,7 +694,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     </motion.div>
                   )}
 
-                  {activeTab === "GERENCIAR" && (
+                  {activeTab === copy.tabManage && (
                     <motion.div
                       key="mgmt-content"
                       initial={{ opacity: 0, y: 20 }}
@@ -486,19 +702,19 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       exit={{ opacity: 0, y: -20 }}
                     >
                       <h3 className="text-[10px] font-bold tracking-[0.3em] text-white/40 uppercase mb-4">
-                        Gerenciamento
+                        {copy.management}
                       </h3>
                       <div className="p-4 rounded-xl premium-glass flex items-center justify-between mb-4">
                         <span className="text-white/60 text-xs truncate max-w-sm">
                           {game.executablePath}
                         </span>
                         <button className="text-[10px] font-bold text-white uppercase tracking-widest pl-4 hover:text-white/70 transition-colors">
-                          Verificar
+                          {copy.verify}
                         </button>
                       </div>
                       <div className="flex gap-4">
                         <button className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest">
-                          Criar Atalho
+                          {copy.createShortcut}
                         </button>
                         <button
                           onClick={() => {
@@ -507,7 +723,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           }}
                           className="px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-400/60 hover:text-red-400 hover:bg-red-500/20 transition-all uppercase tracking-widest"
                         >
-                          Remover
+                          {copy.remove}
                         </button>
                       </div>
                     </motion.div>
@@ -520,11 +736,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 40 }}
-              transition={{
-                duration: 0.6,
-                delay: 0.3,
-                ease: [0.16, 1, 0.3, 1],
-              }}
+              transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col justify-end items-end p-8 pl-0"
             >
               <div className="w-[260px] rounded-[28px] overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
@@ -539,7 +751,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 </div>
                 <div className="p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35 mb-1">
-                    Plataforma
+                    {copy.platform}
                   </p>
                   <p className="text-sm font-semibold text-white/80">
                     {platformLabel}
@@ -547,25 +759,31 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 </div>
               </div>
 
-
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleLaunch}
                 disabled={isLaunching}
+                aria-label={isLaunching ? t("launching") : t("play")}
                 className="rounded-2xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500"
                 style={{
                   background: "var(--game-color, #ffffff)",
-                  boxShadow: "0 8px 32px var(--game-color, transparent)"
+                  boxShadow: "0 8px 32px var(--game-color, transparent)",
                 }}
               >
-                <span className="text-sm font-black tracking-[0.15em] uppercase transition-colors" style={{ color: "var(--game-text-color, #000)" }}>
+                <span
+                  className="text-sm font-black tracking-[0.15em] uppercase transition-colors"
+                  style={{ color: "var(--game-text-color, #000)" }}
+                >
                   {isLaunching ? t("launching") : t("play")}
                 </span>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
                   <Play
                     className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
-                    style={{ color: "var(--game-text-color, #000)", fill: "var(--game-text-color, #000)" }}
+                    style={{
+                      color: "var(--game-text-color, #000)",
+                      fill: "var(--game-text-color, #000)",
+                    }}
                   />
                 </div>
               </motion.button>
@@ -579,13 +797,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
           <button
             onClick={onClose}
+            aria-label={copy.close}
             className="absolute top-8 right-8 z-20 p-4 premium-glass rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90"
           >
             <X className="w-5 h-5 text-white" />
           </button>
 
           <ModalShell
-            isOpen={Boolean(galleryModalOpen && game.screenshots && game.screenshots.length > 0)}
+            isOpen={Boolean(
+              galleryModalOpen && game.screenshots && game.screenshots.length > 0,
+            )}
             onClose={() => {
               setGalleryModalOpen(false);
               playSound("modalClose");
@@ -599,7 +820,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             <div className="relative">
               <div className="absolute top-4 left-6 z-10">
                 <span className="text-[10px] font-bold tracking-[0.3em] text-white/50 uppercase">
-                  GALERIA ({currentGalleryIndex + 1}/{game.screenshots?.length ?? 0})
+                  {copy.gallery} ({currentGalleryIndex + 1}/
+                  {game.screenshots?.length ?? 0})
                 </span>
               </div>
               <button
@@ -607,6 +829,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   setGalleryModalOpen(false);
                   playSound("modalClose");
                 }}
+                aria-label={copy.close}
                 className="absolute top-3 right-4 z-10 p-3 premium-glass rounded-full hover:bg-white/20 transition-all hover:rotate-90 active:scale-90"
               >
                 <X className="w-5 h-5" />
@@ -637,7 +860,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     playSound("navigate");
                   }}
                 >
-                  ← Anterior
+                  {copy.previous}
                 </GlassButton>
                 <GlassButton
                   type="button"
@@ -648,7 +871,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     playSound("navigate");
                   }}
                 >
-                  Próximo →
+                  {copy.next}
                 </GlassButton>
               </div>
             </div>
@@ -674,10 +897,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   </div>
                   <div className="flex flex-col">
                     <span className="text-sm font-black tracking-[0.2em] uppercase text-white">
-                      Remover jogo
+                      {copy.removeGame}
                     </span>
                     <span className="text-[10px] font-bold tracking-[0.24em] uppercase text-white/35">
-                      Esta ação não pode ser desfeita
+                      {copy.cannotUndo}
                     </span>
                   </div>
                 </div>
@@ -686,6 +909,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     setDeleteModalOpen(false);
                     playSound("back");
                   }}
+                  aria-label={copy.close}
                   className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-all border border-white/5"
                 >
                   <X className="text-white/40" size={20} />
@@ -694,9 +918,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
               <div className="px-8 py-7">
                 <p className="text-sm text-white/70 leading-relaxed">
-                  Tem certeza que deseja remover{" "}
-                  <span className="text-white font-semibold">{game.title}</span>{" "}
-                  da sua biblioteca?
+                  {copy.confirmRemove(game.title)}
                 </p>
 
                 <div className="flex gap-3 justify-end mt-7">
@@ -709,7 +931,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     disabled={isDeleting}
                     className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Cancelar
+                    {copy.cancel}
                   </button>
                   <button
                     type="button"
@@ -717,7 +939,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     disabled={isDeleting}
                     className="px-5 py-3 rounded-2xl bg-red-500/15 border border-red-500/25 text-[10px] font-black uppercase tracking-[0.2em] text-red-200/80 hover:text-red-100 hover:bg-red-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    {isDeleting ? "Removendo..." : "Remover"}
+                    {isDeleting ? copy.removing : copy.remove}
                   </button>
                 </div>
               </div>
@@ -730,7 +952,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-200 bg-black flex flex-col items-center justify-center"
+                className="absolute inset-0 z-[200] bg-black flex flex-col items-center justify-center"
               >
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
@@ -782,11 +1004,12 @@ const NavTab: React.FC<{
   label?: string;
   icon?: string;
   active?: boolean;
-  badge?: boolean;
+  ariaLabel?: string;
   onClick?: () => void;
-}> = ({ label, icon, active, onClick }) => (
+}> = ({ label, icon, active, ariaLabel, onClick }) => (
   <button
     onClick={onClick}
+    aria-label={ariaLabel || label}
     className={`
       px-4 py-2 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase
       transition-all duration-300 flex items-center gap-1
@@ -807,20 +1030,20 @@ const StatItem: React.FC<{
   value: string;
   isEmpty?: boolean;
 }> = ({ icon, label, value, isEmpty }) => (
-  <div className={`rounded-2xl border p-4 min-h-[94px] flex flex-col justify-between ${
-    isEmpty
-      ? "border-white/5 bg-white/[0.02]"
-      : "border-white/10 bg-white/[0.055]"
-  }`}>
+  <div
+    className={`rounded-2xl border p-4 min-h-[94px] flex flex-col justify-between ${isEmpty ? "border-white/5 bg-white/[0.02]" : "border-white/10 bg-white/[0.055]"
+      }`}
+  >
     <div className="flex items-center gap-2 text-white/40">
       {icon}
       <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
         {label}
       </span>
     </div>
-    <span className={`text-xl font-semibold tracking-tight truncate ${
-      isEmpty ? "text-white/20" : "text-white"
-    }`}>
+    <span
+      className={`text-xl font-semibold tracking-tight truncate ${isEmpty ? "text-white/20" : "text-white"
+        }`}
+    >
       {value}
     </span>
   </div>
@@ -830,7 +1053,8 @@ const AchievementStat: React.FC<{
   total: number;
   done: number;
   percent: number;
-}> = ({ total, done, percent }) => {
+  label: string;
+}> = ({ total, done, percent, label }) => {
   const isEmpty = total <= 0;
 
   return (
@@ -840,14 +1064,24 @@ const AchievementStat: React.FC<{
           <Trophy className="w-4 h-4" />
           <div className="flex flex-col gap-1">
             <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
-              CONQUISTAS
+              {label}
             </span>
-            <span className={isEmpty ? "text-white/20 text-xs" : "text-white/55 text-xs"}>
+            <span
+              className={
+                isEmpty ? "text-white/20 text-xs" : "text-white/55 text-xs"
+              }
+            >
               {isEmpty ? "---" : `${done}/${total}`}
             </span>
           </div>
         </div>
-        <span className={isEmpty ? "text-2xl font-light text-white/20" : "text-2xl font-light text-white"}>
+        <span
+          className={
+            isEmpty
+              ? "text-2xl font-light text-white/20"
+              : "text-2xl font-light text-white"
+          }
+        >
           {isEmpty ? "0%" : `${percent}%`}
         </span>
       </div>
@@ -863,28 +1097,17 @@ const AchievementStat: React.FC<{
   );
 };
 
-const InfoCard: React.FC<{ label: string; value: string }> = ({
-  label,
-  value,
-}) => (
-  <div className="p-4 rounded-xl premium-glass">
-    <span className="block text-[8px] font-bold text-white/40 uppercase mb-1">
-      {label}
-    </span>
-    <span className="text-white text-xs">{value}</span>
-  </div>
-);
-
-const TechnicalDetail: React.FC<{ label: string; value?: string }> = ({
-  label,
-  value,
-}) => (
+const TechnicalDetail: React.FC<{
+  label: string;
+  value?: string;
+  fallback: string;
+}> = ({ label, value, fallback }) => (
   <div>
     <span className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5">
       {label}
     </span>
     <span className="text-white/80 text-sm font-medium">
-      {value || "Não informado"}
+      {value || fallback}
     </span>
   </div>
 );

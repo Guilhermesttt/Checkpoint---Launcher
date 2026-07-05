@@ -4,7 +4,6 @@ import {
   X,
   ImageIcon,
   Type,
-  Sparkles,
   Play,
   Search,
   Tags,
@@ -12,6 +11,7 @@ import {
   Gamepad2,
   RefreshCw,
   FolderOpen,
+  HardDrive,
 } from "lucide-react";
 import { addDoc, updateDoc, deleteField } from "firebase/firestore";
 import ModalShell from "./ui/ModalShell";
@@ -24,9 +24,7 @@ import {
   userGamesCollectionRef,
   userGameDocRef,
 } from "../services/firestorePaths";
-import {
-  fetchSteamAppDetailsResult,
-} from "../services/steam";
+import { fetchSteamAppDetailsResult } from "../services/steam";
 import {
   fetchEpicAppDetailsResult,
   searchEpicGames,
@@ -71,8 +69,6 @@ const CATEGORIES = [
   { id: "CASUAL", label: "Casual" },
 ];
 
-
-
 type GameFormData = {
   title: string;
   image?: string;
@@ -107,6 +103,63 @@ const removeUndefined = (data: Record<string, unknown>) =>
 const isWindowsExecutablePath = (value: string) =>
   /^(?:[a-zA-Z]:[\\/]|\\\\).+\.exe$/i.test(String(value || "").trim());
 
+// Dropdown de busca reutilizado entre Steam e Epic — antes era duplicado
+// quase inteiro em dois blocos JSX separados.
+const GameSearchDropdown: React.FC<{
+  results: any[];
+  isSearching: boolean;
+  hasQuery: boolean;
+  noResultsLabel: string;
+  onSelect: (game: any) => void;
+}> = ({ results, isSearching, hasQuery, noResultsLabel, onSelect }) => {
+  const showEmptyState =
+    hasQuery && !isSearching && results.length === 0;
+
+  if (!isSearching && !showEmptyState && results.length === 0) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
+        className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#121216] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto no-scrollbar"
+      >
+        {isSearching && (
+          <div className="flex items-center gap-3 p-4 text-white/40">
+            <RefreshCw size={14} className="animate-spin" />
+            <span className="text-xs">Buscando...</span>
+          </div>
+        )}
+        {!isSearching && showEmptyState && (
+          <div className="p-4 text-xs text-white/40">{noResultsLabel}</div>
+        )}
+        {!isSearching &&
+          results.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => onSelect(g)}
+              className="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left group"
+            >
+              {g.tiny_image ? (
+                <img
+                  src={g.tiny_image}
+                  alt=""
+                  className="w-12 h-6 object-cover rounded opacity-40 group-hover:opacity-100 transition-opacity"
+                />
+              ) : (
+                <div className="w-12 h-6 bg-white/5 rounded" />
+              )}
+              <span className="text-sm text-white/70 group-hover:text-white">
+                {g.name}
+              </span>
+            </button>
+          ))}
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
 const AddGameModal: React.FC<AddGameModalProps> = ({
   isOpen,
   onClose,
@@ -121,6 +174,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       editInfo: "Editar informações",
       addGame: "Adicionar Jogo",
       steamSearch: "Buscar na Steam",
+      epicSearch: "Buscar na Epic",
       optional: "Opcional",
       searchPlaceholder: "Pesquisar jogo para auto-preenchimento...",
       title: "Título",
@@ -140,11 +194,23 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       executableHint:
         "No navegador, o sistema não expõe o caminho completo. Em runtime desktop, o caminho local pode ser usado para iniciar o jogo.",
       noExecutable: "Nenhum executável selecionado",
+      noSearchResults: "Nenhum resultado encontrado.",
+      searchError: "Erro ao buscar jogos. Tente novamente.",
+      sizeGB: "Tamanho (GB)",
+      sizePlaceholder: "Ex: 42",
+      missingCoverOrExe:
+        "Adicione uma capa ou selecione um executável antes de salvar.",
+      viewOnEpicStore: "Ver na Epic Games Store",
+      ownGameConfirmed: "✓ Tenho esse jogo",
+      ownGameConfirm: "Confirmar que possuo este jogo",
+      previewPanel: "Prévia no Painel",
+      wallpaper: "Wallpaper",
     },
     "en-US": {
       editInfo: "Edit information",
       addGame: "Add Game",
       steamSearch: "Search Steam",
+      epicSearch: "Search Epic",
       optional: "Optional",
       searchPlaceholder: "Search game for autofill...",
       title: "Title",
@@ -164,11 +230,23 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       executableHint:
         "Browsers do not expose the full local path. In a desktop runtime, the local path can be used to launch the game.",
       noExecutable: "No executable selected",
+      noSearchResults: "No results found.",
+      searchError: "Error searching games. Please try again.",
+      sizeGB: "Size (GB)",
+      sizePlaceholder: "E.g. 42",
+      missingCoverOrExe:
+        "Add a cover image or select an executable before saving.",
+      viewOnEpicStore: "View on Epic Games Store",
+      ownGameConfirmed: "✓ I own this game",
+      ownGameConfirm: "Confirm you own this game",
+      previewPanel: "Dashboard Preview",
+      wallpaper: "Wallpaper",
     },
     "es-ES": {
       editInfo: "Editar información",
       addGame: "Añadir juego",
       steamSearch: "Buscar en Steam",
+      epicSearch: "Buscar en Epic",
       optional: "Opcional",
       searchPlaceholder: "Buscar juego para autocompletar...",
       title: "Título",
@@ -188,6 +266,17 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       executableHint:
         "El navegador no expone la ruta local completa. En runtime de escritorio, la ruta local puede usarse para iniciar el juego.",
       noExecutable: "Ningún ejecutable seleccionado",
+      noSearchResults: "No se encontraron resultados.",
+      searchError: "Error al buscar juegos. Inténtalo de nuevo.",
+      sizeGB: "Tamaño (GB)",
+      sizePlaceholder: "Ej: 42",
+      missingCoverOrExe:
+        "Añade una portada o selecciona un ejecutable antes de guardar.",
+      viewOnEpicStore: "Ver en Epic Games Store",
+      ownGameConfirmed: "✓ Tengo este juego",
+      ownGameConfirm: "Confirmar que posees este juego",
+      previewPanel: "Vista previa del panel",
+      wallpaper: "Fondo",
     },
   }[language];
   const { notify } = useNotification();
@@ -198,6 +287,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const [formData, setFormData] = useState<GameFormData>({
     title: "",
@@ -251,6 +341,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           epicLaunchId: "",
         });
       }
+      setSearchQuery("");
+      setSearchResults([]);
+      setIsSearching(false);
     }
   }, [isOpen, gameToEdit]);
 
@@ -274,8 +367,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const handleSteamSearch = async (query: string) => {
     if (query.length < 3) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
+    setIsSearching(true);
     try {
       const resp = await fetch(
         apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
@@ -284,6 +379,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       setSearchResults(data.items || []);
     } catch (e) {
       console.error(e);
+      setSearchResults([]);
+      notify(copy.searchError, "error");
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -320,7 +419,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
               ? Math.round(d.sizeGB)
-              : undefined,
+              : prev.sizeGB,
           releaseDate: d.releaseDate || "",
           developer: d.developer || "",
           publisher: d.publisher || "",
@@ -329,9 +428,14 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           screenshots: d.screenshots || [],
           source: "manual",
         }));
+      } else {
+        notify(copy.searchError, "error");
       }
       setSearchResults([]);
       setSearchQuery("");
+    } catch (e) {
+      console.error(e);
+      notify(copy.searchError, "error");
     } finally {
       setLoading(false);
     }
@@ -340,13 +444,19 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const handleEpicSearch = async (query: string) => {
     if (query.length < 3) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
+    setIsSearching(true);
     try {
       const data = await searchEpicGames(query);
       setSearchResults(data.items || []);
     } catch (e) {
       console.error(e);
+      setSearchResults([]);
+      notify(copy.searchError, "error");
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -354,6 +464,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     setSearchQuery(query);
     if (searchDebounceRef.current) {
       window.clearTimeout(searchDebounceRef.current);
+    }
+    if (query.length < 3) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
     searchDebounceRef.current = window.setTimeout(() => {
       if (platform === "steam") {
@@ -392,6 +507,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         epicCatalogId: catalogId,
         epicLaunchId: launchId,
         epicStoreUrl: game.productUrl || "",
+        sizeGB: d?.sizeGB ?? prev.sizeGB,
         releaseDate: d?.releaseDate || game.releaseDate || "",
         developer: d?.developer || game.developer || "",
         publisher: d?.publisher || game.publisher || "",
@@ -403,6 +519,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }));
       setSearchResults([]);
       setSearchQuery("");
+    } catch (e) {
+      console.error(e);
+      notify(copy.searchError, "error");
     } finally {
       setLoading(false);
     }
@@ -488,8 +607,41 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
+  const handleSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === "") {
+      setFormData((prev) => ({ ...prev, sizeGB: undefined }));
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isNaN(parsed) && parsed >= 0) {
+      setFormData((prev) => ({ ...prev, sizeGB: parsed }));
+    }
+  };
+
+  const isFormValid = () => {
+    if (!formData.title) return false;
+    if (
+      (formData.launcherType === "epic" || formData.launcherType === "steam") &&
+      !formData.hasGame
+    ) {
+      return false;
+    }
+    if (formData.launcherType === "local") {
+      const hasCover = Boolean(formData.cardImage || formData.image);
+      const hasExecutable = Boolean(formData.executablePath);
+      if (!hasCover && !hasExecutable) return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
-    if (!user?.uid || !formData.title) return;
+    if (!user?.uid || !isFormValid()) {
+      if (formData.title && formData.launcherType === "local") {
+        notify(copy.missingCoverOrExe, "error");
+      }
+      return;
+    }
     setLoading(true);
     playSound("select");
     try {
@@ -552,6 +704,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               playSound("back");
               onClose();
             }}
+            aria-label="Fechar"
             className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-all border border-white/5"
           >
             <X className="text-white/40" size={20} />
@@ -568,6 +721,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <button
                   onClick={() => {
                     playSound("navigate");
+                    setSearchResults([]);
+                    setSearchQuery("");
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "local",
@@ -592,6 +747,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <button
                   onClick={() => {
                     playSound("navigate");
+                    setSearchResults([]);
+                    setSearchQuery("");
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "steam",
@@ -611,6 +768,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <button
                   onClick={() => {
                     playSound("navigate");
+                    setSearchResults([]);
+                    setSearchQuery("");
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "epic",
@@ -644,37 +803,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     placeholder={copy.searchPlaceholder}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
                   />
-                  <AnimatePresence>
-                    {searchResults.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#121216] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto no-scrollbar"
-                      >
-                        {searchResults.map((g) => (
-                          <button
-                            key={g.id}
-                            onClick={() => handleSelectSteamGame(g)}
-                            className="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left group"
-                          >
-                            {g.tiny_image ? (
-                              <img
-                                src={g.tiny_image}
-                                alt=""
-                                className="w-12 h-6 object-cover rounded opacity-40 group-hover:opacity-100 transition-opacity"
-                              />
-                            ) : (
-                              <div className="w-12 h-6 bg-white/5 rounded" />
-                            )}
-                            <span className="text-sm text-white/70 group-hover:text-white">
-                              {g.name}
-                            </span>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <GameSearchDropdown
+                    results={searchResults}
+                    isSearching={isSearching}
+                    hasQuery={searchQuery.length >= 3}
+                    noResultsLabel={copy.noSearchResults}
+                    onSelect={handleSelectSteamGame}
+                  />
                 </div>
               </div>
             )}
@@ -682,7 +817,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             {formData.launcherType === "epic" && (
               <div className="space-y-4">
                 <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <Search size={14} className="text-white/20" /> Buscar na Epic ({copy.optional})
+                  <Search size={14} className="text-white/20" /> {copy.epicSearch} ({copy.optional})
                 </label>
                 <div className="relative">
                   <input
@@ -693,37 +828,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     placeholder={copy.searchPlaceholder}
                     className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
                   />
-                  <AnimatePresence>
-                    {searchResults.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#121216] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-60 overflow-y-auto no-scrollbar"
-                      >
-                        {searchResults.map((g) => (
-                          <button
-                            key={g.id}
-                            onClick={() => handleSelectEpicGame(g)}
-                            className="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left group"
-                          >
-                            {g.tiny_image ? (
-                              <img
-                                src={g.tiny_image}
-                                alt=""
-                                className="w-12 h-6 object-cover rounded opacity-40 group-hover:opacity-100 transition-opacity"
-                              />
-                            ) : (
-                              <div className="w-12 h-6 bg-white/5 rounded" />
-                            )}
-                            <span className="text-sm text-white/70 group-hover:text-white">
-                              {g.name}
-                            </span>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <GameSearchDropdown
+                    results={searchResults}
+                    isSearching={isSearching}
+                    hasQuery={searchQuery.length >= 3}
+                    noResultsLabel={copy.noSearchResults}
+                    onSelect={handleSelectEpicGame}
+                  />
                 </div>
 
                 {formData.epicStoreUrl && (
@@ -733,7 +844,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     rel="noreferrer"
                     className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/70"
                   >
-                    <EpicIcon className="h-3.5 w-3.5 opacity-50" /> Ver na Epic Games Store
+                    <EpicIcon className="h-3.5 w-3.5 opacity-50" /> {copy.viewOnEpicStore}
                   </a>
                 )}
 
@@ -777,18 +888,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     playSound('select')
                     setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }))
                   }}
-
                   className={`w-full px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border flex items-center justify-center gap-2 ${formData.hasGame
                     ? "bg-emerald-500/90 text-black border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                     : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
                     }`}
                 >
-                  {formData.hasGame ? "✓ Tenho esse jogo" : "Confirmar que possuo este jogo"}
+                  {formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}
                 </button>
               </div>
             )}
-
-
 
             <div className="h-px bg-white/5" />
 
@@ -865,8 +973,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 </div>
                 <div className="space-y-4">
                   <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                    <ImageIcon size={14} className="text-white/20" /> Wallpaper
-                    (Link)
+                    <ImageIcon size={14} className="text-white/20" /> {copy.wallpaper}
+                    ({copy.link})
                   </label>
                   <input
                     value={formData.backgroundImage}
@@ -898,6 +1006,21 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     </>
                   )}
                 </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                  <HardDrive size={14} className="text-white/20" /> {copy.sizeGB}
+                  ({copy.optional})
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.sizeGB ?? ""}
+                  onChange={handleSizeChange}
+                  placeholder={copy.sizePlaceholder}
+                  className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                />
               </div>
 
               {formData.launcherType === "local" && (
@@ -935,13 +1058,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             </div>
 
             <button
-              disabled={
-                loading ||
-                !formData.title ||
-                ((formData.launcherType === "epic" ||
-                  formData.launcherType === "steam") &&
-                  !formData.hasGame)
-              }
+              disabled={loading || !isFormValid()}
               onClick={handleSubmit}
               className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-[#e0e0e0] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.1)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
             >
@@ -978,7 +1095,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             <div className="relative z-10 space-y-8 flex flex-col items-center">
               <div className="text-center space-y-1">
                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">
-                  Prévia no Painel
+                  {copy.previewPanel}
                 </p>
                 <div className="h-0.5 w-8 bg-white/10 mx-auto rounded-full" />
               </div>
