@@ -60,10 +60,10 @@ export function CtaSection() {
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
                   <a
-                    href="/login"
+                    href="/download"
                     className="inline-flex items-center gap-2 bg-foreground hover:bg-foreground/90 text-background px-8 h-14 text-base rounded-full group transition-all"
                   >
-                    Criar conta grátis
+                    Baixar launcher
                     <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
                   </a>
                   <a

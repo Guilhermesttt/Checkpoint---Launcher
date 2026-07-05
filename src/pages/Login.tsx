@@ -17,6 +17,7 @@ const GoogleIcon = () => (
 const LoginContent: React.FC = () => {
   const { user, signInWithGoogle, signInWithEmail, signUpWithEmail, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const isDesktopRuntime = Boolean(window.electronAPI);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -87,13 +88,15 @@ const LoginContent: React.FC = () => {
         ))}
       </div>
 
-      <a
-        href="/"
-        className="absolute top-8 left-8 flex items-center gap-2 text-white/40 hover:text-white/80 text-sm font-mono transition-colors group"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        Voltar
-      </a>
+      {!isDesktopRuntime && (
+        <a
+          href="/"
+          className="absolute top-8 left-8 flex items-center gap-2 text-white/40 hover:text-white/80 text-sm font-mono transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Voltar
+        </a>
+      )}
 
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.97 }}

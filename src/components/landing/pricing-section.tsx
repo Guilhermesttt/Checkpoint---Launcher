@@ -15,8 +15,8 @@ const plans = [
       "Sync na nuvem",
       "Suporte da comunidade",
     ],
-    cta: "Começar Agora",
-    href: "/login",
+    cta: "Baixar Agora",
+    href: "/download",
     highlight: false,
   },
   {

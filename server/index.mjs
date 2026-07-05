@@ -8,6 +8,7 @@ import rateLimit from "express-rate-limit";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { OAuth2Client } from "google-auth-library";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -42,6 +43,8 @@ const epicSandboxId = process.env.EPIC_SANDBOX_ID?.trim();
 const discordClientId = process.env.DISCORD_CLIENT_ID?.trim();
 const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
 const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
 
 const parseFirebaseServiceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
@@ -93,12 +96,14 @@ const discordCurrentUserEndpoint = "https://discord.com/api/users/@me";
 const discordRelationshipsEndpoint = "https://discord.com/api/users/@me/relationships";
 const pendingStates = new Map();
 const pendingDiscordStates = new Map();
+const pendingDesktopGoogleStates = new Map();
 
 const appDetailsCache = new Map();
 const achievementsCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
+const DESKTOP_GOOGLE_AUTH_STATE_TTL = 1000 * 60 * 5; // 5 minutos
 
 const steamAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -130,6 +135,53 @@ const buildDiscordRedirectUri = () =>
     `${backendPublicUrl}/auth/discord/callback`
   ).replace(/\/$/, "");
 
+const buildGoogleRedirectUri = () =>
+  (
+    process.env.GOOGLE_REDIRECT_URI?.trim() ||
+    `${backendPublicUrl}/auth/google/callback`
+  ).replace(/\/$/, "");
+
+const createGoogleOauthClient = () => {
+  if (!googleClientId || !googleClientSecret) {
+    throw new Error("GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET nao configurado no backend.");
+  }
+
+  return new OAuth2Client(googleClientId, googleClientSecret, buildGoogleRedirectUri());
+};
+
+const buildOAuthSuccessPage = (platform) => `
+  <!doctype html>
+  <html lang="pt-BR">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Checkpoint Launcher</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { min-height: 100vh; display: grid; place-items: center; background: #05070a; color: white; font-family: Inter, system-ui, sans-serif; }
+        main { max-width: 440px; padding: 40px 32px; text-align: center; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; background: rgba(255,255,255,.04); backdrop-filter: blur(12px); }
+        .icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 26px; }
+        h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
+        p { color: rgba(255,255,255,.55); line-height: 1.6; font-size: 14px; }
+        .badge { display: inline-block; margin-top: 20px; padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); font-size: 11px; color: rgba(255,255,255,.4); letter-spacing: .08em; text-transform: uppercase; }
+        .progress { width: 100%; height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; margin-top: 24px; overflow: hidden; }
+        .bar { height: 100%; width: 0; background: rgba(34,197,94,.6); animation: fill 1.4s linear forwards; }
+        @keyframes fill { to { width: 100%; } }
+      </style>
+    </head>
+    <body>
+      <main>
+        <div class="icon">✓</div>
+        <h1>${platform} conectado!</h1>
+        <p>Sua conta ${platform} foi vinculada com sucesso.<br/>Pode fechar esta aba e voltar ao Checkpoint Launcher.</p>
+        <div class="progress"><div class="bar"></div></div>
+        <span class="badge">Esta aba fechará automaticamente</span>
+      </main>
+      <script>setTimeout(() => { try { window.close(); } catch(e) {} }, 1500);</script>
+    </body>
+  </html>
+`;
+
 const cleanupPendingStates = () => {
   const now = Date.now();
   for (const [token, pending] of pendingStates.entries()) {
@@ -144,6 +196,15 @@ const cleanupPendingDiscordStates = () => {
   for (const [state, pending] of pendingDiscordStates.entries()) {
     if (now - pending.createdAt > DISCORD_AUTH_STATE_TTL) {
       pendingDiscordStates.delete(state);
+    }
+  }
+};
+
+const cleanupPendingDesktopGoogleStates = () => {
+  const now = Date.now();
+  for (const [state, pending] of pendingDesktopGoogleStates.entries()) {
+    if (now - pending.createdAt > DESKTOP_GOOGLE_AUTH_STATE_TTL) {
+      pendingDesktopGoogleStates.delete(state);
     }
   }
 };
@@ -181,6 +242,41 @@ const buildDiscordAuthorizeUrl = (state) => {
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("prompt", "consent");
   return authorizeUrl.toString();
+};
+
+const buildGoogleAuthorizeUrl = (state) => {
+  const client = createGoogleOauthClient();
+  return client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "select_account",
+    scope: ["openid", "email", "profile"],
+    state,
+  });
+};
+
+const resolveFirebaseUserFromGooglePayload = async (payload) => {
+  const email = String(payload?.email ?? "").trim();
+  const emailVerified = Boolean(payload?.email_verified);
+  const googleSub = String(payload?.sub ?? "").trim();
+
+  if (!email || !googleSub) {
+    throw new Error("Perfil Google sem email ou identificador.");
+  }
+
+  try {
+    return await getAuth().getUserByEmail(email);
+  } catch (error) {
+    if (error?.code !== "auth/user-not-found") {
+      throw error;
+    }
+
+    return await getAuth().createUser({
+      email,
+      emailVerified,
+      displayName: String(payload?.name ?? email.split("@")[0] ?? "User"),
+      photoURL: String(payload?.picture ?? ""),
+    });
+  }
 };
 
 const requestDiscordToken = async (code) => {
@@ -1084,6 +1180,171 @@ app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res
   }
 });
 
+app.get("/auth/google/start", steamAuthLimiter, (req, res) => {
+  cleanupPendingDesktopGoogleStates();
+
+  const state = String(req.query.state ?? "").trim();
+  if (!state) {
+    res.status(400).send("state ausente.");
+    return;
+  }
+
+  if (getApps().length === 0) {
+    res.status(500).send("Firebase Admin nao configurado no backend.");
+    return;
+  }
+
+  pendingDesktopGoogleStates.set(state, {
+    createdAt: Date.now(),
+  });
+
+  try {
+    res.redirect(buildGoogleAuthorizeUrl(state));
+  } catch (error) {
+    pendingDesktopGoogleStates.delete(state);
+    res
+      .status(500)
+      .send(error instanceof Error ? error.message : "Falha ao iniciar login Google.");
+  }
+});
+
+app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
+  cleanupPendingDesktopGoogleStates();
+
+  const state = String(req.query.state ?? "").trim();
+  const code = String(req.query.code ?? "").trim();
+  const oauthError = String(req.query.error ?? "").trim();
+  const pending = pendingDesktopGoogleStates.get(state);
+
+  if (!state || !pending) {
+    res.status(400).send("Sessao de login invalida ou expirada. Volte ao app e tente novamente.");
+    return;
+  }
+
+  if (oauthError) {
+    pendingDesktopGoogleStates.delete(state);
+    res.status(400).send("Login Google cancelado ou negado.");
+    return;
+  }
+
+  if (!code) {
+    res.status(400).send("Codigo Google ausente.");
+    return;
+  }
+
+  if (getApps().length === 0) {
+    res.status(500).send("Firebase Admin nao configurado no backend.");
+    return;
+  }
+
+  try {
+    const client = createGoogleOauthClient();
+    const { tokens } = await client.getToken(code);
+
+    if (!tokens.id_token) {
+      throw new Error("Google nao retornou id_token.");
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: googleClientId,
+    });
+    const payload = ticket.getPayload();
+    const firebaseUser = await resolveFirebaseUserFromGooglePayload(payload);
+    const customToken = await getAuth().createCustomToken(firebaseUser.uid);
+
+    pendingDesktopGoogleStates.set(state, {
+      customToken,
+      uid: firebaseUser.uid,
+      createdAt: Date.now(),
+    });
+
+    res.type("html").send(`
+      <!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Checkpoint Launcher</title>
+          <style>
+            body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #05070a; color: white; font-family: Inter, system-ui, sans-serif; }
+            main { max-width: 420px; padding: 32px; text-align: center; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(255,255,255,.05); }
+            h1 { margin: 0 0 12px; font-size: 24px; }
+            p { margin: 0; color: rgba(255,255,255,.66); line-height: 1.5; }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>Login concluido</h1>
+            <p>Voce ja pode voltar para o Checkpoint Launcher.</p>
+          </main>
+          <script>setTimeout(() => window.close(), 1200);</script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    pendingDesktopGoogleStates.delete(state);
+    res
+      .status(500)
+      .send(error instanceof Error ? error.message : "Falha ao concluir login Google.");
+  }
+});
+
+app.post("/auth/desktop/google/complete", steamAuthLimiter, async (req, res) => {
+  cleanupPendingDesktopGoogleStates();
+
+  const state = String(req.body?.state ?? "").trim();
+  const idToken = String(req.body?.idToken ?? "").trim();
+
+  if (!state || !idToken) {
+    res.status(400).json({ error: "state ou idToken ausente." });
+    return;
+  }
+
+  if (getApps().length === 0) {
+    res.status(500).json({ error: "Firebase Admin nao configurado no backend." });
+    return;
+  }
+
+  try {
+    const decodedToken = await getAuth().verifyIdToken(idToken);
+    const customToken = await getAuth().createCustomToken(decodedToken.uid);
+
+    pendingDesktopGoogleStates.set(state, {
+      customToken,
+      uid: decodedToken.uid,
+      createdAt: Date.now(),
+    });
+
+    res.json({ ok: true });
+  } catch {
+    res.status(401).json({ error: "Token Google invalido." });
+  }
+});
+
+app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
+  cleanupPendingDesktopGoogleStates();
+
+  const state = String(req.query.state ?? "").trim();
+  if (!state) {
+    res.status(400).json({ error: "state ausente." });
+    return;
+  }
+
+  const pending = pendingDesktopGoogleStates.get(state);
+  if (!pending || !pending.customToken) {
+    res.json({ status: "pending" });
+    return;
+  }
+
+  pendingDesktopGoogleStates.delete(state);
+  res.json({
+    status: "complete",
+    customToken: pending.customToken,
+    uid: pending.uid,
+  });
+});
+
 app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
   cleanupPendingStates();
   const token = String(req.query.token ?? "");
@@ -1129,8 +1390,7 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
       { merge: true },
     );
 
-    const params = new URLSearchParams({ steamStatus: "ok" });
-    res.redirect(`${frontendUrl}/app?${params.toString()}`);
+    res.type("html").send(buildOAuthSuccessPage("Steam"));
   } catch {
     res.redirect(`${frontendUrl}/app?steamStatus=error`);
   }
@@ -1207,7 +1467,7 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
       { merge: true },
     );
 
-    res.redirect(`${frontendUrl}/app?discordStatus=ok`);
+    res.type("html").send(buildOAuthSuccessPage("Discord"));
   } catch {
     res.redirect(`${frontendUrl}/app?discordStatus=error`);
   }

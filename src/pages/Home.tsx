@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useState,
   useEffect,
   useCallback,
@@ -7,7 +7,6 @@
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CheckCircle2,
   Plus,
   RefreshCw,
   Search,
@@ -28,10 +27,7 @@ import {
   X,
   LogOut,
   Settings,
-  Languages,
-  Volume2,
   Users,
-  Bell,
   Palette,
   BadgeDollarSign,
 } from "lucide-react";
@@ -54,9 +50,17 @@ import DynamicBackground from "../components/DynamicBackground";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
+import LocalGameScanner from "../components/LocalGameScanner";
+import {
+  AddFriendModal,
+  ConfirmationModal,
+  EmptyLibraryOnboarding,
+  EmptyState,
+  FriendsPage,
+  PriceAlertsPage,
+  SettingsPageV2,
+} from "../components/home/HomePanels";
 import { useNotification } from "../components/NotificationCenter";
-import Stepper, { Step } from "../components/ReactBits/Stepper";
-import GlassButton from "../components/ui/GlassButton";
 import ModalShell from "../components/ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 import type { UserProfile } from "../types/domain";
@@ -85,7 +89,6 @@ import {
   getCheckpointFriendStatuses,
   rejectCheckpointFriendRequest,
   removeCheckpointFriend,
-  searchCheckpointFriends,
   sendCheckpointFriendRequest,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
@@ -429,6 +432,7 @@ const Home: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isLocalScannerOpen, setIsLocalScannerOpen] = useState(false);
   const [steamSyncing, setSteamSyncing] = useState(false);
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -468,6 +472,9 @@ const Home: React.FC = () => {
   const lastWheelTime = useRef<number>(0);
   const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
   const previousOutgoingRequestsRef = useRef<Set<string> | null>(null);
+  const previousSteamIdRef = useRef<string | undefined>(undefined);
+  const previousDiscordIdRef = useRef<string | undefined>(undefined);
+  const didInitConnectionRefs = useRef(false);
 
   const { notify } = useNotification();
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
@@ -514,6 +521,29 @@ const Home: React.FC = () => {
     () => userProfile?.discordId || undefined,
     [userProfile?.discordId],
   );
+  const hasLocalScanner = Boolean(window.electronAPI?.scanLocalGames);
+
+  useEffect(() => {
+    if (!didInitConnectionRefs.current) {
+      previousSteamIdRef.current = resolvedSteamId;
+      previousDiscordIdRef.current = resolvedDiscordId;
+      didInitConnectionRefs.current = true;
+      return;
+    }
+
+    if (!previousSteamIdRef.current && resolvedSteamId) {
+      notify("Conta Steam conectada com sucesso.", "success");
+      setSteamConnecting(false);
+    }
+
+    if (!previousDiscordIdRef.current && resolvedDiscordId) {
+      notify("Conta Discord conectada com sucesso.", "success");
+      setDiscordConnecting(false);
+    }
+
+    previousSteamIdRef.current = resolvedSteamId;
+    previousDiscordIdRef.current = resolvedDiscordId;
+  }, [notify, resolvedDiscordId, resolvedSteamId]);
 
 
   useEffect(() => {
@@ -1043,6 +1073,7 @@ const Home: React.FC = () => {
   );
   const isAnyModalOpen =
     isAddModalOpen ||
+    isLocalScannerOpen ||
     isDetailOpen ||
     Boolean(contextMenu) ||
     signOutModalOpen ||
@@ -1202,7 +1233,14 @@ const Home: React.FC = () => {
         return;
       }
       try {
-        window.location.href = await getSteamLinkUrl();
+        const url = await getSteamLinkUrl();
+        if (window.electronAPI?.openExternalUrl) {
+          await window.electronAPI.openExternalUrl(url);
+          notify("Navegador aberto! Conecte sua conta Steam e volte ao app.", "info");
+          setSteamConnecting(false);
+        } else {
+          window.location.href = url;
+        }
       } catch (e) {
         notify(
           e instanceof Error ? e.message : "Não foi possível conectar com a Steam.",
@@ -1225,7 +1263,14 @@ const Home: React.FC = () => {
         return;
       }
       try {
-        window.location.href = await getDiscordLinkUrl();
+        const url = await getDiscordLinkUrl();
+        if (window.electronAPI?.openExternalUrl) {
+          await window.electronAPI.openExternalUrl(url);
+          notify("Navegador aberto! Conecte sua conta Discord e volte ao app.", "info");
+          setDiscordConnecting(false);
+        } else {
+          window.location.href = url;
+        }
       } catch (e) {
         notify(
           e instanceof Error ? e.message : "Não foi possível conectar com o Discord.",
@@ -1573,6 +1618,24 @@ const Home: React.FC = () => {
                 </span>
               </button>
 
+              {hasLocalScanner && (
+                <>
+                  <div className="w-px h-4 bg-white/10" />
+                  <button
+                    onClick={() => {
+                      setIsLocalScannerOpen(true);
+                      playSound("select");
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
+                  >
+                    <Search className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
+                    <span className="text-[10px] font-black uppercase tracking-wider text-white/40 group-hover:text-white transition-colors">
+                      Buscar no PC
+                    </span>
+                  </button>
+                </>
+              )}
+
               <div className="w-px h-4 bg-white/10" />
 
               {resolvedSteamId ? (
@@ -1660,6 +1723,11 @@ const Home: React.FC = () => {
               musicVolume={musicVolume}
               soundTheme={soundTheme}
               visualTheme={visualTheme}
+              languageOptions={LANGUAGE_OPTIONS}
+              appThemeOptions={APP_THEME_OPTIONS}
+              SteamIcon={SteamBrandIcon}
+              DiscordIcon={DiscordBrandIcon}
+              EpicIcon={EpicBrandIcon}
               onLanguageChange={(next) => {
                 setLauncherLanguage(next);
                 playSound("select");
@@ -1703,6 +1771,7 @@ const Home: React.FC = () => {
               discordConnected={Boolean(resolvedDiscordId)}
               discordUsername={userProfile?.discordUsername}
               discordAvatar={userProfile?.discordAvatar}
+              DiscordIcon={DiscordBrandIcon}
               friends={socialFriends}
               incomingRequests={incomingFriendRequests}
               currentPresenceGame={currentPresenceGame}
@@ -1990,6 +2059,23 @@ const Home: React.FC = () => {
         />
       </React.Suspense>
 
+      {isLocalScannerOpen && user?.uid && (
+        <LocalGameScanner
+          uid={user.uid}
+          onClose={() => setIsLocalScannerOpen(false)}
+          onImported={(count) => {
+            notify(
+              count === 1
+                ? "1 jogo local importado."
+                : `${count} jogos locais importados.`,
+              "success",
+            );
+            setActiveCategory("LOCAL");
+            setIsLocalScannerOpen(false);
+          }}
+        />
+      )}
+
       <AddFriendModal
         isOpen={isAddFriendModalOpen}
         onClose={() => setIsAddFriendModalOpen(false)}
@@ -2133,1227 +2219,5 @@ const Home: React.FC = () => {
     </div>
   );
 };
-
-const SettingsPageV2: React.FC<{
-  language: LauncherLanguage;
-  effectsVolume: number;
-  musicVolume: number;
-  soundTheme: SoundTheme;
-  visualTheme: VisualTheme;
-  onLanguageChange: (language: LauncherLanguage) => void;
-  onEffectsVolumeChange: (volume: number) => void;
-  onMusicVolumeChange: (volume: number) => void;
-  onSoundThemeChange: (theme: SoundTheme) => void;
-  onVisualThemeChange: (theme: VisualTheme) => void;
-  onPreviewSound: () => void;
-  t: ReturnType<typeof usePreferences>["t"];
-  steamConnected: boolean;
-  discordConnected: boolean;
-  discordUsername?: string;
-  discordAvatar?: string;
-  steamConnecting: boolean;
-  discordConnecting: boolean;
-  steamSyncing: boolean;
-  onConnectSteam: () => void;
-  onConnectDiscord: () => void;
-  onDisconnectSteam: () => void;
-  onDisconnectDiscord: () => void;
-  onSyncSteam: () => void;
-}> = ({
-  language,
-  effectsVolume,
-  musicVolume,
-  soundTheme,
-  visualTheme,
-  onLanguageChange,
-  onEffectsVolumeChange,
-  onMusicVolumeChange,
-  onSoundThemeChange,
-  onVisualThemeChange,
-  onPreviewSound,
-  t,
-  steamConnected,
-  discordConnected,
-  discordUsername,
-  discordAvatar,
-  steamConnecting,
-  discordConnecting,
-  steamSyncing,
-  onConnectSteam,
-  onConnectDiscord,
-  onDisconnectSteam,
-  onDisconnectDiscord,
-  onSyncSteam,
-}) => {
-    const activeAppTheme =
-      visualTheme === "checkpoint"
-        ? "default"
-        : soundTheme === "gamecube" || visualTheme === "gamecube"
-          ? "gamecube"
-          : soundTheme === "xbox360" || visualTheme === "xbox360"
-            ? "xbox360"
-            : "playstation";
-
-    return (
-      <SystemPageShell eyebrow={t("system")} title={t("settings")}>
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-          <SettingsHeader
-            icon={<Globe className="w-5 h-5 text-white/70" />}
-            title={t("connectedAccounts")}
-            description={t("connectedAccountsHint")}
-          />
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <SteamBrandIcon className="w-4 h-4 text-white/60" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white">Steam</p>
-                  <p className="text-[10px] text-white/40">
-                    {steamConnected ? t("connected") : t("notConnected")}
-                  </p>
-                </div>
-              </div>
-              {steamConnected ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={onSyncSteam}
-                    disabled={steamSyncing}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white/60 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-                  >
-                    {steamSyncing ? t("syncing") : t("sync")}
-                  </button>
-                  <button
-                    onClick={onDisconnectSteam}
-                    className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-                  >
-                    {t("unlink")}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={onConnectSteam}
-                  disabled={steamConnecting}
-                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-                >
-                  {steamConnecting ? t("connecting") : t("connectSteam")}
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <EpicBrandIcon className="w-4 h-4 opacity-70" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white">Epic Games</p>
-                  <p className="text-[10px] text-white/40">
-                    Catálogo e atalhos, sem sync de conta
-                  </p>
-                </div>
-              </div>
-              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/45">
-                Assistido
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center overflow-hidden">
-                  {discordAvatar ? (
-                    <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <DiscordBrandIcon className="w-4 h-4 text-white/60" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white">Discord</p>
-                  <p className="text-[10px] text-white/40 truncate max-w-[140px]">
-                    {discordConnected ? discordUsername || t("connected") : t("notConnected")}
-                  </p>
-                </div>
-              </div>
-              {discordConnected ? (
-                <button
-                  onClick={onDisconnectDiscord}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
-                >
-                  {t("unlink")}
-                </button>
-              ) : (
-                <button
-                  onClick={onConnectDiscord}
-                  disabled={discordConnecting}
-                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase text-white/70 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50"
-                >
-                  {discordConnecting ? t("connecting") : t("connectDiscord")}
-                </button>
-              )}
-            </div>
-
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-            <SettingsHeader
-              icon={<Languages className="w-5 h-5 text-white/70" />}
-              title={t("language")}
-              description={t("languageHint")}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {LANGUAGE_OPTIONS.map((option) => (
-                <SettingsChoice
-                  key={option.id}
-                  active={language === option.id}
-                  label={option.label}
-                  hint={option.hint}
-                  onClick={() => onLanguageChange(option.id)}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-            <SettingsHeader
-              icon={<Settings className="w-5 h-5 text-white/70" />}
-              title={t("themes")}
-              description={t("themesHint")}
-            />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {APP_THEME_OPTIONS.map((option) => (
-                <SettingsChoice
-                  key={option.id}
-                  active={activeAppTheme === option.id}
-                  label={
-                    option.id === "default"
-                      ? t("defaultTheme")
-                      : option.id === "playstation"
-                        ? t("playstationTheme")
-                        : option.id === "gamecube"
-                          ? t("gamecubeTheme")
-                          : t("xbox360Theme")
-                  }
-                  hint={option.hint}
-                  swatch={option.swatch}
-                  onClick={() => {
-                    onVisualThemeChange(option.visualTheme);
-                    onSoundThemeChange(option.soundTheme);
-                  }}
-                />
-              ))}
-            </div>
-          </section>
-
-          <VolumeSettingsCard
-            title={t("soundEffects")}
-            description={t("soundEffectsHint")}
-            value={effectsVolume}
-            max={100}
-            actionLabel={t("test")}
-            onAction={onPreviewSound}
-            onChange={onEffectsVolumeChange}
-            t={t}
-          />
-
-          <VolumeSettingsCard
-            title={t("music")}
-            description={t("musicHint")}
-            value={musicVolume}
-            max={35}
-            onChange={onMusicVolumeChange}
-            t={t}
-          />
-        </div>
-      </SystemPageShell>
-    );
-  };
-
-const SystemPageShell: React.FC<{
-  eyebrow: string;
-  title: string;
-  children: React.ReactNode;
-}> = ({ eyebrow, title, children }) => (
-  <motion.div
-    initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-    className="flex-1 px-10 pb-14 pt-8 overflow-y-auto thin-scrollbar"
-  >
-    <div className="max-w-6xl mx-auto min-h-full flex flex-col">
-      <div className="w-full max-w-5xl mx-auto mb-8 text-right">
-        <p className="text-[10px] font-black uppercase tracking-[0.32em] text-white/25 mb-3">
-          {eyebrow}
-        </p>
-        <h1
-          className="text-5xl font-black tracking-tight text-white uppercase"
-          style={{ textShadow: "0 0 28px rgb(var(--launcher-accent) / 0.28)" }}
-        >
-          {title}
-        </h1>
-      </div>
-      <div className="w-full max-w-5xl mx-auto">{children}</div>
-    </div>
-  </motion.div>
-);
-
-const FriendsPage: React.FC<{
-  t: ReturnType<typeof usePreferences>["t"];
-  discordConnected: boolean;
-  discordUsername?: string;
-  discordAvatar?: string;
-  friends: SocialFriend[];
-  incomingRequests: CheckpointFriendRequest[];
-  currentPresenceGame?: string | null;
-  onConnectDiscord: () => void;
-  onRemoveFriend: (id: string) => void;
-  onViewFriendProfile: (friend: SocialFriend) => void;
-  friendProfileLoadingId?: string | null;
-  onAcceptRequest: (uid: string) => void;
-  onRejectRequest: (uid: string) => void;
-  onAddFriendClick: () => void;
-}> = ({
-  t,
-  discordConnected,
-  discordUsername,
-  discordAvatar,
-  friends,
-  incomingRequests,
-  currentPresenceGame,
-  onConnectDiscord,
-  onRemoveFriend,
-  onViewFriendProfile,
-  friendProfileLoadingId,
-  onAcceptRequest,
-  onRejectRequest,
-  onAddFriendClick,
-}) => {
-    const [friendSearch, setFriendSearch] = useState("");
-    const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
-    const onlineCount = presenceFriends.filter((friend) => friend.status !== "offline").length;
-    const playingCount = presenceFriends.filter((friend) => friend.status === "playing").length;
-    const normalizedSearch = friendSearch.trim().toLowerCase();
-    const visibleFriends = normalizedSearch
-      ? friends.filter(
-        (friend) =>
-          friend.name.toLowerCase().includes(normalizedSearch) ||
-          friend.playing?.toLowerCase().includes(normalizedSearch),
-      )
-      : friends;
-
-    return (
-      <SystemPageShell eyebrow="Social" title={t("friends")}>
-        {/* Seção do perfil do usuário */}
-        <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-          <div className="flex items-center justify-between gap-4 mb-5">
-            <div className="flex items-center gap-4">
-              <div className="relative w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border-2 border-white/20">
-                {discordAvatar ? (
-                  <img src={discordAvatar} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <DiscordBrandIcon className="w-6 h-6 text-white/60" />
-                )}
-                {/* Status indicator */}
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-[#0A0A0C] flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-base font-black text-white">
-                    {discordConnected ? (discordUsername || "Usuário") : "Usuário"}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    {discordConnected && (
-                      <div className="w-4 h-4 rounded bg-white/10 flex items-center justify-center">
-                        <DiscordBrandIcon className="w-2.5 h-2.5 text-white/70" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {currentPresenceGame ? (
-                    <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
-                      Jogando {currentPresenceGame}
-                    </p>
-                  ) : (
-                    <p className="text-[11px] text-white/70 font-bold uppercase tracking-wider">
-                      Online
-                    </p>
-                  )}
-                </div>
-                <p className="text-[10px] text-white/40 mt-1">
-                  {discordConnected
-                    ? "Perfil conectado ao Discord"
-                    : "Conecte o Discord para usar avatar e nome"}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={onAddFriendClick}
-                className="h-10 px-5 rounded-xl bg-white hover:bg-white/90 text-black text-[10px] font-black uppercase tracking-wider transition-all"
-              >
-                + {t("addFriendTitle")}
-              </button>
-              {!discordConnected && (
-                <button
-                  type="button"
-                  onClick={onConnectDiscord}
-                  className="h-8 px-4 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[9px] font-bold uppercase tracking-wider transition-all"
-                >
-                  Conectar Discord
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {[
-              { label: "Online", value: onlineCount },
-              { label: "Jogando", value: playingCount },
-              { label: "Total", value: friends.length },
-            ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
-                  {item.label}
-                </p>
-                <p className="mt-2 text-3xl font-black text-white tabular-nums">
-                  {item.value}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {incomingRequests.length > 0 && (
-          <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-            <div className="flex items-center justify-between gap-4 mb-4">
-              <div>
-                <p className="text-sm font-black text-white">Solicitacoes recebidas</p>
-                <p className="text-[10px] text-white/40 mt-0.5">
-                  Aceite ou rejeite quem quer adicionar voce no Checkpoint.
-                </p>
-              </div>
-              <span className="h-8 min-w-8 rounded-xl bg-white/10 px-3 flex items-center justify-center text-xs font-black text-white">
-                {incomingRequests.length}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {incomingRequests.map((request) => (
-                <div
-                  key={request.uid}
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center overflow-hidden">
-                      {request.photoURL ? (
-                        <img src={request.photoURL} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <Users className="w-4 h-4 text-white/70" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-white truncate">
-                        {request.displayName || "Usuario"}
-                      </p>
-                      <p className="text-[10px] uppercase tracking-widest text-white/35">
-                        Quer ser seu amigo
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => onRejectRequest(request.uid)}
-                      className="h-9 px-3 rounded-lg text-[10px] font-black uppercase text-red-300/80 hover:bg-red-500/10"
-                    >
-                      Rejeitar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onAcceptRequest(request.uid)}
-                      className="h-9 px-3 rounded-lg bg-white text-black text-[10px] font-black uppercase hover:bg-white/90"
-                    >
-                      Aceitar
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {friends.length > 0 && (
-          <div className="mb-5">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-              <input
-                value={friendSearch}
-                onChange={(event) => setFriendSearch(event.target.value)}
-                placeholder="Pesquisar amigos..."
-                className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {visibleFriends.length === 0 ? (
-            <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
-              <Users className="w-8 h-8 mx-auto mb-4 text-white/35" />
-              <p className="text-sm font-bold text-white/70">
-                {!discordConnected
-                  ? "Conecte o Discord para usar nome e avatar no perfil social."
-                  : friends.length === 0
-                    ? "Nenhum amigo do Checkpoint ainda."
-                    : "Nenhum amigo corresponde à busca."}
-              </p>
-              {discordConnected && friends.length === 0 && (
-                <p className="mt-2 text-xs text-white/35">
-                  {t("addFriendEmptyHint")}
-                </p>
-              )}
-            </div>
-          ) : (
-            visibleFriends.map((friend) => (
-              <div key={friend.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-10 w-10 rounded-xl bg-[var(--launcher-accent-soft)] flex items-center justify-center overflow-hidden">
-                    {friend.avatar ? (
-                      <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      friend.source === "discord_friend" ? (
-                        <DiscordBrandIcon className="w-4 h-4 text-white/70" />
-                      ) : (
-                        <Users className="w-4 h-4 text-white/70" />
-                      )
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-white truncate">{friend.name}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-white/35 truncate">
-                      {friend.source === "discord_friend"
-                        ? "Discord conectado"
-                        : friend.source === "checkpoint"
-                          ? friend.status === "playing"
-                            ? `Jogando ${friend.playing || "um jogo"}`
-                            : friend.status === "online"
-                              ? "Online"
-                              : "Offline"
-                          : friend.status === "playing"
-                            ? `Jogando ${friend.playing || "agora"}`
-                            : friend.status === "online" ? "Online" : "Offline"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onViewFriendProfile(friend)}
-                    disabled={friendProfileLoadingId === friend.id}
-                    className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40"
-                  >
-                    {friendProfileLoadingId === friend.id ? "Abrindo..." : "Perfil"}
-                  </button>
-                  {!friend.source?.startsWith("discord") && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveFriend(friend.id)}
-                      className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10 shrink-0"
-                    >
-                      Remover
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </SystemPageShell>
-    );
-  };
-const AddFriendModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onAddFriend: (profile: UserProfile) => void;
-  currentUserUid: string;
-  friendIds: Set<string>;
-  outgoingRequestIds: Set<string>;
-  incomingRequestIds: Set<string>;
-  playSound: (type: SoundEffectType) => void;
-  t: ReturnType<typeof usePreferences>["t"];
-}> = ({
-  isOpen,
-  onClose,
-  onAddFriend,
-  currentUserUid,
-  friendIds,
-  outgoingRequestIds,
-  incomingRequestIds,
-  playSound,
-  t,
-}) => {
-    const [search, setSearch] = useState("");
-    const [results, setResults] = useState<UserProfile[]>([]);
-    const [searching, setSearching] = useState(false);
-    const [recentSearches, setRecentSearches] = useState<string[]>([]);
-    const [selectedIndex, setSelectedIndex] = useState(0);
-    const [sendingUid, setSendingUid] = useState<string | null>(null);
-
-    const getProfileAction = (profile: UserProfile) => {
-      if (profile.uid === currentUserUid) {
-        return { label: t("addFriendYou"), disabled: true };
-      }
-      if (friendIds.has(profile.uid)) {
-        return { label: t("addFriendAlreadyFriend"), disabled: true };
-      }
-      if (outgoingRequestIds.has(profile.uid)) {
-        return { label: t("addFriendPending"), disabled: true };
-      }
-      if (incomingRequestIds.has(profile.uid)) {
-        return { label: t("addFriendRespond"), disabled: true };
-      }
-      if (sendingUid === profile.uid) {
-        return { label: "...", disabled: true };
-      }
-      return { label: t("addFriendSend"), disabled: false };
-    };
-
-    const handleSendRequest = async (profile: UserProfile) => {
-      const action = getProfileAction(profile);
-      if (action.disabled) return;
-
-      playSound("select");
-      setSendingUid(profile.uid);
-      try {
-        await onAddFriend(profile);
-        setResults((current) => current.filter((item) => item.uid !== profile.uid));
-        setSelectedIndex(0);
-      } finally {
-        setSendingUid(null);
-      }
-    };
-
-    useEffect(() => {
-      if (!isOpen) {
-        setSearch("");
-        setResults([]);
-        setSelectedIndex(0);
-      } else {
-        // Carregar pesquisas recentes do localStorage
-        const stored = localStorage.getItem('checkpoint_recent_friend_searches');
-        if (stored) {
-          try {
-            setRecentSearches(JSON.parse(stored).slice(0, 5)); // Máximo 5 pesquisas recentes
-          } catch {
-            setRecentSearches([]);
-          }
-        }
-      }
-    }, [isOpen]);
-
-    const handleSearch = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!search.trim()) return;
-
-      playSound("search");
-      setSearching(true);
-      setResults([]);
-      setSelectedIndex(0);
-
-      try {
-        const searchResults = await searchCheckpointFriends(search.trim());
-        const uniqueResults = searchResults
-          .filter((profile) => profile.uid && profile.uid !== currentUserUid)
-          .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index);
-        setResults(uniqueResults);
-
-        // Adicionar à lista de pesquisas recentes
-        const newRecent = [search.trim(), ...recentSearches.filter(s => s !== search.trim())].slice(0, 5);
-        setRecentSearches(newRecent);
-        localStorage.setItem('checkpoint_recent_friend_searches', JSON.stringify(newRecent));
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setSearching(false);
-      }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (!results.length) return;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        playSound("navigate");
-        setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        playSound("navigate");
-        setSelectedIndex(prev => Math.max(prev - 1, 0));
-      } else if (e.key === 'Enter' && results[selectedIndex]) {
-        e.preventDefault();
-        handleSendRequest(results[selectedIndex]);
-      }
-    };
-
-    const clearRecentSearches = () => {
-      playSound("back");
-      setRecentSearches([]);
-      localStorage.removeItem('checkpoint_recent_friend_searches');
-    };
-
-    const handleClose = () => {
-      playSound("back");
-      onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent pointer-events-none" />
-
-          <div className="relative flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-black text-white">{t("addFriendTitle")}</h2>
-              <p className="text-xs text-white/40 mt-1">{t("addFriendHint")}</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              onMouseEnter={() => playSound("hover")}
-              className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSearch} className="relative mb-4">
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/30" />
-            <input
-              autoFocus
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t("addFriendSearchPlaceholder")}
-              className="h-14 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-12 pr-24 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 focus:bg-white/[0.05]"
-            />
-            <button
-              type="submit"
-              disabled={searching || !search.trim()}
-              onMouseEnter={() => playSound("hover")}
-              className="absolute right-2 top-2 bottom-2 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-50 transition-all hover:bg-white/90 disabled:hover:bg-white"
-            >
-              {searching ? "..." : t("addFriendSearchButton")}
-            </button>
-          </form>
-
-          {/* Pesquisas recentes */}
-          {recentSearches.length > 0 && !search && !results.length && (
-            <div className="mb-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-white/70">{t("addFriendRecentSearches")}</h3>
-                <button
-                  type="button"
-                  onClick={clearRecentSearches}
-                  onMouseEnter={() => playSound("hover")}
-                  className="text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider"
-                >
-                  {t("addFriendClear")}
-                </button>
-              </div>
-              <div className="space-y-2">
-                {recentSearches.map((recentSearch, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      playSound("navigate");
-                      setSearch(recentSearch);
-                    }}
-                    onMouseEnter={() => playSound("hover")}
-                    className="w-full text-left p-2 rounded-lg hover:bg-white/5 text-sm text-white/60 hover:text-white transition-colors"
-                  >
-                    <Search className="inline w-3 h-3 mr-2 text-white/30" />
-                    {recentSearch}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3 min-h-[100px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-            {searching ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="w-8 h-8 border-2 border-white/20 border-t-white/60 rounded-full animate-spin mx-auto mb-3"></div>
-                  <div className="text-sm text-white/40">{t("addFriendSearching")}</div>
-                </div>
-              </div>
-            ) : results.length > 0 ? (
-              results.map((profile, index) => {
-                const action = getProfileAction(profile);
-
-                return (
-                  <div
-                    key={profile.uid}
-                    onMouseEnter={() => playSound("hover")}
-                    className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${index === selectedIndex
-                      ? 'bg-white/[0.08] border-white/20'
-                      : 'bg-white/[0.03] border-white/5 hover:bg-white/[0.06]'
-                      }`}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="w-12 h-12 shrink-0 rounded-full bg-white/10 overflow-hidden border border-white/10">
-                        {profile.photoURL ? (
-                          <img src={profile.photoURL} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Users className="w-6 h-6 text-white/50" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate font-bold text-sm text-white">{profile.displayName || "Usuario"}</div>
-                        <div className="truncate text-[11px] text-white/40">{profile.email}</div>
-                        {profile.status && (
-                          <div className="text-[10px] text-white/30 uppercase tracking-wider mt-1">
-                            {profile.status === "online"
-                              ? t("addFriendOnline")
-                              : profile.status === "playing"
-                                ? `${t("addFriendPlaying")} ${profile.playing || ""}`
-                                : t("addFriendOffline")}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSendRequest(profile)}
-                      onMouseEnter={() => playSound("hover")}
-                      disabled={action.disabled}
-                      className="h-10 min-w-[94px] px-5 rounded-xl bg-white/10 text-white text-[11px] font-black uppercase tracking-wider transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {action.label}
-                    </button>
-                  </div>
-                );
-              })
-            ) : search.trim() && !searching ? (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 mx-auto mb-4 text-white/20" />
-                <div className="text-sm text-white/40 mb-2">{t("addFriendNoResults")}</div>
-                <div className="text-xs text-white/30">{t("addFriendNoResultsHint")}</div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Search className="w-12 h-12 mx-auto mb-4 text-white/20" />
-                <div className="text-sm text-white/40 mb-2">{t("addFriendEmpty")}</div>
-                <div className="text-xs text-white/30">{t("addFriendEmptyHint")}</div>
-              </div>
-            )}
-          </div>
-
-          {results.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <div className="text-[10px] text-white/30 text-center">
-                {t("addFriendKeyboardHint")}
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </div>
-    );
-  };
-
-const PriceAlertsPage: React.FC<{
-  t: ReturnType<typeof usePreferences>["t"];
-  games: Game[];
-  alerts: PriceAlert[];
-  onAddAlert: (game: Game) => void;
-  onRemoveAlert: (id: string) => void;
-}> = ({ t, games, alerts, onAddAlert, onRemoveAlert }) => {
-  const [selectedGameId, setSelectedGameId] = useState("");
-  const selectedGame = games.find((game) => game.id === selectedGameId) || games[0];
-
-  return (
-    <SystemPageShell eyebrow="Deals" title={t("priceAlerts")}>
-      <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6 mb-5">
-        <SettingsHeader
-          icon={<Bell className="w-5 h-5 text-white/70" />}
-          title={t("priceAlerts")}
-          description={t("priceAlertsHint")}
-        />
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-          <select
-            value={selectedGame?.id ?? ""}
-            onChange={(event) => setSelectedGameId(event.target.value)}
-            className="h-11 rounded-xl bg-black/40 border border-white/10 px-3 text-sm text-white outline-none"
-          >
-            {games.map((game) => (
-              <option key={game.id} value={game.id} className="bg-black">
-                {game.title}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            disabled={!selectedGame}
-            onClick={() => selectedGame && onAddAlert(selectedGame)}
-            className="h-11 px-5 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider disabled:opacity-40"
-          >
-            {t("addAlert")}
-          </button>
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {alerts.length === 0 ? (
-          <div className="md:col-span-2 rounded-[28px] border border-white/10 bg-black/35 p-8 text-center">
-            <BadgeDollarSign className="w-8 h-8 mx-auto mb-4 text-white/35" />
-            <p className="text-sm font-bold text-white/70">{t("noAlerts")}</p>
-          </div>
-        ) : (
-          alerts.map((alert) => (
-            <div key={alert.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-bold text-white">{alert.title}</p>
-                  <p className="mt-1 text-[10px] uppercase tracking-widest text-white/35">
-                    {alert.source}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onRemoveAlert(alert.id)}
-                  className="px-3 py-2 rounded-lg text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
-                >
-                  Remover
-                </button>
-              </div>
-              <p className="mt-5 text-xs font-bold text-white/50">
-                Avisaremos quando encontrarmos uma oferta relevante para este jogo.
-              </p>
-            </div>
-          ))
-        )}
-      </div>
-    </SystemPageShell>
-  );
-};
-
-const SettingsHeader: React.FC<{
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}> = ({ icon, title, description }) => (
-  <div className="flex items-center gap-3 mb-6">
-    <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-      {icon}
-    </div>
-    <div>
-      <h2 className="text-lg font-bold text-white">{title}</h2>
-      <p className="text-xs text-white/40">{description}</p>
-    </div>
-  </div>
-);
-
-const SettingsChoice: React.FC<{
-  active: boolean;
-  label: string;
-  hint: string;
-  swatch?: string;
-  onClick: () => void;
-}> = ({ active, label, hint, swatch, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className="relative overflow-hidden text-left rounded-2xl border p-4 transition-all"
-    style={{
-      background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.04)",
-      borderColor: active ? "rgb(var(--launcher-accent) / 0.45)" : "rgba(255,255,255,0.08)",
-    }}
-  >
-    <span className="flex items-center gap-2 text-sm font-bold text-white">
-      {swatch && (
-        <span
-          className="h-3 w-3 rounded-full border border-white/20"
-          style={{ background: swatch }}
-        />
-      )}
-      {label}
-    </span>
-    {active && (
-      <span
-        className="pointer-events-none absolute inset-0 rounded-2xl"
-        style={{
-          boxShadow: "inset 0 0 0 1px rgb(var(--launcher-accent) / 0.28), 0 0 28px rgb(var(--launcher-accent) / 0.16)",
-        }}
-      />
-    )}
-    <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
-      {hint}
-    </span>
-  </button>
-);
-
-const VolumeSettingsCard: React.FC<{
-  title: string;
-  description: string;
-  value: number;
-  max: number;
-  actionLabel?: string;
-  onAction?: () => void;
-  onChange: (volume: number) => void;
-  t: ReturnType<typeof usePreferences>["t"];
-}> = ({ title, description, value, max, actionLabel, onAction, onChange, t }) => (
-  <section className="rounded-[28px] border border-white/10 bg-black/35 backdrop-blur-3xl p-6">
-    <SettingsHeader
-      icon={<Volume2 className="w-5 h-5 text-white/70" />}
-      title={title}
-      description={description}
-    />
-    <div className="flex items-end justify-between gap-5 mb-5">
-      <div>
-        <span className="text-6xl font-light text-white tabular-nums">
-          {value}
-        </span>
-        <span className="ml-1 text-sm font-bold text-white/35">%</span>
-      </div>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="h-10 px-4 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-wider"
-        >
-          {actionLabel}
-        </button>
-      )}
-    </div>
-    <input
-      type="range"
-      min={0}
-      max={max}
-      step={1}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="w-full accent-white"
-    />
-    <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
-      <span>{t("mute")}</span>
-      <span>{t("max")}</span>
-    </div>
-  </section>
-);
-
-
-const EmptyState: React.FC<{
-  searchTerm: string;
-  onAddGame: () => void;
-  onConnect: () => void;
-  steamConnected: boolean;
-}> = ({ searchTerm, onAddGame, onConnect, steamConnected }) => (
-  <div
-    className="w-full max-w-md rounded-3xl p-8 text-center"
-    style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.08)",
-      backdropFilter: "blur(24px)",
-    }}
-  >
-    <h3 className="text-2xl font-black text-white mb-2">
-      {searchTerm ? "Nenhum resultado" : "Biblioteca vazia"}
-    </h3>
-    <p className="text-sm mb-6" style={{ color: "rgba(255,255,255,0.45)" }}>
-      {searchTerm
-        ? "Tente buscar por outro termo."
-        : steamConnected
-          ? "Você não possui jogos salvos. Adicione um jogo manualmente."
-          : "Adicione um jogo ou conecte sua conta Steam."}
-    </p>
-    {!searchTerm && (
-      <div className="flex justify-center gap-3">
-        {!steamConnected && (
-          <button
-            onClick={onConnect}
-            className="h-10 px-5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all hover:scale-[1.02]"
-            style={{
-              background: "rgba(103,182,118,0.1)",
-              border: "1px solid rgba(103,182,118,0.3)",
-              color: "#67b676",
-            }}
-          >
-            Conectar Steam
-          </button>
-        )}
-        <button
-          onClick={onAddGame}
-          className="h-10 px-5 rounded-full bg-white text-black text-[11px] font-black uppercase tracking-wider hover:scale-[1.02] transition-all"
-        >
-          Novo Jogo
-        </button>
-      </div>
-    )}
-  </div>
-);
-
-const EmptyLibraryOnboarding: React.FC<{
-  onConnectSteam: () => void;
-  onOpenAddGame: () => void;
-  onComplete: () => void | Promise<void>;
-  playSound: (type: SoundEffectType) => void;
-}> = ({ onConnectSteam, onOpenAddGame, onComplete, playSound }) => (
-  <div
-    className="w-full max-w-2xl rounded-3xl p-8"
-    style={{
-      background: "rgba(255,255,255,0.04)",
-      border: "1px solid rgba(255,255,255,0.09)",
-      backdropFilter: "blur(32px)",
-    }}
-  >
-    <p
-      className="text-[10px] tracking-[0.28em] uppercase mb-4"
-      style={{ color: "rgba(255,255,255,0.3)" }}
-    >
-      Primeiros passos
-    </p>
-    <Stepper
-      stepCircleContainerClassName="bg-transparent border-0 shadow-none"
-      stepContainerClassName="pt-2"
-      contentClassName="pb-2"
-      footerClassName="pt-2"
-      backButtonText="Voltar"
-      nextButtonText="Próximo"
-      onStepChange={() => playSound("navigate")}
-      onFinalStepCompleted={() => {
-        playSound("select");
-        void onComplete();
-      }}
-      resetOnComplete
-    >
-      <Step>
-        <h3 className="text-2xl font-black mb-2 text-white">
-          Sua biblioteca está vazia
-        </h3>
-        <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Adicione um jogo manualmente ou conecte sua conta Steam.
-        </p>
-      </Step>
-      <Step>
-        <h3 className="text-2xl font-black mb-2 text-white">
-          Conecte com a Steam
-        </h3>
-        <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Vincule sua conta para importar jogos automaticamente.
-        </p>
-        <button
-          type="button"
-          onClick={onConnectSteam}
-          className="h-10 px-5 rounded-full text-[11px] font-black tracking-wider uppercase transition-all"
-          style={{
-            background: "rgba(103,182,118,0.1)",
-            border: "1px solid rgba(103,182,118,0.35)",
-            color: "#67b676",
-          }}
-        >
-          Conectar Steam
-        </button>
-      </Step>
-      <Step>
-        <h3 className="text-2xl font-black mb-2 text-white">
-          Adicione manualmente
-        </h3>
-        <p className="text-sm mb-5" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Cadastre seu primeiro jogo manualmente agora.
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            playSound("select");
-            onOpenAddGame();
-          }}
-          className="h-10 px-5 rounded-full bg-white text-black text-[11px] font-black tracking-wider uppercase hover:scale-[1.02] transition-all"
-        >
-          Novo Jogo
-        </button>
-      </Step>
-    </Stepper>
-    <p
-      className="mt-5 text-[11px] flex items-center gap-2"
-      style={{ color: "rgba(255,255,255,0.35)" }}
-    >
-      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-      Depois da primeira sincronização, seus jogos aparecem automaticamente.
-    </p>
-  </div>
-);
-
-const ConfirmationModal: React.FC<{
-  isOpen: boolean;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  onClose: () => void;
-  onConfirm: () => Promise<void> | void;
-  playSound: (type: SoundEffectType) => void;
-}> = ({
-  isOpen,
-  title,
-  description,
-  confirmLabel,
-  onClose,
-  onConfirm,
-  playSound,
-}) => (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={() => {
-        playSound("back");
-        onClose();
-      }}
-      maxWidthClassName="max-w-md"
-      zIndexClassName="z-[170]"
-      className="bg-[#0a0a0c]/95 backdrop-blur-3xl rounded-[32px] p-8 border border-white/10 shadow-2xl"
-    >
-      <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
-      <p className="text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-        {description}
-      </p>
-      <div className="mt-6 flex items-center justify-end gap-2">
-        <GlassButton
-          type="button"
-          onClick={() => {
-            playSound("back");
-            onClose();
-          }}
-          onMouseEnter={() => playSound("hover")}
-          variant="outline"
-        >
-          Cancelar
-        </GlassButton>
-        <GlassButton
-          type="button"
-          onClick={() => {
-            playSound("select");
-            void onConfirm();
-          }}
-          onMouseEnter={() => playSound("hover")}
-          variant="white"
-        >
-          {confirmLabel}
-        </GlassButton>
-      </div>
-    </ModalShell>
-  );
 
 export default Home;

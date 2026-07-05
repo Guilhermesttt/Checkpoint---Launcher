@@ -7,6 +7,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../Firebase";
+import { apiUrl } from "../services/api";
 import type { UserProfile } from "../types/domain";
 
 interface AuthContextValue {
@@ -21,6 +22,8 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   uid,
@@ -53,6 +56,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) return;
     const ref = doc(db, "profiles", authUser.uid);
     const snap = await getDoc(ref);
+    const fallbackProfile = toProfile(authUser.uid, {
+      email: authUser.email,
+      displayName: authUser.displayName || authUser.email?.split("@")[0] || "User",
+      photoURL: authUser.photoURL,
+    });
 
     if (!snap.exists()) {
       await setDoc(ref, {
@@ -63,20 +71,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-    } else {
-      await setDoc(
-        ref,
-        {
-          email: authUser.email,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      setUserProfile(fallbackProfile);
+      return;
     }
 
-    const profileSnap = await getDoc(ref);
-    const data = profileSnap.data() as Partial<UserProfile> | undefined;
+    const data = snap.data() as Partial<UserProfile> | undefined;
     setUserProfile(toProfile(authUser.uid, data));
+
+    await setDoc(
+      ref,
+      {
+        email: authUser.email,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
   };
 
   const refreshProfile = async () => {
@@ -88,6 +97,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithGoogle = async () => {
+    if (window.electronAPI?.startGoogleBrowserAuth) {
+      const { signInWithCustomToken } = await import("firebase/auth");
+      const { state } = await window.electronAPI.startGoogleBrowserAuth();
+
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        await sleep(1000);
+
+        const response = await fetch(
+          apiUrl(`/auth/desktop/google/status?state=${encodeURIComponent(state)}`),
+        );
+        const payload = (await response.json().catch(() => ({}))) as {
+          status?: string;
+          customToken?: string;
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Falha ao verificar login Google.");
+        }
+
+        if (payload.status === "complete" && payload.customToken) {
+          const result = await signInWithCustomToken(auth, payload.customToken);
+          await syncProfile(result.user);
+          return;
+        }
+      }
+
+      throw new Error("Tempo esgotado aguardando login Google no navegador.");
+    }
+
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const result = await (await import("firebase/auth")).signInWithPopup(auth, provider);

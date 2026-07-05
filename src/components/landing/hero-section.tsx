@@ -146,10 +146,10 @@ export function HeroSection() {
             </p>
             <div className="flex flex-wrap gap-4">
               <a
-                href="/login"
+                href="/download"
                 className="inline-flex items-center gap-2 bg-white hover:bg-white/90 text-black px-8 py-4 rounded-full text-sm font-semibold transition-all hover:scale-105 active:scale-95"
               >
-                Começar Grátis
+                Baixar Launcher
               </a>
               <a
                 href="#features"
