@@ -11,9 +11,10 @@ const getAuthHeaders = async () => {
   };
 };
 
-export const searchCheckpointFriends = async (query: string): Promise<UserProfile[]> => {
+export const searchCheckpointFriends = async (query: string, signal?: AbortSignal): Promise<UserProfile[]> => {
   const response = await fetch(apiUrl(`/api/friends/search?q=${encodeURIComponent(query)}`), {
     headers: await getAuthHeaders(),
+    signal,
   });
   const payload = (await response.json().catch(() => ({}))) as {
     error?: string;

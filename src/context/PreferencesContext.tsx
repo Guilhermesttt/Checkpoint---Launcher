@@ -1,9 +1,9 @@
-﻿import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 
 export type LauncherLanguage = "pt-BR" | "en-US" | "es-ES";
 export type SoundTheme = "ps5" | "ps2" | "gamecube" | "xbox360";
-export type VisualTheme = "playstation" | "gamecube" | "xbox360" | "checkpoint" | "carbon" | "neon" | "sunset";
+export type VisualTheme = "playstation" | "gamecube" | "xbox360" | "checkpoint";
 
 interface PreferencesContextValue {
   language: LauncherLanguage;
@@ -436,10 +436,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       savedVisualTheme === "checkpoint" ||
       savedVisualTheme === "playstation" ||
       savedVisualTheme === "gamecube" ||
-      savedVisualTheme === "xbox360" ||
-      savedVisualTheme === "carbon" ||
-      savedVisualTheme === "neon" ||
-      savedVisualTheme === "sunset"
+      savedVisualTheme === "xbox360"
     ) {
       setVisualTheme(savedVisualTheme);
     }

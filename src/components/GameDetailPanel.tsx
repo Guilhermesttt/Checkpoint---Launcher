@@ -8,6 +8,7 @@ import type { Game } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import {
   fetchSteamAchievementDetails,
+  fetchSteamAchievementSchema,
   searchSteamGames,
   type SteamAchievement,
 } from "../services/steam";
@@ -23,6 +24,7 @@ interface GameDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   playSound: (type: SoundEffectType) => void;
+  onEditGame?: (game: Game) => void;
 }
 
 // Tempo mínimo (ms) que a tela de "abrindo jogo" fica visível, só pra não piscar
@@ -43,6 +45,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   isOpen,
   onClose,
   playSound,
+  onEditGame,
 }) => {
   const { user, userProfile } = useAuth();
   const { t, language } = usePreferences();
@@ -58,6 +61,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [achievementSourceAppId, setAchievementSourceAppId] = React.useState<string>("");
   const [isAchievementsLoading, setIsAchievementsLoading] = React.useState(false);
   const [achievementsError, setAchievementsError] = React.useState<string | null>(null);
+  const [achievementsRequested, setAchievementsRequested] = React.useState(false);
+  const [isAddAchModalOpen, setIsAddAchModalOpen] = React.useState(false);
+  const [newAchName, setNewAchName] = React.useState("");
+  const [newAchDesc, setNewAchDesc] = React.useState("");
 
   const copy = {
     "pt-BR": {
@@ -94,6 +101,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       notInformed: "Não informado",
       management: "Gerenciamento",
       verify: "Verificar",
+      edit: "Editar",
       createShortcut: "Criar Atalho",
       remove: "Remover",
       platform: "Plataforma",
@@ -118,8 +126,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removeError: "Erro ao remover jogo.",
       launchGenericError: "Falha ao iniciar o jogo.",
       achievementsLoading: "Buscando conquistas da Steam...",
+      achievementsLoadingLocal: "Carregando conquistas locais...",
       achievementsEmpty: "Nenhuma conquista encontrada para este jogo.",
+      achievementsLocalEmpty: "Nenhuma conquista local registrada.",
       achievementsSource: "Suas conquistas",
+      achievementsLocalSource: "Conquistas locais",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Jogo Epic usando conquistas da versão Steam vinculada.",
@@ -132,6 +143,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       achievementsLocked: "Bloqueada",
       achievementsUnlocked: "Desbloqueada",
       achievementsUnlockedAt: "Desbloqueada em",
+      verifySuccess: "Executável encontrado.",
+      verifyNotFound: "Executável não encontrado no caminho especificado.",
+      shortcutComingSoon: "Criação de atalhos disponível em breve.",
     },
     "en-US": {
       tabPlay: "PLAY",
@@ -167,6 +181,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       notInformed: "Not informed",
       management: "Management",
       verify: "Verify",
+      edit: "Edit",
       createShortcut: "Create shortcut",
       remove: "Remove",
       platform: "Platform",
@@ -191,8 +206,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removeError: "Error removing game.",
       launchGenericError: "Failed to launch the game.",
       achievementsLoading: "Loading Steam achievements...",
+      achievementsLoadingLocal: "Loading local achievements...",
       achievementsEmpty: "No achievements were found for this game.",
+      achievementsLocalEmpty: "No local achievements recorded.",
       achievementsSource: "Your achievements",
+      achievementsLocalSource: "Local achievements",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Epic game using achievements from the linked Steam version.",
@@ -205,6 +223,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       achievementsLocked: "Locked",
       achievementsUnlocked: "Unlocked",
       achievementsUnlockedAt: "Unlocked on",
+      verifySuccess: "Executable found.",
+      verifyNotFound: "Executable not found at the specified path.",
+      shortcutComingSoon: "Shortcut creation coming soon.",
     },
     "es-ES": {
       tabPlay: "JUGAR",
@@ -240,6 +261,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       notInformed: "No informado",
       management: "Gestión",
       verify: "Verificar",
+      edit: "Editar",
       createShortcut: "Crear acceso directo",
       remove: "Eliminar",
       platform: "Plataforma",
@@ -264,8 +286,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removeError: "Error al eliminar el juego.",
       launchGenericError: "No se pudo iniciar el juego.",
       achievementsLoading: "Cargando logros de Steam...",
+      achievementsLoadingLocal: "Cargando logros locales...",
       achievementsEmpty: "No se encontraron logros para este juego.",
+      achievementsLocalEmpty: "No hay logros locales registrados.",
       achievementsSource: "Tus logros",
+      achievementsLocalSource: "Logros locales",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Juego de Epic usando logros de la versión vinculada de Steam.",
@@ -278,11 +303,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       achievementsLocked: "Bloqueado",
       achievementsUnlocked: "Desbloqueado",
       achievementsUnlockedAt: "Desbloqueado el",
+      verifySuccess: "Ejecutable encontrado.",
+      verifyNotFound: "Ejecutable no encontrado en la ruta especificada.",
+      shortcutComingSoon: "Creación de accesos directos disponible pronto.",
     },
   }[language];
 
   const locale =
     language === "en-US" ? "en-US" : language === "es-ES" ? "es-ES" : "pt-BR";
+
+  const handleAddAchievement = async () => {
+    setIsAddAchModalOpen(false);
+    setNewAchName("");
+    setNewAchDesc("");
+  };
 
   /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
@@ -292,6 +326,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setCurrentGalleryIndex(0);
     setDeleteModalOpen(false);
     setIsDeleting(false);
+    setAchievementsRequested(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -319,26 +354,24 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [galleryModalOpen, game?.screenshots, playSound]);
 
+  // Lazy achievement loading: only fetch when the achievements tab becomes active
   React.useEffect(() => {
+    if (!achievementsRequested) return;
     let cancelled = false;
 
-    const loadAchievements = async () => {
+    const loadSteamAchievements = async () => {
       setAchievementItems([]);
       setAchievementSourceAppId("");
       setAchievementsError(null);
 
       if (!game?.id) return;
-      if (!userProfile?.steamId) {
-        setAchievementsError(copy.achievementsNeedSteam);
-        return;
-      }
 
       setIsAchievementsLoading(true);
 
       try {
         let resolvedAppId = String(game.steamAppId || "").trim();
 
-        if (!resolvedAppId && game.launcherType === "epic") {
+        if (!resolvedAppId) {
           const results = await searchSteamGames(game.title);
           const normalizedTitle = normalizeSteamLookup(game.title);
           const matched = results.find((candidate) => {
@@ -361,10 +394,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           return;
         }
 
-        const result = await fetchSteamAchievementDetails(
-          userProfile.steamId,
-          resolvedAppId,
-        );
+        const result =
+          game.launcherType === "local"
+            ? await fetchSteamAchievementSchema(resolvedAppId)
+            : userProfile?.steamId
+              ? await fetchSteamAchievementDetails(
+                userProfile.steamId,
+                resolvedAppId,
+              )
+              : await fetchSteamAchievementSchema(resolvedAppId);
 
         if (cancelled) return;
 
@@ -372,7 +410,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         setAchievementItems(result.achievements);
 
         if (result.achievements.length === 0) {
-          setAchievementsError(copy.achievementsEmpty);
+          setAchievementsError(
+            !userProfile?.steamId && game.launcherType !== "local"
+              ? copy.achievementsNeedSteam
+              : copy.achievementsEmpty,
+          );
         }
       } catch {
         if (!cancelled) {
@@ -385,12 +427,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       }
     };
 
-    void loadAchievements();
+    void loadSteamAchievements();
 
     return () => {
       cancelled = true;
     };
   }, [
+    achievementsRequested,
     copy.achievementsEmpty,
     copy.achievementsMissingAppId,
     copy.achievementsNeedSteam,
@@ -596,6 +639,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   active={activeTab === copy.tabAchievements}
                   onClick={() => {
                     setActiveTab(copy.tabAchievements);
+                    setAchievementsRequested(true);
                     playSound("navigate");
                   }}
                 />
@@ -902,15 +946,17 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                                 </p>
                               )}
                             </div>
-                            <div className="min-w-[120px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
-                              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
-                                {copy.achievements}
-                              </p>
-                              <p className="mt-2 text-2xl font-light text-white">
-                                {achievementItems.length
-                                  ? `${detailedAchievementsUnlocked}/${achievementItems.length}`
-                                  : `${achievementsDone}/${achievementsTotal}`}
-                              </p>
+                            <div className="flex flex-col gap-2 items-end">
+                              <div className="min-w-[120px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
+                                  {copy.achievements}
+                                </p>
+                                <p className="mt-2 text-2xl font-light text-white">
+                                  {achievementItems.length
+                                    ? `${detailedAchievementsUnlocked}/${achievementItems.length}`
+                                    : `${achievementsDone}/${achievementsTotal}`}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </motion.div>
@@ -922,8 +968,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         )}
 
                         {!isAchievementsLoading && achievementsError && achievementItems.length === 0 && (
-                          <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-6 text-center text-sm text-white/45">
-                            {achievementsError}
+                          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-6 text-center text-sm text-white/45 space-y-4">
+                            <p>{achievementsError}</p>
                           </div>
                         )}
 
@@ -959,12 +1005,38 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         <span className="text-white/60 text-xs truncate max-w-sm">
                           {game.executablePath}
                         </span>
-                        <button className="text-[10px] font-bold text-white uppercase tracking-widest pl-4 hover:text-white/70 transition-colors">
+                        <button
+                          onClick={async () => {
+                            if (!game.executablePath) return;
+                            try {
+                              const running = await window.electronAPI?.isExecutableRunning(game.executablePath);
+                              notify(running !== undefined ? copy.verifySuccess : copy.verifyNotFound, running !== undefined ? "success" : "error");
+                            } catch {
+                              notify(copy.verifyNotFound, "error");
+                            }
+                          }}
+                          className="text-[10px] font-bold text-white uppercase tracking-widest pl-4 hover:text-white/70 transition-colors"
+                        >
                           {copy.verify}
                         </button>
                       </div>
                       <div className="flex gap-4">
-                        <button className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest">
+                        <button
+                          onClick={() => {
+                            if (onEditGame && game) {
+                              playSound("select");
+                              onClose();
+                              onEditGame(game);
+                            }
+                          }}
+                          className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
+                        >
+                          {copy.edit}
+                        </button>
+                        <button
+                          onClick={() => notify(copy.shortcutComingSoon, "info")}
+                          className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
+                        >
                           {copy.createShortcut}
                         </button>
                         <button
@@ -1247,6 +1319,69 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           </AnimatePresence>
         </motion.div>
       )}
+
+      <ModalShell
+        isOpen={isAddAchModalOpen}
+        onClose={() => {
+          playSound("back");
+          setIsAddAchModalOpen(false);
+          setNewAchName("");
+          setNewAchDesc("");
+        }}
+        maxWidthClassName="max-w-md"
+        zIndexClassName="z-[200]"
+        className="rounded-[32px] border border-white/10 bg-[#0a0a0c]/95 p-8 shadow-2xl backdrop-blur-3xl"
+      >
+        <h3 className="mb-4 text-xl font-semibold text-white">Criar Conquista Nativa</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-white/40">
+              Nome da Conquista
+            </label>
+            <input
+              type="text"
+              value={newAchName}
+              onChange={(e) => setNewAchName(e.target.value)}
+              placeholder="Ex: Velocidade Máxima"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-white/40">
+              Descrição
+            </label>
+            <textarea
+              value={newAchDesc}
+              onChange={(e) => setNewAchDesc(e.target.value)}
+              placeholder="Ex: Alcance 100km/h com qualquer veículo."
+              rows={3}
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-2.5 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none resize-none"
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <GlassButton
+            type="button"
+            onClick={() => {
+              playSound("back");
+              setIsAddAchModalOpen(false);
+              setNewAchName("");
+              setNewAchDesc("");
+            }}
+            variant="outline"
+          >
+            Cancelar
+          </GlassButton>
+          <GlassButton
+            type="button"
+            onClick={handleAddAchievement}
+            disabled={!newAchName.trim()}
+            variant="white"
+          >
+            Criar
+          </GlassButton>
+        </div>
+      </ModalShell>
     </AnimatePresence>
   );
 };
@@ -1354,12 +1489,14 @@ const AchievementRow: React.FC<{
   unlockedLabel: string;
   unlockedAtLabel: string;
   formatDate: (unixTime: number) => string | null;
+  onManualUnlock?: () => void;
 }> = ({
   achievement,
   lockedLabel,
   unlockedLabel,
   unlockedAtLabel,
   formatDate,
+  onManualUnlock,
 }) => {
   const unlockedAt = formatDate(achievement.unlockTime);
 
@@ -1396,15 +1533,29 @@ const AchievementRow: React.FC<{
               {achievement.description || " "}
             </p>
           </div>
-          <span
-            className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
-              achievement.achieved
-                ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200/90"
-                : "border-white/10 bg-white/5 text-white/35"
-            }`}
-          >
-            {achievement.achieved ? unlockedLabel : lockedLabel}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {!achievement.achieved && onManualUnlock && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManualUnlock();
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                Desbloquear
+              </button>
+            )}
+            <span
+              className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+                achievement.achieved
+                  ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200/90"
+                  : "border-white/10 bg-white/5 text-white/35"
+              }`}
+            >
+              {achievement.achieved ? unlockedLabel : lockedLabel}
+            </span>
+          </div>
         </div>
 
         {achievement.achieved && unlockedAt && (

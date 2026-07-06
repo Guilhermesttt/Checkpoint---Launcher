@@ -52,6 +52,7 @@ import LoadingSkeleton from "../components/LoadingSkeleton";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
 import {
   AddFriendModal,
+  ChatModal,
   ConfirmationModal,
   EmptyLibraryOnboarding,
   EmptyState,
@@ -77,6 +78,7 @@ import {
   disconnectSteamAccount,
   getSteamLinkUrl,
   syncSteamLibraryToFirestore,
+  fetchSteamAchievementDetails,
 } from "../services/steam";
 import {
   disconnectDiscordAccount,
@@ -91,6 +93,9 @@ import {
   sendCheckpointFriendRequest,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
+import {
+  subscribeToUnreadMessages,
+} from "../services/chat";
 import { discordRichPresence, useDiscordRichPresence } from "../services/discordRichPresence";
 import { getMonitorableExecutablePath } from "../services/launcher";
 import type { Game } from "../types/domain";
@@ -444,14 +449,17 @@ const Home: React.FC = () => {
     useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [socialFriends, setSocialFriends] = useState<SocialFriend[]>([]);
+  const [unreadMessagesByFriend, setUnreadMessagesByFriend] = useState<Record<string, number>>({});
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<CheckpointFriendRequest[]>([]);
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [currentPresenceExecutablePath, setCurrentPresenceExecutablePath] = useState<string | null>(null);
+  const [activeChatFriend, setActiveChatFriend] = useState<SocialFriend | null>(null);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
     games: Game[];
   } | null>(null);
+  const [pendingFriendRemoval, setPendingFriendRemoval] = useState<SocialFriend | null>(null);
   const [pendingDeleteGame, setPendingDeleteGame] = useState<Game | null>(null);
   const [friendProfileLoadingId, setFriendProfileLoadingId] = useState<string | null>(null);
   const [localSocialStateLoaded, setLocalSocialStateLoaded] = useState(false);
@@ -670,8 +678,8 @@ const Home: React.FC = () => {
 
   // Discord Rich Presence: Atualizar quando jogo atual mudar
   useEffect(() => {
-    if (!isRichPresenceEnabled() || !currentPresenceGame) {
-      if (isRichPresenceEnabled() && !currentPresenceGame) {
+    if (!isRichPresenceEnabled || !currentPresenceGame) {
+      if (isRichPresenceEnabled && !currentPresenceGame) {
         setBrowsingActivity();
       }
       return;
@@ -747,7 +755,7 @@ const Home: React.FC = () => {
       setCurrentPresenceExecutablePath(detail?.executablePath || null);
       void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
 
-      if (isRichPresenceEnabled()) {
+      if (isRichPresenceEnabled) {
         const launchedGame = games.find(
           (game) =>
             game.title.toLowerCase().includes(title.toLowerCase()) ||
@@ -831,6 +839,126 @@ const Home: React.FC = () => {
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [clearCurrentPresence, currentPresenceExecutablePath, currentPresenceGame]);
+
+  const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstUnreadSnapshotRef = useRef(true);
+
+  // Unread messages snapshot listener for overlay notifications
+  useEffect(() => {
+    if (!user?.uid) {
+      isFirstUnreadSnapshotRef.current = true;
+      notifiedMessageIdsRef.current.clear();
+      setUnreadMessagesByFriend({});
+      return;
+    }
+
+    const unsubscribe = subscribeToUnreadMessages((unreadMsgs) => {
+      const counts = unreadMsgs.reduce<Record<string, number>>((acc, msg) => {
+        acc[msg.senderId] = (acc[msg.senderId] || 0) + 1;
+        return acc;
+      }, {});
+      setUnreadMessagesByFriend(counts);
+
+      if (isFirstUnreadSnapshotRef.current) {
+        unreadMsgs.forEach((msg) => {
+          const messageId = msg.id || `${msg.senderId}:${msg.createdAt}:${msg.text}`;
+          notifiedMessageIdsRef.current.add(messageId);
+        });
+        isFirstUnreadSnapshotRef.current = false;
+        return;
+      }
+
+      unreadMsgs.forEach((msg) => {
+        const messageId = msg.id || `${msg.senderId}:${msg.createdAt}:${msg.text}`;
+        if (!notifiedMessageIdsRef.current.has(messageId)) {
+          notifiedMessageIdsRef.current.add(messageId);
+          
+          const senderFriend = socialFriends.find((f) => f.id === `cp-friend:${msg.senderId}`);
+          const senderName = senderFriend?.name || "Amigo";
+          const avatarUrl = senderFriend?.avatar || "";
+
+          if (activeChatFriend?.id !== `cp-friend:${msg.senderId}`) {
+            void window.electronAPI?.showFriendMessageOverlay({
+              senderName,
+              messageText: msg.text,
+              avatarUrl,
+            });
+            playSound("friendRequest");
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [user?.uid, socialFriends, activeChatFriend, playSound]);
+
+  // Polling loop for Steam achievements while playing
+  useEffect(() => {
+    if (!currentPresenceGame || !userProfile?.steamId) {
+      return;
+    }
+
+    const runningGame = games.find(
+      (g) =>
+        g.title.toLowerCase().includes(currentPresenceGame.toLowerCase()) ||
+        currentPresenceGame.toLowerCase().includes(g.title.toLowerCase())
+    );
+
+    const appId = runningGame?.steamAppId;
+    if (!appId) return;
+
+    let isPolling = true;
+    const unlockedSet = new Set<string>();
+    let firstLoadDone = false;
+
+    const pollAchievements = async () => {
+      try {
+        const details = await fetchSteamAchievementDetails(userProfile.steamId!, appId);
+        if (!isPolling) return;
+
+        if (!firstLoadDone) {
+          details.achievements.forEach((ach) => {
+            if (ach.achieved) {
+              unlockedSet.add(ach.apiName);
+            }
+          });
+          firstLoadDone = true;
+          return;
+        }
+
+        for (const ach of details.achievements) {
+          if (ach.achieved && !unlockedSet.has(ach.apiName)) {
+            unlockedSet.add(ach.apiName);
+
+            void window.electronAPI?.showAchievementOverlay({
+              gameId: runningGame.id,
+              achievementId: ach.apiName,
+              achievement: {
+                id: ach.apiName,
+                name: ach.name,
+                description: ach.description,
+                icon: ach.icon || "",
+              },
+              unlockedAt: new Date().toISOString(),
+              duplicate: false,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Erro no polling de conquistas Steam:", error);
+      }
+    };
+
+    void pollAchievements();
+    const interval = window.setInterval(() => {
+      void pollAchievements();
+    }, 5000);
+
+    return () => {
+      isPolling = false;
+      window.clearInterval(interval);
+    };
+  }, [currentPresenceGame, userProfile?.steamId, games]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1484,12 +1612,14 @@ const Home: React.FC = () => {
     });
   };
 
-  const removeFriend = async (id: string) => {
+  const removeFriend = async (friend: SocialFriend) => {
+    const id = friend.id;
     if (id.startsWith("cp-friend:") && user?.uid) {
       const friendUid = id.split(":")[1];
       try {
         await removeCheckpointFriend(friendUid);
         await refreshProfile();
+        notify(`${friend.name} foi removido da sua lista de amigos.`, "success");
       } catch (e) {
         notify(e instanceof Error ? e.message : "Erro ao remover amigo do Checkpoint.", "error");
       }
@@ -1589,6 +1719,17 @@ const Home: React.FC = () => {
   const removePriceAlert = (id: string) => {
     setPriceAlerts((current) => current.filter((alert) => alert.id !== id));
   };
+
+  const openFriendChatFromOverview = useCallback(
+    (friendId: string) => {
+      const friend = socialFriends.find((item) => item.id === friendId);
+      if (!friend) return;
+      setActiveCategory("FRIENDS");
+      setActiveChatFriend(friend);
+      playSound("select");
+    },
+    [playSound, socialFriends],
+  );
 
   const onSelectHandler = useCallback(
     (index: number, openGame?: Game) => {
@@ -1971,10 +2112,14 @@ const Home: React.FC = () => {
               discordAvatar={userProfile?.discordAvatar}
               DiscordIcon={DiscordBrandIcon}
               friends={socialFriends}
+              unreadMessagesByFriend={unreadMessagesByFriend}
               incomingRequests={incomingFriendRequests}
               currentPresenceGame={currentPresenceGame}
               onConnectDiscord={connectDiscord}
-              onRemoveFriend={removeFriend}
+              onRemoveFriend={(friend) => {
+                playSound("back");
+                setPendingFriendRemoval(friend);
+              }}
               onViewFriendProfile={handleViewFriendProfile}
               friendProfileLoadingId={friendProfileLoadingId}
               onAcceptRequest={handleAcceptCheckpointFriendRequest}
@@ -1982,6 +2127,10 @@ const Home: React.FC = () => {
               onAddFriendClick={() => {
                 playSound("select");
                 setIsAddFriendModalOpen(true);
+              }}
+              onOpenChat={(friend) => {
+                playSound("select");
+                setActiveChatFriend(friend);
               }}
             />
           ) : activeCategory === "PROFILE" ? (
@@ -2162,6 +2311,7 @@ const Home: React.FC = () => {
                     recentActivity={recentOverviewActivity}
                     onOpenGame={openDetails}
                     onOpenFriends={() => setActiveCategory("FRIENDS")}
+                    onOpenFriendChat={openFriendChatFromOverview}
                     t={t}
                   />
                 )}
@@ -2363,6 +2513,32 @@ const Home: React.FC = () => {
           setDisconnectDiscordModalOpen(false);
           await handleDisconnectDiscord();
         }}
+        playSound={playSound}
+      />
+
+      <ConfirmationModal
+        isOpen={pendingFriendRemoval !== null}
+        title="Desfazer amizade"
+        description={
+          pendingFriendRemoval
+            ? `Voce quer remover ${pendingFriendRemoval.name} da sua lista de amigos?`
+            : ""
+        }
+        confirmLabel="Remover"
+        onClose={() => setPendingFriendRemoval(null)}
+        onConfirm={async () => {
+          const friend = pendingFriendRemoval;
+          setPendingFriendRemoval(null);
+          if (!friend) return;
+          await removeFriend(friend);
+        }}
+        playSound={playSound}
+      />
+
+      <ChatModal
+        isOpen={activeChatFriend !== null}
+        onClose={() => setActiveChatFriend(null)}
+        friend={activeChatFriend}
         playSound={playSound}
       />
 

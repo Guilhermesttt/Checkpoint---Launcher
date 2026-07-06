@@ -412,10 +412,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           launcherType: prev.launcherType === "local" ? "local" : "steam",
           executablePath:
             prev.launcherType === "local" ? prev.executablePath : appId,
-          steamAppId: prev.launcherType === "local" ? "" : appId,
-          epicCatalogId: prev.launcherType === "local" ? prev.epicCatalogId : "",
-          epicLaunchId: prev.launcherType === "local" ? prev.epicLaunchId : "",
-          epicStoreUrl: prev.launcherType === "local" ? prev.epicStoreUrl : "",
+          steamAppId: appId,
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
               ? Math.round(d.sizeGB)
@@ -503,7 +500,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
         launcherType: "epic",
         executablePath: isWindowsExecutablePath(prev.executablePath) ? prev.executablePath : "",
-        steamAppId: "",
+        steamAppId: prev.steamAppId || "",
         epicCatalogId: catalogId,
         epicLaunchId: launchId,
         epicStoreUrl: game.productUrl || "",
@@ -540,7 +537,6 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       ...prev,
       launcherType: "local",
       executablePath: browserPath,
-      steamAppId: "",
       epicCatalogId: "",
       epicLaunchId: "",
       epicStoreUrl: "",
@@ -655,7 +651,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       if (gameToEdit) {
         await updateDoc(userGameDocRef(user.uid, gameToEdit.id), {
           ...data,
-          ...(formData.launcherType !== "steam"
+          ...(!formData.steamAppId
             ? {
               steamPlaytimeMinutes: deleteField(),
               steamLastPlayedAt: deleteField(),
@@ -726,7 +722,6 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     setFormData((prev) => ({
                       ...prev,
                       launcherType: "local",
-                      steamAppId: "",
                       epicCatalogId: "",
                       epicLaunchId: "",
                       epicStoreUrl: "",
@@ -788,31 +783,29 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
             </div>
 
-            {(formData.launcherType === "steam" || formData.launcherType === "local") && (
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <Search size={14} className="text-white/20" /> {copy.steamSearch}
-                  ({copy.optional})
-                </label>
-                <div className="relative">
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => {
-                      scheduleSearch(e.target.value, "steam");
-                    }}
-                    placeholder={copy.searchPlaceholder}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
-                  />
-                  <GameSearchDropdown
-                    results={searchResults}
-                    isSearching={isSearching}
-                    hasQuery={searchQuery.length >= 3}
-                    noResultsLabel={copy.noSearchResults}
-                    onSelect={handleSelectSteamGame}
-                  />
-                </div>
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                <Search size={14} className="text-white/20" /> {copy.steamSearch}
+                ({copy.optional})
+              </label>
+              <div className="relative">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => {
+                    scheduleSearch(e.target.value, "steam");
+                  }}
+                  placeholder={copy.searchPlaceholder}
+                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
+                />
+                <GameSearchDropdown
+                  results={searchResults}
+                  isSearching={isSearching}
+                  hasQuery={searchQuery.length >= 3}
+                  noResultsLabel={copy.noSearchResults}
+                  onSelect={handleSelectSteamGame}
+                />
               </div>
-            )}
+            </div>
 
             {formData.launcherType === "epic" && (
               <div className="space-y-4">

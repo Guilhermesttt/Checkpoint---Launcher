@@ -203,6 +203,39 @@ export const fetchSteamAchievementDetails = async (
   }
 };
 
+export const fetchSteamAchievementSchema = async (
+  appId: string,
+): Promise<{
+  achievements: SteamAchievement[];
+  total: number;
+  unlocked: number;
+}> => {
+  const url = apiUrl(
+    `/api/steam/achievement-schema?appId=${encodeURIComponent(appId)}`,
+  );
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return { achievements: [], total: 0, unlocked: 0 };
+    }
+
+    const data = (await response.json()) as {
+      achievements?: SteamAchievement[];
+      total?: number;
+      unlocked?: number;
+    };
+
+    return {
+      achievements: Array.isArray(data.achievements) ? data.achievements : [],
+      total: typeof data.total === "number" ? data.total : 0,
+      unlocked: typeof data.unlocked === "number" ? data.unlocked : 0,
+    };
+  } catch {
+    return { achievements: [], total: 0, unlocked: 0 };
+  }
+};
+
 export const searchSteamGames = async (query: string) => {
   const response = await fetch(
     apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),

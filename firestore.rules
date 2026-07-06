@@ -6,6 +6,10 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     function validProfileCreate(userId) {
       return isSignedInOwner(userId)
         && request.resource.data.uid == userId
@@ -51,6 +55,36 @@ service cloud.firestore {
       match /games/{gameId} {
         allow read, write: if isSignedInOwner(userId);
       }
+    }
+
+    match /messages/{messageId} {
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'chatId',
+          'senderId',
+          'receiverId',
+          'text',
+          'createdAt',
+          'read'
+        ])
+        && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.receiverId is string
+        && request.resource.data.chatId is string
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.read == false;
+
+      allow read: if isSignedIn()
+        && (resource.data.senderId == request.auth.uid
+          || resource.data.receiverId == request.auth.uid);
+
+      allow update: if isSignedIn()
+        && resource.data.receiverId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+
+      allow delete: if false;
     }
 
     match /{document=**} {

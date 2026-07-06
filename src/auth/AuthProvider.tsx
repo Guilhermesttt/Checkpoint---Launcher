@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -31,6 +31,8 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   displayName: data?.displayName ?? null,
   photoURL: data?.photoURL ?? null,
   steamId: data?.steamId,
+  steamAvatar: data?.steamAvatar,
+  steamUsername: data?.steamUsername,
   discordId: data?.discordId,
   discordUsername: data?.discordUsername,
   discordAvatar: data?.discordAvatar,
@@ -52,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const syncProfile = async (authUser: User) => {
+  const syncProfile = useCallback(async (authUser: User) => {
     if (!auth.currentUser || auth.currentUser.uid !== authUser.uid) return;
     const ref = doc(db, "profiles", authUser.uid);
     const snap = await getDoc(ref);
@@ -86,17 +88,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       { merge: true },
     );
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (!auth.currentUser) return;
     const ref = doc(db, "profiles", auth.currentUser.uid);
     const snap = await getDoc(ref);
     const data = snap.data() as Partial<UserProfile> | undefined;
     setUserProfile(toProfile(auth.currentUser.uid, data));
-  };
+  }, []);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     if (window.electronAPI?.startGoogleBrowserAuth) {
       const { signInWithCustomToken } = await import("firebase/auth");
       const { state } = await window.electronAPI.startGoogleBrowserAuth();
@@ -142,23 +144,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }),
       );
     }
-  };
+  }, [syncProfile]);
 
-  const signUpWithEmail = async (email: string, pass: string) => {
+  const signUpWithEmail = useCallback(async (email: string, pass: string) => {
     const { createUserWithEmailAndPassword } = await import("firebase/auth");
     const result = await createUserWithEmailAndPassword(auth, email, pass);
     await syncProfile(result.user);
-  };
+  }, [syncProfile]);
 
-  const signInWithEmail = async (email: string, pass: string) => {
+  const signInWithEmail = useCallback(async (email: string, pass: string) => {
     const { signInWithEmailAndPassword } = await import("firebase/auth");
     const result = await signInWithEmailAndPassword(auth, email, pass);
     await syncProfile(result.user);
-  };
+  }, [syncProfile]);
 
-  const signOutUser = async () => {
+  const signOutUser = useCallback(async () => {
     await signOut(auth);
-  };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {

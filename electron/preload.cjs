@@ -16,4 +16,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   showFriendPlayingOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-playing", payload),
   showFriendRequestOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-request", payload),
   showFriendAcceptedOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-accepted", payload),
+  getLocalAchievementDefinitions: (gameId) => ipcRenderer.invoke("achievement:get-definitions", gameId),
+  getLocalAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
+  saveLocalAchievementDefinitions: (gameId, definitions) => ipcRenderer.invoke("achievement:save-definitions", gameId, definitions),
+  unlockLocalAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
+  showAchievementOverlay: (payload) => ipcRenderer.invoke("overlay:show-achievement", payload),
+  showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
 });

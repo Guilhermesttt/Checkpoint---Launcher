@@ -139,6 +139,37 @@ html[data-launcher-theme="sunset"] {
     scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+  .chat-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .chat-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+    border: 2px solid rgba(5, 5, 7, 0.92);
+    border-radius: 9999px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 0 12px rgba(255, 255, 255, 0.05);
+  }
+  .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.12) 100%
+    );
+  }
+  .chat-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.02);
+  }
+
   /* â”€â”€ Glass Effect â€” Performance-safe (NO backdrop-filter) â”€â”€
      Uses rgba transparency + border. Zero GPU blur cost.
   â”€â”€ */

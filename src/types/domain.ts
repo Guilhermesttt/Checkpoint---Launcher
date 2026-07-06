@@ -91,3 +91,19 @@ export interface SteamOwnedGame {
   img_logo_url?: string;
   has_community_visible_stats?: boolean;
 }
+export interface ChatMessage {
+  id?: string;
+  chatId?: string;
+  senderId: string;
+  receiverId?: string;
+  text: string;
+  createdAt: string;
+  read?: boolean;
+}
+
+export interface Chat {
+  id: string;
+  participants: string[];
+  lastMessage?: string;
+  lastMessageAt?: string;
+}

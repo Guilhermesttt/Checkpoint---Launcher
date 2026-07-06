@@ -1,4 +1,4 @@
-import { Clock3, Flame, Heart, PlayCircle, Users2 } from "lucide-react";
+import { Clock3, Flame, Heart, MessageSquare, PlayCircle, Users2 } from "lucide-react";
 import type { TranslationKey } from "../context/PreferencesContext";
 import type { Game } from "../types/domain";
 
@@ -23,6 +23,7 @@ interface HomeOverviewPanelsProps {
   recentActivity: ActivityItem[];
   onOpenGame: (game: Game) => void;
   onOpenFriends: () => void;
+  onOpenFriendChat: (friendId: string) => void;
   t: (key: TranslationKey) => string;
 }
 
@@ -53,6 +54,7 @@ export function HomeOverviewPanels({
   recentActivity,
   onOpenGame,
   onOpenFriends,
+  onOpenFriendChat,
   t,
 }: HomeOverviewPanelsProps) {
   const primaryGame = continuePlaying[0];
@@ -147,24 +149,37 @@ export function HomeOverviewPanels({
               topFriends.map((friend) => (
                 <div
                   key={friend.id}
-                  className="flex items-center gap-3 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2"
                 >
-                  <div className="relative h-9 w-9 overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
-                    {friend.avatar ? (
-                      <img src={friend.avatar} alt="" className="h-full w-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-white/60">
-                        <Users2 className="h-4 w-4" />
-                      </div>
-                    )}
-                    <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="relative h-9 w-9 overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
+                      {friend.avatar ? (
+                        <img src={friend.avatar} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-white/60">
+                          <Users2 className="h-4 w-4" />
+                        </div>
+                      )}
+                      <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-black text-white">{friend.name}</p>
+                      <p className="truncate text-[10px] uppercase tracking-widest text-white/35">
+                        {friend.playing ? friend.playing : t("overviewOnline")}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-black text-white">{friend.name}</p>
-                    <p className="truncate text-[10px] uppercase tracking-widest text-white/35">
-                      {friend.playing ? friend.playing : t("overviewOnline")}
-                    </p>
-                  </div>
+                  {friend.id.startsWith("cp-friend:") && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenFriendChat(friend.id)}
+                      aria-label={`Enviar mensagem para ${friend.name}`}
+                      title={`Enviar mensagem para ${friend.name}`}
+                      className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] p-2 text-white/55 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               ))
             ) : (

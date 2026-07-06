@@ -108,70 +108,76 @@ const createAchievementBridge = ({
     response.json({ ok: true });
   });
 
-  app.post("/unlock", async (request, response) => {
-    try {
-      const gameId = sanitizeId(request.body?.gameId, "gameId");
-      const achievementId = sanitizeId(request.body?.achievementId, "achievementId");
-      const achievementsDir = path.join(userDataPath, "achievements");
-      const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
-      const progressPath = path.join(userDataPath, `user_progress_${gameId}.json`);
+  const unlockAchievement = async (gameId, achievementId) => {
+    const cleanedGameId = sanitizeId(gameId, "gameId");
+    const cleanedAchievementId = sanitizeId(achievementId, "achievementId");
+    const achievementsDir = path.join(userDataPath, "achievements");
+    const definitionsPath = path.join(achievementsDir, `${cleanedGameId}.json`);
+    const progressPath = path.join(userDataPath, `user_progress_${cleanedGameId}.json`);
 
-      const definitionFile = await readJsonFile(definitionsPath);
-      const achievement = findAchievementDefinition(definitionFile, achievementId);
-      if (!achievement) {
-        response.status(404).json({ error: "Achievement nao encontrada." });
-        return;
+    const definitionFile = await readJsonFile(definitionsPath);
+    const achievement = findAchievementDefinition(definitionFile, cleanedAchievementId);
+    if (!achievement) {
+      throw new Error("Achievement nao encontrada.");
+    }
+
+    const unlockedAt = new Date().toISOString();
+    const updatedProgress = await withQueuedProgressWrite(progressPath, async () => {
+      let existingProgress = {
+        gameId: cleanedGameId,
+        unlockedAchievements: {},
+        updatedAt: unlockedAt,
+      };
+
+      try {
+        const current = await readJsonFile(progressPath);
+        if (current && typeof current === "object") {
+          existingProgress = {
+            gameId: cleanedGameId,
+            unlockedAchievements:
+              current.unlockedAchievements && typeof current.unlockedAchievements === "object"
+                ? current.unlockedAchievements
+                : {},
+            updatedAt: String(current.updatedAt || unlockedAt),
+          };
+        }
+      } catch (error) {
+        if (error && error.code !== "ENOENT") {
+          throw error;
+        }
       }
 
-      const unlockedAt = new Date().toISOString();
-      const updatedProgress = await withQueuedProgressWrite(progressPath, async () => {
-        let existingProgress = {
-          gameId,
-          unlockedAchievements: {},
-          updatedAt: unlockedAt,
-        };
-
-        try {
-          const current = await readJsonFile(progressPath);
-          if (current && typeof current === "object") {
-            existingProgress = {
-              gameId,
-              unlockedAchievements:
-                current.unlockedAchievements && typeof current.unlockedAchievements === "object"
-                  ? current.unlockedAchievements
-                  : {},
-              updatedAt: String(current.updatedAt || unlockedAt),
-            };
-          }
-        } catch (error) {
-          if (error && error.code !== "ENOENT") {
-            throw error;
-          }
-        }
-
-        const wasAlreadyUnlocked = Boolean(existingProgress.unlockedAchievements[achievementId]);
-        existingProgress.unlockedAchievements[achievementId] = {
-          ...achievement,
-          unlockedAt,
-        };
-        existingProgress.updatedAt = unlockedAt;
-
-        await writeJsonAtomic(progressPath, existingProgress);
-        return { progress: existingProgress, duplicate: wasAlreadyUnlocked };
-      });
-
-      onAchievementUnlocked({
-        gameId,
-        achievementId,
-        achievement,
+      const wasAlreadyUnlocked = Boolean(existingProgress.unlockedAchievements[cleanedAchievementId]);
+      existingProgress.unlockedAchievements[cleanedAchievementId] = {
+        ...achievement,
         unlockedAt,
-        duplicate: updatedProgress.duplicate,
-      });
+      };
+      existingProgress.updatedAt = unlockedAt;
 
+      await writeJsonAtomic(progressPath, existingProgress);
+      return { progress: existingProgress, duplicate: wasAlreadyUnlocked };
+    });
+
+    onAchievementUnlocked({
+      gameId: cleanedGameId,
+      achievementId: cleanedAchievementId,
+      achievement,
+      unlockedAt,
+      duplicate: updatedProgress.duplicate,
+    });
+
+    return { duplicate: updatedProgress.duplicate };
+  };
+
+  app.post("/unlock", async (request, response) => {
+    try {
+      const gameId = request.body?.gameId;
+      const achievementId = request.body?.achievementId;
+      const result = await unlockAchievement(gameId, achievementId);
       response.json({
         ok: true,
-        duplicate: updatedProgress.duplicate,
-        port: bridge.address?.port,
+        duplicate: result.duplicate,
+        port: bridge?.address?.port,
       });
     } catch (error) {
       logger.error?.("[achievement-bridge] unlock failed", error);
@@ -234,6 +240,7 @@ const createAchievementBridge = ({
   return {
     start,
     stop,
+    unlockAchievement,
     getAddress: () => bridge?.address || null,
   };
 };

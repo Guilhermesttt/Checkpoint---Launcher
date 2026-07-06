@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from "react";
 import type { Game } from "../types/domain";
 
 interface DiscordActivity {
@@ -35,27 +36,46 @@ class DiscordRichPresenceService {
   private gameStartTime: number | null = null;
   private isConnected = false;
 
+  private listeners: Set<() => void> = new Set();
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach((listener) => listener());
+  }
+
   async initialize(): Promise<boolean> {
     try {
       if (!this.config.applicationId || this.config.applicationId === "1234567890123456789") {
+        const changed = this.isConnected !== false || this.config.enabled !== false;
         this.isConnected = false;
         this.config.enabled = false;
+        if (changed) this.notifyListeners();
         return false;
       }
 
       if (typeof window !== "undefined" && (window as any).DiscordSDK) {
+        const changed = this.isConnected !== true || this.config.enabled !== true;
         this.isConnected = true;
         this.config.enabled = true;
+        if (changed) this.notifyListeners();
         return true;
       }
 
+      const changed = this.isConnected !== false || this.config.enabled !== false;
       this.isConnected = false;
       this.config.enabled = false;
+      if (changed) this.notifyListeners();
       return false;
     } catch (error) {
       console.warn("Discord Rich Presence indisponivel:", error);
+      const changed = this.isConnected !== false || this.config.enabled !== false;
       this.isConnected = false;
       this.config.enabled = false;
+      if (changed) this.notifyListeners();
       return false;
     }
   }
@@ -177,9 +197,13 @@ class DiscordRichPresenceService {
   }
 
   setEnabled(enabled: boolean): void {
-    this.config.enabled = enabled && this.isConnected;
-    if (!this.config.enabled) {
-      void this.clearActivity();
+    const nextEnabled = enabled && this.isConnected;
+    if (this.config.enabled !== nextEnabled) {
+      this.config.enabled = nextEnabled;
+      if (!this.config.enabled) {
+        void this.clearActivity();
+      }
+      this.notifyListeners();
     }
   }
 
@@ -195,12 +219,21 @@ class DiscordRichPresenceService {
 export const discordRichPresence = new DiscordRichPresenceService();
 
 export const useDiscordRichPresence = () => {
+  const [enabled, setEnabledState] = useState(() => discordRichPresence.isEnabled());
+
+  useEffect(() => {
+    const unsubscribe = discordRichPresence.subscribe(() => {
+      setEnabledState(discordRichPresence.isEnabled());
+    });
+    return unsubscribe;
+  }, []);
+
   return {
-    setGameActivity: discordRichPresence.setGameActivity.bind(discordRichPresence),
-    setBrowsingActivity: discordRichPresence.setBrowsingActivity.bind(discordRichPresence),
-    clearActivity: discordRichPresence.clearActivity.bind(discordRichPresence),
-    setEnabled: discordRichPresence.setEnabled.bind(discordRichPresence),
-    isEnabled: discordRichPresence.isEnabled.bind(discordRichPresence),
-    getCurrentActivity: discordRichPresence.getCurrentActivity.bind(discordRichPresence),
+    setGameActivity: useCallback((game: Game, status: "menu" | "playing" | "paused" = "playing") => discordRichPresence.setGameActivity(game, status), []),
+    setBrowsingActivity: useCallback(() => discordRichPresence.setBrowsingActivity(), []),
+    clearActivity: useCallback(() => discordRichPresence.clearActivity(), []),
+    setEnabled: useCallback((enabled: boolean) => discordRichPresence.setEnabled(enabled), []),
+    isEnabled: enabled,
+    getCurrentActivity: useCallback(() => discordRichPresence.getCurrentActivity(), []),
   };
 };

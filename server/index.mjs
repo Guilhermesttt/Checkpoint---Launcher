@@ -360,6 +360,11 @@ const EPIC_CATALOG_ITEM_QUERY = `
         id
         namespace
         title
+        description
+        releaseDate
+        seller {
+          name
+        }
         keyImages {
           type
           url
@@ -509,14 +514,34 @@ const postEpicGraphql = async (query, variables) => {
 const buildEpicDetails = (catalogId, namespace, catalogItem) => {
   const customAttributes = extractEpicCustomAttributes(catalogItem?.customAttributes);
   const keyImages = Array.isArray(catalogItem?.keyImages) ? catalogItem.keyImages : [];
-  const screenshots = keyImages
+  
+  let screenshots = keyImages
     .filter(
       (image) =>
         typeof image?.url === "string" &&
         typeof image?.type === "string" &&
-        image.type.toLowerCase().includes("screenshot"),
+        (image.type.toLowerCase().includes("screenshot") ||
+          image.type.toLowerCase().includes("gallery") ||
+          image.type.toLowerCase().includes("wide") ||
+          image.type.toLowerCase().includes("hero") ||
+          image.type.toLowerCase().includes("vault") ||
+          image.type.toLowerCase().includes("featuredmedia"))
     )
     .map((image) => image.url);
+
+  if (screenshots.length === 0) {
+    screenshots = keyImages
+      .filter(
+        (image) =>
+          typeof image?.url === "string" &&
+          typeof image?.type === "string" &&
+          !image.type.toLowerCase().includes("logo")
+      )
+      .map((image) => image.url);
+  }
+
+  const sellerName = String(catalogItem?.seller?.name ?? "").trim();
+  const rawReleaseDate = catalogItem?.releaseDate || customAttributes?.releaseDate || "";
 
   return {
     catalogId,
@@ -534,14 +559,18 @@ const buildEpicDetails = (catalogId, namespace, catalogItem) => {
     description:
       String(customAttributes?.shortDescription ?? "").trim() ||
       String(catalogItem?.description ?? "").trim(),
-    aboutTheGame: String(customAttributes?.aboutThisGame ?? "").trim(),
-    releaseDate: String(customAttributes?.releaseDate ?? "").trim(),
+    aboutTheGame:
+      String(customAttributes?.aboutThisGame ?? "").trim() ||
+      String(catalogItem?.description ?? "").trim(),
+    releaseDate: String(rawReleaseDate).trim(),
     developer:
       String(customAttributes?.developerName ?? "").trim() ||
-      String(customAttributes?.developerDisplayName ?? "").trim(),
+      String(customAttributes?.developerDisplayName ?? "").trim() ||
+      sellerName,
     publisher:
       String(customAttributes?.publisherName ?? "").trim() ||
-      String(customAttributes?.publisherDisplayName ?? "").trim(),
+      String(customAttributes?.publisherDisplayName ?? "").trim() ||
+      sellerName,
     tags: Array.isArray(catalogItem?.categories)
       ? catalogItem.categories
           .map((category) => String(category?.path ?? "").split("/").pop())
@@ -1868,6 +1897,43 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
     res.json(data);
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar conquistas." });
+  }
+});
+
+app.get("/api/steam/achievement-schema", steamPublicLimiter, async (req, res) => {
+  if (!steamApiKey) {
+    res
+      .status(500)
+      .json({ error: "STEAM_API_KEY nao configurada no backend." });
+    return;
+  }
+
+  const appId = String(req.query.appId ?? "").trim();
+  if (!/^\d+$/.test(appId)) {
+    res.status(400).json({ error: "appId invalido." });
+    return;
+  }
+
+  try {
+    const schema = await fetchSteamAchievementSchema(appId);
+    const achievements = schema.map((achievement) => ({
+      apiName: achievement.apiName,
+      achieved: false,
+      unlockTime: 0,
+      name: achievement.displayName || achievement.apiName,
+      description: achievement.description || "",
+      icon: achievement.icon || "",
+      iconGray: achievement.iconGray || "",
+      hidden: Boolean(achievement.hidden),
+    }));
+
+    res.json({
+      achievements,
+      total: achievements.length,
+      unlocked: 0,
+    });
+  } catch {
+    res.status(500).json({ error: "Erro interno ao buscar schema de conquistas." });
   }
 });
 

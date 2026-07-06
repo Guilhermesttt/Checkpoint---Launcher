@@ -46,6 +46,32 @@
   //     ]
   //   },
   // ]
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "chatId", "mode": "ASCENDING" },
+        { "fieldPath": "createdAt", "mode": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "chatId", "mode": "ASCENDING" },
+        { "fieldPath": "receiverId", "mode": "ASCENDING" },
+        { "fieldPath": "read", "mode": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "receiverId", "mode": "ASCENDING" },
+        { "fieldPath": "read", "mode": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

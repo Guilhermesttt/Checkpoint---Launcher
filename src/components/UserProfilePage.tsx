@@ -163,15 +163,22 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                 <h1 className="truncate text-3xl font-black tracking-tight text-white">{displayName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {userProfile?.steamId && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
-                      <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> Steam
-                    </span>
+                    <button 
+                      onClick={() => window.electronAPI?.openExternalUrl(`https://steamcommunity.com/profiles/${userProfile.steamId}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
+                      <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> 
+                      {userProfile.steamUsername || "Steam"}
+                    </button>
                   )}
                   {userProfile?.discordId && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white">
+                    <button 
+                      onClick={() => window.electronAPI?.openExternalUrl(`https://discordapp.com/users/${userProfile.discordId}`)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    >
                       <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
                       {userProfile.discordUsername || "Discord"}
-                    </span>
+                    </button>
                   )}
                 </div>
                 {email && <p className="mt-3 text-xs font-semibold text-white/28">{email}</p>}

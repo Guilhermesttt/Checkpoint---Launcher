@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpotify } from "@fortawesome/free-brands-svg-icons";
@@ -11,17 +11,27 @@ import {
   Search,
   Settings,
   Sparkles,
+  Trash2,
+  User,
   Users,
   Volume2,
   X,
+  Send,
+  MessageSquare,
 } from "lucide-react";
 import Stepper, { Step } from "../ReactBits/Stepper";
 import GlassButton from "../ui/GlassButton";
 import ModalShell from "../ui/ModalShell";
+import { useNotification } from "../NotificationCenter";
 import { searchCheckpointFriends } from "../../services/checkpointFriends";
+import {
+  markMessagesAsRead,
+  sendChatMessage,
+  subscribeToChatMessages,
+} from "../../services/chat";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../../context/PreferencesContext";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
-import type { Game, UserProfile } from "../../types/domain";
+import type { ChatMessage, Game, UserProfile } from "../../types/domain";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -94,7 +104,7 @@ const SystemPageShell: React.FC<{
 
 const SettingsHeader: React.FC<{
   icon: React.ReactNode;
-  title: string;
+  title: React.ReactNode;
   description: string;
 }> = ({ icon, title, description }) => (
   <div className="mb-6 flex items-center gap-3">
@@ -478,15 +488,17 @@ export const FriendsPage: React.FC<{
   discordAvatar?: string;
   DiscordIcon: BrandIcon;
   friends: HomeSocialFriend[];
+  unreadMessagesByFriend: Record<string, number>;
   incomingRequests: HomeCheckpointFriendRequest[];
   currentPresenceGame?: string | null;
   onConnectDiscord: () => void;
-  onRemoveFriend: (id: string) => void;
+  onRemoveFriend: (friend: HomeSocialFriend) => void;
   onViewFriendProfile: (friend: HomeSocialFriend) => void;
   friendProfileLoadingId?: string | null;
   onAcceptRequest: (uid: string) => void;
   onRejectRequest: (uid: string) => void;
   onAddFriendClick: () => void;
+  onOpenChat: (friend: HomeSocialFriend) => void;
 }> = ({
   t,
   discordConnected,
@@ -495,6 +507,7 @@ export const FriendsPage: React.FC<{
   discordAvatar,
   DiscordIcon,
   friends,
+  unreadMessagesByFriend,
   incomingRequests,
   currentPresenceGame,
   onConnectDiscord,
@@ -504,6 +517,7 @@ export const FriendsPage: React.FC<{
   onAcceptRequest,
   onRejectRequest,
   onAddFriendClick,
+  onOpenChat,
 }) => {
     const [friendSearch, setFriendSearch] = useState("");
     const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
@@ -686,7 +700,7 @@ export const FriendsPage: React.FC<{
                 className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
+                  <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
                     {friend.avatar ? (
                       <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
                     ) : friend.source === "discord_friend" ? (
@@ -694,6 +708,11 @@ export const FriendsPage: React.FC<{
                     ) : (
                       <Users className="h-4 w-4 text-white/70" />
                     )}
+                    <span
+                      className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-[#0A0A0C] ${
+                        friend.status === "offline" ? "bg-red-500" : "bg-green-500"
+                      }`}
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-white">{friend.name}</p>
@@ -715,21 +734,49 @@ export const FriendsPage: React.FC<{
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {friend.source === "checkpoint" && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenChat(friend)}
+                      aria-label="Abrir chat"
+                      title="Abrir chat"
+                      className="relative rounded-lg p-2.5 text-white/60 hover:bg-white/10 hover:text-white"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      {Number(unreadMessagesByFriend[friend.id.split(":")[1]] || 0) > 0 && (
+                        <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black leading-none text-white shadow-[0_0_12px_rgba(239,68,68,0.35)]">
+                          {Math.min(unreadMessagesByFriend[friend.id.split(":")[1]], 99)}
+                        </span>
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => onViewFriendProfile(friend)}
                     disabled={friendProfileLoadingId === friend.id}
-                    className="rounded-lg px-3 py-2 text-[10px] font-black uppercase text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                    aria-label={
+                      friendProfileLoadingId === friend.id
+                        ? "Abrindo perfil"
+                        : "Ver perfil"
+                    }
+                    title={
+                      friendProfileLoadingId === friend.id
+                        ? "Abrindo perfil"
+                        : "Ver perfil"
+                    }
+                    className="rounded-lg p-2.5 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
                   >
-                    {friendProfileLoadingId === friend.id ? "Abrindo..." : "Perfil"}
+                    <User className="h-4 w-4" />
                   </button>
                   {!friend.source?.startsWith("discord") && (
                     <button
                       type="button"
-                      onClick={() => onRemoveFriend(friend.id)}
-                      className="shrink-0 rounded-lg px-3 py-2 text-[10px] font-black uppercase text-red-300/70 hover:bg-red-500/10"
+                      onClick={() => onRemoveFriend(friend)}
+                      aria-label="Remover amigo"
+                      title="Remover amigo"
+                      className="shrink-0 rounded-lg p-2.5 text-red-300/70 hover:bg-red-500/10"
                     >
-                      Remover
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
@@ -813,9 +860,17 @@ export const AddFriendModal: React.FC<{
       }
     }, [isOpen]);
 
+    const abortControllerRef = React.useRef<AbortController | null>(null);
+
     const handleSearch = async (event: React.FormEvent) => {
       event.preventDefault();
       if (!search.trim()) return;
+
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      const currentSignal = abortControllerRef.current.signal;
 
       playSound("search");
       setSearching(true);
@@ -823,7 +878,8 @@ export const AddFriendModal: React.FC<{
       setSelectedIndex(0);
 
       try {
-        const searchResults = await searchCheckpointFriends(search.trim());
+        const searchResults = await searchCheckpointFriends(search.trim(), currentSignal);
+        if (currentSignal.aborted) return;
         const uniqueResults = searchResults
           .filter((profile) => profile.uid && profile.uid !== currentUserUid)
           .filter(
@@ -1049,7 +1105,14 @@ export const PriceAlertsPage: React.FC<{
       <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
         <SettingsHeader
           icon={<Bell className="h-5 w-5 text-white/70" />}
-          title={t("priceAlerts")}
+          title={
+            <div className="flex items-center gap-2">
+              {t("priceAlerts")}
+              <span className="rounded-md bg-amber-500/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-500">
+                Em breve
+              </span>
+            </div>
+          }
           description={t("priceAlertsHint")}
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
@@ -1288,3 +1351,154 @@ export const ConfirmationModal: React.FC<{
     </div>
   </ModalShell>
 );
+
+export const ChatModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  friend: HomeSocialFriend | null;
+  playSound: (type: SoundEffectType) => void;
+}> = ({ isOpen, onClose, friend, playSound }) => {
+  const { notify } = useNotification();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputText, setInputText] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !friend) return;
+
+    const friendUid = friend.id.split(":")[1];
+    void markMessagesAsRead(friendUid);
+
+    const unsubscribe = subscribeToChatMessages(friendUid, (msgs) => {
+      setMessages(msgs);
+      void markMessagesAsRead(friendUid);
+    });
+
+    return () => unsubscribe();
+  }, [isOpen, friend]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  if (!isOpen || !friend) return null;
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = inputText.trim();
+    if (!text) return;
+
+    const friendUid = friend.id.split(":")[1];
+    try {
+      playSound("select");
+      await sendChatMessage(friendUid, text);
+      setInputText("");
+    } catch (error) {
+      console.error("Erro ao enviar mensagem:", error);
+      notify("Nao foi possivel enviar a mensagem.", "error");
+    }
+  };
+
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={() => {
+        playSound("back");
+        onClose();
+      }}
+      maxWidthClassName="max-w-md"
+      zIndexClassName="z-[180]"
+      className="p-0 border-0 overflow-hidden rounded-[24px]"
+    >
+      <div className="flex h-[550px] w-[450px] flex-col bg-[#050507]">
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-white/5 bg-white/[0.02] px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img
+                src={friend.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256"}
+                alt={friend.name}
+                className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
+              />
+              <span
+                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${
+                  friend.status === "playing"
+                    ? "bg-green-500 animate-pulse"
+                    : friend.status === "online"
+                      ? "bg-green-400"
+                      : "bg-white/20"
+                }`}
+              />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white leading-none">{friend.name}</h4>
+              <span className="text-[10px] text-white/40 uppercase tracking-wider block mt-1">
+                {friend.status === "playing" ? `Jogando ${friend.playing}` : friend.status}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              playSound("back");
+              onClose();
+            }}
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="chat-scrollbar flex-1 overflow-y-auto p-6 pr-3 space-y-4">
+          {messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center text-white/20 space-y-2">
+              <MessageSquare className="h-8 w-8" />
+              <p className="text-xs uppercase tracking-wider">Nenhuma mensagem ainda</p>
+            </div>
+          ) : (
+            messages.map((msg, index) => {
+              const isMe = msg.senderId !== friend.id.split(":")[1];
+              return (
+                <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${
+                      isMe
+                        ? "bg-white/10 text-white rounded-tr-none"
+                        : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
+                    }`}
+                  >
+                    <p className="break-words leading-relaxed">{msg.text}</p>
+                    <span className="mt-1 block text-[8px] text-white/30 text-right uppercase tracking-wider">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Footer / Input */}
+        <form onSubmit={handleSend} className="shrink-0 border-t border-white/5 bg-white/[0.01] p-4 flex gap-2">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Digite sua mensagem..."
+            className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none"
+          />
+          <button
+            type="submit"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black hover:bg-white/90 active:scale-95 transition-transform"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
+    </ModalShell>
+  );
+};

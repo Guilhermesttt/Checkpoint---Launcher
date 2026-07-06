@@ -386,6 +386,78 @@ const startAchievementBridge = async () => {
   return achievementBridge.start();
 };
 
+ipcMain.handle("achievement:get-definitions", async (_event, gameId) => {
+  try {
+    const achievementsDir = path.join(app.getPath("userData"), "achievements");
+    const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
+    if (fs.existsSync(definitionsPath)) {
+      const content = await fs.promises.readFile(definitionsPath, "utf8");
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.error("Error reading achievement definitions:", error);
+  }
+  return null;
+});
+
+ipcMain.handle("achievement:get-progress", async (_event, gameId) => {
+  try {
+    const progressPath = path.join(app.getPath("userData"), `user_progress_${gameId}.json`);
+    if (fs.existsSync(progressPath)) {
+      const content = await fs.promises.readFile(progressPath, "utf8");
+      return JSON.parse(content);
+    }
+  } catch (error) {
+    console.error("Error reading achievement progress:", error);
+  }
+  return null;
+});
+
+ipcMain.handle("achievement:save-definitions", async (_event, gameId, definitions) => {
+  try {
+    const achievementsDir = path.join(app.getPath("userData"), "achievements");
+    const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
+    
+    await fs.promises.mkdir(achievementsDir, { recursive: true });
+    const payload = { achievements: definitions };
+    await fs.promises.writeFile(definitionsPath, JSON.stringify(payload, null, 2), "utf8");
+    return true;
+  } catch (error) {
+    console.error("Error saving achievement definitions:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("achievement:unlock", async (_event, gameId, achievementId) => {
+  try {
+    if (achievementBridge) {
+      return await achievementBridge.unlockAchievement(gameId, achievementId);
+    }
+    throw new Error("Achievement bridge nao iniciada.");
+  } catch (error) {
+    console.error("Error unlocking achievement:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("overlay:show-achievement", async (_event, payload) => {
+  sendOverlayEvent("achievement:unlock", payload);
+  playOverlaySound("achievement-unlock");
+});
+
+ipcMain.handle("overlay:show-friend-message", async (_event, payload) => {
+  const senderName = String(payload?.senderName || "").trim() || "Amigo";
+  const messageText = String(payload?.messageText || "").trim() || "Nova mensagem";
+  const avatarUrl = String(payload?.avatarUrl || "").trim();
+
+  sendOverlayEvent("overlay:social", {
+    kind: "friend-message",
+    title: senderName,
+    description: messageText,
+    avatarUrl: avatarUrl || overlayIconUrl(),
+  });
+});
+
 ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) {
@@ -688,6 +760,10 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("will-quit", () => {
+  process.exit(0);
 });
 
 app.on("before-quit", () => {
