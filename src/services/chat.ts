@@ -12,8 +12,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { auth, db, storage } from "../../Firebase";
+import { auth, db } from "../../Firebase";
 import type { ChatMessage } from "../types/domain";
 import { apiUrl } from "./api";
 
@@ -34,51 +33,13 @@ export const getChatId = (uid1: string, uid2: string) => {
   return [uid1, uid2].sort().join("_");
 };
 
-const sanitizeAttachmentName = (fileName: string) =>
-  fileName.replace(/[^\w.\-()\s]/g, "_").slice(0, 120);
-
-export const uploadChatAttachment = async (friendUid: string, file: File) => {
-  const currentUid = auth.currentUser?.uid;
-  if (!currentUid) throw new Error("Usuario nao autenticado");
-
-  const participants = [currentUid, friendUid].sort();
-  const safeName = sanitizeAttachmentName(file.name || "arquivo");
-  const objectId = `${Date.now()}-${crypto.randomUUID()}`;
-  const attachmentPath = `chat-attachments/${participants[0]}/${participants[1]}/${currentUid}/${objectId}-${safeName}`;
-  const storageRef = ref(storage, attachmentPath);
-
-  await uploadBytes(storageRef, file, {
-    contentType: file.type || "application/octet-stream",
-  });
-
-  return {
-    attachmentName: safeName,
-    attachmentPath,
-    attachmentSize: file.size,
-    attachmentType: file.type || "application/octet-stream",
-    attachmentUrl: await getDownloadURL(storageRef),
-  };
-};
-
-export const sendChatMessage = async (
-  receiverUid: string,
-  payload: {
-    text?: string;
-    attachment?: {
-      attachmentName: string;
-      attachmentUrl: string;
-      attachmentType: string;
-      attachmentSize: number;
-      attachmentPath: string;
-    };
-  },
-) => {
+export const sendChatMessage = async (receiverUid: string, text: string) => {
   const currentUid = auth.currentUser?.uid;
   if (!currentUid) throw new Error("Usuario nao autenticado");
 
   const chatId = getChatId(currentUid, receiverUid);
-  const text = String(payload.text ?? "").trim();
-  if (!text && !payload.attachment) {
+  const normalizedText = String(text).trim();
+  if (!normalizedText) {
     throw new Error("Mensagem vazia.");
   }
 
@@ -86,14 +47,14 @@ export const sendChatMessage = async (
     chatId,
     senderId: currentUid,
     receiverId: receiverUid,
-    text,
+    text: normalizedText,
     createdAt: serverTimestamp(),
     read: false,
-    attachmentName: payload.attachment?.attachmentName ?? "",
-    attachmentUrl: payload.attachment?.attachmentUrl ?? "",
-    attachmentType: payload.attachment?.attachmentType ?? "",
-    attachmentSize: payload.attachment?.attachmentSize ?? 0,
-    attachmentPath: payload.attachment?.attachmentPath ?? "",
+    attachmentName: "",
+    attachmentUrl: "",
+    attachmentType: "",
+    attachmentSize: 0,
+    attachmentPath: "",
   });
 };
 

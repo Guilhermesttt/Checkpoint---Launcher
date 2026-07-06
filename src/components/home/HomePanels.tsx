@@ -6,10 +6,8 @@ import {
   BadgeDollarSign,
   Bell,
   CheckCircle2,
-  Download,
   Globe,
   Languages,
-  Paperclip,
   Search,
   Settings,
   Sparkles,
@@ -33,7 +31,6 @@ import {
   setChatTyping,
   subscribeToChatMessages,
   subscribeToFriendTyping,
-  uploadChatAttachment,
 } from "../../services/chat";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../../context/PreferencesContext";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
@@ -1368,12 +1365,9 @@ export const ChatModal: React.FC<{
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [renderMessages, setRenderMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [friendTyping, setFriendTyping] = useState(false);
   const [spamLockedUntil, setSpamLockedUntil] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recentSendTimestampsRef = useRef<number[]>([]);
   const lastTypingSentRef = useRef(false);
 
@@ -1385,8 +1379,6 @@ export const ChatModal: React.FC<{
     setMessages([]);
     setRenderMessages([]);
     setInputText("");
-    setSelectedFile(null);
-    setUploadingAttachment(false);
     setFriendTyping(false);
     setSpamLockedUntil(null);
     recentSendTimestampsRef.current = [];
@@ -1455,7 +1447,7 @@ export const ChatModal: React.FC<{
   useEffect(() => {
     if (!isOpen || !friendUid) return;
 
-    const shouldSendTyping = inputText.trim().length > 0 || Boolean(selectedFile);
+    const shouldSendTyping = inputText.trim().length > 0;
     if (lastTypingSentRef.current === shouldSendTyping) return;
 
     lastTypingSentRef.current = shouldSendTyping;
@@ -1467,36 +1459,50 @@ export const ChatModal: React.FC<{
     }, shouldSendTyping ? 180 : 0);
 
     return () => window.clearTimeout(timer);
-  }, [friendUid, inputText, isOpen, selectedFile]);
+  }, [friendUid, inputText, isOpen]);
 
   if (!isOpen || !friend) return null;
 
-  const formatAttachmentSize = (size?: number) => {
-    if (!size || size <= 0) return "";
-    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-    if (size >= 1024) return `${Math.ceil(size / 1024)} KB`;
-    return `${size} B`;
+  const linkPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
+  const imageLinkPattern = /^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg)(\?[^\s]*)?$/i;
+
+  const renderMessageText = (text: string) => {
+    if (!text) return null;
+
+    return text.split(linkPattern).filter(Boolean).map((part, index) => {
+      const isLink = /^(https?:\/\/|www\.)/i.test(part);
+      if (!isLink) {
+        return (
+          <React.Fragment key={`${part}-${index}`}>
+            {part}
+          </React.Fragment>
+        );
+      }
+
+      const href = part.startsWith("http") ? part : `https://${part}`;
+      return (
+        <a
+          key={`${href}-${index}`}
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-sky-300 underline underline-offset-2 transition-colors hover:text-sky-200"
+        >
+          {part}
+        </a>
+      );
+    });
   };
 
-  const isImageAttachment = (type?: string) => String(type || "").startsWith("image/");
-
-  const handleSelectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      notify("Arquivo muito grande. Limite de 15 MB.", "error");
-      event.target.value = "";
-      return;
-    }
-
-    setSelectedFile(file);
-  };
+  const extractImageLinks = (text: string) =>
+    Array.from(new Set((text.match(linkPattern) ?? [])
+      .map((part) => (part.startsWith("http") ? part : `https://${part}`))
+      .filter((part) => imageLinkPattern.test(part))));
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = inputText.trim();
-    if (!text && !selectedFile) return;
+    if (!text) return;
     if (!friendUid) return;
 
     const now = Date.now();
@@ -1506,7 +1512,7 @@ export const ChatModal: React.FC<{
     );
 
     if (spamLockedUntil && spamLockedUntil > now) {
-      notify("DEVAGAR PAE - vc ta enviando mts mensagens", "error");
+      notify("DEVAGAR PAE: Você está enviando mensaagens rápido demais!", "error");
       return;
     }
 
@@ -1514,16 +1520,12 @@ export const ChatModal: React.FC<{
       const cooldownEnd = now + 6000;
       recentSendTimestampsRef.current = freshTimestamps;
       setSpamLockedUntil(cooldownEnd);
-      notify("DEVAGAR PAE - vc ta enviando mts mensagens", "error");
+      notify("DEVAGAR PAE: Você está enviando mensaagens rápido demais!", "error");
       return;
     }
 
     try {
       playSound("select");
-      setUploadingAttachment(Boolean(selectedFile));
-      const uploadedAttachment = selectedFile
-        ? await uploadChatAttachment(friendUid, selectedFile)
-        : undefined;
       const optimisticMessage: ChatMessage = {
         id: `local-${now}`,
         chatId: friendUid,
@@ -1532,27 +1534,20 @@ export const ChatModal: React.FC<{
         text,
         createdAt: new Date(now).toISOString(),
         read: true,
-        ...(uploadedAttachment ?? {}),
       };
 
       recentSendTimestampsRef.current = [...freshTimestamps, now];
       setRenderMessages((current) => [...current, optimisticMessage]);
       setInputText("");
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
       lastTypingSentRef.current = false;
       void setChatTyping(friendUid, false);
-      await sendChatMessage(friendUid, { text, attachment: uploadedAttachment });
+      await sendChatMessage(friendUid, text);
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
       setRenderMessages((current) =>
         current.filter((message) => message.id !== `local-${now}`),
       );
       notify("Nao foi possivel enviar a mensagem.", "error");
-    } finally {
-      setUploadingAttachment(false);
     }
   };
 
@@ -1616,6 +1611,7 @@ export const ChatModal: React.FC<{
           ) : (
             renderMessages.map((msg, index) => {
               const isMe = msg.senderId !== friendUid;
+              const inlineImageLinks = extractImageLinks(msg.text);
               return (
                 <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                   <div
@@ -1625,42 +1621,31 @@ export const ChatModal: React.FC<{
                         : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
                     }`}
                   >
-                    {msg.attachmentUrl ? (
-                      <a
-                        href={msg.attachmentUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={msg.attachmentName || "arquivo"}
-                        className={`mb-2 block rounded-2xl border px-3 py-3 transition-all ${
-                          isMe
-                            ? "border-white/10 bg-black/25 hover:bg-black/35"
-                            : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        {isImageAttachment(msg.attachmentType) ? (
+                    {inlineImageLinks.length > 0 ? (
+                      <div className="mb-2 space-y-2">
+                        {inlineImageLinks.map((imageUrl) => (
+                          <a
+                            key={imageUrl}
+                            href={imageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`block rounded-2xl border px-3 py-3 transition-all ${
+                              isMe
+                                ? "border-white/10 bg-black/25 hover:bg-black/35"
+                                : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
+                            }`}
+                          >
                           <img
-                            src={msg.attachmentUrl}
-                            alt={msg.attachmentName || "Imagem enviada"}
-                            className="mb-3 max-h-48 w-full rounded-xl object-cover"
+                            src={imageUrl}
+                            alt="Imagem compartilhada"
+                            className="max-h-48 w-full rounded-xl object-cover"
                           />
-                        ) : null}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-bold text-white">
-                              {msg.attachmentName || "Arquivo"}
-                            </p>
-                            <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-white/35">
-                              {formatAttachmentSize(msg.attachmentSize) || "Arquivo anexado"}
-                            </p>
-                          </div>
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8">
-                            <Download className="h-3.5 w-3.5 text-white/80" />
-                          </span>
-                        </div>
-                      </a>
+                          </a>
+                        ))}
+                      </div>
                     ) : null}
                     {msg.text ? (
-                      <p className="break-words leading-relaxed">{msg.text}</p>
+                      <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
                     ) : null}
                     <span className="mt-1 block text-[8px] text-white/30 text-right uppercase tracking-wider">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -1711,43 +1696,7 @@ export const ChatModal: React.FC<{
               </span>
             ) : null}
           </div>
-          {selectedFile ? (
-            <div className="mb-3 flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-bold text-white">{selectedFile.name}</p>
-                <p className="text-[9px] uppercase tracking-[0.2em] text-white/35">
-                  {formatAttachmentSize(selectedFile.size)}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFile(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                  }
-                }}
-                className="rounded-full p-1 text-white/50 transition-colors hover:text-white"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : null}
           <div className="flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleSelectFile}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAttachment}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 transition-colors hover:bg-white/[0.1] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
             <input
               type="text"
               value={inputText}
@@ -1757,7 +1706,7 @@ export const ChatModal: React.FC<{
             />
             <button
               type="submit"
-              disabled={Boolean(spamLockedUntil && spamLockedUntil > Date.now()) || uploadingAttachment}
+              disabled={Boolean(spamLockedUntil && spamLockedUntil > Date.now())}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black transition-transform hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-black/50"
             >
               <Send className="h-4 w-4" />

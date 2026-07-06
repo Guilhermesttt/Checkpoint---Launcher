@@ -33,6 +33,7 @@ service cloud.firestore {
           'email',
           'displayName',
           'photoURL',
+          'presence',
           'updatedAt',
           'lastSteamSyncAt',
           'gamesMigratedAt',

@@ -1,4 +1,5 @@
-import { auth } from "../../Firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "../../Firebase";
 import type { Game, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
 
@@ -82,14 +83,48 @@ export const updateCheckpointPresence = async (
   status: "online" | "playing" | "offline",
   currentGameTitle?: string,
 ) => {
-  const response = await fetch(apiUrl("/api/presence"), {
-    method: "POST",
-    headers: await getAuthHeaders(),
-    body: JSON.stringify({ status, currentGameTitle }),
-  });
-  const payload = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error || "Erro ao atualizar presenca.");
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) {
+    throw new Error("Sessao expirada. Entre novamente.");
+  }
+
+  const now = new Date().toISOString();
+  const profileRef = doc(db, "profiles", currentUid);
+
+  const firestoreWrite = setDoc(
+    profileRef,
+    {
+      presence: {
+        status,
+        currentGameTitle: status === "playing" ? String(currentGameTitle || "").trim().slice(0, 120) : "",
+        updatedAt: now,
+      },
+      updatedAt: now,
+    },
+    { merge: true },
+  );
+
+  const backendWrite = (async () => {
+    const response = await fetch(apiUrl("/api/presence"), {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ status, currentGameTitle }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    if (!response.ok) {
+      throw new Error(payload.error || "Erro ao atualizar presenca.");
+    }
+  })();
+
+  const [firestoreResult, backendResult] = await Promise.allSettled([
+    firestoreWrite,
+    backendWrite,
+  ]);
+
+  if (firestoreResult.status === "rejected" && backendResult.status === "rejected") {
+    throw firestoreResult.reason instanceof Error
+      ? firestoreResult.reason
+      : new Error("Erro ao atualizar presenca.");
   }
 };
 
