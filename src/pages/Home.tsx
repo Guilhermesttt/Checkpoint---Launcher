@@ -1181,8 +1181,8 @@ const Home: React.FC = () => {
       const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map(f => ({
         id: `cp-friend:${f.uid}`,
         name: f.displayName,
-        status: f.status || "offline",
-        playing: f.playing || undefined,
+        status: "offline",
+        playing: undefined,
         avatar: f.photoURL || undefined,
         source: "checkpoint",
       }));
