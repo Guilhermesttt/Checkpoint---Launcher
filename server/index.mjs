@@ -7,7 +7,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
+import { getStorage as getAdminStorage } from "firebase-admin/storage";
 import { OAuth2Client } from "google-auth-library";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -45,6 +46,11 @@ const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
 const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const firebaseStorageBucket = (
+  process.env.FIREBASE_STORAGE_BUCKET?.trim()
+  || process.env.VITE_FIREBASE_STORAGE_BUCKET?.trim()
+  || ""
+);
 
 const parseFirebaseServiceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
@@ -61,6 +67,7 @@ const firebaseServiceAccount = parseFirebaseServiceAccount();
 if (firebaseServiceAccount && getApps().length === 0) {
   initializeApp({
     credential: cert(firebaseServiceAccount),
+    ...(firebaseStorageBucket ? { storageBucket: firebaseStorageBucket } : {}),
   });
 }
 
@@ -105,6 +112,7 @@ const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DESKTOP_GOOGLE_AUTH_STATE_TTL = 1000 * 60 * 5; // 5 minutos
+const CHAT_RETENTION_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 const steamAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -1151,6 +1159,74 @@ app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, asyn
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Erro ao remover amigo." });
+  }
+});
+
+app.post("/api/chat/cleanup", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  const friendUid = String(req.body?.uid ?? "").trim();
+  if (!friendUid || friendUid === req.firebaseUser.uid) {
+    res.status(400).json({ error: "Usuário inválido." });
+    return;
+  }
+
+  try {
+    const firestore = getFirestore();
+    const chatId = [req.firebaseUser.uid, friendUid].sort().join("_");
+    const cutoff = Timestamp.fromMillis(Date.now() - CHAT_RETENTION_MS);
+    const expiredMessagesSnap = await firestore
+      .collection("messages")
+      .where("chatId", "==", chatId)
+      .where("createdAt", "<", cutoff)
+      .limit(400)
+      .get();
+
+    let deletedMessages = 0;
+    if (!expiredMessagesSnap.empty) {
+      const batch = firestore.batch();
+      const attachmentPaths = [];
+      expiredMessagesSnap.forEach((doc) => {
+        const attachmentPath = String(doc.data()?.attachmentPath || "").trim();
+        if (attachmentPath) {
+          attachmentPaths.push(attachmentPath);
+        }
+        batch.delete(doc.ref);
+        deletedMessages += 1;
+      });
+      await batch.commit();
+
+      if (attachmentPaths.length > 0 && firebaseStorageBucket) {
+        const bucket = getAdminStorage().bucket(firebaseStorageBucket);
+        await Promise.all(
+          attachmentPaths.map((attachmentPath) =>
+            bucket.file(attachmentPath).delete().catch(() => undefined),
+          ),
+        );
+      }
+    }
+
+    let deletedTyping = 0;
+    const typingDocs = await Promise.all([
+      firestore.doc(`chatTyping/${chatId}_${req.firebaseUser.uid}`).get(),
+      firestore.doc(`chatTyping/${chatId}_${friendUid}`).get(),
+    ]);
+    const expiredTypingDocs = typingDocs.filter((doc) => {
+      const updatedAt = doc.data()?.updatedAt;
+      return doc.exists && updatedAt?.toMillis && updatedAt.toMillis() < cutoff.toMillis();
+    });
+
+    if (expiredTypingDocs.length > 0) {
+      const batch = firestore.batch();
+      expiredTypingDocs.forEach((doc) => {
+        batch.delete(doc.ref);
+        deletedTyping += 1;
+      });
+      await batch.commit();
+    }
+
+    res.json({ ok: true, deletedMessages, deletedTyping });
+  } catch (error) {
+    console.error("Erro ao limpar conversa expirada:", error);
+    res.status(500).json({ error: "Erro ao limpar conversa expirada." });
   }
 });
 

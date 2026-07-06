@@ -65,14 +65,27 @@ service cloud.firestore {
           'receiverId',
           'text',
           'createdAt',
-          'read'
+          'read',
+          'attachmentName',
+          'attachmentUrl',
+          'attachmentType',
+          'attachmentSize',
+          'attachmentPath'
         ])
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.receiverId is string
         && request.resource.data.chatId is string
         && request.resource.data.text is string
-        && request.resource.data.text.size() > 0
+        && (
+          request.resource.data.text.size() > 0
+          || request.resource.data.attachmentUrl.size() > 0
+        )
         && request.resource.data.text.size() <= 2000
+        && request.resource.data.attachmentName is string
+        && request.resource.data.attachmentUrl is string
+        && request.resource.data.attachmentType is string
+        && request.resource.data.attachmentPath is string
+        && request.resource.data.attachmentSize is number
         && request.resource.data.read == false;
 
       allow read: if isSignedIn()
@@ -85,6 +98,30 @@ service cloud.firestore {
         && request.resource.data.read is bool;
 
       allow delete: if false;
+    }
+
+    match /chatTyping/{typingId} {
+      allow create, update: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'chatId',
+          'userId',
+          'participants',
+          'typing',
+          'updatedAt'
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.chatId is string
+        && request.resource.data.typing is bool
+        && request.resource.data.participants is list
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants.hasAll([request.auth.uid]);
+
+      allow read: if isSignedIn()
+        && resource.data.participants is list
+        && resource.data.participants.hasAll([request.auth.uid]);
+
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
     }
 
     match /{document=**} {

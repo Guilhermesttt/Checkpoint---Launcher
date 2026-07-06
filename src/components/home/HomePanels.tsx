@@ -6,8 +6,10 @@ import {
   BadgeDollarSign,
   Bell,
   CheckCircle2,
+  Download,
   Globe,
   Languages,
+  Paperclip,
   Search,
   Settings,
   Sparkles,
@@ -25,9 +27,13 @@ import ModalShell from "../ui/ModalShell";
 import { useNotification } from "../NotificationCenter";
 import { searchCheckpointFriends } from "../../services/checkpointFriends";
 import {
+  cleanupExpiredChatMessages,
   markMessagesAsRead,
   sendChatMessage,
+  setChatTyping,
   subscribeToChatMessages,
+  subscribeToFriendTyping,
+  uploadChatAttachment,
 } from "../../services/chat";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../../context/PreferencesContext";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
@@ -1360,44 +1366,193 @@ export const ChatModal: React.FC<{
 }> = ({ isOpen, onClose, friend, playSound }) => {
   const { notify } = useNotification();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [renderMessages, setRenderMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [friendTyping, setFriendTyping] = useState(false);
+  const [spamLockedUntil, setSpamLockedUntil] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const recentSendTimestampsRef = useRef<number[]>([]);
+  const lastTypingSentRef = useRef(false);
+
+  const friendUid = friend?.id.split(":")[1] ?? null;
 
   useEffect(() => {
     if (!isOpen || !friend) return;
 
-    const friendUid = friend.id.split(":")[1];
+    setMessages([]);
+    setRenderMessages([]);
+    setInputText("");
+    setSelectedFile(null);
+    setUploadingAttachment(false);
+    setFriendTyping(false);
+    setSpamLockedUntil(null);
+    recentSendTimestampsRef.current = [];
+    lastTypingSentRef.current = false;
+
+    if (!friendUid) return;
+    void cleanupExpiredChatMessages(friendUid).catch((error) => {
+      console.error("Erro ao limpar conversa expirada:", error);
+    });
     void markMessagesAsRead(friendUid);
 
     const unsubscribe = subscribeToChatMessages(friendUid, (msgs) => {
       setMessages(msgs);
       void markMessagesAsRead(friendUid);
     });
+    const unsubscribeTyping = subscribeToFriendTyping(friendUid, setFriendTyping);
 
-    return () => unsubscribe();
-  }, [isOpen, friend]);
+    return () => {
+      void setChatTyping(friendUid, false);
+      unsubscribe();
+      unsubscribeTyping();
+    };
+  }, [isOpen, friend, friendUid]);
+
+  useEffect(() => {
+    setRenderMessages((current) => {
+      const merged = new Map<string, ChatMessage>();
+
+      current.forEach((message) => {
+        merged.set(message.id ?? `temp:${message.senderId}:${message.createdAt}:${message.text}`, message);
+      });
+
+      messages.forEach((message) => {
+        merged.set(message.id ?? `temp:${message.senderId}:${message.createdAt}:${message.text}`, message);
+      });
+
+      return Array.from(merged.values()).sort(
+        (left, right) =>
+          new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+      );
+    });
+  }, [messages]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
+  }, [renderMessages, friendTyping]);
+
+  useEffect(() => {
+    if (!spamLockedUntil) return;
+
+    const remaining = spamLockedUntil - Date.now();
+    if (remaining <= 0) {
+      setSpamLockedUntil(null);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSpamLockedUntil(null);
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [spamLockedUntil]);
+
+  useEffect(() => {
+    if (!isOpen || !friendUid) return;
+
+    const shouldSendTyping = inputText.trim().length > 0 || Boolean(selectedFile);
+    if (lastTypingSentRef.current === shouldSendTyping) return;
+
+    lastTypingSentRef.current = shouldSendTyping;
+
+    const timer = window.setTimeout(() => {
+      void setChatTyping(friendUid, shouldSendTyping).catch((error) => {
+        console.error("Erro ao atualizar digitacao do chat:", error);
+      });
+    }, shouldSendTyping ? 180 : 0);
+
+    return () => window.clearTimeout(timer);
+  }, [friendUid, inputText, isOpen, selectedFile]);
 
   if (!isOpen || !friend) return null;
+
+  const formatAttachmentSize = (size?: number) => {
+    if (!size || size <= 0) return "";
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (size >= 1024) return `${Math.ceil(size / 1024)} KB`;
+    return `${size} B`;
+  };
+
+  const isImageAttachment = (type?: string) => String(type || "").startsWith("image/");
+
+  const handleSelectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      notify("Arquivo muito grande. Limite de 15 MB.", "error");
+      event.target.value = "";
+      return;
+    }
+
+    setSelectedFile(file);
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = inputText.trim();
-    if (!text) return;
+    if (!text && !selectedFile) return;
+    if (!friendUid) return;
 
-    const friendUid = friend.id.split(":")[1];
+    const now = Date.now();
+    const recentWindow = now - 8000;
+    const freshTimestamps = recentSendTimestampsRef.current.filter(
+      (timestamp) => timestamp > recentWindow,
+    );
+
+    if (spamLockedUntil && spamLockedUntil > now) {
+      notify("DEVAGAR PAE - vc ta enviando mts mensagens", "error");
+      return;
+    }
+
+    if (freshTimestamps.length >= 4) {
+      const cooldownEnd = now + 6000;
+      recentSendTimestampsRef.current = freshTimestamps;
+      setSpamLockedUntil(cooldownEnd);
+      notify("DEVAGAR PAE - vc ta enviando mts mensagens", "error");
+      return;
+    }
+
     try {
       playSound("select");
-      await sendChatMessage(friendUid, text);
+      setUploadingAttachment(Boolean(selectedFile));
+      const uploadedAttachment = selectedFile
+        ? await uploadChatAttachment(friendUid, selectedFile)
+        : undefined;
+      const optimisticMessage: ChatMessage = {
+        id: `local-${now}`,
+        chatId: friendUid,
+        senderId: "me",
+        receiverId: friendUid,
+        text,
+        createdAt: new Date(now).toISOString(),
+        read: true,
+        ...(uploadedAttachment ?? {}),
+      };
+
+      recentSendTimestampsRef.current = [...freshTimestamps, now];
+      setRenderMessages((current) => [...current, optimisticMessage]);
       setInputText("");
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      lastTypingSentRef.current = false;
+      void setChatTyping(friendUid, false);
+      await sendChatMessage(friendUid, { text, attachment: uploadedAttachment });
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
+      setRenderMessages((current) =>
+        current.filter((message) => message.id !== `local-${now}`),
+      );
       notify("Nao foi possivel enviar a mensagem.", "error");
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -1453,14 +1608,14 @@ export const ChatModal: React.FC<{
 
         {/* Messages */}
         <div className="chat-scrollbar flex-1 overflow-y-auto p-6 pr-3 space-y-4">
-          {messages.length === 0 ? (
+          {renderMessages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center text-white/20 space-y-2">
               <MessageSquare className="h-8 w-8" />
               <p className="text-xs uppercase tracking-wider">Nenhuma mensagem ainda</p>
             </div>
           ) : (
-            messages.map((msg, index) => {
-              const isMe = msg.senderId !== friend.id.split(":")[1];
+            renderMessages.map((msg, index) => {
+              const isMe = msg.senderId !== friendUid;
               return (
                 <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                   <div
@@ -1470,7 +1625,43 @@ export const ChatModal: React.FC<{
                         : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
                     }`}
                   >
-                    <p className="break-words leading-relaxed">{msg.text}</p>
+                    {msg.attachmentUrl ? (
+                      <a
+                        href={msg.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={msg.attachmentName || "arquivo"}
+                        className={`mb-2 block rounded-2xl border px-3 py-3 transition-all ${
+                          isMe
+                            ? "border-white/10 bg-black/25 hover:bg-black/35"
+                            : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {isImageAttachment(msg.attachmentType) ? (
+                          <img
+                            src={msg.attachmentUrl}
+                            alt={msg.attachmentName || "Imagem enviada"}
+                            className="mb-3 max-h-48 w-full rounded-xl object-cover"
+                          />
+                        ) : null}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-bold text-white">
+                              {msg.attachmentName || "Arquivo"}
+                            </p>
+                            <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-white/35">
+                              {formatAttachmentSize(msg.attachmentSize) || "Arquivo anexado"}
+                            </p>
+                          </div>
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/8">
+                            <Download className="h-3.5 w-3.5 text-white/80" />
+                          </span>
+                        </div>
+                      </a>
+                    ) : null}
+                    {msg.text ? (
+                      <p className="break-words leading-relaxed">{msg.text}</p>
+                    ) : null}
                     <span className="mt-1 block text-[8px] text-white/30 text-right uppercase tracking-wider">
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
@@ -1479,24 +1670,99 @@ export const ChatModal: React.FC<{
               );
             })
           )}
+          {friendTyping && (
+            <div className="flex justify-start">
+              <div className="rounded-[18px] rounded-tl-none border border-white/5 bg-white/[0.04] px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] uppercase tracking-[0.28em] text-white/30">
+                    digitando
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2].map((dot) => (
+                      <motion.span
+                        key={dot}
+                        animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          delay: dot * 0.12,
+                          ease: "easeInOut",
+                        }}
+                        className="h-1.5 w-1.5 rounded-full bg-emerald-400"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Footer / Input */}
-        <form onSubmit={handleSend} className="shrink-0 border-t border-white/5 bg-white/[0.01] p-4 flex gap-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Digite sua mensagem..."
-            className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none"
-          />
-          <button
-            type="submit"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black hover:bg-white/90 active:scale-95 transition-transform"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+        <form onSubmit={handleSend} className="shrink-0 border-t border-white/5 bg-white/[0.01] p-4">
+          <div className="mb-2 flex min-h-[16px] items-center justify-between px-1">
+            <span className="text-[10px] uppercase tracking-[0.24em] text-white/25">
+              {friendTyping ? `${friend.name} está digitando...` : "Chat em tempo real"}
+            </span>
+            {spamLockedUntil && spamLockedUntil > Date.now() ? (
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+                DEVAGAR PAE
+              </span>
+            ) : null}
+          </div>
+          {selectedFile ? (
+            <div className="mb-3 flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-bold text-white">{selectedFile.name}</p>
+                <p className="text-[9px] uppercase tracking-[0.2em] text-white/35">
+                  {formatAttachmentSize(selectedFile.size)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
+                }}
+                className="rounded-full p-1 text-white/50 transition-colors hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : null}
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleSelectFile}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAttachment}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/75 transition-colors hover:bg-white/[0.1] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Digite sua mensagem..."
+              className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={Boolean(spamLockedUntil && spamLockedUntil > Date.now()) || uploadingAttachment}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black transition-transform hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-black/50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
         </form>
       </div>
     </ModalShell>

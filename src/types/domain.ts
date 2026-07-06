@@ -99,6 +99,11 @@ export interface ChatMessage {
   text: string;
   createdAt: string;
   read?: boolean;
+  attachmentName?: string;
+  attachmentUrl?: string;
+  attachmentType?: string;
+  attachmentSize?: number;
+  attachmentPath?: string;
 }
 
 export interface Chat {
