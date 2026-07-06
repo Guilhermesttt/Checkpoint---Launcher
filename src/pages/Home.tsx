@@ -92,6 +92,7 @@ import {
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
 import { discordRichPresence, useDiscordRichPresence } from "../services/discordRichPresence";
+import { getMonitorableExecutablePath } from "../services/launcher";
 import type { Game } from "../types/domain";
 import {
   profileDocRef,
@@ -445,6 +446,7 @@ const Home: React.FC = () => {
   const [socialFriends, setSocialFriends] = useState<SocialFriend[]>([]);
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<CheckpointFriendRequest[]>([]);
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
+  const [currentPresenceExecutablePath, setCurrentPresenceExecutablePath] = useState<string | null>(null);
   const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
@@ -473,6 +475,7 @@ const Home: React.FC = () => {
   const previousIncomingRequestsRef = useRef<Set<string> | null>(null);
   const previousSteamIdRef = useRef<string | undefined>(undefined);
   const previousDiscordIdRef = useRef<string | undefined>(undefined);
+  const friendPresenceFingerprintRef = useRef<Map<string, string>>(new Map());
   const didInitConnectionRefs = useRef(false);
 
   const { notify } = useNotification();
@@ -521,6 +524,77 @@ const Home: React.FC = () => {
     [userProfile?.discordId],
   );
   const hasLocalScanner = Boolean(window.electronAPI?.scanLocalGames);
+
+  const clearCurrentPresence = useCallback(() => {
+    setCurrentPresenceGame(null);
+    setCurrentPresenceExecutablePath(null);
+  }, []);
+
+  const syncDetectedRunningGame = useCallback(async () => {
+    if (!window.electronAPI?.detectRunningGames || games.length === 0) {
+      return;
+    }
+
+    const monitorableGames = games
+      .map((game) => ({
+        game,
+        executablePath: getMonitorableExecutablePath(game),
+      }))
+      .filter(
+        (entry): entry is { game: Game; executablePath: string } =>
+          Boolean(entry.executablePath),
+      );
+
+    if (monitorableGames.length === 0) {
+      return;
+    }
+
+    try {
+      const runningPaths = await window.electronAPI.detectRunningGames(
+        monitorableGames.map((entry) => entry.executablePath),
+      );
+      const normalizedRunning = new Set(
+        runningPaths.map((value) => value.trim().toLowerCase()),
+      );
+
+      const matchedCurrent = currentPresenceExecutablePath
+        ? monitorableGames.find(
+          (entry) =>
+            entry.executablePath.trim().toLowerCase() ===
+              currentPresenceExecutablePath.trim().toLowerCase() &&
+            normalizedRunning.has(entry.executablePath.trim().toLowerCase()),
+        )
+        : undefined;
+
+      const matchedGame =
+        matchedCurrent ||
+        monitorableGames.find((entry) =>
+          normalizedRunning.has(entry.executablePath.trim().toLowerCase()),
+        );
+
+      if (!matchedGame) {
+        if (currentPresenceExecutablePath) {
+          clearCurrentPresence();
+        }
+        return;
+      }
+
+      if (
+        currentPresenceGame !== matchedGame.game.title ||
+        currentPresenceExecutablePath !== matchedGame.executablePath
+      ) {
+        setCurrentPresenceGame(matchedGame.game.title);
+        setCurrentPresenceExecutablePath(matchedGame.executablePath);
+      }
+    } catch {
+      // Presence auto-detection is best-effort.
+    }
+  }, [
+    clearCurrentPresence,
+    currentPresenceExecutablePath,
+    currentPresenceGame,
+    games,
+  ]);
 
   useEffect(() => {
     if (!didInitConnectionRefs.current) {
@@ -662,10 +736,15 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const handleGameLaunch = (event: Event) => {
-      const title = (event as CustomEvent<{ title?: string }>).detail?.title?.trim();
+      const detail = (event as CustomEvent<{
+        title?: string;
+        executablePath?: string | null;
+      }>).detail;
+      const title = detail?.title?.trim();
       if (!title) return;
 
       setCurrentPresenceGame(title);
+      setCurrentPresenceExecutablePath(detail?.executablePath || null);
       void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
 
       if (isRichPresenceEnabled()) {
@@ -686,10 +765,83 @@ const Home: React.FC = () => {
   }, [games, isRichPresenceEnabled, setGameActivity]);
 
   useEffect(() => {
-    if (!currentPresenceGame) return;
-    const timeout = window.setTimeout(() => setCurrentPresenceGame(null), 3 * 60 * 60 * 1000);
-    return () => window.clearTimeout(timeout);
-  }, [currentPresenceGame]);
+    if (!currentPresenceGame || !currentPresenceExecutablePath || !window.electronAPI?.isExecutableRunning) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncRunningState = async () => {
+      try {
+        const isRunning = await window.electronAPI?.isExecutableRunning(
+          currentPresenceExecutablePath,
+        );
+        if (!cancelled && !isRunning) {
+          clearCurrentPresence();
+        }
+      } catch {
+        // Presence cleanup is best-effort.
+      }
+    };
+
+    void syncRunningState();
+    const interval = window.setInterval(() => {
+      void syncRunningState();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [clearCurrentPresence, currentPresenceExecutablePath, currentPresenceGame]);
+
+  useEffect(() => {
+    if (!user?.uid || !window.electronAPI?.detectRunningGames) {
+      return;
+    }
+
+    void syncDetectedRunningGame();
+
+    const handleFocus = () => {
+      void syncDetectedRunningGame();
+    };
+
+    const interval = window.setInterval(() => {
+      if (!currentPresenceExecutablePath) {
+        void syncDetectedRunningGame();
+      }
+    }, 15_000);
+
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [currentPresenceExecutablePath, syncDetectedRunningGame, user?.uid]);
+
+  useEffect(() => {
+    if (!currentPresenceGame || currentPresenceExecutablePath || !window.electronAPI?.isExecutableRunning) {
+      return;
+    }
+
+    const handleFocus = () => {
+      clearCurrentPresence();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [clearCurrentPresence, currentPresenceExecutablePath, currentPresenceGame]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const markOffline = () => {
+      void updateCheckpointPresence("offline").catch(() => undefined);
+    };
+
+    window.addEventListener("beforeunload", markOffline);
+    return () => window.removeEventListener("beforeunload", markOffline);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid || (userProfile?.checkpointFriends ?? []).length === 0) return;
@@ -715,18 +867,29 @@ const Home: React.FC = () => {
               status: status.status || "offline",
               playing: status.playing || undefined,
             };
+            const nextFingerprint = `${newFriend.status}:${newFriend.playing || ""}`;
+            const previousFingerprint = friendPresenceFingerprintRef.current.get(friend.id);
 
             // Verificar mudanças relevantes e notificar
             if (friend.status !== newFriend.status || friend.playing !== newFriend.playing) {
               hasChanges = true;
 
               // Notificar quando amigo fica online
-              if (friend.status === "offline" && newFriend.status === "online") {
+              if (
+                friend.status === "offline" &&
+                newFriend.status === "online" &&
+                previousFingerprint !== nextFingerprint
+              ) {
                 notify(`${newFriend.name} ficou online`, "success");
               }
 
               // Notificar quando amigo começa a jogar
-              if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing) {
+              if (
+                friend.status !== "playing" &&
+                newFriend.status === "playing" &&
+                newFriend.playing &&
+                previousFingerprint !== nextFingerprint
+              ) {
                 notify(`${newFriend.name} começou a jogar ${newFriend.playing}`, "success");
                 void window.electronAPI?.showFriendPlayingOverlay({
                   playerName: newFriend.name,
@@ -736,6 +899,7 @@ const Home: React.FC = () => {
               }
             }
 
+            friendPresenceFingerprintRef.current.set(friend.id, nextFingerprint);
             return newFriend;
           });
 
@@ -762,13 +926,20 @@ const Home: React.FC = () => {
             const status = statusById.get(uid);
             if (!status) return friend;
 
-            return {
+            const nextFriend = {
               ...friend,
               name: status.displayName || friend.name,
               avatar: status.photoURL || friend.avatar,
               status: status.status || "offline",
               playing: status.playing || undefined,
             };
+
+            friendPresenceFingerprintRef.current.set(
+              friend.id,
+              `${nextFriend.status}:${nextFriend.playing || ""}`,
+            );
+
+            return nextFriend;
           });
 
           return updatedFriends;
@@ -848,6 +1019,10 @@ const Home: React.FC = () => {
           `${acceptedFriend.displayName} aceitou seu pedido. Agora voces sao amigos.`,
           "success",
         );
+        void window.electronAPI?.showFriendAcceptedOverlay({
+          playerName: acceptedFriend.displayName,
+          avatarUrl: acceptedFriend.photoURL || null,
+        });
       }
     }
 
@@ -1791,6 +1966,7 @@ const Home: React.FC = () => {
             <FriendsPage
               t={t}
               discordConnected={Boolean(resolvedDiscordId)}
+              userDisplay={userDisplay}
               discordUsername={userProfile?.discordUsername}
               discordAvatar={userProfile?.discordAvatar}
               DiscordIcon={DiscordBrandIcon}

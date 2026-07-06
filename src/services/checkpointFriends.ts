@@ -78,7 +78,7 @@ export const removeCheckpointFriend = async (uid: string) => {
 };
 
 export const updateCheckpointPresence = async (
-  status: "online" | "playing",
+  status: "online" | "playing" | "offline",
   currentGameTitle?: string,
 ) => {
   const response = await fetch(apiUrl("/api/presence"), {

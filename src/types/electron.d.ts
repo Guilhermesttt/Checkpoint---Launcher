@@ -4,6 +4,8 @@ declare global {
   interface Window {
     electronAPI?: {
       launchExecutable: (executablePath: string) => Promise<void>;
+      isExecutableRunning: (executablePath: string) => Promise<boolean>;
+      detectRunningGames: (executablePaths: string[]) => Promise<string[]>;
       startGoogleBrowserAuth: () => Promise<{ state: string }>;
       openExternalUrl: (url: string) => Promise<void>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
@@ -16,6 +18,10 @@ declare global {
         avatarUrl?: string | null;
       }) => Promise<void>;
       showFriendRequestOverlay: (payload: {
+        playerName: string;
+        avatarUrl?: string | null;
+      }) => Promise<void>;
+      showFriendAcceptedOverlay: (payload: {
         playerName: string;
         avatarUrl?: string | null;
       }) => Promise<void>;

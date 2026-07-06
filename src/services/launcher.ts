@@ -20,6 +20,11 @@ const hasCompleteEpicLaunchId = (value: string) =>
 const isWindowsExecutablePath = (value: string) =>
   WINDOWS_EXECUTABLE_PATH_REGEX.test(String(value || "").trim());
 
+export const getMonitorableExecutablePath = (game: Game): string | null => {
+  const executablePath = String(game.executablePath || "").trim();
+  return isWindowsExecutablePath(executablePath) ? executablePath : null;
+};
+
 const buildEpicLaunchUri = (game: Game): string | null => {
   const explicitLaunchId = String(game.epicLaunchId || "").trim();
   const rawLaunchId = isWindowsExecutablePath(game.executablePath || "")
@@ -71,7 +76,7 @@ export const launchGame = async (game: Game): Promise<void> => {
       (window as Window & {
         electronAPI?: { launchExecutable?: (path: string) => Promise<void> };
       }).electronAPI?.launchExecutable &&
-      isWindowsExecutablePath(game.executablePath || "")
+      getMonitorableExecutablePath(game)
     ) {
       await (window as Window & {
         electronAPI?: { launchExecutable?: (path: string) => Promise<void> };
@@ -96,9 +101,14 @@ export const launchGame = async (game: Game): Promise<void> => {
   }
 
   // Local (desktop only)
-  if ((window as Window & { electronAPI?: { launchExecutable?: (path: string) => Promise<void> } }).electronAPI?.launchExecutable && game.executablePath) {
+  if (
+    (window as Window & {
+      electronAPI?: { launchExecutable?: (path: string) => Promise<void> };
+    }).electronAPI?.launchExecutable &&
+    getMonitorableExecutablePath(game)
+  ) {
     await (window as Window & { electronAPI?: { launchExecutable?: (path: string) => Promise<void> } }).electronAPI?.launchExecutable?.(
-      game.executablePath,
+      String(game.executablePath).trim(),
     );
     return;
   }

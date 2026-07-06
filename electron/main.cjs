@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen } = require("electron");
 const crypto = require("node:crypto");
+const { execFile } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
@@ -417,6 +418,75 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   }
 });
 
+ipcMain.handle("launcher:is-executable-running", async (_event, executablePath) => {
+  const target = String(executablePath || "").trim();
+  if (!target) {
+    return false;
+  }
+
+  const normalizedTarget = path.normalize(target);
+  const executableName = path.basename(normalizedTarget);
+  if (!executableName || path.extname(executableName).toLowerCase() !== ".exe") {
+    return false;
+  }
+
+  const output = await new Promise((resolve, reject) => {
+    execFile(
+      "tasklist",
+      ["/fo", "csv", "/nh", "/fi", `imagename eq ${executableName}`],
+      { windowsHide: true },
+      (error, stdout = "") => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(stdout);
+      },
+    );
+  }).catch(() => "");
+
+  return String(output)
+    .split(/\r?\n/)
+    .some((line) => line.trim().toLowerCase().startsWith(`"${executableName.toLowerCase()}"`));
+});
+
+ipcMain.handle("launcher:detect-running-games", async (_event, executablePaths) => {
+  const normalizedTargets = Array.isArray(executablePaths)
+    ? executablePaths
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .map((value) => path.normalize(value))
+      .filter((value) => path.isAbsolute(value) && path.extname(value).toLowerCase() === ".exe")
+    : [];
+
+  if (normalizedTargets.length === 0) {
+    return [];
+  }
+
+  const output = await new Promise((resolve, reject) => {
+    execFile("tasklist", ["/fo", "csv", "/nh"], { windowsHide: true }, (error, stdout = "") => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(stdout);
+    });
+  }).catch(() => "");
+
+  const runningNames = new Set(
+    String(output)
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.match(/^"([^"]+)"/)?.[1]?.toLowerCase())
+      .filter(Boolean),
+  );
+
+  return normalizedTargets.filter((target) =>
+    runningNames.has(path.basename(target).toLowerCase()),
+  );
+});
+
 ipcMain.handle("auth:start-google-browser", async () => {
   const state = crypto.randomUUID();
   const authUrl = new URL("/auth/google/start", APP_URL);
@@ -489,6 +559,18 @@ ipcMain.handle("overlay:show-friend-request", async (_event, payload) => {
     kind: "friend-request",
     title: playerName,
     description: "Enviou um pedido de amizade",
+    avatarUrl: avatarUrl || overlayIconUrl(),
+  });
+});
+
+ipcMain.handle("overlay:show-friend-accepted", async (_event, payload) => {
+  const playerName = String(payload?.playerName || "").trim() || "Jogador";
+  const avatarUrl = String(payload?.avatarUrl || "").trim();
+
+  sendOverlayEvent("overlay:social", {
+    kind: "friend-accepted",
+    title: playerName,
+    description: "Aceitou teu pedido de amizade",
     avatarUrl: avatarUrl || overlayIconUrl(),
   });
 });

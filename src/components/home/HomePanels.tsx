@@ -473,6 +473,7 @@ export const SettingsPageV2: React.FC<{
 export const FriendsPage: React.FC<{
   t: TranslationFn;
   discordConnected: boolean;
+  userDisplay: string;
   discordUsername?: string;
   discordAvatar?: string;
   DiscordIcon: BrandIcon;
@@ -489,6 +490,7 @@ export const FriendsPage: React.FC<{
 }> = ({
   t,
   discordConnected,
+  userDisplay,
   discordUsername,
   discordAvatar,
   DiscordIcon,
@@ -534,7 +536,7 @@ export const FriendsPage: React.FC<{
               <div className="flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <p className="text-base font-black text-white">
-                    {discordConnected ? discordUsername || "Usuario" : "Usuario"}
+                    {discordConnected ? discordUsername || userDisplay : userDisplay}
                   </p>
                   {discordConnected && (
                     <div className="flex h-4 w-4 items-center justify-center rounded bg-white/10">

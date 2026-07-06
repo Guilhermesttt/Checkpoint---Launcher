@@ -3,7 +3,7 @@ import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, Clock, CalendarClock, Trophy, Camera, Trash2 } from "lucide-react";
 import { updateDoc, deleteDoc } from "firebase/firestore";
-import { launchGame } from "../services/launcher";
+import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
 import type { Game } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import {
@@ -473,12 +473,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setIsLaunching(true);
     setLaunchError(null);
     playSound("play");
-    window.dispatchEvent(
-      new CustomEvent("checkpoint:game-launch", {
-        detail: { title: game.title },
-      }),
-    );
-
     try {
       const [result] = await Promise.allSettled([
         launchGame(game),
@@ -496,6 +490,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       if (result.status === "rejected") {
         throw result.reason;
       }
+
+      window.dispatchEvent(
+        new CustomEvent("checkpoint:game-launch", {
+          detail: {
+            title: game.title,
+            executablePath: getMonitorableExecutablePath(game),
+          },
+        }),
+      );
     } catch (error) {
       setLaunchError(
         error instanceof Error ? error.message : copy.launchGenericError,

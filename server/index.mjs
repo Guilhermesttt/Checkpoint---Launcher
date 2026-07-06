@@ -718,6 +718,7 @@ const resolvePresence = (presence = {}) => {
   const updatedAtMs = Date.parse(String(presence.updatedAt || ""));
   const isFresh = Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < 2 * 60 * 1000;
   if (!isFresh) return { status: "offline", playing: null };
+  if (presence.status === "offline") return { status: "offline", playing: null };
   const currentGameTitle = String(presence.currentGameTitle || "").trim();
   if (presence.status === "playing" && currentGameTitle) {
     return { status: "playing", playing: currentGameTitle };
@@ -780,7 +781,12 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
 
 app.post("/api/presence", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const requestedStatus = String(req.body?.status || "online");
-  const status = requestedStatus === "playing" ? "playing" : "online";
+  const status =
+    requestedStatus === "playing"
+      ? "playing"
+      : requestedStatus === "offline"
+        ? "offline"
+        : "online";
   const currentGameTitle = String(req.body?.currentGameTitle || "").trim().slice(0, 120);
 
   try {

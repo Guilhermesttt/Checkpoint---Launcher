@@ -424,12 +424,12 @@
       0%,
       100% {
         transform: translateY(0);
-        box-shadow: 0 0 18px rgba(31, 209, 79, 0.14);
+        box-shadow: 0 0 18px rgba(255, 255, 255, 0.12);
       }
 
       50% {
         transform: translateY(-1px);
-        box-shadow: 0 0 26px rgba(31, 209, 79, 0.2);
+        box-shadow: 0 0 26px rgba(255, 255, 255, 0.18);
       }
     }
 
@@ -470,7 +470,7 @@
       if (!src) return;
       const audio = new Audio(src);
       audio.volume = 0.22;
-      audio.play().catch(() => {});
+      audio.play().catch(() => { });
     };
 
     const applyStagger = (stack, card) => {
@@ -500,6 +500,16 @@
           <path d="M4 22h16"></path>
           <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path>
           <path d="M12 2a5 5 0 0 0-5 5v4c0 .32.03.63.08.94h9.84c.05-.31.08-.62.08-.94V7a5 5 0 0 0-5-5z"></path>
+        </svg>
+      `;
+
+    const controllerSvg = () => `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.8 8h10.4a3 3 0 0 1 2.9 2.26l1.1 4.25a2.5 2.5 0 0 1-4.42 2.2L14.9 14H9.1l-1.88 2.71a2.5 2.5 0 0 1-4.42-2.2l1.1-4.25A3 3 0 0 1 6.8 8Z"></path>
+          <path d="M8 11v4"></path>
+          <path d="M6 13h4"></path>
+          <path d="M15.5 12h.01"></path>
+          <path d="M18 14h.01"></path>
         </svg>
       `;
 
@@ -537,7 +547,9 @@
     };
 
     const socialBadgeLabel = (kind) => {
+      if (kind === "controller-connected") return "Controle conectado";
       if (kind === "friend-request") return "Pedido de amizade";
+      if (kind === "friend-accepted") return "Pedido aceito";
       if (kind === "friend-playing") return "Amigo jogando";
       return "Jogo iniciado";
     };
@@ -598,12 +610,19 @@
       shell.className = "overlay-shell";
 
       const isGameStart = payload.kind === "game-start";
+      const isControllerConnected = payload.kind === "controller-connected";
       shell.appendChild(
         createIconColumn({
           ring: true,
-          avatarSrc: isGameStart ? checkpointIconUrl : payload.avatarUrl || checkpointIconUrl,
-          isPhoto: !isGameStart && Boolean(payload.avatarUrl),
-          isLogo: isGameStart,
+          avatarSrc:
+            isGameStart
+              ? checkpointIconUrl
+              : isControllerConnected
+                ? ""
+                : payload.avatarUrl || checkpointIconUrl,
+          avatarSvg: isControllerConnected ? controllerSvg() : "",
+          isPhoto: !isGameStart && !isControllerConnected && Boolean(payload.avatarUrl),
+          isLogo: isGameStart || isControllerConnected,
         }),
       );
 
