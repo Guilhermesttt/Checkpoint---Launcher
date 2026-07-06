@@ -100,6 +100,7 @@ const pendingDesktopGoogleStates = new Map();
 
 const appDetailsCache = new Map();
 const achievementsCache = new Map();
+const achievementSchemaCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
@@ -568,6 +569,47 @@ const pickSteamTrailerUrl = (movies) => {
     }
   }
   return null;
+};
+
+const fetchSteamAchievementSchema = async (appId) => {
+  const cached = achievementSchemaCache.get(appId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  const url = new URL(
+    "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/",
+  );
+  url.searchParams.set("key", steamApiKey);
+  url.searchParams.set("appid", appId);
+  url.searchParams.set("l", "brazilian");
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error(`Falha ao consultar schema de conquistas (status ${response.status}).`);
+  }
+
+  const payload = await response.json();
+  const rawAchievements = payload?.game?.availableGameStats?.achievements;
+  const schema = Array.isArray(rawAchievements)
+    ? rawAchievements.map((achievement) => ({
+        apiName: String(achievement?.name ?? "").trim(),
+        displayName: String(
+          achievement?.displayName ?? achievement?.name ?? "",
+        ).trim(),
+        description: String(achievement?.description ?? "").trim(),
+        icon: String(achievement?.icon ?? "").trim(),
+        iconGray: String(achievement?.icongray ?? "").trim(),
+        hidden: Number(achievement?.hidden ?? 0) === 1,
+      }))
+    : [];
+
+  achievementSchemaCache.set(appId, {
+    data: schema,
+    timestamp: Date.now(),
+  });
+
+  return schema;
 };
 
 const parseDiskSizeGb = (text) => {
@@ -1755,15 +1797,16 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
   }
 
   try {
-    const url = new URL(
-      "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/",
-    );
+    const url = new URL("https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/");
     url.searchParams.set("key", steamApiKey);
     url.searchParams.set("steamid", steamId);
     url.searchParams.set("appid", appId);
     url.searchParams.set("l", "brazilian");
 
-    const response = await fetch(url.toString());
+    const [response, schema] = await Promise.all([
+      fetch(url.toString()),
+      fetchSteamAchievementSchema(appId).catch(() => []),
+    ]);
     if (!response.ok) {
       if (response.status === 400 || response.status === 404) {
         const data = { achievements: [], total: 0, unlocked: 0 };
@@ -1780,9 +1823,34 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
     }
 
     const payload = await response.json();
-    const achievements = payload?.playerstats?.achievements ?? [];
+    const playerAchievements = Array.isArray(payload?.playerstats?.achievements)
+      ? payload.playerstats.achievements
+      : [];
+    const schemaByApiName = new Map(
+      schema.map((achievement) => [achievement.apiName, achievement]),
+    );
+    const achievements = playerAchievements.map((achievement) => {
+      const apiName = String(achievement?.apiname ?? "").trim();
+      const schemaItem = schemaByApiName.get(apiName);
+      return {
+        apiName,
+        achieved: Number(achievement?.achieved ?? 0) === 1,
+        unlockTime: Number(achievement?.unlocktime ?? 0) || 0,
+        name: String(
+          achievement?.name ??
+            schemaItem?.displayName ??
+            apiName,
+        ).trim(),
+        description: String(
+          achievement?.description ?? schemaItem?.description ?? "",
+        ).trim(),
+        icon: String(schemaItem?.icon ?? "").trim(),
+        iconGray: String(schemaItem?.iconGray ?? "").trim(),
+        hidden: Boolean(schemaItem?.hidden),
+      };
+    });
     const total = achievements.length;
-    const unlocked = achievements.filter((a) => a.achieved === 1).length;
+    const unlocked = achievements.filter((a) => a.achieved).length;
 
     const data = {
       achievements,

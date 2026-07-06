@@ -1,9 +1,15 @@
 import React from "react";
 import { Play, Star } from "lucide-react";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSteam } from '@fortawesome/free-brands-svg-icons';
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSteam } from "@fortawesome/free-brands-svg-icons";
+import {
+  motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+  useTransform,
+} from "framer-motion";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 interface GameCardProps {
   title: string;
@@ -16,11 +22,12 @@ interface GameCardProps {
   isEpic?: boolean;
 }
 
-// Fallback usado sempre que --game-color não estiver definido no elemento.
-// Sem isso, um var() inválido invalida a propriedade box-shadow INTEIRA
-// (não só o trecho da cor) — o card perde até o anel branco e a sombra base.
-const GAME_COLOR_FALLBACK = "rgba(255,255,255,0.35)";
-const gameColor = (extra = "") => `var(--game-color, ${GAME_COLOR_FALLBACK})${extra}`;
+const CARD_FRAME_WIDTH = 172;
+const CARD_FRAME_HEIGHT = 260;
+const CARD_WIDTH = 156;
+const CARD_HEIGHT = 236;
+const FALLBACK_CARD_BACKGROUND =
+  "radial-gradient(circle at top, rgba(255,255,255,0.12), rgba(255,255,255,0.04) 35%, rgba(5,5,7,0.96) 100%)";
 
 const GameCard: React.FC<GameCardProps> = ({
   title,
@@ -32,7 +39,8 @@ const GameCard: React.FC<GameCardProps> = ({
   isSteam = false,
   isEpic = false,
 }) => {
-  const [isHovered, setIsHovered] = React.useState(false);
+  const reduceMotion = useReducedMotion();
+  const [failedImageSrc, setFailedImageSrc] = React.useState<string | null>(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
@@ -44,31 +52,30 @@ const GameCard: React.FC<GameCardProps> = ({
 
   const glareX = useTransform(mouseXSpring, [-0.5, 0.5], ["100%", "0%"]);
   const glareY = useTransform(mouseYSpring, [-0.5, 0.5], ["100%", "0%"]);
-  const glareOpacity = useTransform(mouseXSpring, [-0.5, 0, 0.5], [0.3, 0, 0.3]);
+  const glareOpacity = useTransform(
+    mouseXSpring,
+    [-0.5, 0, 0.5],
+    [0.3, 0, 0.3],
+  );
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isActive) return;
+  const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isActive || reduceMotion) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    x.set(mouseX / width - 0.5);
-    y.set(mouseY / height - 0.5);
+    x.set(mouseX / rect.width - 0.5);
+    y.set(mouseY / rect.height - 0.5);
   };
-
-  const handleMouseEnter = () => setIsHovered(true);
 
   const handleMouseLeave = () => {
     x.set(0);
     y.set(0);
-    setIsHovered(false);
   };
 
-  // Suporte a acessibilidade e navegação por gamepad/teclado
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       onClick?.();
     }
@@ -80,9 +87,16 @@ const GameCard: React.FC<GameCardProps> = ({
         label: "Steam",
         color: "#67b676",
         border: "rgba(103,182,118,0.35)",
-        icon: <FontAwesomeIcon icon={faSteam} className="w-2.5 h-2.5" style={{ color: "#67b676" }} />,
+        icon: (
+          <FontAwesomeIcon
+            icon={faSteam}
+            className="h-2.5 w-2.5"
+            style={{ color: "#67b676" }}
+          />
+        ),
       };
     }
+
     if (isEpic) {
       return {
         label: "Epic",
@@ -92,37 +106,45 @@ const GameCard: React.FC<GameCardProps> = ({
           <img
             src={EPIC_GAMES_ICON_PATH}
             alt=""
-            className="w-2.5 h-2.5 object-contain"
+            className="h-2.5 w-2.5 object-contain"
             style={{ filter: "invert(1)" }}
+            referrerPolicy="no-referrer"
+            draggable={false}
           />
         ),
       };
     }
+
     return null;
-  }, [isSteam, isEpic]);
+  }, [isEpic, isSteam]);
+
+  const hasImageError = failedImageSrc === image;
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={onContextMenu}
       onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="relative flex items-center justify-center cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 rounded-2xl"
-      style={{ width: 172, height: 260, perspective: 1200 }}
+      aria-label={title}
+      aria-pressed={isActive}
+      className="relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+      style={{
+        width: CARD_FRAME_WIDTH,
+        height: CARD_FRAME_HEIGHT,
+        perspective: reduceMotion ? undefined : 1200,
+      }}
     >
-      {/* 1. Ambient Glow Extravasado (Ambilight) */}
       {isActive && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.6 }}
           transition={{ duration: 0.4 }}
-          className="absolute inset-0 rounded-2xl pointer-events-none"
+          className="pointer-events-none absolute inset-0 rounded-2xl"
           style={{
-            background: gameColor(),
+            background: "var(--launcher-accent-soft, rgba(255,255,255,0.18))",
             filter: "blur(24px)",
             transform: "translateY(12px) scale(0.9)",
             zIndex: 0,
@@ -130,74 +152,76 @@ const GameCard: React.FC<GameCardProps> = ({
         />
       )}
 
-      {/* 1b. Glow de borda pulsante — respiração de luz ao redor do card ativo */}
-      {isActive && (
-        <motion.div
-          className="absolute rounded-[20px] pointer-events-none"
-          style={{
-            inset: -3,
-            border: `2px solid ${gameColor()}`,
-            boxShadow: `0 0 24px 2px ${gameColor()}`,
-            zIndex: 1,
-          }}
-          animate={{ opacity: [0.35, 0.85, 0.35] }}
-          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
-
-      {/* 1c. Glow sutil no hover para cards inativos — reforça affordance de clique */}
-      {!isActive && isHovered && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
-          className="absolute inset-0 rounded-2xl pointer-events-none"
-          style={{
-            boxShadow: `0 0 0 1.5px ${gameColor(", 0 0 20px 0")} `,
-            zIndex: 1,
-          }}
-        />
-      )}
-
       <motion.div
         className="relative z-10 origin-center"
         style={{
-          width: 156,
-          height: 236,
-          rotateX: isActive ? rotateX : 0,
-          rotateY: isActive ? rotateY : 0,
-          scale: isActive ? 1.05 : isHovered ? 0.9 : 0.87,
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+          rotateX: isActive && !reduceMotion ? rotateX : 0,
+          rotateY: isActive && !reduceMotion ? rotateY : 0,
+          scale: isActive ? 1.02 : 0.9,
           transformStyle: "preserve-3d",
         }}
-        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        transition={
+          reduceMotion
+            ? { duration: 0.18 }
+            : { type: "spring", stiffness: 300, damping: 20 }
+        }
       >
         <div
-          className={`
-            relative w-full h-full overflow-hidden rounded-2xl
-            transition-shadow duration-300 bg-gray-900
-            ${isActive
-              ? "shadow-[0_0_0_2px_rgba(255,255,255,0.18),0_32px_64px_rgba(0,0,0,0.9)]"
-              : "shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
-            }
-          `}
+          className={`relative h-full w-full overflow-hidden rounded-2xl border bg-gray-900 transition-[transform,box-shadow,border-color] duration-300 ${
+            isActive
+              ? "border-white/25 shadow-[0_20px_48px_rgba(0,0,0,0.78)]"
+              : "border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
+          }`}
           style={
             isActive
               ? {
-                boxShadow: `0 0 0 2px rgba(255,255,255,0.18), 0 32px 64px rgba(0,0,0,0.9), 0 8px 32px ${gameColor()}`,
-              }
-              : {}
+                  boxShadow:
+                    "0 20px 48px rgba(0,0,0,0.78), 0 0 0 1px rgba(255,255,255,0.22), 0 0 28px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
+                }
+              : undefined
           }
         >
-          {/* 2. Zoom Interno Contínuo (Breathe / Ken Burns) */}
-          <img
-            src={image}
-            alt={title}
-            className={`absolute inset-0 w-full h-full object-cover transition-transform ease-out ${isActive ? "scale-110 duration-[10000ms]" : "scale-100 duration-500"
-              }`}
-            loading="lazy"
-            decoding="async"
+          <div
+            className="pointer-events-none absolute inset-0 z-[1] rounded-2xl"
+            style={{
+              padding: 1,
+              background: isActive
+                ? "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.08) 100%)"
+                : "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 100%)",
+              WebkitMask:
+                "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+              WebkitMaskComposite: "xor",
+              maskComposite: "exclude",
+            }}
           />
+
+          {hasImageError ? (
+            <div
+              className="absolute inset-0 flex items-end p-4"
+              style={{ background: FALLBACK_CARD_BACKGROUND }}
+            >
+              <span className="line-clamp-3 text-sm font-semibold leading-snug text-white/90">
+                {title}
+              </span>
+            </div>
+          ) : (
+            <img
+              src={image}
+              alt={title}
+              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${
+                isActive && !reduceMotion
+                  ? "scale-110 duration-[10000ms]"
+                  : "scale-100 duration-500"
+              }`}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              referrerPolicy="no-referrer"
+              onError={() => setFailedImageSrc(image)}
+            />
+          )}
 
           <div
             className="absolute inset-0 transition-colors duration-500"
@@ -210,44 +234,54 @@ const GameCard: React.FC<GameCardProps> = ({
 
           {isActive && (
             <>
-              {/* 3. Efeito Shimmer (Varredura de Luz) */}
-              <motion.div
-                initial={{ x: "-150%" }}
-                animate={{ x: "150%" }}
-                transition={{ duration: 0.7, ease: "easeInOut" }}
-                className="absolute inset-0 z-20 pointer-events-none"
+              {!reduceMotion && (
+                <motion.div
+                  initial={{ x: "-150%" }}
+                  animate={{ x: "150%" }}
+                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                  className="pointer-events-none absolute inset-0 z-20"
+                  style={{
+                    background:
+                      "linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)",
+                    mixBlendMode: "overlay",
+                  }}
+                />
+              )}
+
+              <div
+                className="pointer-events-none absolute inset-0 z-10"
                 style={{
-                  background: "linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)",
-                  mixBlendMode: "overlay",
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 48%)",
+                  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
                 }}
               />
 
-              <div
-                className="absolute inset-0 pointer-events-none z-10"
-                style={{
-                  background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%)",
-                  boxShadow: `inset 0 0 0 1px ${gameColor()}`,
-                }}
-              />
-              <motion.div
-                className="absolute inset-0 pointer-events-none z-20 mix-blend-overlay"
-                style={{
-                  background: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, transparent 60%)",
-                  left: glareX,
-                  top: glareY,
-                  opacity: glareOpacity,
-                  width: "200%",
-                  height: "200%",
-                  transform: "translate(-50%, -50%)",
-                }}
-              />
+              {!reduceMotion && (
+                <motion.div
+                  className="pointer-events-none absolute inset-0 z-20 mix-blend-overlay"
+                  style={{
+                    background:
+                      "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, transparent 60%)",
+                    left: glareX,
+                    top: glareY,
+                    opacity: glareOpacity,
+                    width: "200%",
+                    height: "200%",
+                    transform: "translate(-50%, -50%)",
+                  }}
+                />
+              )}
             </>
           )}
 
-          <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between z-30" style={{ transform: "translateZ(20px)" }}>
-            {platformBadge && (
+          <div
+            className="absolute left-2.5 right-2.5 top-2.5 z-30 flex items-start justify-between"
+            style={{ transform: "translateZ(20px)" }}
+          >
+            {platformBadge ? (
               <div
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
                 style={{
                   background: "rgba(0,0,0,0.4)",
                   border: `1px solid ${platformBadge.border}`,
@@ -256,51 +290,58 @@ const GameCard: React.FC<GameCardProps> = ({
               >
                 {platformBadge.icon}
                 <span
-                  className="text-[10px] font-bold tracking-widest uppercase"
+                  className="text-[10px] font-bold uppercase tracking-widest"
                   style={{ color: platformBadge.color }}
                 >
                   {platformBadge.label}
                 </span>
               </div>
+            ) : (
+              <div />
             )}
-            {!platformBadge && <div />}
+
             {isFavorite && (
               <div
-                className="w-6 h-6 rounded-full flex items-center justify-center"
+                className="flex h-6 w-6 items-center justify-center rounded-full"
                 style={{
                   background: "rgba(251,191,36,0.15)",
                   border: "1px solid rgba(251,191,36,0.5)",
                   backdropFilter: "blur(8px)",
                 }}
               >
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
               </div>
             )}
           </div>
 
           <div
-            className={`absolute bottom-0 left-0 right-0 p-4 transition-all duration-400 z-30 ${isActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-              }`}
+            className={`absolute bottom-0 left-0 right-0 z-30 p-4 transition-all duration-400 ${
+              isActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+            }`}
             style={{ transform: "translateZ(30px)" }}
           >
-            <p
-              className="text-[10px] font-bold uppercase tracking-[0.2em] mb-1.5 text-white/60"
-            >
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
               Iniciar
             </p>
-            <h3 className="text-sm font-bold text-white leading-snug line-clamp-2">
+            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">
               {title}
             </h3>
           </div>
 
-          {/* O Play foi ajustado para ficar sempre visível de forma sutil quando ativo, não precisando de hover para indicar a ação */}
           {isActive && (
-            <div className="absolute inset-0 flex items-center justify-center opacity-100 transition-opacity duration-300 z-30" style={{ transform: "translateZ(40px)" }}>
+            <div
+              className="absolute inset-0 z-30 flex items-center justify-center opacity-100 transition-opacity duration-300"
+              style={{ transform: "translateZ(40px)" }}
+            >
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
+                initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.1 }}
-                className="w-14 h-14 rounded-full flex items-center justify-center shadow-2xl"
+                transition={
+                  reduceMotion
+                    ? { duration: 0.18 }
+                    : { type: "spring", stiffness: 400, damping: 25, delay: 0.1 }
+                }
+                className="flex h-14 w-14 items-center justify-center rounded-full shadow-2xl"
                 style={{
                   background: "rgba(255,255,255,0.15)",
                   border: "1.5px solid rgba(255,255,255,0.4)",
@@ -308,7 +349,7 @@ const GameCard: React.FC<GameCardProps> = ({
                 }}
               >
                 <Play
-                  className="w-6 h-6 text-white fill-white"
+                  className="h-6 w-6 fill-white text-white"
                   style={{ marginLeft: 3 }}
                 />
               </motion.div>
@@ -318,7 +359,7 @@ const GameCard: React.FC<GameCardProps> = ({
 
         {isActive && (
           <div
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 h-0.5 rounded-full"
+            className="absolute -bottom-3 left-1/2 h-0.5 -translate-x-1/2 rounded-full"
             style={{
               width: 32,
               background:
@@ -327,7 +368,7 @@ const GameCard: React.FC<GameCardProps> = ({
           />
         )}
       </motion.div>
-    </div>
+    </button>
   );
 };
 

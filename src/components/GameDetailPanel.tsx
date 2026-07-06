@@ -6,6 +6,11 @@ import { updateDoc, deleteDoc } from "firebase/firestore";
 import { launchGame } from "../services/launcher";
 import type { Game } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
+import {
+  fetchSteamAchievementDetails,
+  searchSteamGames,
+  type SteamAchievement,
+} from "../services/steam";
 import ModalShell from "./ui/ModalShell";
 import GlassButton from "./ui/GlassButton";
 import { useAuth } from "../auth/AuthProvider";
@@ -25,6 +30,13 @@ interface GameDetailPanelProps {
 const MIN_LAUNCH_SCREEN_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const normalizeSteamLookup = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   game,
@@ -32,7 +44,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   onClose,
   playSound,
 }) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { t, language } = usePreferences();
   const { notify } = useNotification();
   const [isLaunching, setIsLaunching] = React.useState(false);
@@ -42,10 +54,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [currentGalleryIndex, setCurrentGalleryIndex] = React.useState(0);
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [achievementItems, setAchievementItems] = React.useState<SteamAchievement[]>([]);
+  const [achievementSourceAppId, setAchievementSourceAppId] = React.useState<string>("");
+  const [isAchievementsLoading, setIsAchievementsLoading] = React.useState(false);
+  const [achievementsError, setAchievementsError] = React.useState<string | null>(null);
 
   const copy = {
     "pt-BR": {
       tabPlay: "JOGAR",
+      tabAchievements: "CONQUISTAS",
       tabAbout: "SOBRE",
       tabManage: "GERENCIAR",
       steamLabel: "Steam",
@@ -100,9 +117,25 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removedSuccess: "Jogo removido.",
       removeError: "Erro ao remover jogo.",
       launchGenericError: "Falha ao iniciar o jogo.",
+      achievementsLoading: "Buscando conquistas da Steam...",
+      achievementsEmpty: "Nenhuma conquista encontrada para este jogo.",
+      achievementsSource: "Suas conquistas",
+      achievementsSteamFallback: "Steam",
+      achievementsSteamFallbackHint:
+        "Jogo Epic usando conquistas da versão Steam vinculada.",
+      achievementsSteamLinked: "Steam vinculada",
+      achievementsSteamMatched: "Steam encontrada automaticamente",
+      achievementsNeedSteam:
+        "Conecte sua conta Steam para carregar conquistas detalhadas.",
+      achievementsMissingAppId:
+        "Este jogo não possui Steam App ID vinculado para importar conquistas.",
+      achievementsLocked: "Bloqueada",
+      achievementsUnlocked: "Desbloqueada",
+      achievementsUnlockedAt: "Desbloqueada em",
     },
     "en-US": {
       tabPlay: "PLAY",
+      tabAchievements: "ACHIEVEMENTS",
       tabAbout: "ABOUT",
       tabManage: "MANAGE",
       steamLabel: "Steam",
@@ -157,9 +190,25 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removedSuccess: "Game removed.",
       removeError: "Error removing game.",
       launchGenericError: "Failed to launch the game.",
+      achievementsLoading: "Loading Steam achievements...",
+      achievementsEmpty: "No achievements were found for this game.",
+      achievementsSource: "Your achievements",
+      achievementsSteamFallback: "Steam",
+      achievementsSteamFallbackHint:
+        "Epic game using achievements from the linked Steam version.",
+      achievementsSteamLinked: "Linked Steam version",
+      achievementsSteamMatched: "Steam version matched automatically",
+      achievementsNeedSteam:
+        "Connect your Steam account to load detailed achievements.",
+      achievementsMissingAppId:
+        "This game does not have a linked Steam App ID for importing achievements.",
+      achievementsLocked: "Locked",
+      achievementsUnlocked: "Unlocked",
+      achievementsUnlockedAt: "Unlocked on",
     },
     "es-ES": {
       tabPlay: "JUGAR",
+      tabAchievements: "LOGROS",
       tabAbout: "ACERCA DE",
       tabManage: "GESTIONAR",
       steamLabel: "Steam",
@@ -214,12 +263,28 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       removedSuccess: "Juego eliminado.",
       removeError: "Error al eliminar el juego.",
       launchGenericError: "No se pudo iniciar el juego.",
+      achievementsLoading: "Cargando logros de Steam...",
+      achievementsEmpty: "No se encontraron logros para este juego.",
+      achievementsSource: "Tus logros",
+      achievementsSteamFallback: "Steam",
+      achievementsSteamFallbackHint:
+        "Juego de Epic usando logros de la versión vinculada de Steam.",
+      achievementsSteamLinked: "Versión de Steam vinculada",
+      achievementsSteamMatched: "Versión de Steam encontrada automáticamente",
+      achievementsNeedSteam:
+        "Conecta tu cuenta de Steam para cargar los logros detallados.",
+      achievementsMissingAppId:
+        "Este juego no tiene un Steam App ID vinculado para importar logros.",
+      achievementsLocked: "Bloqueado",
+      achievementsUnlocked: "Desbloqueado",
+      achievementsUnlockedAt: "Desbloqueado el",
     },
   }[language];
 
   const locale =
     language === "en-US" ? "en-US" : language === "es-ES" ? "es-ES" : "pt-BR";
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     setActiveTab(copy.tabPlay);
     setLaunchError(null);
@@ -229,6 +294,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setIsDeleting(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Navegação por teclado na galeria: ← → para trocar imagem, Esc para fechar.
   React.useEffect(() => {
@@ -253,6 +319,88 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [galleryModalOpen, game?.screenshots, playSound]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadAchievements = async () => {
+      setAchievementItems([]);
+      setAchievementSourceAppId("");
+      setAchievementsError(null);
+
+      if (!game?.id) return;
+      if (!userProfile?.steamId) {
+        setAchievementsError(copy.achievementsNeedSteam);
+        return;
+      }
+
+      setIsAchievementsLoading(true);
+
+      try {
+        let resolvedAppId = String(game.steamAppId || "").trim();
+
+        if (!resolvedAppId && game.launcherType === "epic") {
+          const results = await searchSteamGames(game.title);
+          const normalizedTitle = normalizeSteamLookup(game.title);
+          const matched = results.find((candidate) => {
+            const rawName =
+              typeof candidate.name === "string"
+                ? candidate.name
+                : typeof candidate.title === "string"
+                  ? candidate.title
+                  : "";
+            return normalizeSteamLookup(rawName) === normalizedTitle;
+          });
+
+          if (matched && matched.id != null) {
+            resolvedAppId = String(matched.id).trim();
+          }
+        }
+
+        if (!resolvedAppId) {
+          setAchievementsError(copy.achievementsMissingAppId);
+          return;
+        }
+
+        const result = await fetchSteamAchievementDetails(
+          userProfile.steamId,
+          resolvedAppId,
+        );
+
+        if (cancelled) return;
+
+        setAchievementSourceAppId(resolvedAppId);
+        setAchievementItems(result.achievements);
+
+        if (result.achievements.length === 0) {
+          setAchievementsError(copy.achievementsEmpty);
+        }
+      } catch {
+        if (!cancelled) {
+          setAchievementsError(copy.achievementsEmpty);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAchievementsLoading(false);
+        }
+      }
+    };
+
+    void loadAchievements();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    copy.achievementsEmpty,
+    copy.achievementsMissingAppId,
+    copy.achievementsNeedSteam,
+    game?.id,
+    game?.launcherType,
+    game?.steamAppId,
+    game?.title,
+    userProfile?.steamId,
+  ]);
+
   if (!game) return null;
 
   const heroImage = game.backgroundImage || game.image;
@@ -275,6 +423,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     achievementsTotal > 0
       ? Math.round((achievementsDone / achievementsTotal) * 100)
       : 0;
+  const detailedAchievementsUnlocked = achievementItems.filter(
+    (achievement) => achievement.achieved,
+  ).length;
+  const detailedAchievementPercent =
+    achievementItems.length > 0
+      ? Math.round((detailedAchievementsUnlocked / achievementItems.length) * 100)
+      : 0;
   const lastSessionSource =
     game.launcherType === "steam"
       ? game.steamLastPlayedAt || game.lastPlayedAt
@@ -292,12 +447,25 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  const achievementSourceLabel =
+    game.launcherType === "epic" && achievementSourceAppId
+      ? game.steamAppId
+        ? copy.achievementsSteamLinked
+        : copy.achievementsSteamMatched
+      : achievementSourceAppId
+        ? copy.steamLabel
+        : copy.achievementsSteamFallback;
 
   const formatHours = (hours: number = 0) => {
     const h = Math.floor(hours);
     const m = Math.floor((hours - h) * 60);
     return `${h}H ${m}M`;
   };
+
+  const formatAchievementDate = (unixTime: number) =>
+    unixTime > 0
+      ? new Date(unixTime * 1000).toLocaleDateString(locale)
+      : null;
 
   const handleLaunch = async () => {
     if (isLaunching) return;
@@ -421,6 +589,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   }}
                 />
                 <NavTab
+                  label={copy.tabAchievements}
+                  active={activeTab === copy.tabAchievements}
+                  onClick={() => {
+                    setActiveTab(copy.tabAchievements);
+                    playSound("navigate");
+                  }}
+                />
+                <NavTab
                   label={copy.tabManage}
                   active={activeTab === copy.tabManage}
                   onClick={() => {
@@ -482,9 +658,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   isEmpty={!lastSessionSource}
                 />
                 <AchievementStat
-                  total={achievementsTotal}
-                  done={achievementsDone}
-                  percent={achievementPercent}
+                  total={achievementItems.length || achievementsTotal}
+                  done={achievementItems.length ? detailedAchievementsUnlocked : achievementsDone}
+                  percent={achievementItems.length ? detailedAchievementPercent : achievementPercent}
                   label={copy.achievements}
                 />
               </motion.div>
@@ -689,6 +865,78 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               ))}
                             </div>
                           </motion.div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === copy.tabAchievements && (
+                    <motion.div
+                      key="achievements-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="max-w-3xl"
+                    >
+                      <div className="flex flex-col gap-6">
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: false, amount: 0.2 }}
+                          className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.3em] text-white/35">
+                                {copy.achievementsSource}
+                              </p>
+                              <p className="text-sm font-semibold text-white/85">
+                                {achievementSourceLabel}
+                              </p>
+                              {game.launcherType === "epic" && achievementSourceAppId && (
+                                <p className="mt-2 text-xs text-white/45">
+                                  {copy.achievementsSteamFallbackHint}
+                                </p>
+                              )}
+                            </div>
+                            <div className="min-w-[120px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
+                                {copy.achievements}
+                              </p>
+                              <p className="mt-2 text-2xl font-light text-white">
+                                {achievementItems.length
+                                  ? `${detailedAchievementsUnlocked}/${achievementItems.length}`
+                                  : `${achievementsDone}/${achievementsTotal}`}
+                              </p>
+                            </div>
+                          </div>
+                        </motion.div>
+
+                        {isAchievementsLoading && (
+                          <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.03] text-sm text-white/55">
+                            {copy.achievementsLoading}
+                          </div>
+                        )}
+
+                        {!isAchievementsLoading && achievementsError && achievementItems.length === 0 && (
+                          <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-6 text-center text-sm text-white/45">
+                            {achievementsError}
+                          </div>
+                        )}
+
+                        {!isAchievementsLoading && achievementItems.length > 0 && (
+                          <div className="grid gap-3 pb-8">
+                            {achievementItems.map((achievement) => (
+                              <AchievementRow
+                                key={achievement.apiName}
+                                achievement={achievement}
+                                lockedLabel={copy.achievementsLocked}
+                                unlockedLabel={copy.achievementsUnlocked}
+                                unlockedAtLabel={copy.achievementsUnlockedAt}
+                                formatDate={formatAchievementDate}
+                              />
+                            ))}
+                          </div>
                         )}
                       </div>
                     </motion.div>
@@ -1092,6 +1340,75 @@ const AchievementStat: React.FC<{
           transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
           className="h-full bg-white rounded-full"
         />
+      </div>
+    </div>
+  );
+};
+
+const AchievementRow: React.FC<{
+  achievement: SteamAchievement;
+  lockedLabel: string;
+  unlockedLabel: string;
+  unlockedAtLabel: string;
+  formatDate: (unixTime: number) => string | null;
+}> = ({
+  achievement,
+  lockedLabel,
+  unlockedLabel,
+  unlockedAtLabel,
+  formatDate,
+}) => {
+  const unlockedAt = formatDate(achievement.unlockTime);
+
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-[24px] border p-4 transition-colors ${
+        achievement.achieved
+          ? "border-emerald-400/20 bg-emerald-500/[0.08]"
+          : "border-white/10 bg-white/[0.035]"
+      }`}
+    >
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+        {achievement.icon || achievement.iconGray ? (
+          <img
+            src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon}
+            alt=""
+            className={`h-full w-full object-cover ${achievement.achieved ? "" : "opacity-45 grayscale"}`}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <Trophy className="h-6 w-6 text-white/25" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h4 className="truncate text-sm font-semibold text-white">
+              {achievement.name}
+            </h4>
+            <p className="mt-1 text-xs leading-relaxed text-white/55">
+              {achievement.description || " "}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
+              achievement.achieved
+                ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200/90"
+                : "border-white/10 bg-white/5 text-white/35"
+            }`}
+          >
+            {achievement.achieved ? unlockedLabel : lockedLabel}
+          </span>
+        </div>
+
+        {achievement.achieved && unlockedAt && (
+          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
+            {unlockedAtLabel} <span className="ml-1 text-white/55">{unlockedAt}</span>
+          </p>
+        )}
       </div>
     </div>
   );

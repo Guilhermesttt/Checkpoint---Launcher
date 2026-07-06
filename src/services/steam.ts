@@ -14,10 +14,10 @@ import {
   userGamesCollectionRef,
 } from "./firestorePaths";
 
-const clean = (obj: any) => {
+const clean = <T extends Record<string, unknown>>(obj: T) => {
   const newObj = { ...obj };
   Object.keys(newObj).forEach(
-    (key) => newObj[key] === undefined && delete newObj[key],
+    (key) => newObj[key as keyof T] === undefined && delete newObj[key as keyof T],
   );
   return newObj;
 };
@@ -93,6 +93,17 @@ export interface SteamAppDetails {
   sizeGB?: number | null;
 }
 
+export interface SteamAchievement {
+  apiName: string;
+  achieved: boolean;
+  unlockTime: number;
+  name: string;
+  description: string;
+  icon: string;
+  iconGray: string;
+  hidden: boolean;
+}
+
 export type SteamAppDetailsFetchResult =
   | { ok: true; data: SteamAppDetails }
   | { ok: false; message: string };
@@ -158,6 +169,53 @@ export const fetchSteamAchievements = async (
   }
 };
 
+export const fetchSteamAchievementDetails = async (
+  steamId: string,
+  appId: string,
+): Promise<{
+  achievements: SteamAchievement[];
+  total: number;
+  unlocked: number;
+}> => {
+  const url = apiUrl(
+    `/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}`,
+  );
+
+  try {
+    const response = await fetch(url, { headers: await getAuthHeaders() });
+    if (!response.ok) {
+      return { achievements: [], total: 0, unlocked: 0 };
+    }
+
+    const data = (await response.json()) as {
+      achievements?: SteamAchievement[];
+      total?: number;
+      unlocked?: number;
+    };
+
+    return {
+      achievements: Array.isArray(data.achievements) ? data.achievements : [],
+      total: typeof data.total === "number" ? data.total : 0,
+      unlocked: typeof data.unlocked === "number" ? data.unlocked : 0,
+    };
+  } catch {
+    return { achievements: [], total: 0, unlocked: 0 };
+  }
+};
+
+export const searchSteamGames = async (query: string) => {
+  const response = await fetch(
+    apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
+  );
+
+  if (!response.ok) {
+    throw new Error("Falha ao buscar jogos na Steam.");
+  }
+
+  const payload = (await response.json()) as { items?: Array<Record<string, unknown>> };
+  return payload.items ?? [];
+};
+
 export const fetchSteamAppDetails = async (
   appId: string,
 ): Promise<SteamAppDetails | null> => {
@@ -177,7 +235,9 @@ export const fetchSteamLibrary = async (
     try {
       const body = (await response.json()) as { error?: string };
       if (body.error) message = body.error;
-    } catch {}
+    } catch {
+      // Preserve fallback message when the backend does not return JSON.
+    }
     throw new Error(message);
   }
   return (await response.json()) as SteamLibraryResponse;
