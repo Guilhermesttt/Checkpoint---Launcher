@@ -1,0 +1,13 @@
+{
+  "gameId": "demo-game",
+  "unlockedAchievements": {
+    "first-blood": {
+      "id": "first-blood",
+      "name": "Primeiro Abate",
+      "description": "Teste local",
+      "icon": "file:///tmp/test.png",
+      "unlockedAt": "2026-07-05T14:56:53.191Z"
+    }
+  },
+  "updatedAt": "2026-07-05T14:56:53.191Z"
+}

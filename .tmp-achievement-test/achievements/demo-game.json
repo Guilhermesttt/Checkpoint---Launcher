@@ -1,0 +1,10 @@
+{
+  "achievements": [
+    {
+      "id": "first-blood",
+      "name": "Primeiro Abate",
+      "description": "Teste local",
+      "icon": "file:///tmp/test.png"
+    }
+  ]
+}

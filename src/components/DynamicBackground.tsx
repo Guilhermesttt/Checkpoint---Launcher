@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 interface DynamicBackgroundProps {
@@ -48,8 +48,8 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
         className="absolute inset-0 transition-[background] duration-700"
         style={{
           background:
-            "radial-gradient(circle at 76% 18%, var(--launcher-tint), transparent 34%), radial-gradient(circle at 18% 82%, var(--launcher-accent-soft), transparent 42%)",
-          opacity: 0.65,
+            "radial-gradient(circle at 76% 18%, rgb(var(--launcher-accent) / 0.20), transparent 45%), radial-gradient(circle at 18% 82%, rgb(var(--launcher-accent) / 0.28), transparent 50%)",
+          opacity: 1,
         }}
       />
 

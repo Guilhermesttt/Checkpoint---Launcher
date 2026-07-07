@@ -1845,6 +1845,38 @@ const Home: React.FC = () => {
         reducedEffects={isAnyModalOpen}
       />
 
+      {/* Hero Section Gradient */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-[#050507] via-[#050507]/70 to-transparent"
+        style={{ left: 96 }}
+      />
+
+      {/* Widgets flutuantes (Pulso, Amigos) com animação sincronizada ao jogo */}
+      {activeCategory === "ALL" && !isLoading && (
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={`widgets-${currentGame?.id}`}
+            initial={{ opacity: 0, filter: "blur(8px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, filter: "blur(4px)" }}
+            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <HomeOverviewPanels
+              continuePlaying={continuePlayingGames}
+              favoriteGames={favoriteShowcaseGames}
+              friendsPlaying={friendsPlayingNow}
+              recentActivity={recentOverviewActivity}
+              onOpenGame={openDetails}
+              onOpenFriends={() => setActiveCategory("FRIENDS")}
+              onOpenFriendChat={openFriendChatFromOverview}
+              t={t}
+            />
+          </motion.div>
+        </AnimatePresence>
+      )}
+
+
+
       <Sidebar
         activeCategory={activeCategory}
         onCategory={setActiveCategory}
@@ -2214,9 +2246,8 @@ const Home: React.FC = () => {
                         /{displayGames.length}
                       </p>
                       <h1
-                        className="font-black tracking-tighter text-white uppercase leading-none"
+                        className="tracking-wide font-black uppercase text-6xl text-white leading-none"
                         style={{
-                          fontSize: "clamp(2.5rem, 5vw, 4.8rem)",
                           textShadow: "0 8px 48px rgba(0,0,0,0.85)",
                           maxWidth: "75vw",
                           overflow: "hidden",
@@ -2303,18 +2334,7 @@ const Home: React.FC = () => {
               </motion.div>
 
               <div className="shrink-0 pb-14">
-                {activeCategory === "ALL" && (
-                  <HomeOverviewPanels
-                    continuePlaying={continuePlayingGames}
-                    favoriteGames={favoriteShowcaseGames}
-                    friendsPlaying={friendsPlayingNow}
-                    recentActivity={recentOverviewActivity}
-                    onOpenGame={openDetails}
-                    onOpenFriends={() => setActiveCategory("FRIENDS")}
-                    onOpenFriendChat={openFriendChatFromOverview}
-                    t={t}
-                  />
-                )}
+
                 <AnimatePresence mode="popLayout" initial={false}>
                   <motion.div
                     key={activeCategory}

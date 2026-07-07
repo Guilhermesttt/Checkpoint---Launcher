@@ -130,7 +130,7 @@ const GameCard: React.FC<GameCardProps> = ({
       onMouseLeave={handleMouseLeave}
       aria-label={title}
       aria-pressed={isActive}
-      className="relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+      className="group relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
       style={{
         width: CARD_FRAME_WIDTH,
         height: CARD_FRAME_HEIGHT,
@@ -169,17 +169,16 @@ const GameCard: React.FC<GameCardProps> = ({
         }
       >
         <div
-          className={`relative h-full w-full overflow-hidden rounded-2xl border bg-gray-900 transition-[transform,box-shadow,border-color] duration-300 ${
-            isActive
-              ? "border-white/25 shadow-[0_20px_48px_rgba(0,0,0,0.78)]"
-              : "border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.6)]"
-          }`}
+          className={`relative h-full w-full overflow-hidden rounded-2xl bg-gray-900 transition-all duration-300 ease-out transform group-hover:scale-105 group-hover:ring-2 group-hover:ring-orange-500/50 ${isActive
+              ? "shadow-[0_20px_48px_rgba(0,0,0,0.78),0_0_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
+              : "shadow-[0_8px_32px_rgba(0,0,0,0.6)] group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.8),0_0_15px_rgba(255,165,0,0.15)]"
+            }`}
           style={
             isActive
               ? {
-                  boxShadow:
-                    "0 20px 48px rgba(0,0,0,0.78), 0 0 0 1px rgba(255,255,255,0.22), 0 0 28px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
-                }
+                boxShadow:
+                  "0 20px 48px rgba(0,0,0,0.78), 0 0 0 1px rgba(255,255,255,0.22), 0 0 28px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
+              }
               : undefined
           }
         >
@@ -210,11 +209,10 @@ const GameCard: React.FC<GameCardProps> = ({
             <img
               src={image}
               alt={title}
-              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${
-                isActive && !reduceMotion
+              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${isActive && !reduceMotion
                   ? "scale-110 duration-[10000ms]"
                   : "scale-100 duration-500"
-              }`}
+                }`}
               loading="lazy"
               decoding="async"
               draggable={false}
@@ -227,8 +225,8 @@ const GameCard: React.FC<GameCardProps> = ({
             className="absolute inset-0 transition-colors duration-500"
             style={{
               background: isActive
-                ? "linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.85) 85%, rgba(0,0,0,0.95) 100%)"
-                : "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0.7) 100%)",
+                ? "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.1) 35%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0.95) 100%)"
+                : "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.75) 100%)",
             }}
           />
 
@@ -314,47 +312,49 @@ const GameCard: React.FC<GameCardProps> = ({
             )}
           </div>
 
+          {/* NOVO: Layout cinematográfico integrado de texto sem caixa sólida de fundo */}
           <div
-            className={`absolute bottom-0 left-0 right-0 z-30 p-4 transition-all duration-400 ${
-              isActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-            }`}
+            className={`absolute bottom-0 left-0 right-0 z-30 px-3.5 pb-4 pt-10 transition-all duration-400 bg-gradient-to-t from-black/95 via-black/50 to-transparent backdrop-blur-2xs ${isActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+              }`}
             style={{ transform: "translateZ(30px)" }}
           >
-            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-1.5">
               Iniciar
+              {isActive && (
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                </span>
+              )}
             </p>
-            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-white">
+            <h3 className="line-clamp-2 text-xs font-bold leading-snug text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
               {title}
             </h3>
           </div>
 
-          {isActive && (
-            <div
-              className="absolute inset-0 z-30 flex items-center justify-center opacity-100 transition-opacity duration-300"
-              style={{ transform: "translateZ(40px)" }}
+          <div
+            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+            style={{ transform: "translateZ(40px)" }}
+          >
+            <motion.div
+              initial={reduceMotion ? false : { scale: isActive ? 1 : 0.8, opacity: isActive ? 1 : 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={
+                reduceMotion
+                  ? { duration: 0.18 }
+                  : { type: "spring", stiffness: 400, damping: 25, delay: 0.1 }
+              }
+              className="flex h-14 w-14 items-center justify-center rounded-full shadow-2xl backdrop-blur-xl bg-white/10 border border-white/20"
             >
-              <motion.div
-                initial={reduceMotion ? false : { scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={
-                  reduceMotion
-                    ? { duration: 0.18 }
-                    : { type: "spring", stiffness: 400, damping: 25, delay: 0.1 }
-                }
-                className="flex h-14 w-14 items-center justify-center rounded-full shadow-2xl"
-                style={{
-                  background: "rgba(255,255,255,0.15)",
-                  border: "1.5px solid rgba(255,255,255,0.4)",
-                  backdropFilter: "blur(12px)",
-                }}
-              >
-                <Play
-                  className="h-6 w-6 fill-white text-white"
-                  style={{ marginLeft: 3 }}
-                />
-              </motion.div>
-            </div>
-          )}
+              <div
+                className="absolute inset-0 rounded-full bg-white opacity-0 transition-opacity duration-300 group-hover:opacity-10"
+              />
+              <Play
+                className="h-6 w-6 fill-white text-white"
+                style={{ marginLeft: 3 }}
+              />
+            </motion.div>
+          </div>
         </div>
 
         {isActive && (

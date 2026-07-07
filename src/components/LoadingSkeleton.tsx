@@ -16,17 +16,7 @@ const LoadingSkeleton: React.FC = () => {
               height: i === 1 ? 340 : 260,
             }}
           >
-            <motion.div
-              animate={{
-                opacity: [0.3, 0.6, 0.3],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="w-full h-full rounded-2xl premium-glass-black border border-white/5 opacity-50"
-            />
+            <div className="w-full h-full rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse shadow-[0_0_20px_rgba(255,255,255,0.02)] backdrop-blur-sm" />
           </div>
         ))}
       </div>

@@ -27,8 +27,6 @@ interface GameDetailPanelProps {
   onEditGame?: (game: Game) => void;
 }
 
-// Tempo mínimo (ms) que a tela de "abrindo jogo" fica visível, só pra não piscar
-// caso o launchGame() resolva quase instantaneamente.
 const MIN_LAUNCH_SCREEN_MS = 1200;
 
 const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -318,7 +316,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setNewAchDesc("");
   };
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     setActiveTab(copy.tabPlay);
     setLaunchError(null);
@@ -327,11 +324,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setDeleteModalOpen(false);
     setIsDeleting(false);
     setAchievementsRequested(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Navegação por teclado na galeria: ← → para trocar imagem, Esc para fechar.
   React.useEffect(() => {
     if (!galleryModalOpen || !game?.screenshots?.length) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -354,7 +348,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [galleryModalOpen, game?.screenshots, playSound]);
 
-  // Load achievements immediately so the summary sidebar card can display progress
   React.useEffect(() => {
     let cancelled = false;
 
@@ -405,7 +398,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
         if (cancelled) return;
 
-        // Salva as definições localmente para a ponte de conquistas usar
         if (result.achievements && result.achievements.length > 0 && window.electronAPI?.saveLocalAchievementDefinitions) {
           try {
             await window.electronAPI.saveLocalAchievementDefinitions(
@@ -423,7 +415,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           }
         }
 
-        // Se for um jogo local, mescla com o progresso local salvo pela ponte
         if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementProgress) {
           try {
             const localProgress = await window.electronAPI.getLocalAchievementProgress(game.id);
@@ -450,7 +441,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           }
         }
 
-        // NOVO: Mesclar com o estado retroativo direto do emulador Goldberg/outros (arquivos locais do AppData)
         if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementState) {
           try {
             const retroactiveState = await window.electronAPI.getLocalAchievementState(resolvedAppId);
@@ -509,18 +499,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     userProfile?.steamId,
   ]);
 
-  // Ref para guardar a versão mais recente dos items sem causar re-render,
-  // permitindo que o listener acesse os metadados frescos das conquistas.
   const latestAchievementsRef = React.useRef(achievementItems);
   React.useEffect(() => {
     latestAchievementsRef.current = achievementItems;
   }, [achievementItems]);
 
-  // ── Real-time achievement listener (main process → renderer IPC push) ─────────
-  // Subscribes while this panel is mounted and the game is a local game.
-  // When an unlock event arrives we:
-  //   1. Mark the matching achievement as unlocked in the local list.
-  //   2. Trigger the overlay notification.
   React.useEffect(() => {
     if (!game?.id || game.launcherType !== "local") return;
     if (!window.electronAPI?.onRealtimeAchievementUnlock) return;
@@ -528,11 +511,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     const handler = window.electronAPI.onRealtimeAchievementUnlock((payload) => {
       const { achievementId, earnedTime, unlockedAt } = payload;
 
-      // Update the achievement list in-place so the UI reflects the unlock
-      // immediately — no refetch needed.
       setAchievementItems((prev) =>
         prev.map((ach) => {
-          // Match by apiName (raw emulator ID) case-insensitively.
           const isMatch =
             ach.apiName.toLowerCase() === achievementId.toLowerCase();
           if (!isMatch || ach.achieved) return ach;
@@ -544,10 +524,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           return { ...ach, achieved: true, unlockTime: unixSecs };
         })
       );
-
-      // Lemos do ref apenas por sanidade, mas o disparo real do Overlay 
-      // agora acontece no Backend (main.cjs) que tem acesso à imagem de forma nativa.
-      // O componente React agora fica apenas responsável por atualizar a interface!
     });
 
     return () => {
@@ -616,18 +592,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return `${h}H ${m}M`;
   };
 
-  /**
-   * Formats a Unix timestamp (seconds) into "DD/MM/AAAA - HH:MM".
-   * Returns null when the timestamp is 0 or missing.
-   */
   const formatAchievementDate = (unixTime: number) => {
     if (!unixTime || unixTime <= 0) return null;
     const date = new Date(unixTime * 1000);
-    const dd   = String(date.getDate()).padStart(2, "0");
-    const mm   = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
     const yyyy = date.getFullYear();
-    const hh   = String(date.getHours()).padStart(2, "0");
-    const min  = String(date.getMinutes()).padStart(2, "0");
+    const hh = String(date.getHours()).padStart(2, "0");
+    const min = String(date.getMinutes()).padStart(2, "0");
     return `${dd}/${mm}/${yyyy} - ${hh}:${min}`;
   };
 
@@ -698,14 +670,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex"
+          className="fixed inset-0 z-100 flex bg-[#050507]"
         >
           <motion.div
-            initial={{ scale: 1.1, opacity: 0 }}
+            initial={{ scale: 1.05, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.1, opacity: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0"
+            exit={{ scale: 1.05, opacity: 0 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute inset-0 origin-center"
+            style={{
+              maskImage: "linear-gradient(to left, black 40%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to left, black 40%, transparent 100%)",
+            }}
           >
             <img
               src={heroImage}
@@ -714,8 +690,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               loading="eager"
               decoding="async"
             />
-            <div className="absolute inset-0 bg-linear-to-r from-[#050507] via-[#050507]/70 to-transparent" />
-            <div className="absolute inset-0 bg-linear-to-t from-[#050507]/90 via-transparent to-[#050507]/30" />
+            <div className="absolute inset-0 bg-linear-to-r from-[#050507] via-[#050507]/80 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-[#050507] via-transparent to-[#050507]/40" />
           </motion.div>
 
           <div className="relative z-10 grid w-full h-full grid-cols-[minmax(560px,720px)_1fr] gap-8">
@@ -1051,7 +1027,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           initial={{ opacity: 0, y: 20 }}
                           whileInView={{ opacity: 1, y: 0 }}
                           viewport={{ once: false, amount: 0.2 }}
-                          className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5"
+                          className="rounded-[24px] border border-white/10 bg-white/0.04 p-5"
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
@@ -1083,13 +1059,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         </motion.div>
 
                         {isAchievementsLoading && (
-                          <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.03] text-sm text-white/55">
+                          <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-white/10 bg-white/0.03 text-sm text-white/55">
                             {copy.achievementsLoading}
                           </div>
                         )}
 
                         {!isAchievementsLoading && achievementsError && achievementItems.length === 0 && (
-                          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.03] px-6 text-center text-sm text-white/45 space-y-4">
+                          <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/0.03 px-6 text-center text-sm text-white/45 space-y-4">
                             <p>{achievementsError}</p>
                           </div>
                         )}
@@ -1184,7 +1160,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               className="flex flex-col justify-end items-end p-8 pl-0"
             >
               <div className="w-[260px] rounded-[28px] overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
-                <div className="aspect-[3/4] bg-white/5">
+                <div className="aspect-3/4 bg-white/5">
                   <img
                     src={coverImage}
                     alt={game.title}
@@ -1396,7 +1372,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 z-[200] bg-black flex flex-col items-center justify-center"
+                className="absolute inset-0 z-200 bg-black flex flex-col items-center justify-center"
               >
                 <motion.div
                   initial={{ scale: 0.8, opacity: 0 }}
@@ -1518,16 +1494,24 @@ const NavTab: React.FC<{
     onClick={onClick}
     aria-label={ariaLabel || label}
     className={`
-      px-4 py-2 rounded-full text-[10px] font-bold tracking-[0.15em] uppercase
-      transition-all duration-300 flex items-center gap-1
+      relative px-4 py-2 text-[10px] font-bold tracking-[0.15em] uppercase
+      transition-all duration-300 flex items-center gap-1 rounded-full
       ${active
-        ? "premium-glass-white text-black"
-        : "text-white/40 hover:text-white/70 hover:bg-white/10"
+        ? "text-white"
+        : "text-white/40 hover:text-white/70 hover:bg-white/5"
       }
     `}
   >
-    {icon && <span className="text-xs">{icon}</span>}
-    {label}
+    {icon && <span className="text-xs relative z-10">{icon}</span>}
+    <span className="relative z-10">{label}</span>
+    {active && (
+      <motion.div
+        layoutId="activeTab"
+        className="absolute -bottom-1 left-4 right-4 h-0.5 rounded-full"
+        style={{ background: "var(--game-color, rgb(var(--launcher-accent)))" }}
+        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      />
+    )}
   </button>
 );
 
@@ -1538,7 +1522,7 @@ const StatItem: React.FC<{
   isEmpty?: boolean;
 }> = ({ icon, label, value, isEmpty }) => (
   <div
-    className={`rounded-2xl border p-4 min-h-[94px] flex flex-col justify-between ${isEmpty ? "border-white/5 bg-white/[0.02]" : "border-white/10 bg-white/[0.055]"
+    className={`rounded-2xl border p-4 min-h-[94px] flex flex-col justify-between backdrop-blur-xl ${isEmpty ? "border-zinc-800/50 bg-zinc-900/20" : "border-zinc-800 bg-zinc-900/40"
       }`}
   >
     <div className="flex items-center gap-2 text-white/40">
@@ -1565,7 +1549,7 @@ const AchievementStat: React.FC<{
   const isEmpty = total <= 0;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 min-h-[94px] flex flex-col justify-between col-span-2">
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-xl p-4 min-h-[94px] flex flex-col justify-between col-span-2">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2 text-white/40">
           <Trophy className="w-4 h-4" />
@@ -1619,75 +1603,78 @@ const AchievementRow: React.FC<{
   formatDate,
   onManualUnlock,
 }) => {
-  const unlockedAt = formatDate(achievement.unlockTime);
+    const unlockedAt = formatDate(achievement.unlockTime);
 
-  return (
-    <div
-      className={`flex items-center gap-4 rounded-[24px] border p-4 transition-colors ${
-        achievement.achieved
-          ? "border-emerald-400/20 bg-emerald-500/[0.08]"
-          : "border-white/10 bg-white/[0.035]"
-      }`}
-    >
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/25">
-        {achievement.icon || achievement.iconGray ? (
-          <img
-            src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon}
-            alt=""
-            className={`h-full w-full object-cover ${achievement.achieved ? "" : "opacity-45 grayscale"}`}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <Trophy className="h-6 w-6 text-white/25" />
-        )}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h4 className="truncate text-sm font-semibold text-white">
-              {achievement.name}
-            </h4>
-            <p className="mt-1 text-xs leading-relaxed text-white/55">
-              {achievement.description || " "}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {!achievement.achieved && onManualUnlock && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onManualUnlock();
-                }}
-                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/10 hover:text-white"
-              >
-                Desbloquear
-              </button>
-            )}
-            <span
-              className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] ${
-                achievement.achieved
-                  ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200/90"
-                  : "border-white/10 bg-white/5 text-white/35"
-              }`}
-            >
-              {achievement.achieved ? unlockedLabel : lockedLabel}
-            </span>
-          </div>
+    return (
+      <div
+        className={`flex items-center gap-4 py-4 transition-all duration-300 px-4 -mx-4 rounded-xl ${achievement.achieved
+          ? "bg-linear-to-r from-emerald-500/12 via-emerald-500/6 to-transparent border border-emerald-500/15 shadow-[0_4px_20px_rgba(16,185,129,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] hover:from-emerald-500/18 hover:via-emerald-500/10"
+          : "border border-transparent border-b-white/5 hover:bg-white/0.02"
+          }`}
+      >
+        <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-black/25 transition-all duration-300 ${achievement.achieved
+          ? "border-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+          : "border-white/10 grayscale contrast-75 opacity-40"
+          }`}>
+          {achievement.icon || achievement.iconGray ? (
+            <img
+              src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <Trophy className="h-6 w-6 text-white/25" />
+          )}
         </div>
 
-        {achievement.achieved && unlockedAt && (
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.24em] text-white/35">
-            {unlockedAtLabel} <span className="ml-1 text-white/55">{unlockedAt}</span>
-          </p>
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h4 className={`truncate text-sm font-bold tracking-wide transition-all ${achievement.achieved ? "text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "text-white/80"
+                }`}>
+                {achievement.name}
+              </h4>
+              <p className={`mt-1 text-xs leading-relaxed transition-colors ${achievement.achieved ? "text-zinc-300" : "text-white/55"
+                }`}>
+                {achievement.description || " "}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!achievement.achieved && onManualUnlock && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onManualUnlock();
+                  }}
+                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/10 hover:text-white"
+                >
+                  Desbloquear
+                </button>
+              )}
+              <span
+                className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-all ${achievement.achieved
+                  ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                  : "border-white/10 bg-white/5 text-white/35"
+                  }`}
+              >
+                {achievement.achieved ? unlockedLabel : lockedLabel}
+              </span>
+            </div>
+          </div>
+
+          {achievement.achieved && unlockedAt && (
+            <p className="mt-2.5 text-xs text-emerald-400/80 font-semibold tracking-[0.05em]">
+              {unlockedAtLabel} <span className="ml-1 text-white/90 font-medium">{unlockedAt}</span>
+            </p>
+          )}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 const TechnicalDetail: React.FC<{
   label: string;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen, Tray } = require("electron");
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -60,6 +60,7 @@ let overlayWindow;
 let achievementBridge;
 let startupErrorShown = false;
 let isQuitting = false;
+let tray = null;
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -889,14 +890,28 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     // código null, mas NÃO dispara "spawn". Usamos isso para não encerrar o watcher
     // prematuramente quando o jogo é iniciado via shell.openPath como fallback.
     let didSpawn = false;
-    child.once("spawn", () => { didSpawn = true; });
+    child.once("spawn", () => {
+      didSpawn = true;
+      if (mainWindow) {
+        mainWindow.hide();
+      }
+    });
 
     // Registra os hooks de saída ANTES do unref() — o evento ainda é emitido
     // mesmo após o processo pai "desacoplar" do filho via unref().
     // Só encerra o watcher se o processo realmente havia iniciado.
     const registerExitHook = (stopFn) => {
-      child.once("exit", () => { if (didSpawn) stopFn(); });
-      child.once("close", () => { if (didSpawn) stopFn(); });
+      const handleExit = () => {
+        if (didSpawn) {
+          stopFn();
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        }
+      };
+      child.once("exit", handleExit);
+      child.once("close", handleExit);
     };
 
     // Inicia o watcher usando o hook de saída do child process.
@@ -1172,6 +1187,27 @@ ipcMain.handle("game:scan-local", async (_event) => {
 
 app.whenReady().then(async () => {
   try {
+    const iconPath = path.join(app.getAppPath(), "assets", "icon.png");
+    try {
+      if (fs.existsSync(iconPath)) {
+        tray = new Tray(iconPath);
+        const contextMenu = Menu.buildFromTemplate([
+          { label: "Abrir Checkpoint", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+          { label: "Sair", click: () => { isQuitting = true; app.quit(); } }
+        ]);
+        tray.setToolTip("Checkpoint Launcher");
+        tray.setContextMenu(contextMenu);
+        tray.on("double-click", () => {
+          if (mainWindow) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("Não foi possível inicializar a System Tray:", e);
+    }
+
     createOverlayWindow();
     screen.on("display-metrics-changed", syncOverlayBounds);
     screen.on("display-added", syncOverlayBounds);
