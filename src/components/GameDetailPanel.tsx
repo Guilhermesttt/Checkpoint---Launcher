@@ -354,9 +354,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [galleryModalOpen, game?.screenshots, playSound]);
 
-  // Lazy achievement loading: only fetch when the achievements tab becomes active
+  // Load achievements immediately so the summary sidebar card can display progress
   React.useEffect(() => {
-    if (!achievementsRequested) return;
     let cancelled = false;
 
     const loadSteamAchievements = async () => {
@@ -500,7 +499,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       cancelled = true;
     };
   }, [
-    achievementsRequested,
     copy.achievementsEmpty,
     copy.achievementsMissingAppId,
     copy.achievementsNeedSteam,
