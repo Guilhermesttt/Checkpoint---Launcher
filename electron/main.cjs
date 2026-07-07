@@ -584,8 +584,12 @@ async function injectGoldbergDefinitions(appId, settingsPath) {
     let currentSaves = {};
     if (fs.existsSync(paths.savePath)) {
       try {
-        currentSaves = JSON.parse(await fs.promises.readFile(paths.savePath, "utf8"));
-      } catch { /* ignora erro de parse */ }
+        const raw = await fs.promises.readFile(paths.savePath, "utf8");
+        const normalized = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+        currentSaves = JSON.parse(normalized);
+      } catch (e) {
+        console.error(`[goldberg-injector] Erro de parse no save atual:`, e);
+      }
     }
 
     let modified = false;
