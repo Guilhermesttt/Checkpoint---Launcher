@@ -489,9 +489,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           : null;
       const d = details?.ok ? details.data : null;
 
+      const gameTitle = d?.title || game.title || game.name || "";
+      let resolvedSteamAppId = "";
+
+      // Buscar equivalência na Steam em segundo plano para obter as conquistas
+      if (gameTitle) {
+        try {
+          const resp = await fetch(
+            apiUrl(`/api/steam/search?query=${encodeURIComponent(gameTitle)}`),
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            const items = data.items || [];
+            const match = items.find(
+              (item: any) =>
+                String(item.name || "").toLowerCase() === gameTitle.toLowerCase(),
+            ) || items[0];
+            if (match) {
+              resolvedSteamAppId = String(match.id);
+            }
+          }
+        } catch (err) {
+          console.error("Erro ao buscar conquistas equivalentes na Steam:", err);
+        }
+      }
+
       setFormData((prev) => ({
         ...prev,
-        title: d?.title || game.title || game.name || "",
+        title: gameTitle,
         image: d?.cardImage || game.cardImage || game.tiny_image || game.image || "",
         cardImage: d?.cardImage || game.cardImage || game.tiny_image || game.image || "",
         backgroundImage: d?.backgroundImage || game.backgroundImage || game.image || "",
@@ -500,7 +525,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
         launcherType: "epic",
         executablePath: isWindowsExecutablePath(prev.executablePath) ? prev.executablePath : "",
-        steamAppId: prev.steamAppId || "",
+        steamAppId: resolvedSteamAppId || prev.steamAppId || "",
         epicCatalogId: catalogId,
         epicLaunchId: launchId,
         epicStoreUrl: game.productUrl || "",
@@ -783,29 +808,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
             </div>
 
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                <Search size={14} className="text-white/20" /> {copy.steamSearch}
-                ({copy.optional})
-              </label>
-              <div className="relative">
-                <input
-                  value={searchQuery}
-                  onChange={(e) => {
-                    scheduleSearch(e.target.value, "steam");
-                  }}
-                  placeholder={copy.searchPlaceholder}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
-                />
-                <GameSearchDropdown
-                  results={searchResults}
-                  isSearching={isSearching}
-                  hasQuery={searchQuery.length >= 3}
-                  noResultsLabel={copy.noSearchResults}
-                  onSelect={handleSelectSteamGame}
-                />
+            {formData.launcherType !== "epic" && (
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                  <Search size={14} className="text-white/20" /> {copy.steamSearch}
+                  ({copy.optional})
+                </label>
+                <div className="relative">
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => {
+                      scheduleSearch(e.target.value, "steam");
+                    }}
+                    placeholder={copy.searchPlaceholder}
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
+                  />
+                  <GameSearchDropdown
+                    results={searchResults}
+                    isSearching={isSearching}
+                    hasQuery={searchQuery.length >= 3}
+                    noResultsLabel={copy.noSearchResults}
+                    onSelect={handleSelectSteamGame}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {formData.launcherType === "epic" && (
               <div className="space-y-4">

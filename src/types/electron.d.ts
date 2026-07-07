@@ -40,9 +40,13 @@ declare global {
         >;
         updatedAt: string;
       } | null>;
+      getLocalAchievementState: (
+        appId: string
+      ) => Promise<{ [id: string]: { earned: boolean; earnedTime: number } }>;
       saveLocalAchievementDefinitions: (
         gameId: string,
-        definitions: Array<{ id: string; name: string; description: string; icon?: string }>
+        definitions: Array<{ id: string; name: string; description: string; icon?: string }>,
+        steamAppId?: string
       ) => Promise<boolean>;
       unlockLocalAchievement: (
         gameId: string,
@@ -60,6 +64,37 @@ declare global {
         messageText: string;
         avatarUrl?: string;
       }) => Promise<void>;
+
+      // ─ Real-time achievement push events (main → renderer) ─────────────────
+      /**
+       * Registers a listener that fires every time the main process detects a
+       * newly unlocked achievement from the local emulator's save file.
+       * Returns the internal handler reference — keep it to call
+       * `removeRealtimeAchievementUnlock` later and avoid memory leaks.
+       */
+      onRealtimeAchievementUnlock: (
+        callback: (payload: RealtimeAchievementPayload) => void
+      ) => RealtimeAchievementHandler;
+      /** Removes a previously registered real-time achievement listener. */
+      removeRealtimeAchievementUnlock: (
+        handler: RealtimeAchievementHandler
+      ) => void;
     };
   }
+
+  /** Payload pushed by the main process when an achievement is detected as newly unlocked. */
+  interface RealtimeAchievementPayload {
+    /** Watcher key used internally (e.g. "steam_3764200"). */
+    gameId: string;
+    /** Raw achievement ID as stored by the emulator (e.g. "ACH_WIN_GAME"). */
+    achievementId: string;
+    /** Unix timestamp in seconds from the emulator (0 if unknown). */
+    earnedTime: number;
+    /** ISO 8601 date string derived from earnedTime (or Date.now() as fallback). */
+    unlockedAt: string;
+  }
+
+  /** Opaque handle returned by onRealtimeAchievementUnlock — used for cleanup. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type RealtimeAchievementHandler = (...args: any[]) => void;
 }

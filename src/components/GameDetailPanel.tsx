@@ -394,7 +394,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           return;
         }
 
-        const result =
+        let result =
           game.launcherType === "local"
             ? await fetchSteamAchievementSchema(resolvedAppId)
             : userProfile?.steamId
@@ -405,6 +405,73 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               : await fetchSteamAchievementSchema(resolvedAppId);
 
         if (cancelled) return;
+
+        // Salva as definições localmente para a ponte de conquistas usar
+        if (result.achievements && result.achievements.length > 0 && window.electronAPI?.saveLocalAchievementDefinitions) {
+          try {
+            await window.electronAPI.saveLocalAchievementDefinitions(
+              game.id,
+              result.achievements.map((ach) => ({
+                id: ach.apiName,
+                name: ach.name,
+                description: ach.description,
+                icon: ach.icon,
+              })),
+              String(resolvedAppId)
+            );
+          } catch (e) {
+            console.error("Erro ao salvar definições de conquistas locais:", e);
+          }
+        }
+
+        // Se for um jogo local, mescla com o progresso local salvo pela ponte
+        if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementProgress) {
+          try {
+            const localProgress = await window.electronAPI.getLocalAchievementProgress(game.id);
+            if (localProgress && localProgress.unlockedAchievements) {
+              const mappedAchievements = result.achievements.map((ach) => {
+                const unlocked = localProgress.unlockedAchievements[ach.apiName] || localProgress.unlockedAchievements[ach.apiName.toLowerCase()];
+                if (unlocked) {
+                  return {
+                    ...ach,
+                    achieved: true,
+                    unlockTime: unlocked.unlockedAt ? Math.floor(new Date(unlocked.unlockedAt).getTime() / 1000) : 0,
+                  };
+                }
+                return ach;
+              });
+              result = {
+                achievements: mappedAchievements,
+                total: mappedAchievements.length,
+                unlocked: mappedAchievements.filter((a) => a.achieved).length,
+              };
+            }
+          } catch (e) {
+            console.error("Erro ao carregar progresso de conquistas locais:", e);
+          }
+        }
+
+        // NOVO: Mesclar com o estado retroativo direto do emulador Goldberg/outros (arquivos locais do AppData)
+        if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementState) {
+          try {
+            const retroactiveState = await window.electronAPI.getLocalAchievementState(resolvedAppId);
+            if (retroactiveState && Object.keys(retroactiveState).length > 0) {
+              result.achievements = result.achievements.map((ach) => {
+                const emuState = retroactiveState[ach.apiName];
+                if (emuState && emuState.earned) {
+                  return {
+                    ...ach,
+                    achieved: true,
+                    unlockTime: emuState.earnedTime || 0,
+                  };
+                }
+                return ach;
+              });
+            }
+          } catch (e) {
+            console.error("Erro ao carregar estado retroativo do emulador:", e);
+          }
+        }
 
         setAchievementSourceAppId(resolvedAppId);
         setAchievementItems(result.achievements);
@@ -443,6 +510,52 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     game?.title,
     userProfile?.steamId,
   ]);
+
+  // Ref para guardar a versão mais recente dos items sem causar re-render,
+  // permitindo que o listener acesse os metadados frescos das conquistas.
+  const latestAchievementsRef = React.useRef(achievementItems);
+  React.useEffect(() => {
+    latestAchievementsRef.current = achievementItems;
+  }, [achievementItems]);
+
+  // ── Real-time achievement listener (main process → renderer IPC push) ─────────
+  // Subscribes while this panel is mounted and the game is a local game.
+  // When an unlock event arrives we:
+  //   1. Mark the matching achievement as unlocked in the local list.
+  //   2. Trigger the overlay notification.
+  React.useEffect(() => {
+    if (!game?.id || game.launcherType !== "local") return;
+    if (!window.electronAPI?.onRealtimeAchievementUnlock) return;
+
+    const handler = window.electronAPI.onRealtimeAchievementUnlock((payload) => {
+      const { achievementId, earnedTime, unlockedAt } = payload;
+
+      // Update the achievement list in-place so the UI reflects the unlock
+      // immediately — no refetch needed.
+      setAchievementItems((prev) =>
+        prev.map((ach) => {
+          // Match by apiName (raw emulator ID) case-insensitively.
+          const isMatch =
+            ach.apiName.toLowerCase() === achievementId.toLowerCase();
+          if (!isMatch || ach.achieved) return ach;
+
+          const unixSecs = earnedTime > 0
+            ? earnedTime
+            : Math.floor(new Date(unlockedAt).getTime() / 1000);
+
+          return { ...ach, achieved: true, unlockTime: unixSecs };
+        })
+      );
+
+      // Lemos do ref apenas por sanidade, mas o disparo real do Overlay 
+      // agora acontece no Backend (main.cjs) que tem acesso à imagem de forma nativa.
+      // O componente React agora fica apenas responsável por atualizar a interface!
+    });
+
+    return () => {
+      window.electronAPI?.removeRealtimeAchievementUnlock?.(handler);
+    };
+  }, [game?.id, game?.launcherType]);
 
   if (!game) return null;
 
@@ -505,10 +618,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return `${h}H ${m}M`;
   };
 
-  const formatAchievementDate = (unixTime: number) =>
-    unixTime > 0
-      ? new Date(unixTime * 1000).toLocaleDateString(locale)
-      : null;
+  /**
+   * Formats a Unix timestamp (seconds) into "DD/MM/AAAA - HH:MM".
+   * Returns null when the timestamp is 0 or missing.
+   */
+  const formatAchievementDate = (unixTime: number) => {
+    if (!unixTime || unixTime <= 0) return null;
+    const date = new Date(unixTime * 1000);
+    const dd   = String(date.getDate()).padStart(2, "0");
+    const mm   = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    const hh   = String(date.getHours()).padStart(2, "0");
+    const min  = String(date.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} - ${hh}:${min}`;
+  };
 
   const handleLaunch = async () => {
     if (isLaunching) return;

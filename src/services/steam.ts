@@ -1,4 +1,4 @@
-﻿import {
+import {
   serverTimestamp,
   writeBatch,
   getDocs,
@@ -296,10 +296,6 @@ export const syncSteamLibraryToFirestore = async (
   });
 
   const detailsCache = new Map<string, SteamAppDetails | null>();
-  const achievementsCache = new Map<
-    string,
-    { total: number; unlocked: number } | null
-  >();
 
   const gamesToSync = payload.games.slice(0, 80);
   const CHUNK_SIZE = 10;
@@ -309,12 +305,8 @@ export const syncSteamLibraryToFirestore = async (
     await Promise.all(
       chunk.map(async (owned) => {
         const appId = String(owned.appid);
-        const [details, achievements] = await Promise.all([
-          fetchSteamAppDetails(appId).catch(() => null),
-          fetchSteamAchievements(steamId, appId).catch(() => null),
-        ]);
+        const details = await fetchSteamAppDetails(appId).catch(() => null);
         detailsCache.set(appId, details);
-        achievementsCache.set(appId, achievements);
       }),
     );
   }
@@ -326,7 +318,6 @@ export const syncSteamLibraryToFirestore = async (
 
     const assets = buildSteamAssets(owned.appid);
     const details = detailsCache.get(appIdStr);
-    const achievements = achievementsCache.get(appIdStr);
     const coverImage = details?.cardImage || assets.cardImage;
     const backgroundImage = details?.backgroundImage || assets.image;
     const normalizedHours = Math.round((owned.playtime_forever ?? 0) / 60);
@@ -354,8 +345,8 @@ export const syncSteamLibraryToFirestore = async (
       steamLastPlayedAt,
       hoursPlayed: normalizedHours,
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
-      totalAchievements: achievements?.total || 0,
-      completedAchievements: achievements?.unlocked || 0,
+      totalAchievements: 0,
+      completedAchievements: 0,
       trailerUrl: details?.trailerUrl || "",
       screenshots: details?.screenshots || [],
       releaseDate: details?.releaseDate || "",

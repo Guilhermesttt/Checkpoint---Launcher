@@ -13,13 +13,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
+
   showFriendPlayingOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-playing", payload),
   showFriendRequestOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-request", payload),
   showFriendAcceptedOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-accepted", payload),
   getLocalAchievementDefinitions: (gameId) => ipcRenderer.invoke("achievement:get-definitions", gameId),
   getLocalAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
-  saveLocalAchievementDefinitions: (gameId, definitions) => ipcRenderer.invoke("achievement:save-definitions", gameId, definitions),
-  unlockLocalAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
+  saveLocalAchievementDefinitions: (gameId, definitions, steamAppId) => ipcRenderer.invoke("achievement:save-definitions", gameId, definitions, steamAppId),
+  getAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
+  getLocalAchievementState: (appId) => ipcRenderer.invoke("achievement:get-local-state", appId),
+  unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
   showAchievementOverlay: (payload) => ipcRenderer.invoke("overlay:show-achievement", payload),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
+  // ─ Real-time achievement events (push from main → renderer) ─────────────────
+  onRealtimeAchievementUnlock: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("achievement:realtime-unlock", handler);
+    return handler; // retorna o handler para o renderer poder removê-lo depois
+  },
+  removeRealtimeAchievementUnlock: (handler) => {
+    ipcRenderer.removeListener("achievement:realtime-unlock", handler);
+  },
 });

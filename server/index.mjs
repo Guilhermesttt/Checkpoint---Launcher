@@ -723,7 +723,8 @@ const requireLinkedSteamId = async (req, res, next) => {
     }
     req.steamId = steamId;
     next();
-  } catch {
+  } catch (error) {
+    console.error("Erro interno no requireLinkedSteamId:", error);
     res.status(500).json({ error: "Erro ao validar vínculo Steam." });
   }
 };

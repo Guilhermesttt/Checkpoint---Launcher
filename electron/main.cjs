@@ -1,14 +1,32 @@
 const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen } = require("electron");
 const crypto = require("node:crypto");
-const { execFile } = require("node:child_process");
+const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
+const { detectEmulator, parseAchievementState, getGoldbergV1Paths } = require("./emulator-detector.cjs");
 
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
 const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
 const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
+
+// ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
+// Garante que nunca tenhamos dois watchers para o mesmo jogo.
+const activeWatchers = new Map();
+
+/**
+ * Para e remove o watcher ativo de um jogo, se existir.
+ * @param {string} gameId
+ */
+const stopGameWatcher = (gameId) => {
+  const entry = activeWatchers.get(gameId);
+  if (!entry) return;
+  try { entry.watcher.close(); } catch { /* ignore */ }
+  clearTimeout(entry.debounceTimer);
+  activeWatchers.delete(gameId);
+  console.info(`[achievement-watcher] Watcher encerrado para jogo ${gameId}`);
+};
 
 // Em modo dev o ELECTRON_START_URL aponta para o Vite (porta diferente)
 const DEV_ORIGIN = process.env.ELECTRON_START_URL
@@ -376,8 +394,35 @@ const playOverlaySound = (sound) => {
 const startAchievementBridge = async () => {
   achievementBridge = createAchievementBridge({
     userDataPath: app.getPath("userData"),
+    appUrl: APP_URL,
     logger: console,
-    onAchievementUnlocked: (payload) => {
+    onAchievementUnlocked: async (payload) => {
+      // payload vem do emulador como { gameId, achievementId, unlockedAt, duplicate }
+      if (payload.duplicate) return;
+
+      const schema = await getSchemaByAppIdOrGameId(payload.gameId);
+      if (schema) {
+        const ach = schema.find(a => String(a.id).toLowerCase() === String(payload.achievementId).toLowerCase());
+        if (ach) {
+          payload.achievement = {
+            id: ach.id,
+            name: ach.name,
+            description: ach.description || "",
+            icon: ach.icon || "",
+          };
+        }
+      }
+
+      // Fallback para caso não consigamos ler o schema
+      if (!payload.achievement) {
+        payload.achievement = {
+          id: payload.achievementId,
+          name: payload.achievementId,
+          description: "",
+          icon: ""
+        };
+      }
+
       sendOverlayEvent("achievement:unlock", payload);
       playOverlaySound("achievement-unlock");
     },
@@ -413,13 +458,24 @@ ipcMain.handle("achievement:get-progress", async (_event, gameId) => {
   return null;
 });
 
-ipcMain.handle("achievement:save-definitions", async (_event, gameId, definitions) => {
+const { readLocalSavesRetroactive } = require("./emulator-detector.cjs");
+ipcMain.handle("achievement:get-local-state", async (_event, appId) => {
+  try {
+    if (!appId) return {};
+    return readLocalSavesRetroactive(appId);
+  } catch (error) {
+    console.error("Error reading retroactive achievement state:", error);
+    return {};
+  }
+});
+
+ipcMain.handle("achievement:save-definitions", async (_event, gameId, definitions, steamAppId) => {
   try {
     const achievementsDir = path.join(app.getPath("userData"), "achievements");
     const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
     
     await fs.promises.mkdir(achievementsDir, { recursive: true });
-    const payload = { achievements: definitions };
+    const payload = { steamAppId, achievements: definitions };
     await fs.promises.writeFile(definitionsPath, JSON.stringify(payload, null, 2), "utf8");
     return true;
   } catch (error) {
@@ -458,6 +514,97 @@ ipcMain.handle("overlay:show-friend-message", async (_event, payload) => {
   });
 });
 
+/**
+ * Helper genérico para localizar e parsear o schema de conquistas
+ * usando tanto o Game ID local quanto o App ID da Steam (ex: "steam_3764200").
+ */
+async function getSchemaByAppIdOrGameId(key) {
+  const achievementsDir = path.join(app.getPath("userData"), "achievements");
+  if (!fs.existsSync(achievementsDir)) return null;
+
+  const isSteamAppId = String(key).startsWith("steam_");
+  const targetAppId = isSteamAppId ? key.replace("steam_", "") : null;
+
+  const files = await fs.promises.readdir(achievementsDir);
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    
+    const gameId = path.basename(file, ".json");
+    if (!isSteamAppId && gameId === key) {
+      try {
+        const content = await fs.promises.readFile(path.join(achievementsDir, file), "utf8");
+        return JSON.parse(content).achievements;
+      } catch { /* ignora */ }
+    }
+    
+    if (isSteamAppId) {
+      try {
+        const content = await fs.promises.readFile(path.join(achievementsDir, file), "utf8");
+        const parsed = JSON.parse(content);
+        if (String(parsed.steamAppId) === String(targetAppId)) {
+          return parsed.achievements;
+        }
+      } catch { /* ignora */ }
+    }
+  }
+  return null;
+}
+
+/**
+ * Injeta o arquivo steam_settings/achievements.json no emulador e
+ * inicializa o arquivo de saves no AppData com { earned: false }.
+ */
+async function injectGoldbergDefinitions(appId, settingsPath) {
+  try {
+    // 1. Procurar o schema salvo usando o steamAppId
+    const targetSchema = await getSchemaByAppIdOrGameId(`steam_${appId}`);
+    if (!targetSchema || targetSchema.length === 0) return;
+
+    // 2. Gerar steam_settings/achievements.json
+    const steamSettingsPath = path.join(settingsPath, "achievements.json");
+    if (!fs.existsSync(steamSettingsPath)) {
+      const goldbergSettings = targetSchema.map(ach => ({
+        name: ach.id, // O ID técnico do Steam que o jogo requisitará
+        hidden: false,
+        icon: "",
+        icon_gray: "",
+        display_name: { english: ach.name },
+        description: { english: ach.description || "" }
+      }));
+      await fs.promises.writeFile(steamSettingsPath, JSON.stringify(goldbergSettings, null, 4), "utf8");
+      console.info(`[goldberg-injector] Arquivo steam_settings/achievements.json criado para o AppID ${appId}.`);
+    }
+
+    // 3. Inicializar progresso vazio no AppData
+    const paths = getGoldbergV1Paths(appId);
+    if (!fs.existsSync(paths.watchDir)) {
+      await fs.promises.mkdir(paths.watchDir, { recursive: true });
+    }
+    
+    let currentSaves = {};
+    if (fs.existsSync(paths.savePath)) {
+      try {
+        currentSaves = JSON.parse(await fs.promises.readFile(paths.savePath, "utf8"));
+      } catch { /* ignora erro de parse */ }
+    }
+
+    let modified = false;
+    for (const ach of targetSchema) {
+      if (!currentSaves[ach.id]) {
+        currentSaves[ach.id] = { earned: false, earned_time: 0 };
+        modified = true;
+      }
+    }
+
+    if (modified || Object.keys(currentSaves).length === 0) {
+      await fs.promises.writeFile(paths.savePath, JSON.stringify(currentSaves, null, 2), "utf8");
+      console.info(`[goldberg-injector] Arquivo de progresso inicializado no AppData para o AppID ${appId}.`);
+    }
+  } catch (error) {
+    console.error(`[goldberg-injector] Falha ao injetar conquistas:`, error);
+  }
+}
+
 ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) {
@@ -484,9 +631,301 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     throw new Error("Executavel invalido.");
   }
 
-  const error = await shell.openPath(normalizedTarget);
-  if (error) {
-    throw new Error(error);
+  // Autoconfiguração de ponte de conquistas para emuladores Steam locais (Goldberg)
+  try {
+    const gameDir = path.dirname(normalizedTarget);
+    const parentDir = path.dirname(gameDir);
+
+    const pathsToCheck = [
+      path.join(gameDir, "steam_settings"),
+      path.join(parentDir, "steam_settings")
+    ];
+
+    const hasSteamDll = fs.existsSync(path.join(gameDir, "steam_api64.dll")) ||
+                         fs.existsSync(path.join(gameDir, "steam_api.dll"));
+
+    let settingsPath = null;
+    for (const p of pathsToCheck) {
+      if (fs.existsSync(p)) {
+        settingsPath = p;
+        break;
+      }
+    }
+
+    if (!settingsPath && hasSteamDll) {
+      settingsPath = path.join(gameDir, "steam_settings");
+      fs.mkdirSync(settingsPath, { recursive: true });
+    }
+
+    if (settingsPath) {
+      fs.writeFileSync(path.join(settingsPath, "achievements_receiver.txt"), "http://127.0.0.1:3000", "utf8");
+
+      // Tenta obter o App ID para configurar as conquistas no emulador Goldberg
+      let appId = null;
+      const appidPaths = [
+        path.join(gameDir, "steam_appid.txt"),
+        path.join(settingsPath, "steam_appid.txt")
+      ];
+      for (const ap of appidPaths) {
+        if (fs.existsSync(ap)) {
+          const content = fs.readFileSync(ap, "utf8").trim();
+          if (/^\d+$/.test(content)) {
+            appId = content;
+            break;
+          }
+        }
+      }
+
+      if (appId) {
+        // Injeta as definições das conquistas antes do jogo abrir
+        await injectGoldbergDefinitions(appId, settingsPath);
+      }
+
+      if (appId) {
+        const achievementsDir = path.join(app.getPath("userData"), "achievements");
+        let schemaAchievements = null;
+
+        if (fs.existsSync(achievementsDir)) {
+          const files = fs.readdirSync(achievementsDir);
+          for (const file of files) {
+            if (file.endsWith(".json")) {
+              const gameId = path.basename(file, ".json");
+              try {
+                const rawContent = fs.readFileSync(path.join(achievementsDir, file), "utf8");
+                const parsed = JSON.parse(rawContent);
+                // Verifica se bate com o appId
+                if (
+                  gameId.endsWith(`_steam_${appId}`) || 
+                  gameId === appId || 
+                  String(parsed.steamAppId) === String(appId)
+                ) {
+                  if (parsed && Array.isArray(parsed.achievements)) {
+                    schemaAchievements = parsed.achievements;
+                    break;
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+
+        // Se encontramos conquistas salvas, criamos os arquivos vazios no Goldberg
+        if (schemaAchievements && schemaAchievements.length > 0) {
+          const goldbergAchDir = path.join(settingsPath, "achievements");
+          fs.mkdirSync(goldbergAchDir, { recursive: true });
+
+          for (const ach of schemaAchievements) {
+            const apiName = ach.apiName || ach.id;
+            if (apiName) {
+              const achFilePath = path.join(goldbergAchDir, String(apiName).trim());
+              if (!fs.existsSync(achFilePath)) {
+                fs.writeFileSync(achFilePath, "", "utf8");
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Erro na autoconfiguração do receptor de conquistas:", err);
+  }
+
+  const gameDir = path.dirname(normalizedTarget);
+
+  // ── Detectar emulador e preparar watcher de conquistas ─────────────────────
+  // Extrai o appId do steam_appid.txt para que o detector saiba onde procurar.
+  let detectedGameAppId = null;
+  {
+    const appidCandidates = [
+      path.join(gameDir, "steam_appid.txt"),
+      path.join(gameDir, "steam_settings", "steam_appid.txt"),
+    ];
+    for (const ap of appidCandidates) {
+      if (fs.existsSync(ap)) {
+        const raw = fs.readFileSync(ap, "utf8").trim();
+        if (/^\d+$/.test(raw)) { detectedGameAppId = raw; break; }
+      }
+    }
+  }
+
+  // gameId para associar o watcher — usamos o appId como chave porque é estável.
+  const watcherKey = detectedGameAppId ? `steam_${detectedGameAppId}` : path.basename(normalizedTarget, ".exe");
+
+  // Para qualquer watcher anterior do mesmo jogo antes de iniciar um novo.
+  stopGameWatcher(watcherKey);
+
+  // Função chamada pelo watcher quando o arquivo de saves muda.
+  // Compara o estado novo com o estado anterior e dispara IPC para cada
+  // conquista recém-desbloqueada.
+  const handleAchievementFileChange = (detectedEmulator) => {
+    const newState = parseAchievementState(detectedEmulator);
+    const entry = activeWatchers.get(watcherKey);
+    if (!entry) return;
+
+    const prevState = entry.lastState;
+    const newlyUnlocked = [];
+
+    for (const [id, current] of Object.entries(newState)) {
+      const previous = prevState[id];
+      const justUnlocked = current.earned && (!previous || !previous.earned);
+      if (justUnlocked) {
+        newlyUnlocked.push({ id, earnedTime: current.earnedTime });
+      }
+    }
+
+    // Atualiza o estado armazenado independentemente de ter desbloqueado algo.
+    entry.lastState = newState;
+
+    if (newlyUnlocked.length === 0) return;
+
+    // Resolve os metadados (nome, ícone) via achievement-bridge e dispara IPC.
+    for (const { id, earnedTime } of newlyUnlocked) {
+      if (achievementBridge) {
+        achievementBridge
+          .unlockAchievement(watcherKey, id)
+          .catch((err) => console.error("[achievement-watcher] unlockAchievement error:", err));
+      }
+
+      // Envia evento em tempo real para o renderer atualizar a UI.
+      const payload = {
+        gameId: watcherKey,
+        achievementId: id,
+        earnedTime,   // Unix timestamp (segundos) vindo do emulador
+        unlockedAt: earnedTime > 0
+          ? new Date(earnedTime * 1000).toISOString()
+          : new Date().toISOString(),
+      };
+
+      try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("achievement:realtime-unlock", payload);
+        }
+      } catch (e) {
+        console.error("[achievement-watcher] IPC send error:", e);
+      }
+    }
+  };
+
+  /**
+   * Inicia o fs.watch no diretório de saves do emulador.
+   * @param {object} detectedEmulator
+   * @param {Function|null} onExit - chamada quando o jogo encerrar (pode ser null)
+   */
+  const startGameWatcher = (detectedEmulator, onExit) => {
+    if (!detectedEmulator) return;
+
+    // Garante que o diretório de saves existe (Goldberg pode não tê-lo criado ainda).
+    try { fs.mkdirSync(detectedEmulator.watchDir, { recursive: true }); } catch { /* ignore */ }
+
+    // Lê o estado inicial ANTES de montar o watcher para poder comparar depois.
+    const initialState = parseAchievementState(detectedEmulator);
+
+    let debounceTimer = null;
+
+    let watcher;
+    try {
+      watcher = fs.watch(detectedEmulator.watchDir, { persistent: false }, (_event, filename) => {
+        // Filtra apenas o arquivo relevante (ex: achievements.json).
+        const saveFile = path.basename(detectedEmulator.savePath);
+        if (filename && filename !== saveFile) return;
+
+        // Debounce: emuladores podem escrever o arquivo em múltiplos eventos
+        // em sequência (write + rename). Aguardamos 300ms antes de parsear.
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          handleAchievementFileChange(detectedEmulator);
+        }, 300);
+
+        // Atualiza o timer no registro para que stopGameWatcher possa limpá-lo.
+        const entry = activeWatchers.get(watcherKey);
+        if (entry) entry.debounceTimer = debounceTimer;
+      });
+    } catch (watchErr) {
+      console.error("[achievement-watcher] Falha ao iniciar fs.watch:", watchErr);
+      return;
+    }
+
+    watcher.on("error", (err) => {
+      console.error("[achievement-watcher] Erro no watcher:", err);
+      stopGameWatcher(watcherKey);
+    });
+
+    activeWatchers.set(watcherKey, {
+      watcher,
+      debounceTimer: null,
+      lastState: initialState,
+    });
+
+    console.info(
+      `[achievement-watcher] Monitorando conquistas do jogo ${watcherKey}` +
+      ` em ${detectedEmulator.watchDir}` +
+      ` (emulador: ${detectedEmulator.emulatorType})`
+    );
+
+    if (onExit) {
+      onExit(() => stopGameWatcher(watcherKey));
+    }
+  };
+
+  const detectedEmulator = detectedGameAppId
+    ? detectEmulator(gameDir, detectedGameAppId)
+    : null;
+
+  try {
+    const child = spawn(normalizedTarget, [], {
+      cwd: gameDir,
+      detached: true,
+      stdio: "ignore",
+    });
+
+    // Flag: true apenas se o processo filho realmente iniciou (evento "spawn" do Node).
+    // Quando o spawn falha (EACCES, etc.) o Node dispara "error" + "exit"/"close" com
+    // código null, mas NÃO dispara "spawn". Usamos isso para não encerrar o watcher
+    // prematuramente quando o jogo é iniciado via shell.openPath como fallback.
+    let didSpawn = false;
+    child.once("spawn", () => { didSpawn = true; });
+
+    // Registra os hooks de saída ANTES do unref() — o evento ainda é emitido
+    // mesmo após o processo pai "desacoplar" do filho via unref().
+    // Só encerra o watcher se o processo realmente havia iniciado.
+    const registerExitHook = (stopFn) => {
+      child.once("exit", () => { if (didSpawn) stopFn(); });
+      child.once("close", () => { if (didSpawn) stopFn(); });
+    };
+
+    // Inicia o watcher usando o hook de saída do child process.
+    if (detectedEmulator) {
+      startGameWatcher(detectedEmulator, registerExitHook);
+    }
+
+    child.on("error", async (err) => {
+      console.error("Falha ao iniciar via spawn (child_process), tentando shell.openPath:", err);
+      // NÃO paramos o watcher aqui: shell.openPath vai abrir o jogo com as
+      // permissões corretas (UAC/admin) e o watcher deve continuar monitorando.
+      // Só paramos se shell.openPath também falhar.
+      const openError = await shell.openPath(normalizedTarget);
+      if (openError) {
+        console.error("Falha ao iniciar pelo shell.openPath:", openError);
+        // Ambos os métodos falharam: o jogo não iniciou, encerra o watcher.
+        stopGameWatcher(watcherKey);
+      } else {
+        console.info("[achievement-watcher] Jogo aberto via shell.openPath — watcher mantido ativo.");
+      }
+    });
+
+    child.unref();
+  } catch (spawnError) {
+    console.error("Falha síncrona ao iniciar via spawn, tentando shell.openPath:", spawnError);
+    // Na exceção síncrona do spawn também tentamos shell.openPath antes de desistir.
+    const openError = await shell.openPath(normalizedTarget);
+    if (openError) {
+      stopGameWatcher(watcherKey);
+      throw new Error(openError);
+    } else {
+      console.info("[achievement-watcher] Jogo aberto via shell.openPath (fallback síncrono) — watcher mantido ativo.");
+    }
   }
 });
 

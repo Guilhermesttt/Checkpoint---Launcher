@@ -97,6 +97,7 @@ const findAchievementDefinition = (definitionFile, achievementId) => {
 
 const createAchievementBridge = ({
   userDataPath,
+  appUrl,
   logger = console,
   onAchievementUnlocked,
 }) => {
@@ -115,10 +116,51 @@ const createAchievementBridge = ({
     const definitionsPath = path.join(achievementsDir, `${cleanedGameId}.json`);
     const progressPath = path.join(userDataPath, `user_progress_${cleanedGameId}.json`);
 
-    const definitionFile = await readJsonFile(definitionsPath);
-    const achievement = findAchievementDefinition(definitionFile, cleanedAchievementId);
+    let definitionFile = null;
+    try {
+      definitionFile = await readJsonFile(definitionsPath);
+    } catch (err) {
+      if (err && err.code === "ENOENT" && appUrl) {
+        let appid = null;
+        if (/^\d+$/.test(cleanedGameId)) {
+          appid = cleanedGameId;
+        } else {
+          const parts = cleanedGameId.split("_steam_");
+          if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {
+            appid = parts[parts.length - 1];
+          }
+        }
+
+        if (appid) {
+          try {
+            const schemaRes = await fetch(`${appUrl}/api/steam/achievement-schema?appId=${appid}`);
+            if (schemaRes.ok) {
+              const schemaData = await schemaRes.json();
+              if (schemaData && Array.isArray(schemaData.achievements)) {
+                await ensureDir(achievementsDir);
+                await writeJsonAtomic(definitionsPath, { achievements: schemaData.achievements });
+                definitionFile = { achievements: schemaData.achievements };
+              }
+            }
+          } catch (fetchErr) {
+            logger.error?.("[achievement-bridge] falha ao buscar definições online:", fetchErr);
+          }
+        }
+      }
+      
+      if (!definitionFile) {
+        definitionFile = { achievements: [] };
+      }
+    }
+
+    let achievement = findAchievementDefinition(definitionFile, cleanedAchievementId);
     if (!achievement) {
-      throw new Error("Achievement nao encontrada.");
+      achievement = {
+        id: cleanedAchievementId,
+        name: cleanedAchievementId,
+        description: "Conquista desbloqueada localmente.",
+        icon: "",
+      };
     }
 
     const unlockedAt = new Date().toISOString();
@@ -181,6 +223,46 @@ const createAchievementBridge = ({
       });
     } catch (error) {
       logger.error?.("[achievement-bridge] unlock failed", error);
+      response.status(400).json({
+        error: error instanceof Error ? error.message : "Falha ao desbloquear achievement.",
+      });
+    }
+  });
+
+  app.post("/", async (request, response) => {
+    try {
+      const appid = request.body?.appid;
+      const achievementId = request.body?.achievement || request.body?.achievement_name || request.body?.achievementId;
+      if (!appid || !achievementId) {
+        response.status(400).json({ error: "Parâmetros appid ou achievement inválidos." });
+        return;
+      }
+
+      const achievementsDir = path.join(userDataPath, "achievements");
+      let matchedGameId = null;
+      try {
+        const files = await fs.promises.readdir(achievementsDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            const gameId = path.basename(file, ".json");
+            if (gameId.endsWith(`_steam_${appid}`) || gameId === String(appid)) {
+              matchedGameId = gameId;
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        logger.error?.("[achievement-bridge] erro ao buscar appid local", err);
+      }
+
+      if (!matchedGameId) {
+        matchedGameId = `${appid}`;
+      }
+
+      const result = await unlockAchievement(matchedGameId, achievementId);
+      response.json({ ok: true, duplicate: result.duplicate });
+    } catch (error) {
+      logger.error?.("[achievement-bridge] Goldberg emulator post failed", error);
       response.status(400).json({
         error: error instanceof Error ? error.message : "Falha ao desbloquear achievement.",
       });

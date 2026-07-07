@@ -25,26 +25,12 @@ service cloud.firestore {
 
     function validProfileUpdate(userId) {
       return isSignedInOwner(userId)
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'uid',
-          'steamId'
-        ])
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'email',
-          'displayName',
-          'photoURL',
-          'presence',
-          'updatedAt',
-          'lastSteamSyncAt',
-          'gamesMigratedAt',
-          'migrationSkippedReason',
-          'onboardingCompletedAt'
-        ]);
+        && request.resource.data.uid == userId;
     }
 
     match /profiles/{userId} {
       allow create: if validProfileCreate(userId);
-      allow read: if isSignedInOwner(userId);
+      allow read: if isSignedIn();
       allow update: if validProfileUpdate(userId);
       allow delete: if false;
     }
