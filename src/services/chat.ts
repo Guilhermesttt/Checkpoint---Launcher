@@ -7,6 +7,11 @@ let eventSource: EventSource | null = null;
 const messageListeners = new Set<(msg: ChatMessage) => void>();
 const typingListeners = new Set<(data: { senderId: string; typing: boolean }) => void>();
 
+// Gerenciamento de Não Lidas em Memória (Tempo Real)
+let activeChatFriendUid: string | null = null;
+const unreadMessages: ChatMessage[] = [];
+const unreadListeners = new Set<(messages: ChatMessage[]) => void>();
+
 const getAuthHeaders = async () => {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error("Sessao expirada. Entre novamente.");
@@ -44,7 +49,17 @@ export const establishChatConnection = async () => {
       const data = JSON.parse(event.data);
       if (data.type === "message" && data.message) {
         console.log("[ChatClient] Nova mensagem recebida via SSE:", data.message);
-        messageListeners.forEach((listener) => listener(data.message));
+        const msg = data.message as ChatMessage;
+
+        // Se a mensagem for recebida e NÃO for do amigo cujo chat está aberto
+        if (activeChatFriendUid !== msg.senderId) {
+          if (!unreadMessages.some((m) => m.id === msg.id)) {
+            unreadMessages.push(msg);
+            unreadListeners.forEach((listener) => listener([...unreadMessages]));
+          }
+        }
+
+        messageListeners.forEach((listener) => listener(msg));
       } else if (data.type === "typing") {
         console.log("[ChatClient] Evento de digitação recebido via SSE:", data);
         typingListeners.forEach((listener) => listener({ senderId: data.senderId, typing: data.typing }));
@@ -107,6 +122,16 @@ export const cleanupExpiredChatMessages = async (friendUid: string) => {
 };
 
 export const markMessagesAsRead = async (friendUid: string) => {
+  const initialLength = unreadMessages.length;
+  // Remove mensagens não lidas do amigo específico
+  for (let i = unreadMessages.length - 1; i >= 0; i--) {
+    if (unreadMessages[i].senderId === friendUid) {
+      unreadMessages.splice(i, 1);
+    }
+  }
+  if (unreadMessages.length !== initialLength) {
+    unreadListeners.forEach((listener) => listener([...unreadMessages]));
+  }
   return Promise.resolve();
 };
 
@@ -119,6 +144,10 @@ export const subscribeToChatMessages = (
   callback: (messages: ChatMessage[]) => void,
 ) => {
   let messagesList: ChatMessage[] = [];
+  activeChatFriendUid = friendUid;
+
+  // Ao abrir o chat de um amigo, limpa as mensagens não lidas dele
+  void markMessagesAsRead(friendUid);
 
   // 1. Carrega o histórico em memória inicial
   const loadHistory = async () => {
@@ -156,6 +185,9 @@ export const subscribeToChatMessages = (
 
   return () => {
     messageListeners.delete(handleNewMessage);
+    if (activeChatFriendUid === friendUid) {
+      activeChatFriendUid = null;
+    }
   };
 };
 
@@ -182,11 +214,15 @@ export const subscribeToFriendTyping = (
 };
 
 /**
- * Mock para compatibilidade com o Home.tsx que ouve não lidos
+ * Escuta não lidas em tempo real (em memória do cliente)
  */
 export const subscribeToUnreadMessages = (
   callback: (messages: ChatMessage[]) => void,
 ) => {
-  callback([]);
-  return () => {};
+  unreadListeners.add(callback);
+  callback([...unreadMessages]);
+  
+  return () => {
+    unreadListeners.delete(callback);
+  };
 };
