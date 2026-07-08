@@ -25,6 +25,21 @@ contextBridge.exposeInMainWorld("electronAPI", {
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
   showAchievementOverlay: (payload) => ipcRenderer.invoke("overlay:show-achievement", payload),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
+  // ─ Auto-Updater APIs ────────────────────────────────────────────────────────
+  getVersion: () => ipcRenderer.invoke("app:get-version"),
+  checkForUpdates: () => ipcRenderer.invoke("update:check-for-updates"),
+  startDownload: () => ipcRenderer.invoke("update:start-download"),
+  quitAndInstallUpdate: () => ipcRenderer.invoke("update:quit-and-install"),
+  onUpdateMessage: (callback) => {
+    const handler = (_event, message, data) => callback(message, data);
+    ipcRenderer.on("update:message", handler);
+    return () => ipcRenderer.removeListener("update:message", handler);
+  },
+  onDownloadProgress: (callback) => {
+    const handler = (_event, progressInfo) => callback(progressInfo);
+    ipcRenderer.on("update:download-progress", handler);
+    return () => ipcRenderer.removeListener("update:download-progress", handler);
+  },
   // ─ Real-time achievement events (push from main → renderer) ─────────────────
   onRealtimeAchievementUnlock: (callback) => {
     const handler = (_event, payload) => callback(payload);

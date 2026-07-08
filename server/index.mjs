@@ -706,6 +706,133 @@ const requireFirebaseUser = async (req, res, next) => {
   }
 };
 
+const verifyUserToken = async (token) => {
+  if (!token) return null;
+  try {
+    return await getAuth().verifyIdToken(token);
+  } catch {
+    return null;
+  }
+};
+
+// ─── Chat Transiente via SSE (Custo Zero e Tempo Real) ──────────────────────
+const activeClients = new Map(); // Map<string, Response> (uid -> Express Response)
+const chatHistory = new Map(); // Map<string, ChatMessage[]> (chatId -> array de mensagens)
+
+app.get("/api/chat/stream", async (req, res) => {
+  const token = String(req.query.token || "").trim();
+  if (!token) {
+    res.status(401).json({ error: "Token ausente" });
+    return;
+  }
+
+  const firebaseUser = await verifyUserToken(token);
+  if (!firebaseUser) {
+    res.status(401).json({ error: "Token inválido ou expirado" });
+    return;
+  }
+
+  const userId = firebaseUser.uid;
+
+  // Define headers para Server-Sent Events (SSE)
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "Access-Control-Allow-Origin": "*",
+  });
+
+  // Registra o cliente ativo
+  activeClients.set(userId, res);
+  console.log(`[ChatServer] Cliente conectado via SSE: ${userId}. Ativos: ${activeClients.size}`);
+
+  // Envia ping periódico para manter a conexão aberta (especialmente no Render/Heroku)
+  const pingInterval = setInterval(() => {
+    res.write(":\n\n");
+  }, 20000);
+
+  req.on("close", () => {
+    clearInterval(pingInterval);
+    activeClients.delete(userId);
+    console.log(`[ChatServer] Cliente desconectado do SSE: ${userId}. Ativos: ${activeClients.size}`);
+  });
+});
+
+app.post("/api/chat/send", requireFirebaseUser, (req, res) => {
+  const senderId = req.firebaseUser.uid;
+  const { receiverId, text } = req.body;
+
+  if (!receiverId || !text || !String(text).trim()) {
+    res.status(400).json({ error: "Destinatário ou mensagem vazia" });
+    return;
+  }
+
+  const msgId = crypto.randomUUID();
+  const normalizedText = String(text).trim();
+  const chatId = [senderId, receiverId].sort().join("_");
+
+  const message = {
+    id: msgId,
+    chatId,
+    senderId,
+    receiverId,
+    text: normalizedText,
+    createdAt: new Date().toISOString(),
+    read: false,
+  };
+
+  // Mantém histórico das últimas 30 mensagens em memória
+  if (!chatHistory.has(chatId)) {
+    chatHistory.set(chatId, []);
+  }
+  const history = chatHistory.get(chatId);
+  history.push(message);
+  if (history.length > 30) {
+    history.shift();
+  }
+
+  // Encaminha via SSE ao destinatário se estiver online
+  const receiverClient = activeClients.get(receiverId);
+  if (receiverClient) {
+    console.log(`[ChatServer] Encaminhando mensagem de ${senderId} para ${receiverId}`);
+    receiverClient.write(`data: ${JSON.stringify({ type: "message", message })}\n\n`);
+  }
+
+  res.json({ success: true, message });
+});
+
+app.post("/api/chat/typing", requireFirebaseUser, (req, res) => {
+  const senderId = req.firebaseUser.uid;
+  const { receiverId, typing } = req.body;
+
+  if (!receiverId) {
+    res.status(400).json({ error: "Destinatário ausente" });
+    return;
+  }
+
+  const receiverClient = activeClients.get(receiverId);
+  if (receiverClient) {
+    receiverClient.write(`data: ${JSON.stringify({ type: "typing", senderId, typing: Boolean(typing) })}\n\n`);
+  }
+
+  res.json({ success: true });
+});
+
+app.get("/api/chat/history", requireFirebaseUser, (req, res) => {
+  const currentUid = req.firebaseUser.uid;
+  const { friendUid } = req.query;
+
+  if (!friendUid) {
+    res.status(400).json({ error: "friendUid ausente" });
+    return;
+  }
+
+  const chatId = [currentUid, friendUid].sort().join("_");
+  const history = chatHistory.get(chatId) || [];
+  res.json(history);
+});
+
+
 const requireLinkedSteamId = async (req, res, next) => {
   const steamId = String(req.query.steamId ?? "").trim();
   if (!/^\d+$/.test(steamId)) {

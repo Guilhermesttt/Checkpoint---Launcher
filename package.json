@@ -14,15 +14,25 @@
     "build": "tsc -b && vite build",
     "dist": "node scripts/build-portable.cjs",
     "dist:windows": "node scripts/build-portable.cjs",
+    "publish": "npm run build && electron-builder --win --publish always",
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "node ./server/index.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guilhermesttt/Checkpoint---Launcher.git"
   },
   "build": {
     "appId": "com.checkpoint.launcher",
     "productName": "Checkpoint Launcher",
     "directories": {
       "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Guilhermesttt",
+      "repo": "Checkpoint---Launcher"
     },
     "files": [
       "dist/**/*",
@@ -36,7 +46,7 @@
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        "dir"
+        "nsis"
       ]
     },
     "nsis": {
@@ -97,6 +107,7 @@
     "discord-rpc": "^4.0.1",
     "dompurify": "^3.4.11",
     "dotenv": "^17.2.3",
+    "electron-updater": "^6.8.9",
     "embla-carousel": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.1.0",

@@ -479,9 +479,174 @@ export const SettingsPageV2: React.FC<{
             </button>
           </div>
         </section>
+
+        <AppUpdateSection t={t} />
       </SystemPageShell>
     );
   };
+
+const AppUpdateSection: React.FC<{ t: TranslationFn }> = ({ t }) => {
+  const [currentVersion, setCurrentVersion] = useState<string>("0.0.0");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error" | "dev">("idle");
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [newVersionInfo, setNewVersionInfo] = useState<any>(null);
+
+  useEffect(() => {
+    // Busca versão inicial
+    if ((window as any).electronAPI?.getVersion) {
+      (window as any).electronAPI.getVersion().then(setCurrentVersion).catch(console.error);
+    }
+
+    if ((window as any).electronAPI?.onUpdateMessage) {
+      const unsubscribe = (window as any).electronAPI.onUpdateMessage((msg: string, data: any) => {
+        console.log("[Update UI] Mensagem recebida:", msg, data);
+        if (msg === "checking-for-update") {
+          setUpdateStatus("checking");
+        } else if (msg === "update-available") {
+          setUpdateStatus("available");
+          setNewVersionInfo(data);
+        } else if (msg === "update-not-available") {
+          setUpdateStatus("not-available");
+        } else if (msg === "update-downloaded") {
+          setUpdateStatus("downloaded");
+          setNewVersionInfo(data);
+        } else if (msg === "error") {
+          setUpdateStatus("error");
+          setErrorMessage(data || "Erro desconhecido ao atualizar.");
+        }
+      });
+      return unsubscribe;
+    }
+  }, []);
+
+  useEffect(() => {
+    if ((window as any).electronAPI?.onDownloadProgress) {
+      const unsubscribe = (window as any).electronAPI.onDownloadProgress((progressInfo: any) => {
+        setUpdateStatus("downloading");
+        if (progressInfo && typeof progressInfo.percent === "number") {
+          setDownloadProgress(Math.round(progressInfo.percent));
+        }
+      });
+      return unsubscribe;
+    }
+  }, []);
+
+  const handleCheckForUpdates = async () => {
+    if (!(window as any).electronAPI?.checkForUpdates) return;
+    setUpdateStatus("checking");
+    setErrorMessage("");
+    try {
+      const res = await (window as any).electronAPI.checkForUpdates();
+      if (res && res.status === "development") {
+        setUpdateStatus("dev");
+      }
+    } catch (err: any) {
+      setUpdateStatus("error");
+      setErrorMessage(err.message || "Não foi possível buscar atualizações.");
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!(window as any).electronAPI?.startDownload) return;
+    setUpdateStatus("downloading");
+    setDownloadProgress(0);
+    try {
+      await (window as any).electronAPI.startDownload();
+    } catch (err: any) {
+      setUpdateStatus("error");
+      setErrorMessage(err.message || "Erro ao baixar atualização.");
+    }
+  };
+
+  const handleInstall = () => {
+    if ((window as any).electronAPI?.quitAndInstallUpdate) {
+      (window as any).electronAPI.quitAndInstallUpdate();
+    }
+  };
+
+  return (
+    <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <SettingsHeader
+        icon={<Sparkles className="h-5 w-5 text-white/70" />}
+        title="Atualizações do Sistema"
+        description={`Versão instalada atualmente: v${currentVersion}`}
+      />
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.03] p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            {updateStatus === "idle" && (
+              <p className="text-xs text-white/50">Mantenha seu Checkpoint Launcher na versão mais recente para novos recursos.</p>
+            )}
+            {updateStatus === "checking" && (
+              <p className="text-xs text-amber-300 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-amber-300 animate-pulse" />
+                Buscando atualizações no GitHub...
+              </p>
+            )}
+            {updateStatus === "available" && (
+              <p className="text-xs text-emerald-400">
+                Nova versão {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""} disponível!
+              </p>
+            )}
+            {updateStatus === "not-available" && (
+              <p className="text-xs text-white/70">Você já está usando a versão mais recente do launcher.</p>
+            )}
+            {updateStatus === "downloading" && (
+              <div className="space-y-2">
+                <p className="text-xs text-sky-400">Baixando atualização... {downloadProgress}%</p>
+                <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full bg-sky-400 transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                </div>
+              </div>
+            )}
+            {updateStatus === "downloaded" && (
+              <p className="text-xs text-emerald-400">Atualização baixada com sucesso! Pronto para instalar.</p>
+            )}
+            {updateStatus === "dev" && (
+              <p className="text-xs text-amber-300/80">Você está rodando em ambiente de desenvolvimento local (código-fonte).</p>
+            )}
+            {updateStatus === "error" && (
+              <p className="text-xs text-red-400">Erro: {errorMessage}</p>
+            )}
+          </div>
+
+          <div className="shrink-0">
+            {updateStatus === "idle" || updateStatus === "not-available" || updateStatus === "dev" || updateStatus === "error" ? (
+              <button
+                type="button"
+                onClick={handleCheckForUpdates}
+                className="rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase text-black hover:bg-white/90 active:scale-95 transition-all cursor-pointer"
+              >
+                Buscar Atualizações
+              </button>
+            ) : null}
+
+            {updateStatus === "available" ? (
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="rounded-xl bg-sky-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-sky-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer"
+              >
+                Baixar Agora
+              </button>
+            ) : null}
+
+            {updateStatus === "downloaded" ? (
+              <button
+                type="button"
+                onClick={handleInstall}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
+              >
+                Reiniciar e Instalar
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
 
 export const FriendsPage: React.FC<{
   t: TranslationFn;
@@ -1362,102 +1527,95 @@ export const ChatModal: React.FC<{
   playSound: (type: SoundEffectType) => void;
 }> = ({ isOpen, onClose, friend, playSound }) => {
   const { notify } = useNotification();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [renderMessages, setRenderMessages] = useState<ChatMessage[]>([]);
+  const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
+  const optimisticRef = useRef<Map<string, ChatMessage>>(new Map());
   const [inputText, setInputText] = useState("");
   const [friendTyping, setFriendTyping] = useState(false);
   const [spamLockedUntil, setSpamLockedUntil] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recentSendTimestampsRef = useRef<number[]>([]);
   const lastTypingSentRef = useRef(false);
+  // Ref para o friendUid — evita que o useEffect re-execute quando apenas o
+  // objeto friend (status/avatar) muda, mas o UID permanece o mesmo.
+  const friendUidRef = useRef<string | null>(null);
 
   const friendUid = friend?.id.split(":")[1] ?? null;
 
+  // ── Subscrições Firebase ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!isOpen || !friend) return;
-
-    setMessages([]);
-    setRenderMessages([]);
-    setInputText("");
-    setFriendTyping(false);
-    setSpamLockedUntil(null);
-    recentSendTimestampsRef.current = [];
-    lastTypingSentRef.current = false;
-
-    if (!friendUid) return;
-    void cleanupExpiredChatMessages(friendUid).catch((error) => {
-      console.error("Erro ao limpar conversa expirada:", error);
-    });
-    void markMessagesAsRead(friendUid);
-
-    const unsubscribe = subscribeToChatMessages(friendUid, (msgs) => {
-      setMessages(msgs);
-      void markMessagesAsRead(friendUid);
-    });
-    const unsubscribeTyping = subscribeToFriendTyping(friendUid, setFriendTyping);
-
-    return () => {
-      void setChatTyping(friendUid, false);
-      unsubscribe();
-      unsubscribeTyping();
-    };
-  }, [isOpen, friend, friendUid]);
-
-  useEffect(() => {
-    setRenderMessages((current) => {
-      const merged = new Map<string, ChatMessage>();
-
-      current.forEach((message) => {
-        merged.set(message.id ?? `temp:${message.senderId}:${message.createdAt}:${message.text}`, message);
-      });
-
-      messages.forEach((message) => {
-        merged.set(message.id ?? `temp:${message.senderId}:${message.createdAt}:${message.text}`, message);
-      });
-
-      return Array.from(merged.values()).sort(
-        (left, right) =>
-          new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-      );
-    });
-  }, [messages]);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [renderMessages, friendTyping]);
-
-  useEffect(() => {
-    if (!spamLockedUntil) return;
-
-    const remaining = spamLockedUntil - Date.now();
-    if (remaining <= 0) {
+    if (!isOpen || !friendUid) {
+      // Chat fechado — limpa tudo
+      setDisplayMessages([]);
+      optimisticRef.current.clear();
+      setInputText("");
+      setFriendTyping(false);
       setSpamLockedUntil(null);
+      recentSendTimestampsRef.current = [];
+      lastTypingSentRef.current = false;
+      friendUidRef.current = null;
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      setSpamLockedUntil(null);
-    }, remaining);
+    // Evita re-criar listeners se o UID não mudou
+    if (friendUidRef.current === friendUid) return;
+    friendUidRef.current = friendUid;
 
+    void cleanupExpiredChatMessages(friendUid).catch(() => undefined);
+    // markMessagesAsRead é chamado uma vez ao abrir, não dentro do callback do snapshot
+    void markMessagesAsRead(friendUid);
+
+    const unsubscribeMessages = subscribeToChatMessages(friendUid, (serverMsgs) => {
+      // Remove mensagens otimistas que o servidor já confirmou
+      const serverIds = new Set(serverMsgs.map((m) => m.id));
+      optimisticRef.current.forEach((_, key) => {
+        if (serverIds.has(key)) optimisticRef.current.delete(key);
+      });
+
+      const pending = Array.from(optimisticRef.current.values());
+      const merged = [...serverMsgs, ...pending].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+      setDisplayMessages(merged);
+    });
+
+    const unsubscribeTyping = subscribeToFriendTyping(friendUid, (typing) => {
+      setFriendTyping(typing);
+    });
+
+    return () => {
+      void setChatTyping(friendUid, false);
+      unsubscribeMessages();
+      unsubscribeTyping();
+      friendUidRef.current = null;
+    };
+  }, [isOpen, friendUid]);
+
+  // ── Scroll automático ────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = messagesEndRef.current;
+    if (!el) return;
+    const timer = setTimeout(() => el.scrollIntoView({ behavior: "smooth" }), 60);
+    return () => clearTimeout(timer);
+  }, [displayMessages, friendTyping]);
+
+  // ── Anti-spam cooldown ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!spamLockedUntil) return;
+    const remaining = spamLockedUntil - Date.now();
+    if (remaining <= 0) { setSpamLockedUntil(null); return; }
+    const timer = window.setTimeout(() => setSpamLockedUntil(null), remaining);
     return () => window.clearTimeout(timer);
   }, [spamLockedUntil]);
 
+  // ── Indicador de "está digitando" (enviado para o amigo) ─────────────────
   useEffect(() => {
     if (!isOpen || !friendUid) return;
-
     const shouldSendTyping = inputText.trim().length > 0;
     if (lastTypingSentRef.current === shouldSendTyping) return;
-
     lastTypingSentRef.current = shouldSendTyping;
-
     const timer = window.setTimeout(() => {
-      void setChatTyping(friendUid, shouldSendTyping).catch((error) => {
-        console.error("Erro ao atualizar digitacao do chat:", error);
-      });
-    }, shouldSendTyping ? 180 : 0);
-
+      void setChatTyping(friendUid, shouldSendTyping);
+    }, shouldSendTyping ? 150 : 0);
     return () => window.clearTimeout(timer);
   }, [friendUid, inputText, isOpen]);
 
@@ -1526,8 +1684,9 @@ export const ChatModal: React.FC<{
 
     try {
       playSound("select");
+      const optimisticId = `local-${now}`;
       const optimisticMessage: ChatMessage = {
-        id: `local-${now}`,
+        id: optimisticId,
         chatId: friendUid,
         senderId: "me",
         receiverId: friendUid,
@@ -1537,15 +1696,18 @@ export const ChatModal: React.FC<{
       };
 
       recentSendTimestampsRef.current = [...freshTimestamps, now];
-      setRenderMessages((current) => [...current, optimisticMessage]);
+      optimisticRef.current.set(optimisticId, optimisticMessage);
+      setDisplayMessages((current) => [...current, optimisticMessage]);
       setInputText("");
       lastTypingSentRef.current = false;
       void setChatTyping(friendUid, false);
       await sendChatMessage(friendUid, text);
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      setRenderMessages((current) =>
-        current.filter((message) => message.id !== `local-${now}`),
+      const localId = `local-${now}`;
+      optimisticRef.current.delete(localId);
+      setDisplayMessages((current) =>
+        current.filter((message) => message.id !== localId),
       );
       notify("Nao foi possivel enviar a mensagem.", "error");
     }
@@ -1603,13 +1765,13 @@ export const ChatModal: React.FC<{
 
         {/* Messages */}
         <div className="chat-scrollbar flex-1 overflow-y-auto p-6 pr-3 space-y-4">
-          {renderMessages.length === 0 ? (
+          {displayMessages.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center text-white/20 space-y-2">
               <MessageSquare className="h-8 w-8" />
               <p className="text-xs uppercase tracking-wider">Nenhuma mensagem ainda</p>
             </div>
           ) : (
-            renderMessages.map((msg, index) => {
+            displayMessages.map((msg, index) => {
               const isMe = msg.senderId !== friendUid;
               const inlineImageLinks = extractImageLinks(msg.text);
               return (

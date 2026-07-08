@@ -1,14 +1,8 @@
 /**
  * emulator-detector.cjs
  *
- * Detects the Steam emulator type used by a local game and provides
- * a normalised parser for its achievement save state.
- *
- * Currently supported:
- *   - Goldberg Steam Emulator v1  (single achievements.json)
- *
- * Designed to be extended easily — add a new EMULATOR_TYPE constant,
- * a detector block in `detectEmulator`, and a parser in `parseAchievementState`.
+ * Implementa o Padrão Adapter para suportar múltiplos emuladores da cena
+ * sem quebrar a assinatura original esperada pelo 'main.cjs'.
  */
 
 const fs = require("node:fs");
@@ -16,25 +10,17 @@ const path = require("node:path");
 const os = require("node:os");
 
 // ─── Emulator type identifiers ────────────────────────────────────────────────
-
 const EMULATOR_TYPES = {
   GOLDBERG_V1: "goldberg_v1",
-  // Ready for future additions:
-  // GOLDBERG_V2: "goldberg_v2",
-  // ALI213:      "ali213",
-  // TENOKE:      "tenoke",
+  GOLDBERG_SOCIALCLUB: "goldberg_socialclub",
+  TENOKE: "tenoke",
+  GENERIC_INI: "generic_ini"
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Reads a UTF-8 (or UTF-8 BOM) file and JSON-parses it.
- * Returns null on any error.
- * @param {string} filePath
- * @returns {object|null}
- */
 const tryReadJson = (filePath) => {
   try {
+    if (!fs.existsSync(filePath)) return null;
     const raw = fs.readFileSync(filePath, "utf8");
     const normalized = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
     return JSON.parse(normalized);
@@ -43,149 +29,571 @@ const tryReadJson = (filePath) => {
   }
 };
 
-// ─── Parsers (one per emulator type) ─────────────────────────────────────────
+// ─── Estrutura de Adaptadores ───────────────────────────────────────────────
 
-/**
- * Parses Goldberg v1's achievements.json.
- *
- * File lives in:
- *   %APPDATA%\Goldberg SteamEmu Saves\<AppID>\achievements.json
- *
- * Expected structure:
- * {
- *   "ACH_SOME_ID": { "earned": true,  "earned_time": 1720000000 },
- *   "ACH_OTHER":   { "earned": false, "earned_time": 0 },
- *   ...
- * }
- *
- * @param {string} filePath
- * @returns {{ [achievementId: string]: { earned: boolean, earnedTime: number } }}
- */
-const parseGoldbergV1 = (filePath) => {
-  const data = tryReadJson(filePath);
-  if (!data || typeof data !== "object") return {};
+class GoldbergAdapter {
+  constructor() {
+    this.emulatorType = EMULATOR_TYPES.GOLDBERG_V1;
+  }
 
-  const result = {};
-  for (const [id, entry] of Object.entries(data)) {
-    if (entry && typeof entry === "object") {
-      result[id] = {
-        earned: Boolean(entry.earned),
-        earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
-      };
+  _getPaths(appId) {
+    const appDataRoaming = path.join(os.homedir(), "AppData", "Roaming");
+    const goldbergClassic = path.join(appDataRoaming, "Goldberg SteamEmu Saves", String(appId));
+    const goldbergGse = path.join(appDataRoaming, "GSE Saves", String(appId));
+    const appDataBase = fs.existsSync(goldbergGse) ? goldbergGse : goldbergClassic;
+    return {
+      watchDir: appDataBase,
+      savePath: path.join(appDataBase, "achievements.json"),
+    };
+  }
+
+  detect(gamePath) {
+    if (!gamePath) return false;
+    const hasSteamApi =
+      fs.existsSync(path.join(gamePath, "steam_api64.dll")) ||
+      fs.existsSync(path.join(gamePath, "steam_api.dll"));
+    const hasSteamSettings = fs.existsSync(path.join(gamePath, "steam_settings"));
+    return hasSteamApi || hasSteamSettings;
+  }
+
+  readAchievements(appId, gamePath) {
+    const { savePath } = this._getPaths(appId);
+    const data = tryReadJson(savePath);
+    if (!data || typeof data !== "object") return {};
+
+    const result = {};
+    for (const [id, entry] of Object.entries(data)) {
+      if (entry && typeof entry === "object") {
+        result[id] = {
+          earned: Boolean(entry.earned),
+          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
+        };
+      }
+    }
+    return result;
+  }
+
+  writeAchievements(appId, data, gamePath) {
+    // Escrita é delegada no main.cjs
+    return false;
+  }
+
+  watchSaves(appId, callback) {
+    return null;
+  }
+  
+  getWatchInfo(appId) {
+    const paths = this._getPaths(appId);
+    return {
+      emulatorType: this.emulatorType,
+      savePath: paths.savePath,
+      watchDir: paths.watchDir
+    };
+  }
+}
+
+class GoldbergSocialClubAdapter {
+  constructor() {
+    this.emulatorType = EMULATOR_TYPES.GOLDBERG_SOCIALCLUB;
+  }
+
+  _getPaths(appId) {
+    const appDataRoaming = path.join(os.homedir(), "AppData", "Roaming");
+    const appDataBase = path.join(appDataRoaming, "Goldberg Socialclub Emu Saves", String(appId));
+    return {
+      watchDir: appDataBase,
+      savePath: path.join(appDataBase, "achievements.json"),
+    };
+  }
+
+  detect(gamePath) {
+    if (!gamePath) return false;
+    return fs.existsSync(path.join(gamePath, "socialclub_emu.ini")) || 
+           fs.existsSync(path.join(gamePath, "socialclub.dll")) ||
+           fs.existsSync(path.join(gamePath, "GTA5.exe")) ||
+           fs.existsSync(path.join(gamePath, "RDR2.exe"));
+  }
+
+  readAchievements(appId, gamePath) {
+    const { savePath } = this._getPaths(appId);
+    const data = tryReadJson(savePath);
+    if (!data || typeof data !== "object") return {};
+
+    const result = {};
+    for (const [id, entry] of Object.entries(data)) {
+      if (entry && typeof entry === "object") {
+        result[id] = {
+          earned: Boolean(entry.earned),
+          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
+        };
+      }
+    }
+    return result;
+  }
+
+  writeAchievements(appId, data, gamePath) {
+    return false;
+  }
+
+  watchSaves(appId, callback) {
+    return null;
+  }
+  
+  getWatchInfo(appId) {
+    const paths = this._getPaths(appId);
+    return {
+      emulatorType: this.emulatorType,
+      savePath: paths.savePath,
+      watchDir: paths.watchDir
+    };
+  }
+}
+
+class TenokeAdapter {
+  constructor() {
+    this.emulatorType = EMULATOR_TYPES.TENOKE;
+  }
+
+  _getPaths(appId) {
+    const appDataLocal = path.join(os.homedir(), "AppData", "Local");
+    const appDataBase = path.join(appDataLocal, "TENOKE", String(appId));
+    return {
+      watchDir: appDataBase,
+      savePath: path.join(appDataBase, "achievements.json"),
+    };
+  }
+
+  detect(gamePath) {
+    if (!gamePath) return false;
+    return fs.existsSync(path.join(gamePath, "tenoke.ini"));
+  }
+
+  readAchievements(appId, gamePath) {
+    const { savePath } = this._getPaths(appId);
+    const data = tryReadJson(savePath);
+    if (!data || typeof data !== "object") return {};
+
+    const result = {};
+    for (const [id, entry] of Object.entries(data)) {
+      if (entry && typeof entry === "object") {
+        result[id] = {
+          earned: Boolean(entry.earned),
+          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
+        };
+      }
+    }
+    return result;
+  }
+
+  writeAchievements(appId, data, gamePath) {
+    return false;
+  }
+
+  watchSaves(appId, callback) {
+    return null;
+  }
+  
+  getWatchInfo(appId) {
+    const paths = this._getPaths(appId);
+    return {
+      emulatorType: this.emulatorType,
+      savePath: paths.savePath,
+      watchDir: paths.watchDir
+    };
+  }
+}
+
+class GenericIniAdapter {
+  constructor() {
+    this.emulatorType = EMULATOR_TYPES.GENERIC_INI;
+  }
+
+  _getPaths(appId, gamePath) {
+    let iniPath = null;
+    let watchDir = null;
+    
+    if (gamePath) {
+      if (fs.existsSync(path.join(gamePath, "steam_emu.ini"))) {
+        iniPath = path.join(gamePath, "steam_emu.ini");
+      } else if (fs.existsSync(path.join(gamePath, "ALI213.ini"))) {
+        iniPath = path.join(gamePath, "ALI213.ini");
+      }
+      if (iniPath) watchDir = path.dirname(iniPath);
+    }
+    
+    const publicDocs = path.join(process.env.PUBLIC || "C:\\Users\\Public", "Documents");
+    const runePath = path.join(publicDocs, "Steam", "RUNE", String(appId), "remote", "achievements.ini");
+    const codexPath = path.join(publicDocs, "Steam", "CODEX", String(appId), "remote", "achievements.ini");
+    
+    if (fs.existsSync(runePath)) {
+      return { watchDir: path.dirname(runePath), savePath: runePath };
+    }
+    if (fs.existsSync(codexPath)) {
+      return { watchDir: path.dirname(codexPath), savePath: codexPath };
+    }
+
+    return {
+      watchDir: watchDir || gamePath || "",
+      savePath: iniPath || "",
+    };
+  }
+
+  detect(gamePath) {
+    if (!gamePath) return false;
+    return fs.existsSync(path.join(gamePath, "steam_emu.ini")) || 
+           fs.existsSync(path.join(gamePath, "ALI213.ini"));
+  }
+
+  readAchievements(appId, gamePath) {
+    const { savePath } = this._getPaths(appId, gamePath);
+    if (!savePath || !fs.existsSync(savePath)) return {};
+
+    try {
+      const content = fs.readFileSync(savePath, "utf8");
+      // Extração simples via RegEx de chaves sob [Achievements]
+      const achievementsBlockRegex = /\[Achievements\]([\s\S]*?)(?:\[|$)/i;
+      const match = content.match(achievementsBlockRegex);
+      
+      const result = {};
+      if (match && match[1]) {
+        const lines = match[1].split("\n");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+          
+          const parts = trimmed.split("=");
+          if (parts.length >= 2) {
+            const key = parts[0].trim();
+            const val = parts[1].trim();
+            if (key) {
+              result[key] = {
+                earned: val === "1" || val.toLowerCase() === "true",
+                earnedTime: Date.now() / 1000 // Mock de tempo atual
+              };
+            }
+          }
+        }
+      }
+      return result;
+    } catch {
+      return {};
     }
   }
-  return result;
-};
 
-// ─── Emulator detection ───────────────────────────────────────────────────────
+  writeAchievements(appId, data, gamePath) {
+    return false; // Modo Read-Only
+  }
 
-/**
- * Retorna os caminhos de diretório e arquivo de saves do Goldberg v1.
- *
- * @param {string} appId Steam App ID
- * @returns {{ savePath: string, watchDir: string }}
- */
-function getGoldbergV1Paths(appId) {
-  const appDataRoaming = path.join(os.homedir(), "AppData", "Roaming");
-  const goldbergClassic = path.join(appDataRoaming, "Goldberg SteamEmu Saves", String(appId));
-  const goldbergGse = path.join(appDataRoaming, "GSE Saves", String(appId));
-
-  const appDataBase = fs.existsSync(goldbergGse) ? goldbergGse : goldbergClassic;
-  return {
-    watchDir: appDataBase,
-    savePath: path.join(appDataBase, "achievements.json"),
-  };
+  watchSaves(appId, callback) {
+    return null; // Modo Read-Only
+  }
+  
+  getWatchInfo(appId, gamePath) {
+    const paths = this._getPaths(appId, gamePath);
+    return {
+      emulatorType: this.emulatorType,
+      savePath: paths.savePath,
+      watchDir: paths.watchDir
+    };
+  }
 }
 
-/**
- * Inspects a game directory and returns an object describing the emulator
- * type and the path to the achievement save file/directory to watch.
- *
- * @param {string} gameDir    Absolute path to the folder containing the game .exe
- * @param {string} appId      Steam App ID (as a string of digits)
- * @returns {{
- *   emulatorType: string,
- *   savePath:     string,   // Path to the file (or dir for folder-based emulators)
- *   watchDir:     string,   // Directory to pass to fs.watch()
- * } | null}
- */
+// ─── Seletor Universal e Escaneamento de Caminhos (Baseado no Hydra) ──────────
+
+const adapters = [
+  new GoldbergSocialClubAdapter(), // Prioridade alta para testes de GTA
+  new TenokeAdapter(),
+  new GenericIniAdapter(),
+  new GoldbergAdapter() // Fallback padrão
+];
+
+const getScannedEmulator = (appId, gameDir) => {
+  if (!appId) return null;
+
+  const appData = path.join(os.homedir(), "AppData", "Roaming");
+  const localAppData = path.join(os.homedir(), "AppData", "Local");
+  const programData = process.env.PROGRAMDATA || "C:\\ProgramData";
+  const publicDocs = path.join(process.env.PUBLIC || "C:\\Users\\Public", "Documents");
+  const documents = path.join(os.homedir(), "Documents");
+
+  const candidates = [
+    // Goldberg
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+      savePath: path.join(appData, "Goldberg SteamEmu Saves", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "Goldberg SteamEmu Saves", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+      savePath: path.join(appData, "GSE Saves", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "GSE Saves", String(appId))
+    },
+    // Goldberg Social Club
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_SOCIALCLUB,
+      savePath: path.join(appData, "Goldberg Socialclub Emu Saves", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "Goldberg Socialclub Emu Saves", String(appId))
+    },
+    // Tenoke
+    {
+      emulatorType: EMULATOR_TYPES.TENOKE,
+      savePath: path.join(localAppData, "TENOKE", String(appId), "achievements.json"),
+      watchDir: path.join(localAppData, "TENOKE", String(appId))
+    },
+    // RUNE
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "Steam", "RUNE", String(appId), "achievements.ini"),
+      watchDir: path.join(publicDocs, "Steam", "RUNE", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "Steam", "RUNE", String(appId), "remote", "achievements.ini"),
+      watchDir: path.join(publicDocs, "Steam", "RUNE", String(appId), "remote")
+    },
+    // CODEX
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "Steam", "CODEX", String(appId), "achievements.ini"),
+      watchDir: path.join(publicDocs, "Steam", "CODEX", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "Steam", "CODEX", String(appId), "remote", "achievements.ini"),
+      watchDir: path.join(publicDocs, "Steam", "CODEX", String(appId), "remote")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "Steam", "CODEX", String(appId), "achievements.ini"),
+      watchDir: path.join(appData, "Steam", "CODEX", String(appId))
+    },
+    // OnlineFix
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "OnlineFix", String(appId), "Stats", "Achievements.ini"),
+      watchDir: path.join(publicDocs, "OnlineFix", String(appId), "Stats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(publicDocs, "OnlineFix", String(appId), "Achievements.ini"),
+      watchDir: path.join(publicDocs, "OnlineFix", String(appId))
+    },
+    // RLD! / DODI / PLAZA
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "RLD!", String(appId), "achievements.ini"),
+      watchDir: path.join(programData, "RLD!", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "Player", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "Player", String(appId), "stats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "RLD!", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "RLD!", String(appId), "stats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "dodi", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "dodi", String(appId), "stats")
+    },
+    // Skidrow
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(documents, "SKIDROW", String(appId), "SteamEmu", "UserStats", "achiev.ini"),
+      watchDir: path.join(documents, "SKIDROW", String(appId), "SteamEmu", "UserStats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(documents, "Player", String(appId), "SteamEmu", "UserStats", "achiev.ini"),
+      watchDir: path.join(documents, "Player", String(appId), "SteamEmu", "UserStats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(localAppData, "SKIDROW", String(appId), "SteamEmu", "UserStats", "achiev.ini"),
+      watchDir: path.join(localAppData, "SKIDROW", String(appId), "SteamEmu", "UserStats")
+    },
+    // SmartSteamEmu
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "SmartSteamEmu", String(appId), "User", "Achievements.ini"),
+      watchDir: path.join(appData, "SmartSteamEmu", String(appId), "User")
+    },
+    // CreamAPI
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "CreamAPI", String(appId), "stats", "CreamAPI.Achievements.cfg"),
+      watchDir: path.join(appData, "CreamAPI", String(appId), "stats")
+    },
+    // RLE
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "RLE", String(appId), "achievements.ini"),
+      watchDir: path.join(appData, "RLE", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "RLE", String(appId), "Achievements.ini"),
+      watchDir: path.join(appData, "RLE", String(appId))
+    }
+  ];
+
+  // Adiciona caminhos internos da pasta do jogo se fornecida
+  if (gameDir) {
+    candidates.push(
+      {
+        emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+        savePath: path.join(gameDir, "steam_settings", "achievements.json"),
+        watchDir: path.join(gameDir, "steam_settings")
+      },
+      {
+        emulatorType: EMULATOR_TYPES.GENERIC_INI,
+        savePath: path.join(gameDir, "steam_settings", "achievements.ini"),
+        watchDir: path.join(gameDir, "steam_settings")
+      },
+      {
+        emulatorType: EMULATOR_TYPES.GENERIC_INI,
+        savePath: path.join(gameDir, "SteamData", "user_stats.ini"),
+        watchDir: path.join(gameDir, "SteamData")
+      },
+      {
+        emulatorType: EMULATOR_TYPES.GENERIC_INI,
+        savePath: path.join(gameDir, "3DMGAME", "Player", "stats", "achievements.ini"),
+        watchDir: path.join(gameDir, "3DMGAME", "Player", "stats")
+      }
+    );
+  }
+
+  // Verifica se algum arquivo dos emuladores realmente existe no disco
+  for (const cand of candidates) {
+    if (fs.existsSync(cand.savePath)) {
+      console.log(`[EmulatorDetector] Arquivo existente encontrado: ${cand.savePath} (Emulador: ${cand.emulatorType})`);
+      return cand;
+    }
+  }
+
+  return null;
+};
+
+const getEmulatorForGame = (gamePath) => {
+  if (!gamePath) return null;
+  console.log(`[EmulatorDetector] Procurando emulador na pasta do jogo: ${gamePath}`);
+  for (const adapter of adapters) {
+    if (adapter.detect(gamePath)) {
+      console.log(`[EmulatorDetector] Emulador detectado via assinatura: ${adapter.emulatorType}`);
+      return adapter;
+    }
+  }
+  console.log(`[EmulatorDetector] Nenhum emulador específico detectado na raiz do jogo.`);
+  return null;
+};
+
+// ─── Compatibilidade IPC (Retro-compatível com main.cjs) ─────────────────────
+
 function detectEmulator(gameDir, appId) {
   if (!gameDir || !appId) return null;
-
-  const hasSteamApi =
-    fs.existsSync(path.join(gameDir, "steam_api64.dll")) ||
-    fs.existsSync(path.join(gameDir, "steam_api.dll"));
-
-  if (!hasSteamApi) return null;
-
-  // ── Goldberg v1 — %APPDATA% save (most common) ───────────────────────────
-  const paths = getGoldbergV1Paths(appId);
-
-  // Return even if the file doesn't exist yet — the watcher will pick it up
-  // the moment Goldberg creates it on first boot or first unlock.
-  return {
-    emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
-    savePath: paths.savePath,
-    watchDir: paths.watchDir,   // watch the folder so we catch file creation too
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // FUTURE — Goldberg v2 (folder-based, one file per achievement)
-  //
-  // const goldbergV2Dir = path.join(appDataBase, "achievements");
-  // if (fs.existsSync(goldbergV2Dir)) {
-  //   return {
-  //     emulatorType: EMULATOR_TYPES.GOLDBERG_V2,
-  //     savePath:  goldbergV2Dir,
-  //     watchDir:  goldbergV2Dir,
-  //   };
-  // }
-  //
-  // FUTURE — ALI213 / TENOKE / CODEX
-  // Check for ALI213.ini, tenoke_settings/, valve.ini, etc.
-  // ─────────────────────────────────────────────────────────────────────────
-};
-
-// ─── Unified state parser ─────────────────────────────────────────────────────
-
-/**
- * Given a detected emulator descriptor, reads the current achievement state
- * from disk and returns a normalised map.
- *
- * @param {{ emulatorType: string, savePath: string } | null} detectedEmulator
- * @returns {{ [achievementId: string]: { earned: boolean, earnedTime: number } }}
- */
-const parseAchievementState = (detectedEmulator) => {
-  if (!detectedEmulator?.savePath) return {};
-
-  switch (detectedEmulator.emulatorType) {
-    case EMULATOR_TYPES.GOLDBERG_V1:
-      return parseGoldbergV1(detectedEmulator.savePath);
-
-    // Future parsers will be added here as case blocks:
-    // case EMULATOR_TYPES.GOLDBERG_V2: return parseGoldbergV2(detectedEmulator.savePath);
-    // case EMULATOR_TYPES.ALI213:      return parseAli213(detectedEmulator.savePath);
-
-    default:
-      return {};
+  
+  // 1. Tenta escaneamento global/Hydra para encontrar arquivos já criados
+  const scanned = getScannedEmulator(appId, gameDir);
+  if (scanned) {
+    console.log(`[EmulatorDetector] Sucesso no escaneamento automático para appId ${appId}!`);
+    return {
+      ...scanned,
+      appId,
+      gameDir
+    };
   }
-};
 
-/**
- * Lê o estado de saves do emulador de forma pontual (retroativa) sem iniciar um watcher.
- * Utilizado para popular o painel de conquistas ao carregar a tela.
- *
- * @param {string} appId Steam App ID
- * @returns {{ [achievementId: string]: { earned: boolean, earnedTime: number } }}
- */
-function readLocalSavesRetroactive(appId) {
-  if (!appId) return {};
-  const paths = getGoldbergV1Paths(appId);
-  // Por ora suporta apenas Goldberg v1. Pode ser expandido futuramente chamando outros parsers.
-  return parseGoldbergV1(paths.savePath);
+  // 2. Fallback: detecção de emulador baseada nas DLLs do jogo para novos saves
+  const adapter = getEmulatorForGame(gameDir) || new GoldbergAdapter();
+  const watchInfo = adapter.getWatchInfo(appId, gameDir);
+  
+  console.log(`[EmulatorDetector] Fallback de detecção de emulador para appId: ${appId} | Emulador: ${adapter.emulatorType}`);
+  console.log(`[EmulatorDetector] Pasta de saves (watchDir): ${watchInfo.watchDir}`);
+  console.log(`[EmulatorDetector] Arquivo alvo (savePath): ${watchInfo.savePath}`);
+
+  return {
+    ...watchInfo,
+    appId,
+    gameDir
+  };
 }
 
-// ─── Exports ─────────────────────────────────────────────────────────────────
+function parseAchievementState(detectedEmulator) {
+  if (!detectedEmulator || !detectedEmulator.savePath) return {};
+  
+  const adapter = adapters.find(a => a.emulatorType === detectedEmulator.emulatorType);
+  if (!adapter) return {};
+
+  return adapter.readAchievements(detectedEmulator.appId, detectedEmulator.gameDir);
+}
+
+function readLocalSavesRetroactive(appId, gameDir = null) {
+  if (!appId) return {};
+  
+  // Tenta ler do escaneamento automático primeiro
+  const scanned = getScannedEmulator(appId, gameDir);
+  if (scanned && fs.existsSync(scanned.savePath)) {
+    const adapter = adapters.find(a => a.emulatorType === scanned.emulatorType);
+    if (adapter) {
+      // Como readAchievements aceita savePath customizado ou lê do padrão,
+      // nós temporariamente instanciamos para ler o arquivo do local correto.
+      if (scanned.emulatorType === EMULATOR_TYPES.GENERIC_INI) {
+        try {
+          const content = fs.readFileSync(scanned.savePath, "utf8");
+          const achievementsBlockRegex = /\[Achievements\]([\s\S]*?)(?:\[|$)/i;
+          const match = content.match(achievementsBlockRegex);
+          const result = {};
+          if (match && match[1]) {
+            const lines = match[1].split("\n");
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+              const parts = trimmed.split("=");
+              if (parts.length >= 2) {
+                const key = parts[0].trim();
+                const val = parts[1].trim();
+                if (key) {
+                  result[key] = {
+                    earned: val === "1" || val.toLowerCase() === "true",
+                    earnedTime: Date.now() / 1000
+                  };
+                }
+              }
+            }
+          }
+          return result;
+        } catch {
+          return {};
+        }
+      } else {
+        const data = tryReadJson(scanned.savePath);
+        if (data && typeof data === "object") {
+          const result = {};
+          for (const [id, entry] of Object.entries(data)) {
+            if (entry && typeof entry === "object") {
+              result[id] = {
+                earned: Boolean(entry.earned),
+                earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
+              };
+            }
+          }
+          return result;
+        }
+      }
+    }
+  }
+
+  const adapter = gameDir ? (getEmulatorForGame(gameDir) || new GoldbergAdapter()) : new GoldbergAdapter();
+  return adapter.readAchievements(appId, gameDir);
+}
+
+// Mantemos esse helper exportado solto para a autoconfiguração antiga no main.cjs
+function getGoldbergV1Paths(appId) {
+  return new GoldbergAdapter()._getPaths(appId);
+}
 
 module.exports = {
   EMULATOR_TYPES,
@@ -193,4 +601,5 @@ module.exports = {
   detectEmulator,
   parseAchievementState,
   readLocalSavesRetroactive,
+  getEmulatorForGame
 };

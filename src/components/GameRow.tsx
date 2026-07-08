@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import GameCard from "./GameCard";
 import type { Game } from "../types/domain";

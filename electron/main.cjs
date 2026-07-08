@@ -1185,6 +1185,80 @@ ipcMain.handle("game:scan-local", async (_event) => {
   return results;
 });
 
+// ─── Auto-Updater ───────────────────────────────────────────────────────────
+const { autoUpdater } = require("electron-updater");
+
+// Desativa o autoDownload para dar controle ao usuário (ele decide baixar pelo botão)
+autoUpdater.autoDownload = false;
+
+// Repassa eventos do autoUpdater para a interface de usuário (Vite/React)
+autoUpdater.on("checking-for-update", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", "checking-for-update");
+  }
+});
+
+autoUpdater.on("update-available", (info) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", "update-available", info);
+  }
+});
+
+autoUpdater.on("update-not-available", (info) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", "update-not-available", info);
+  }
+});
+
+autoUpdater.on("error", (err) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", "error", err ? err.message : "Erro desconhecido");
+  }
+});
+
+autoUpdater.on("download-progress", (progressObj) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:download-progress", progressObj);
+  }
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", "update-downloaded", info);
+  }
+});
+
+ipcMain.handle("app:get-version", () => {
+  return app.getVersion();
+});
+
+ipcMain.handle("update:check-for-updates", async () => {
+  try {
+    if (!app.isPackaged) {
+      return { status: "development", message: "O atualizador não funciona em ambiente de desenvolvimento." };
+    }
+    const result = await autoUpdater.checkForUpdates();
+    return result;
+  } catch (error) {
+    console.error("[auto-updater] Erro ao checar atualizações:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("update:start-download", async () => {
+  try {
+    return await autoUpdater.downloadUpdate();
+  } catch (error) {
+    console.error("[auto-updater] Erro ao iniciar download:", error);
+    throw error;
+  }
+});
+
+ipcMain.handle("update:quit-and-install", () => {
+  isQuitting = true;
+  autoUpdater.quitAndInstall();
+});
+
 app.whenReady().then(async () => {
   try {
     const iconPath = path.join(app.getAppPath(), "assets", "icon.png");
