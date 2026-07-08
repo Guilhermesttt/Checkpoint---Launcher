@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { AnimatePresence } from "framer-motion";
 import { Navigate } from "react-router-dom";
 import Home from "./pages/Home";
@@ -83,6 +83,10 @@ const AppContent: React.FC = () => {
   }, []);
 
   const startBackgroundMusic = React.useCallback(async () => {
+    if (document.hidden || !document.hasFocus()) {
+      pendingMusicStartRef.current = true;
+      return;
+    }
     const audio = await ensureMusicSource(soundTheme);
     if (!audio || !audio.paused) return;
 
@@ -193,6 +197,27 @@ const AppContent: React.FC = () => {
     },
     [clearMusicFade],
   );
+
+  React.useEffect(() => {
+    const handleFocus = () => {
+      if (user?.uid && !loading && !isIntroVisible) {
+        startBackgroundMusic();
+      }
+    };
+    const handleBlur = () => {
+      const audio = musicRef.current;
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [user?.uid, loading, isIntroVisible, startBackgroundMusic]);
 
   if (loading) {
     return <AsyncLoader />;

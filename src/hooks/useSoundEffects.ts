@@ -156,6 +156,9 @@ export const useSoundEffects = (volume = 0.35, theme: SoundTheme = "ps2") => {
 
   const playSound = useCallback(
     (type: SoundEffectType) => {
+      if (document.hidden || !document.hasFocus()) {
+        return;
+      }
       if (type === "navigate") {
         const now = performance.now();
         if (now - lastNavigateAtRef.current < 85) return;

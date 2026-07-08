@@ -379,6 +379,7 @@ const createOverlayWindow = () => {
       nodeIntegration: false,
       sandbox: false,
       backgroundThrottling: false,
+      webSecurity: false,
     },
   });
 
@@ -1281,6 +1282,8 @@ ipcMain.handle("update:quit-and-install", () => {
   isQuitting = true;
   autoUpdater.quitAndInstall();
 });
+
+app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
   try {
