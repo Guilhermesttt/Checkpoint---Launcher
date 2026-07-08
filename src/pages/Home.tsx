@@ -626,6 +626,21 @@ const Home: React.FC = () => {
     previousDiscordIdRef.current = resolvedDiscordId;
   }, [notify, resolvedDiscordId, resolvedSteamId]);
 
+  // ── Auto-Updater Global Listener ──────────────────────────────────────────
+  useEffect(() => {
+    if (!(window as any).electronAPI?.onUpdateMessage) return;
+
+    const unsubscribe = (window as any).electronAPI.onUpdateMessage((msg: string, data: any) => {
+      if (msg === "update-available") {
+        notify(`Nova atualização disponível (v${data?.version})! Vá nas Configurações para baixar.`, "success");
+      } else if (msg === "update-downloaded") {
+        notify("Nova versão baixada! Reinicie o aplicativo para aplicar as atualizações.", "success");
+      }
+    });
+
+    return unsubscribe;
+  }, [notify]);
+
 
   useEffect(() => {
     if (!user?.uid) {

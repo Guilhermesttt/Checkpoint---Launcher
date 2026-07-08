@@ -303,6 +303,13 @@ const createWindow = async () => {
     shell.openExternal(url);
   });
 
+  mainWindow.on("close", (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
 
@@ -317,6 +324,22 @@ const createWindow = async () => {
   });
 
   await loadMainWindow();
+
+  // Checa atualizações de forma silenciosa na inicialização
+  if (app.isPackaged) {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.error("[AutoUpdater] Erro ao buscar atualizações automáticas:", err);
+      });
+    }, 5000); // aguarda 5s após abrir a janela principal para não sobrecarregar a inicialização
+
+    // Checa por atualizações a cada 2 horas
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.error("[AutoUpdater] Erro ao buscar atualizações periódicas:", err);
+      });
+    }, 2 * 60 * 60 * 1000);
+  }
 };
 
 const syncOverlayBounds = () => {
