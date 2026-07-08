@@ -1564,6 +1564,8 @@ export const ChatModal: React.FC<{
     // markMessagesAsRead é chamado uma vez ao abrir, não dentro do callback do snapshot
     void markMessagesAsRead(friendUid);
 
+    const lastMsgCountRef = { current: 0 };
+
     const unsubscribeMessages = subscribeToChatMessages(friendUid, (serverMsgs) => {
       // Remove mensagens otimistas que o servidor já confirmou
       const serverIds = new Set(serverMsgs.map((m) => m.id));
@@ -1575,6 +1577,15 @@ export const ChatModal: React.FC<{
       const merged = [...serverMsgs, ...pending].sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
+
+      // Se o número de mensagens aumentou e a última foi enviada pelo amigo, reproduz o som
+      if (merged.length > lastMsgCountRef.current && lastMsgCountRef.current > 0) {
+        const lastMsg = merged[merged.length - 1];
+        if (lastMsg && lastMsg.senderId === friendUid) {
+          playSound("friendRequest");
+        }
+      }
+      lastMsgCountRef.current = merged.length;
       setDisplayMessages(merged);
     });
 
