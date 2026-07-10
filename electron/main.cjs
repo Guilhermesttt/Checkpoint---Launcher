@@ -668,6 +668,116 @@ async function injectGoldbergDefinitions(appId, settingsPath) {
   }
 }
 
+const parseIniSectionsForMerge = (content) => {
+  const sections = new Map();
+  let currentSection = "";
+  sections.set(currentSection, new Map());
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].trim();
+      if (!sections.has(currentSection)) sections.set(currentSection, new Map());
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) continue;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (key) sections.get(currentSection).set(key, value);
+  }
+
+  return sections;
+};
+
+const serializeIniSections = (sections) => {
+  const chunks = [];
+  for (const [sectionName, values] of sections.entries()) {
+    if (!sectionName) continue;
+
+    chunks.push(`[${sectionName}]`);
+    for (const [key, value] of values.entries()) {
+      chunks.push(`${key}=${value}`);
+    }
+    chunks.push("");
+  }
+
+  return chunks.join("\n").trimEnd() + "\n";
+};
+
+async function injectGenericIniDefinitions(appId, savePath) {
+  try {
+    if (!appId || !savePath) return;
+
+    const fileName = path.basename(savePath).toLowerCase();
+    if (!fileName.includes("achiev")) return;
+
+    const targetSchema = await getSchemaByAppIdOrGameId(`steam_${appId}`);
+    if (!targetSchema || targetSchema.length === 0) return;
+
+    let currentContent = "";
+    if (fs.existsSync(savePath)) {
+      currentContent = await fs.promises.readFile(savePath, "utf8");
+    }
+
+    const sections = parseIniSectionsForMerge(currentContent);
+    const existingAchievements = sections.get("Achievements") || new Map();
+    const existingSteamAchievements = sections.get("SteamAchievements") || new Map();
+    const achievedIds = new Set();
+
+    for (const [key, value] of existingAchievements.entries()) {
+      if (!key || key.toLowerCase() === "count") continue;
+      const normalizedValue = String(value || "").trim().toLowerCase();
+      if (["1", "true", "yes", "on"].includes(normalizedValue)) {
+        achievedIds.add(key);
+      }
+    }
+
+    for (const [sectionName, values] of sections.entries()) {
+      if (!sectionName || sectionName === "Achievements" || sectionName === "SteamAchievements") continue;
+      for (const [key, value] of values.entries()) {
+        if (key.toLowerCase() !== "achieved") continue;
+        const normalizedValue = String(value || "").trim().toLowerCase();
+        if (["1", "true", "yes", "on"].includes(normalizedValue)) {
+          achievedIds.add(sectionName);
+        }
+      }
+    }
+
+    for (const [key, value] of existingSteamAchievements.entries()) {
+      if (!/^Achievement\d+$/i.test(key)) continue;
+      const normalizedId = String(value || "").trim();
+      if (normalizedId) achievedIds.add(normalizedId);
+    }
+
+    const achievementIds = targetSchema
+      .map((achievement) => String(achievement?.apiName || achievement?.id || "").trim())
+      .filter(Boolean);
+    if (achievementIds.length === 0) return;
+
+    const achievements = new Map();
+    achievements.set("Count", String(achievementIds.length));
+    for (const id of achievementIds) {
+      achievements.set(id, achievedIds.has(id) ? "1" : "0");
+    }
+
+    const nextSections = new Map([["Achievements", achievements]]);
+    const nextContent = serializeIniSections(nextSections);
+    if (currentContent.trim() !== nextContent.trim()) {
+      await fs.promises.mkdir(path.dirname(savePath), { recursive: true });
+      await fs.promises.writeFile(savePath, nextContent, "utf8");
+      console.info(`[generic-ini-injector] Arquivo de conquistas inicializado para o AppID ${appId}: ${savePath}`);
+    }
+  } catch (error) {
+    console.error(`[generic-ini-injector] Falha ao inicializar conquistas:`, error);
+  }
+}
+
 ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) {
@@ -953,6 +1063,10 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   const detectedEmulator = detectedGameAppId
     ? detectEmulator(gameDir, detectedGameAppId)
     : null;
+
+  if (detectedGameAppId && detectedEmulator?.emulatorType === "generic_ini") {
+    await injectGenericIniDefinitions(detectedGameAppId, detectedEmulator.savePath);
+  }
 
   try {
     const child = spawn(normalizedTarget, [], {

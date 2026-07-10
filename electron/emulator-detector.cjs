@@ -31,6 +31,121 @@ const tryReadJson = (filePath) => {
 
 // ─── Estrutura de Adaptadores ───────────────────────────────────────────────
 
+const readTextFile = (filePath) => {
+  const buffer = fs.readFileSync(filePath);
+  if (buffer.length >= 2) {
+    if (buffer[0] === 0xff && buffer[1] === 0xfe) {
+      return buffer.toString("utf16le").replace(/^\uFEFF/, "");
+    }
+    if (buffer[0] === 0xfe && buffer[1] === 0xff) {
+      return Buffer.from(buffer).swap16().toString("utf16le").replace(/^\uFEFF/, "");
+    }
+  }
+  return buffer.toString("utf8").replace(/^\uFEFF/, "");
+};
+
+const parseIniSections = (content) => {
+  const sections = new Map();
+  let currentSection = "";
+  sections.set(currentSection, new Map());
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
+
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].trim();
+      if (!sections.has(currentSection)) sections.set(currentSection, new Map());
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) continue;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const value = trimmed.slice(separatorIndex + 1).trim();
+    if (key) sections.get(currentSection).set(key, value);
+  }
+
+  return sections;
+};
+
+const parseBooleanLike = (value) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "y", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "n", "off"].includes(normalized)) return false;
+  return null;
+};
+
+const getSectionValue = (section, names) => {
+  if (!section) return undefined;
+  for (const [key, value] of section.entries()) {
+    if (names.some((name) => key.toLowerCase() === name.toLowerCase())) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const parseGenericIniAchievements = (content) => {
+  const sections = parseIniSections(content);
+  const result = {};
+
+  for (const [sectionName, section] of sections.entries()) {
+    if (!sectionName || /^(?:Steam)?Achievements$/i.test(sectionName) || /^UserStats$/i.test(sectionName)) {
+      continue;
+    }
+
+    const achievedValue = getSectionValue(section, ["Achieved", "Earned", "Unlocked", "IsAchieved"]);
+    const earned = parseBooleanLike(achievedValue);
+    if (earned === null) continue;
+
+    const unlockTimeValue = getSectionValue(section, [
+      "UnlockTime",
+      "UnlockTimestamp",
+      "UnlockedAt",
+      "earned_time",
+      "earnedTime",
+    ]);
+    const unlockTime = Number(unlockTimeValue || 0);
+
+    result[sectionName] = {
+      earned,
+      earnedTime: Number.isFinite(unlockTime) ? unlockTime : 0,
+    };
+  }
+
+  for (const [sectionName, section] of sections.entries()) {
+    if (!/^(?:Steam)?Achievements$/i.test(sectionName)) continue;
+
+    for (const [key, value] of section.entries()) {
+      if (!key || key.toLowerCase() === "count") continue;
+
+      const booleanValue = parseBooleanLike(value);
+      if (booleanValue !== null) {
+        result[key] = {
+          earned: booleanValue,
+          earnedTime: booleanValue ? Date.now() / 1000 : 0,
+        };
+        continue;
+      }
+
+      if (!/^Achievement\d+$/i.test(key)) continue;
+
+      const achievementId = String(value || "").trim();
+      if (!achievementId || result[achievementId]) continue;
+
+      result[achievementId] = {
+        earned: true,
+        earnedTime: Date.now() / 1000,
+      };
+    }
+  }
+
+  return result;
+};
+
 class GoldbergAdapter {
   constructor() {
     this.emulatorType = EMULATOR_TYPES.GOLDBERG_V1;
@@ -249,49 +364,11 @@ class GenericIniAdapter {
     if (!savePath || !fs.existsSync(savePath)) return {};
 
     try {
-      const content = fs.readFileSync(savePath, "utf8");
-      // Extração simples via RegEx de chaves sob [Achievements]
-      const achievementsBlockRegex = /\[(?:Steam)?Achievements\]([\s\S]*?)(?:\[|$)/i;
-      const match = content.match(achievementsBlockRegex);
-      
-      const result = {};
-      if (match && match[1]) {
-        const lines = match[1].split("\n");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
-          
-          const parts = trimmed.split("=");
-          if (parts.length >= 2) {
-            const key = parts[0].trim();
-            const val = parts[1].trim();
-            if (key && key.toLowerCase() !== "count") {
-              const lowerVal = val.toLowerCase();
-              const isBooleanVal = lowerVal === "1" || lowerVal === "0" || lowerVal === "true" || lowerVal === "false";
-              
-              if (isBooleanVal) {
-                // CODEX / ALI213: NomeDaConquista=1
-                result[key] = {
-                  earned: lowerVal === "1" || lowerVal === "true",
-                  earnedTime: Date.now() / 1000
-                };
-              } else {
-                // RUNE: Achievement0=NomeDaConquista
-                result[val] = {
-                  earned: true,
-                  earnedTime: Date.now() / 1000
-                };
-              }
-            }
-          }
-        }
-      }
-      return result;
+      return parseGenericIniAchievements(readTextFile(savePath));
     } catch {
       return {};
     }
   }
-
   writeAchievements(appId, data, gamePath) {
     return false; // Modo Read-Only
   }
@@ -544,74 +621,18 @@ function parseAchievementState(detectedEmulator) {
 
 function readLocalSavesRetroactive(appId, gameDir = null) {
   if (!appId) return {};
-  
-  // Tenta ler do escaneamento automático primeiro
+
   const scanned = getScannedEmulator(appId, gameDir);
   if (scanned && fs.existsSync(scanned.savePath)) {
     const adapter = adapters.find(a => a.emulatorType === scanned.emulatorType);
     if (adapter) {
-      // Como readAchievements aceita savePath customizado ou lê do padrão,
-      // nós temporariamente instanciamos para ler o arquivo do local correto.
-      if (scanned.emulatorType === EMULATOR_TYPES.GENERIC_INI) {
-        try {
-          const content = fs.readFileSync(scanned.savePath, "utf8");
-          const achievementsBlockRegex = /\[(?:Steam)?Achievements\]([\s\S]*?)(?:\[|$)/i;
-          const match = content.match(achievementsBlockRegex);
-          const result = {};
-          if (match && match[1]) {
-            const lines = match[1].split("\n");
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith(";") || trimmed.startsWith("#")) continue;
-              const parts = trimmed.split("=");
-              if (parts.length >= 2) {
-                const key = parts[0].trim();
-                const val = parts[1].trim();
-                if (key && key.toLowerCase() !== "count") {
-                  const lowerVal = val.toLowerCase();
-                  const isBooleanVal = lowerVal === "1" || lowerVal === "0" || lowerVal === "true" || lowerVal === "false";
-                  
-                  if (isBooleanVal) {
-                    result[key] = {
-                      earned: lowerVal === "1" || lowerVal === "true",
-                      earnedTime: Date.now() / 1000
-                    };
-                  } else {
-                    result[val] = {
-                      earned: true,
-                      earnedTime: Date.now() / 1000
-                    };
-                  }
-                }
-              }
-            }
-          }
-          return result;
-        } catch {
-          return {};
-        }
-      } else {
-        const data = tryReadJson(scanned.savePath);
-        if (data && typeof data === "object") {
-          const result = {};
-          for (const [id, entry] of Object.entries(data)) {
-            if (entry && typeof entry === "object") {
-              result[id] = {
-                earned: Boolean(entry.earned),
-                earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
-              };
-            }
-          }
-          return result;
-        }
-      }
+      return adapter.readAchievements(appId, gameDir, scanned.savePath);
     }
   }
 
   const adapter = gameDir ? (getEmulatorForGame(gameDir) || new GoldbergAdapter()) : new GoldbergAdapter();
   return adapter.readAchievements(appId, gameDir);
 }
-
 // Mantemos esse helper exportado solto para a autoconfiguração antiga no main.cjs
 function getGoldbergV1Paths(appId) {
   return new GoldbergAdapter()._getPaths(appId);
