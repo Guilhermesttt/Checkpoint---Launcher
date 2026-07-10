@@ -22,8 +22,9 @@ const activeWatchers = new Map();
 const stopGameWatcher = (gameId) => {
   const entry = activeWatchers.get(gameId);
   if (!entry) return;
-  try { entry.watcher.close(); } catch { /* ignore */ }
+  try { if (entry.watcher) entry.watcher.close(); } catch { /* ignore */ }
   clearTimeout(entry.debounceTimer);
+  clearInterval(entry.intervalTimer);
   activeWatchers.delete(gameId);
   console.info(`[achievement-watcher] Watcher encerrado para jogo ${gameId}`);
 };
@@ -127,6 +128,34 @@ const isSafeOpenExternalUrl = (rawUrl) => {
   }
 };
 
+const configureHidAccess = (electronSession) => {
+  const SONY_VENDOR_ID = 0x054c;
+
+  electronSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === "hid");
+  });
+
+  if (typeof electronSession.setPermissionCheckHandler === "function") {
+    electronSession.setPermissionCheckHandler((_webContents, permission) => permission === "hid");
+  }
+
+  if (typeof electronSession.setDevicePermissionHandler === "function") {
+    electronSession.setDevicePermissionHandler((details) => {
+      const device = details?.device;
+      return details?.deviceType === "hid" && device?.vendorId === SONY_VENDOR_ID;
+    });
+  }
+
+  if (electronSession.listenerCount("select-hid-device") === 0) {
+    electronSession.on("select-hid-device", (event, details, callback) => {
+      event.preventDefault();
+      const devices = details?.deviceList ?? [];
+      const device = devices.find((candidate) => candidate.vendorId === SONY_VENDOR_ID) ?? devices[0];
+      callback(device?.deviceId ?? "");
+    });
+  }
+};
+
 const isAuthPopupUrl = (rawUrl) => {
   if (rawUrl === "about:blank") return true;
 
@@ -226,9 +255,7 @@ const createWindow = async () => {
     },
   });
 
-  mainWindow.webContents.session.setPermissionRequestHandler(
-    (_webContents, _permission, callback) => callback(false),
-  );
+  configureHidAccess(mainWindow.webContents.session);
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
@@ -498,7 +525,7 @@ ipcMain.handle("achievement:save-definitions", async (_event, gameId, definition
   try {
     const achievementsDir = path.join(app.getPath("userData"), "achievements");
     const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
-    
+
     await fs.promises.mkdir(achievementsDir, { recursive: true });
     const payload = { steamAppId, achievements: definitions };
     await fs.promises.writeFile(definitionsPath, JSON.stringify(payload, null, 2), "utf8");
@@ -553,7 +580,7 @@ async function getSchemaByAppIdOrGameId(key) {
   const files = await fs.promises.readdir(achievementsDir);
   for (const file of files) {
     if (!file.endsWith(".json")) continue;
-    
+
     const gameId = path.basename(file, ".json");
     if (!isSteamAppId && gameId === key) {
       try {
@@ -561,7 +588,7 @@ async function getSchemaByAppIdOrGameId(key) {
         return JSON.parse(content).achievements;
       } catch { /* ignora */ }
     }
-    
+
     if (isSteamAppId) {
       try {
         const content = await fs.promises.readFile(path.join(achievementsDir, file), "utf8");
@@ -605,7 +632,7 @@ async function injectGoldbergDefinitions(appId, settingsPath) {
     if (!fs.existsSync(paths.watchDir)) {
       await fs.promises.mkdir(paths.watchDir, { recursive: true });
     }
-    
+
     let currentSaves = {};
     if (fs.existsSync(paths.savePath)) {
       try {
@@ -671,7 +698,7 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     ];
 
     const hasSteamDll = fs.existsSync(path.join(gameDir, "steam_api64.dll")) ||
-                         fs.existsSync(path.join(gameDir, "steam_api.dll"));
+      fs.existsSync(path.join(gameDir, "steam_api.dll"));
 
     let settingsPath = null;
     for (const p of pathsToCheck) {
@@ -724,8 +751,8 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
                 const parsed = JSON.parse(rawContent);
                 // Verifica se bate com o appId
                 if (
-                  gameId.endsWith(`_steam_${appId}`) || 
-                  gameId === appId || 
+                  gameId.endsWith(`_steam_${appId}`) ||
+                  gameId === appId ||
                   String(parsed.steamAppId) === String(appId)
                 ) {
                   if (parsed && Array.isArray(parsed.achievements)) {
@@ -770,11 +797,22 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     const appidCandidates = [
       path.join(gameDir, "steam_appid.txt"),
       path.join(gameDir, "steam_settings", "steam_appid.txt"),
+      path.join(gameDir, "steam_emu.ini"),
+      path.join(gameDir, "tenoke.ini"),
+      path.join(gameDir, "ALI213.ini")
     ];
     for (const ap of appidCandidates) {
       if (fs.existsSync(ap)) {
         const raw = fs.readFileSync(ap, "utf8").trim();
-        if (/^\d+$/.test(raw)) { detectedGameAppId = raw; break; }
+        if (ap.endsWith(".txt")) {
+          if (/^\d+$/.test(raw)) { detectedGameAppId = raw; break; }
+        } else {
+          const match = raw.match(/AppId\s*=\s*(\d+)/i);
+          if (match && match[1]) {
+            detectedGameAppId = match[1];
+            break;
+          }
+        }
       }
     }
   }
@@ -852,37 +890,44 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     const initialState = parseAchievementState(detectedEmulator);
 
     let debounceTimer = null;
+    let watcher = null;
+    let intervalTimer = null;
 
-    let watcher;
-    try {
-      watcher = fs.watch(detectedEmulator.watchDir, { persistent: false }, (_event, filename) => {
-        // Filtra apenas o arquivo relevante (ex: achievements.json).
-        const saveFile = path.basename(detectedEmulator.savePath);
-        if (filename && filename !== saveFile) return;
+    // Se for emulador genérico (.ini como RUNE/CODEX), fs.watch falha. Usamos Polling!
+    if (detectedEmulator.emulatorType === "generic_ini") {
+      console.info(`[achievement-watcher] Usando Polling de 3s para o emulador INI em: ${detectedEmulator.savePath}`);
+      intervalTimer = setInterval(() => {
+        handleAchievementFileChange(detectedEmulator);
+      }, 3000);
+    } else {
+      // Para Goldberg/Tenoke (.json), fs.watch funciona perfeitamente.
+      try {
+        watcher = fs.watch(detectedEmulator.watchDir, { persistent: false }, (_event, filename) => {
+          const saveFile = path.basename(detectedEmulator.savePath);
+          if (filename && filename !== saveFile) return;
 
-        // Debounce: emuladores podem escrever o arquivo em múltiplos eventos
-        // em sequência (write + rename). Aguardamos 300ms antes de parsear.
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          handleAchievementFileChange(detectedEmulator);
-        }, 300);
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            handleAchievementFileChange(detectedEmulator);
+          }, 300);
 
-        // Atualiza o timer no registro para que stopGameWatcher possa limpá-lo.
-        const entry = activeWatchers.get(watcherKey);
-        if (entry) entry.debounceTimer = debounceTimer;
+          const entry = activeWatchers.get(watcherKey);
+          if (entry) entry.debounceTimer = debounceTimer;
+        });
+      } catch (watchErr) {
+        console.error("[achievement-watcher] Falha ao iniciar fs.watch:", watchErr);
+        return;
+      }
+
+      watcher.on("error", (err) => {
+        console.error("[achievement-watcher] Erro no watcher:", err);
+        stopGameWatcher(watcherKey);
       });
-    } catch (watchErr) {
-      console.error("[achievement-watcher] Falha ao iniciar fs.watch:", watchErr);
-      return;
     }
-
-    watcher.on("error", (err) => {
-      console.error("[achievement-watcher] Erro no watcher:", err);
-      stopGameWatcher(watcherKey);
-    });
 
     activeWatchers.set(watcherKey, {
       watcher,
+      intervalTimer, // Salva o timer para o stopGameWatcher matar depois
       debounceTimer: null,
       lastState: initialState,
     });

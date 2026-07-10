@@ -41,8 +41,11 @@ const GameCard: React.FC<GameCardProps> = ({
 }) => {
   const reduceMotion = useReducedMotion();
   const [failedImageSrc, setFailedImageSrc] = React.useState<string | null>(null);
+  const [isFocused, setIsFocused] = React.useState(false);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
+
+  const visuallyActive = isActive || isFocused;
 
   const mouseXSpring = useSpring(x, { stiffness: 400, damping: 30 });
   const mouseYSpring = useSpring(y, { stiffness: 400, damping: 30 });
@@ -59,7 +62,7 @@ const GameCard: React.FC<GameCardProps> = ({
   );
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!isActive || reduceMotion) return;
+    if (!visuallyActive || reduceMotion) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -129,15 +132,19 @@ const GameCard: React.FC<GameCardProps> = ({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       aria-label={title}
-      aria-pressed={isActive}
-      className="group relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+      aria-pressed={visuallyActive}
+      tabIndex={0}
+      data-game-card={true}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => setIsFocused(false)}
+      className="group relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus:outline-none"
       style={{
         width: CARD_FRAME_WIDTH,
         height: CARD_FRAME_HEIGHT,
         perspective: reduceMotion ? undefined : 1200,
       }}
     >
-      {isActive && (
+      {visuallyActive && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.6 }}
@@ -157,9 +164,9 @@ const GameCard: React.FC<GameCardProps> = ({
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          rotateX: isActive && !reduceMotion ? rotateX : 0,
-          rotateY: isActive && !reduceMotion ? rotateY : 0,
-          scale: isActive ? 1.02 : 0.9,
+          rotateX: visuallyActive && !reduceMotion ? rotateX : 0,
+          rotateY: visuallyActive && !reduceMotion ? rotateY : 0,
+          scale: visuallyActive ? 1.02 : 0.9,
           transformStyle: "preserve-3d",
         }}
         transition={
@@ -169,12 +176,12 @@ const GameCard: React.FC<GameCardProps> = ({
         }
       >
         <div
-          className={`relative h-full w-full overflow-hidden rounded-2xl bg-gray-900 transition-all duration-300 ease-out transform group-hover:scale-105 group-hover:ring-2 group-hover:ring-orange-500/50 ${isActive
+          className={`relative h-full w-full overflow-hidden rounded-2xl bg-gray-900 transition-all duration-300 ease-out transform group-hover:scale-105 group-hover:ring-2 group-hover:ring-orange-500/50 ${visuallyActive
               ? "shadow-[0_20px_48px_rgba(0,0,0,0.78),0_0_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
               : "shadow-[0_8px_32px_rgba(0,0,0,0.6)] group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.8),0_0_15px_rgba(255,165,0,0.15)]"
             }`}
           style={
-            isActive
+            visuallyActive
               ? {
                 boxShadow:
                   "0 20px 48px rgba(0,0,0,0.78), 0 0 0 1px rgba(255,255,255,0.22), 0 0 28px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
@@ -186,7 +193,7 @@ const GameCard: React.FC<GameCardProps> = ({
             className="pointer-events-none absolute inset-0 z-[1] rounded-2xl"
             style={{
               padding: 1,
-              background: isActive
+              background: visuallyActive
                 ? "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.08) 100%)"
                 : "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 100%)",
               WebkitMask:
@@ -209,7 +216,7 @@ const GameCard: React.FC<GameCardProps> = ({
             <img
               src={image}
               alt={title}
-              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${isActive && !reduceMotion
+              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !reduceMotion
                   ? "scale-110 duration-[10000ms]"
                   : "scale-100 duration-500"
                 }`}
@@ -224,13 +231,13 @@ const GameCard: React.FC<GameCardProps> = ({
           <div
             className="absolute inset-0 transition-colors duration-500"
             style={{
-              background: isActive
+              background: visuallyActive
                 ? "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.1) 35%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0.95) 100%)"
                 : "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.75) 100%)",
             }}
           />
 
-          {isActive && (
+          {visuallyActive && (
             <>
               {!reduceMotion && (
                 <motion.div
@@ -314,13 +321,13 @@ const GameCard: React.FC<GameCardProps> = ({
 
           {/* NOVO: Layout cinematográfico integrado de texto sem caixa sólida de fundo */}
           <div
-            className={`absolute bottom-0 left-0 right-0 z-30 px-3.5 pb-4 pt-10 transition-all duration-400 bg-gradient-to-t from-black/95 via-black/50 to-transparent backdrop-blur-2xs ${isActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+            className={`absolute bottom-0 left-0 right-0 z-30 px-3.5 pb-4 pt-10 transition-all duration-400 bg-gradient-to-t from-black/95 via-black/50 to-transparent backdrop-blur-2xs ${visuallyActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
               }`}
             style={{ transform: "translateZ(30px)" }}
           >
             <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-1.5">
               Iniciar
-              {isActive && (
+              {visuallyActive && (
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
@@ -333,11 +340,11 @@ const GameCard: React.FC<GameCardProps> = ({
           </div>
 
           <div
-            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-300 ${visuallyActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
             style={{ transform: "translateZ(40px)" }}
           >
             <motion.div
-              initial={reduceMotion ? false : { scale: isActive ? 1 : 0.8, opacity: isActive ? 1 : 0 }}
+              initial={reduceMotion ? false : { scale: visuallyActive ? 1 : 0.8, opacity: visuallyActive ? 1 : 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={
                 reduceMotion
@@ -357,7 +364,7 @@ const GameCard: React.FC<GameCardProps> = ({
           </div>
         </div>
 
-        {isActive && (
+        {visuallyActive && (
           <div
             className="absolute -bottom-3 left-1/2 h-0.5 -translate-x-1/2 rounded-full"
             style={{

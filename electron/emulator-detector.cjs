@@ -56,8 +56,8 @@ class GoldbergAdapter {
     return hasSteamApi || hasSteamSettings;
   }
 
-  readAchievements(appId, gamePath) {
-    const { savePath } = this._getPaths(appId);
+  readAchievements(appId, gamePath, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId).savePath;
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
@@ -114,8 +114,8 @@ class GoldbergSocialClubAdapter {
            fs.existsSync(path.join(gamePath, "RDR2.exe"));
   }
 
-  readAchievements(appId, gamePath) {
-    const { savePath } = this._getPaths(appId);
+  readAchievements(appId, gamePath, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId).savePath;
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
@@ -168,8 +168,8 @@ class TenokeAdapter {
     return fs.existsSync(path.join(gamePath, "tenoke.ini"));
   }
 
-  readAchievements(appId, gamePath) {
-    const { savePath } = this._getPaths(appId);
+  readAchievements(appId, gamePath, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId).savePath;
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
@@ -244,14 +244,14 @@ class GenericIniAdapter {
            fs.existsSync(path.join(gamePath, "ALI213.ini"));
   }
 
-  readAchievements(appId, gamePath) {
-    const { savePath } = this._getPaths(appId, gamePath);
+  readAchievements(appId, gamePath, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId, gamePath).savePath;
     if (!savePath || !fs.existsSync(savePath)) return {};
 
     try {
       const content = fs.readFileSync(savePath, "utf8");
       // Extração simples via RegEx de chaves sob [Achievements]
-      const achievementsBlockRegex = /\[Achievements\]([\s\S]*?)(?:\[|$)/i;
+      const achievementsBlockRegex = /\[(?:Steam)?Achievements\]([\s\S]*?)(?:\[|$)/i;
       const match = content.match(achievementsBlockRegex);
       
       const result = {};
@@ -265,11 +265,23 @@ class GenericIniAdapter {
           if (parts.length >= 2) {
             const key = parts[0].trim();
             const val = parts[1].trim();
-            if (key) {
-              result[key] = {
-                earned: val === "1" || val.toLowerCase() === "true",
-                earnedTime: Date.now() / 1000 // Mock de tempo atual
-              };
+            if (key && key.toLowerCase() !== "count") {
+              const lowerVal = val.toLowerCase();
+              const isBooleanVal = lowerVal === "1" || lowerVal === "0" || lowerVal === "true" || lowerVal === "false";
+              
+              if (isBooleanVal) {
+                // CODEX / ALI213: NomeDaConquista=1
+                result[key] = {
+                  earned: lowerVal === "1" || lowerVal === "true",
+                  earnedTime: Date.now() / 1000
+                };
+              } else {
+                // RUNE: Achievement0=NomeDaConquista
+                result[val] = {
+                  earned: true,
+                  earnedTime: Date.now() / 1000
+                };
+              }
             }
           }
         }
@@ -527,7 +539,7 @@ function parseAchievementState(detectedEmulator) {
   const adapter = adapters.find(a => a.emulatorType === detectedEmulator.emulatorType);
   if (!adapter) return {};
 
-  return adapter.readAchievements(detectedEmulator.appId, detectedEmulator.gameDir);
+  return adapter.readAchievements(detectedEmulator.appId, detectedEmulator.gameDir, detectedEmulator.savePath);
 }
 
 function readLocalSavesRetroactive(appId, gameDir = null) {
@@ -543,7 +555,7 @@ function readLocalSavesRetroactive(appId, gameDir = null) {
       if (scanned.emulatorType === EMULATOR_TYPES.GENERIC_INI) {
         try {
           const content = fs.readFileSync(scanned.savePath, "utf8");
-          const achievementsBlockRegex = /\[Achievements\]([\s\S]*?)(?:\[|$)/i;
+          const achievementsBlockRegex = /\[(?:Steam)?Achievements\]([\s\S]*?)(?:\[|$)/i;
           const match = content.match(achievementsBlockRegex);
           const result = {};
           if (match && match[1]) {
@@ -555,11 +567,21 @@ function readLocalSavesRetroactive(appId, gameDir = null) {
               if (parts.length >= 2) {
                 const key = parts[0].trim();
                 const val = parts[1].trim();
-                if (key) {
-                  result[key] = {
-                    earned: val === "1" || val.toLowerCase() === "true",
-                    earnedTime: Date.now() / 1000
-                  };
+                if (key && key.toLowerCase() !== "count") {
+                  const lowerVal = val.toLowerCase();
+                  const isBooleanVal = lowerVal === "1" || lowerVal === "0" || lowerVal === "true" || lowerVal === "false";
+                  
+                  if (isBooleanVal) {
+                    result[key] = {
+                      earned: lowerVal === "1" || lowerVal === "true",
+                      earnedTime: Date.now() / 1000
+                    };
+                  } else {
+                    result[val] = {
+                      earned: true,
+                      earnedTime: Date.now() / 1000
+                    };
+                  }
                 }
               }
             }

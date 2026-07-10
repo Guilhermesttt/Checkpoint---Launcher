@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 :root {
   --background: oklch(0.06 0.008 260);
@@ -108,8 +108,18 @@ html[data-launcher-theme="sunset"] {
 
   :focus:not(:focus-visible) { outline: none; }
   :focus-visible {
-    outline: 2px solid rgba(59, 130, 246, 0.6);
-    outline-offset: 2px;
+    outline: 2px solid rgba(255, 255, 255, 0.75);
+    outline-offset: 3px;
+    border-radius: 6px;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12), 0 0 16px rgba(255, 255, 255, 0.1);
+  }
+
+  [data-system-page] [data-gamepad-focused="true"] {
+    outline: 2px solid rgb(var(--launcher-accent));
+    outline-offset: 3px;
+    box-shadow:
+      0 0 0 4px rgb(var(--launcher-accent) / 0.18),
+      0 0 24px rgb(var(--launcher-accent) / 0.28);
   }
 }
 
@@ -170,9 +180,9 @@ html[data-launcher-theme="sunset"] {
     scrollbar-color: rgba(255, 255, 255, 0.18) rgba(255, 255, 255, 0.02);
   }
 
-  /* â”€â”€ Glass Effect â€” Performance-safe (NO backdrop-filter) â”€â”€
+  /* ── Glass Effect – Performance-safe (NO backdrop-filter) ──
      Uses rgba transparency + border. Zero GPU blur cost.
-  â”€â”€ */
+  ── */
   .liquid-glass {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.15);

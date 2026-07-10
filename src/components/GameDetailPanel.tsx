@@ -6,6 +6,7 @@ import { updateDoc, deleteDoc } from "firebase/firestore";
 import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
 import type { Game } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
+import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
   fetchSteamAchievementDetails,
   fetchSteamAchievementSchema,
@@ -18,6 +19,8 @@ import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { userGameDocRef } from "../services/firestorePaths";
 import { useNotification } from "./NotificationCenter";
+import { useGamepadButton } from "../context/GamepadContext";
+import InputHints from "./ui/InputHints";
 
 interface GameDetailPanelProps {
   game: Game | null;
@@ -53,6 +56,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [launchError, setLaunchError] = React.useState<string | null>(null);
   const [galleryModalOpen, setGalleryModalOpen] = React.useState(false);
   const [currentGalleryIndex, setCurrentGalleryIndex] = React.useState(0);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
   const [deleteModalOpen, setDeleteModalOpen] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [achievementItems, setAchievementItems] = React.useState<SteamAchievement[]>([]);
@@ -63,6 +67,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [isAddAchModalOpen, setIsAddAchModalOpen] = React.useState(false);
   const [newAchName, setNewAchName] = React.useState("");
   const [newAchDesc, setNewAchDesc] = React.useState("");
+
 
   const copy = {
     "pt-BR": {
@@ -315,6 +320,58 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setNewAchName("");
     setNewAchDesc("");
   };
+
+  const launchRef = React.useRef<() => void>(() => {});
+
+  const TABS = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabManage];
+
+  useGamepadNavigation({
+    onClose: () => {
+      if (galleryModalOpen) {
+        setGalleryModalOpen(false);
+        playSound("modalClose");
+      } else if (deleteModalOpen) {
+        setDeleteModalOpen(false);
+        playSound("back");
+      } else if (isAddAchModalOpen) {
+        setIsAddAchModalOpen(false);
+        playSound("back");
+      } else if (isOpen && !isLaunching) {
+        onClose();
+        playSound("back");
+      }
+    },
+    scrollRef: scrollRef as React.RefObject<HTMLElement>,
+    scrollSpeed: 25,
+    disableX: true,
+    disableO: false,
+    enabled: isOpen,
+  });
+
+  useGamepadButton("L1", () => {
+    if (!isOpen || deleteModalOpen || galleryModalOpen || isAddAchModalOpen || isLaunching) return;
+    const i = TABS.indexOf(activeTab);
+    if (i > 0) {
+      setActiveTab(TABS[i - 1]);
+      if (TABS[i - 1] === copy.tabAchievements) setAchievementsRequested(true);
+      playSound("navigate");
+    }
+  });
+
+  useGamepadButton("R1", () => {
+    if (!isOpen || deleteModalOpen || galleryModalOpen || isAddAchModalOpen || isLaunching) return;
+    const i = TABS.indexOf(activeTab);
+    if (i >= 0 && i < TABS.length - 1) {
+      setActiveTab(TABS[i + 1]);
+      if (TABS[i + 1] === copy.tabAchievements) setAchievementsRequested(true);
+      playSound("navigate");
+    }
+  });
+
+  useGamepadButton("X", () => {
+    if (!isOpen || galleryModalOpen || deleteModalOpen || isAddAchModalOpen || isLaunching) return;
+    launchRef.current();
+  });
 
   React.useEffect(() => {
     setActiveTab(copy.tabPlay);
@@ -604,7 +661,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   };
 
   const handleLaunch = async () => {
-    if (isLaunching) return;
+    if (isLaunching || !game) return;
 
     setIsLaunching(true);
     setLaunchError(null);
@@ -643,6 +700,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       setIsLaunching(false);
     }
   };
+  launchRef.current = handleLaunch;
 
   const handleDeleteGame = async () => {
     if (!user?.uid) {
@@ -672,6 +730,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-100 flex bg-[#050507]"
         >
+          <div className="fixed bottom-6 right-8 z-50 pointer-events-none">
+            <InputHints hints={[
+              { button: "X", label: "Jogar" },
+              { button: "O", label: "Voltar" },
+              { button: "SCROLL", label: "Scroll" },
+              { button: "L1_R1", label: "Abas" }
+            ]} />
+          </div>
           <motion.div
             initial={{ scale: 1.05, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -809,7 +875,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 />
               </motion.div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto thin-scrollbar pr-4 -mr-4 pb-4">
+              <div
+                ref={scrollRef}
+                className="flex-1 min-h-0 overflow-y-auto thin-scrollbar pr-4 -mr-4 pb-4"
+              >
                 <AnimatePresence mode="wait">
                   {activeTab === copy.tabPlay && (
                     <motion.div
@@ -1179,39 +1248,41 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 </div>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handleLaunch}
-                disabled={isLaunching}
-                aria-label={isLaunching ? t("launching") : t("play")}
-                className="rounded-2xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500"
-                style={{
-                  background: "var(--game-color, #ffffff)",
-                  boxShadow: "0 8px 32px var(--game-color, transparent)",
-                }}
-              >
-                <span
-                  className="text-sm font-black tracking-[0.15em] uppercase transition-colors"
-                  style={{ color: "var(--game-text-color, #000)" }}
+              <div className="mb-14 flex flex-col items-end">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleLaunch}
+                  disabled={isLaunching}
+                  aria-label={isLaunching ? t("launching") : t("play")}
+                  className="rounded-2xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500"
+                  style={{
+                    background: "var(--game-color, #ffffff)",
+                    boxShadow: "0 8px 32px var(--game-color, transparent)",
+                  }}
                 >
-                  {isLaunching ? t("launching") : t("play")}
-                </span>
-                <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
-                  <Play
-                    className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
-                    style={{
-                      color: "var(--game-text-color, #000)",
-                      fill: "var(--game-text-color, #000)",
-                    }}
-                  />
-                </div>
-              </motion.button>
-              {launchError && (
-                <p className="mt-3 text-xs text-amber-300/90 max-w-[260px] text-right">
-                  {launchError}
-                </p>
-              )}
+                  <span
+                    className="text-sm font-black tracking-[0.15em] uppercase transition-colors"
+                    style={{ color: "var(--game-text-color, #000)" }}
+                  >
+                    {isLaunching ? t("launching") : t("play")}
+                  </span>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
+                    <Play
+                      className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
+                      style={{
+                        color: "var(--game-text-color, #000)",
+                        fill: "var(--game-text-color, #000)",
+                      }}
+                    />
+                  </div>
+                </motion.button>
+                {launchError && (
+                  <p className="mt-3 text-xs text-amber-300/90 max-w-[260px] text-right">
+                    {launchError}
+                  </p>
+                )}
+              </div>
             </motion.div>
           </div>
 

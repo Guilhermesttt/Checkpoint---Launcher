@@ -34,9 +34,8 @@ const GameCardSlot = React.memo(
         onSelect(index, game);
       } else {
         onSelect(index);
-        playSound("navigate");
       }
-    }, [game, index, isActive, onSelect, playSound]);
+    }, [game, index, isActive, onSelect]);
 
     const handleContextMenu = useCallback(
       (e: React.MouseEvent) => onContextMenu?.(e, game),
@@ -98,17 +97,24 @@ const GameRow: React.FC<GameRowProps> = ({
     return Array.from({ length: MAX_VISIBLE_DOTS }, (_, offset) => start + offset);
   }, [canonicalIndex, games]);
 
+  const isProgrammaticRef = React.useRef(false);
+
   useEffect(() => {
-    if (emblaApi) emblaApi.scrollTo(canonicalIndex);
+    if (!emblaApi) return;
+    isProgrammaticRef.current = true;
+    emblaApi.scrollTo(canonicalIndex);
+    // Small delay to reset flag after Embla processes the scroll
+    const t = setTimeout(() => { isProgrammaticRef.current = false; }, 100);
+    return () => clearTimeout(t);
   }, [emblaApi, canonicalIndex]);
 
   useEffect(() => {
     if (!emblaApi) return;
     const onSnap = () => {
+      if (isProgrammaticRef.current) return; // Skip sound for programmatic scrolls
       const idx = emblaApi.selectedScrollSnap();
       if (idx !== canonicalIndex) {
         onSelect(idx);
-        playSound("navigate");
       }
     };
     emblaApi.on("select", onSnap);
@@ -160,7 +166,6 @@ const GameRow: React.FC<GameRowProps> = ({
             }}
             onClick={() => {
               onSelect(i);
-              playSound("navigate");
             }}
           />
         ))}

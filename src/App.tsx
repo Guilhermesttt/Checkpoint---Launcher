@@ -8,6 +8,9 @@ import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { NotificationProvider } from "./components/NotificationCenter";
 import MainVideoBackground from "./components/MainVideoBackground";
 import { PreferencesProvider, usePreferences } from "./context/PreferencesContext";
+import { GamepadProvider } from "./context/GamepadContext";
+import { GamepadStatusOverlay } from "./components/ui/GamepadStatusOverlay";
+import { useControllerLed } from "./hooks/useControllerLed";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
@@ -23,6 +26,7 @@ const menuMusicLoaders: Record<SoundTheme, () => Promise<string>> = {
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const { musicVolume, soundTheme } = usePreferences();
+  useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const musicFadeRef = React.useRef<number | null>(null);
@@ -231,7 +235,8 @@ const AppContent: React.FC = () => {
     <div className="overflow-hidden select-none h-screen w-full">
       <MainVideoBackground />
       <Home />
-      <AnimatePresence>
+      <GamepadStatusOverlay />
+      <AnimatePresence mode="wait">
         {isIntroVisible && (
           <GameBootIntro
             key="boot-intro"
@@ -250,7 +255,9 @@ const App: React.FC = () => (
   <NotificationProvider>
     <AuthProvider>
       <PreferencesProvider>
-        <AppContent />
+        <GamepadProvider>
+          <AppContent />
+        </GamepadProvider>
       </PreferencesProvider>
     </AuthProvider>
   </NotificationProvider>

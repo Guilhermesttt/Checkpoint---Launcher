@@ -22,8 +22,6 @@ import {
   Trophy,
   Globe,
   Crosshair,
-  MouseLeft,
-  MouseRight,
   X,
   LogOut,
   Settings,
@@ -67,6 +65,7 @@ import type { UserProfile } from "../types/domain";
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects, type SoundEffectType } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
+import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
   usePreferences,
   type LauncherLanguage,
@@ -106,6 +105,8 @@ import {
   userGamesCollectionRef,
 } from "../services/firestorePaths";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
+import { useGamepadButton, useGamepad } from "../context/GamepadContext";
+import InputHints from "../components/ui/InputHints";
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
@@ -468,6 +469,8 @@ const Home: React.FC = () => {
     y: number;
     game: Game;
   } | null>(null);
+
+  const { activeInputType } = useGamepad();
 
   const handleContextMenu = useCallback((e: React.MouseEvent, game: Game) => {
     e.preventDefault();
@@ -1422,6 +1425,11 @@ const Home: React.FC = () => {
     isAddModalOpen ||
     isDetailOpen ||
     Boolean(contextMenu) ||
+    Boolean(activeChatFriend) ||
+    Boolean(friendProfileModal) ||
+    Boolean(pendingFriendRemoval) ||
+    Boolean(pendingDeleteGame) ||
+    isAddFriendModalOpen ||
     signOutModalOpen ||
     disconnectSteamModalOpen ||
     disconnectDiscordModalOpen;
@@ -1444,6 +1452,15 @@ const Home: React.FC = () => {
       setSelectedIndex(displayGames.length - 1);
   }, [displayGames.length, selectedIndex]);
 
+  useEffect(() => {
+    const cards = document.querySelectorAll<HTMLElement>("[data-game-card]");
+    if (cards[selectedIndex]) {
+      cards[selectedIndex].focus();
+    }
+  }, [selectedIndex]);
+
+  // Keyboard arrows stay separate; gamepad D-pad is handled by useGamepadButton below.
+
   const openDetails = useCallback(
     (game: Game) => {
       setSelectedGame(game);
@@ -1453,6 +1470,332 @@ const Home: React.FC = () => {
     },
     [playSound],
   );
+
+  const isSystemCategory = ["FRIENDS", "SETTINGS", "PROFILE", "DEALS"].includes(activeCategory);
+
+  const getSystemFocusableElements = useCallback(() => {
+    const root = document.querySelector<HTMLElement>("[data-system-page]");
+    if (!root) return [];
+
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        [
+          "button:not(:disabled)",
+          "input:not(:disabled)",
+          "select:not(:disabled)",
+          "textarea:not(:disabled)",
+          "[tabindex]:not([tabindex='-1'])",
+        ].join(","),
+      ),
+    ).filter((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    });
+  }, []);
+
+  type SpatialDirection = "up" | "down" | "left" | "right";
+
+  const focusSystemElement = useCallback((element: HTMLElement, previousElement?: HTMLElement) => {
+    document
+      .querySelectorAll<HTMLElement>("[data-gamepad-focused='true']")
+      .forEach((focusedElement) => {
+        delete focusedElement.dataset.gamepadFocused;
+      });
+
+    element.dataset.gamepadFocused = "true";
+    element.focus({ preventScroll: true });
+    element.scrollIntoView({ block: "nearest", inline: "nearest" });
+
+    if (element !== previousElement) {
+      playSound("navigate");
+    }
+  }, [playSound]);
+
+  const moveSystemFocus = useCallback((direction: SpatialDirection = "down") => {
+    const elements = getSystemFocusableElements();
+    if (elements.length === 0) return false;
+
+    const activeElement = document.activeElement;
+    const currentIndex = activeElement instanceof HTMLElement ? elements.indexOf(activeElement) : -1;
+
+    if (currentIndex === -1) {
+      focusSystemElement(elements[0]);
+      return true;
+    }
+
+    const currentElement = elements[currentIndex];
+    const currentRect = currentElement.getBoundingClientRect();
+    const currentCenterX = currentRect.left + currentRect.width / 2;
+    const currentCenterY = currentRect.top + currentRect.height / 2;
+    const threshold = 8;
+
+    const rankedCandidates = elements
+      .map((element, index) => {
+        if (index === currentIndex) return null;
+
+        const rect = element.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const deltaX = centerX - currentCenterX;
+        const deltaY = centerY - currentCenterY;
+
+        const isInDirection =
+          direction === "left"
+            ? deltaX < -threshold
+            : direction === "right"
+              ? deltaX > threshold
+              : direction === "up"
+                ? deltaY < -threshold
+                : deltaY > threshold;
+
+        if (!isInDirection) return null;
+
+        const primaryDistance =
+          direction === "left" || direction === "right"
+            ? Math.abs(deltaX)
+            : Math.abs(deltaY);
+        const secondaryDistance =
+          direction === "left" || direction === "right"
+            ? Math.abs(deltaY)
+            : Math.abs(deltaX);
+
+        return {
+          element,
+          score: primaryDistance * 4 + secondaryDistance,
+        };
+      })
+      .filter((candidate): candidate is { element: HTMLElement; score: number } => Boolean(candidate))
+      .sort((a, b) => a.score - b.score);
+
+    const nextElement = rankedCandidates[0]?.element;
+    if (!nextElement) return false;
+
+    focusSystemElement(nextElement, currentElement);
+    return true;
+  }, [focusSystemElement, getSystemFocusableElements]);
+
+  useEffect(() => {
+    if (isSystemCategory) return;
+    document
+      .querySelectorAll<HTMLElement>("[data-gamepad-focused='true']")
+      .forEach((focusedElement) => {
+        delete focusedElement.dataset.gamepadFocused;
+      });
+  }, [isSystemCategory]);
+
+  const adjustFocusedRange = useCallback((direction: 1 | -1) => {
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLInputElement) || activeElement.type !== "range") {
+      return false;
+    }
+
+    const previousValue = activeElement.value;
+    if (direction > 0) {
+      activeElement.stepUp();
+    } else {
+      activeElement.stepDown();
+    }
+
+    if (activeElement.value !== previousValue) {
+      activeElement.dispatchEvent(new Event("input", { bubbles: true }));
+      activeElement.dispatchEvent(new Event("change", { bubbles: true }));
+      playSound("navigate");
+    }
+    return true;
+  }, [playSound]);
+
+  useEffect(() => {
+    if (!isSystemCategory) return;
+    const timer = window.setTimeout(() => {
+      const root = document.querySelector<HTMLElement>("[data-system-page]");
+      if (root?.contains(document.activeElement)) return;
+      moveSystemFocus("down");
+    }, 80);
+
+    return () => window.clearTimeout(timer);
+  }, [activeCategory, isSystemCategory, moveSystemFocus]);
+
+  const closeTopGamepadSurface = useCallback(() => {
+    if (activeChatFriend) {
+      setActiveChatFriend(null);
+      playSound("back");
+      return;
+    }
+    if (friendProfileModal) {
+      setFriendProfileModal(null);
+      playSound("back");
+      return;
+    }
+    if (pendingFriendRemoval) {
+      setPendingFriendRemoval(null);
+      playSound("back");
+      return;
+    }
+    if (pendingDeleteGame) {
+      setPendingDeleteGame(null);
+      playSound("back");
+      return;
+    }
+    if (signOutModalOpen) {
+      setSignOutModalOpen(false);
+      playSound("back");
+      return;
+    }
+    if (disconnectSteamModalOpen) {
+      setDisconnectSteamModalOpen(false);
+      playSound("back");
+      return;
+    }
+    if (disconnectDiscordModalOpen) {
+      setDisconnectDiscordModalOpen(false);
+      playSound("back");
+      return;
+    }
+    if (isAddFriendModalOpen) {
+      setIsAddFriendModalOpen(false);
+      playSound("back");
+      return;
+    }
+    if (contextMenu) {
+      setContextMenu(null);
+      playSound("back");
+      return;
+    }
+    if (searchOpen) {
+      setSearchOpen(false);
+      setSearchTerm("");
+      playSound("back");
+    }
+  }, [
+    activeChatFriend,
+    contextMenu,
+    disconnectDiscordModalOpen,
+    disconnectSteamModalOpen,
+    friendProfileModal,
+    isAddFriendModalOpen,
+    pendingDeleteGame,
+    pendingFriendRemoval,
+    playSound,
+    searchOpen,
+    signOutModalOpen,
+  ]);
+
+  useGamepadNavigation({
+    disableX: true,
+    disableO: isDetailOpen || isAddModalOpen,
+    onClose: closeTopGamepadSurface,
+  });
+
+  useGamepadButton("X", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    if (isSystemCategory) {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        activeElement.click();
+        return;
+      }
+      moveSystemFocus("down");
+      return;
+    }
+
+    const game = displayGames[selectedIndex];
+    if (game) {
+      openDetails(game);
+    }
+  });
+
+  useGamepadButton("DPAD_LEFT", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    if (isSystemCategory) {
+      if (!adjustFocusedRange(-1)) moveSystemFocus("left");
+      return;
+    }
+    if (displayGames.length === 0) return;
+
+    setSelectedIndex((p) => {
+      const prev = Math.max(p - 1, 0);
+      if (prev !== p) playSound("navigate");
+      return prev;
+    });
+  });
+
+  useGamepadButton("DPAD_RIGHT", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    if (isSystemCategory) {
+      if (!adjustFocusedRange(1)) moveSystemFocus("right");
+      return;
+    }
+    if (displayGames.length === 0) return;
+
+    setSelectedIndex((p) => {
+      const next = Math.min(p + 1, displayGames.length - 1);
+      if (next !== p) playSound("navigate");
+      return next;
+    });
+  });
+
+  useGamepadButton("DPAD_UP", () => {
+    if (isAnyModalOpen || searchOpen || !isSystemCategory) return;
+    moveSystemFocus("up");
+  });
+
+  useGamepadButton("DPAD_DOWN", () => {
+    if (isAnyModalOpen || searchOpen || !isSystemCategory) return;
+    moveSystemFocus("down");
+  });
+
+  useGamepadButton("SQUARE", async () => {
+    if (isAnyModalOpen || searchOpen || isSystemCategory) return;
+    const game = displayGames[selectedIndex];
+    if (game && user?.uid) {
+      playSound(game.isFavorite ? "favoriteOff" : "favoriteOn");
+      try {
+        await updateDoc(userGameDocRef(user.uid, game.id), {
+          isFavorite: !game.isFavorite,
+        });
+      } catch (err) {
+        console.error("Error toggling favorite via gamepad", err);
+      }
+    }
+  });
+
+  useGamepadButton("L2", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
+    if (currentIndex > 0) {
+      setActiveCategory(SIDEBAR_CATEGORIES[currentIndex - 1].id);
+      playSound("navigate");
+    }
+  });
+
+  useGamepadButton("R2", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
+    if (currentIndex < SIDEBAR_CATEGORIES.length - 1) {
+      setActiveCategory(SIDEBAR_CATEGORIES[currentIndex + 1].id);
+      playSound("navigate");
+    }
+  });
+
+  useGamepadButton("TRIANGLE", () => {
+    if (isAnyModalOpen || searchOpen || isSystemCategory) return;
+    setIsAddModalOpen(true);
+    playSound("select");
+  });
+
+  useGamepadButton("OPTIONS", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    setActiveCategory("SETTINGS");
+    playSound("select");
+  });
+
+  useGamepadButton("SHARE", () => {
+    if (isAnyModalOpen || searchOpen) return;
+    setActiveCategory("FRIENDS");
+    playSound("select");
+  });
+
   useEffect(() => {
     if (isAnyModalOpen || displayGames.length === 0) return;
 
@@ -2387,26 +2730,18 @@ const Home: React.FC = () => {
           >
             {displayGames.length} {displayGames.length === 1 ? "jogo" : "jogos"}
           </p>
-          <div className="flex items-center gap-7">
-            {[
-              {
-                label: "Navegar",
-                node: <span className="text-[12px] font-bold">← →</span>,
-              },
-              { label: "Abrir", node: <MouseLeft className="w-3.5 h-3.5" /> },
-              { label: "Opções", node: <MouseRight className="w-3.5 h-3.5" /> },
-            ].map(({ label, node }) => (
-              <div key={label} className="flex items-center gap-2">
-                <span style={{ color: "rgba(255,255,255,0.28)" }}>{node}</span>
-                <span
-                  className="text-[9px] font-black uppercase tracking-[0.2em]"
-                  style={{ color: "rgba(255,255,255,0.18)" }}
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
-          </div>
+          <InputHints hints={activeInputType === "gamepad" ? [
+            { button: "DPAD", label: "Navegar" },
+            { button: "X", label: "Abrir" },
+            { button: "TRIANGLE", label: "Novo Jogo" },
+            { button: "L2_R2", label: "Categorias" },
+            { button: "SHARE", label: "Amigos" },
+            { button: "OPTIONS", label: "Ajustes" }
+          ] : [
+            { button: "DPAD", label: "Navegar" },
+            { button: "X", label: "Abrir" },
+            { button: "CONTEXT", label: "Opções" }
+          ]} />
         </div>
       </div>
 
