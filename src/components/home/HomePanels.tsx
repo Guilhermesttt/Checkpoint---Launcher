@@ -7,6 +7,7 @@ import {
   Bell,
   CheckCircle2,
   Globe,
+  Gamepad2,
   Languages,
   Search,
   Settings,
@@ -34,34 +35,24 @@ import {
 } from "../../services/chat";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../../context/PreferencesContext";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
-import type { ChatMessage, Game, UserProfile } from "../../types/domain";
+import type {
+  ChatMessage,
+  CheckpointFriendRequest,
+  Game,
+  PriceAlert,
+  SocialFriend,
+  UserProfile,
+} from "../../types/domain";
 import { useGamepadNavigation } from "../../hooks/useGamepadNavigation";
+import { useControllerLedStatus } from "../../hooks/useControllerLed";
+import { useGamepad } from "../../context/GamepadContext";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 
-export interface HomeSocialFriend {
-  id: string;
-  name: string;
-  status: "online" | "playing" | "offline";
-  playing?: string;
-  avatar?: string;
-  source?: "discord" | "discord_friend" | "local" | "checkpoint";
-}
-
-export interface HomeCheckpointFriendRequest {
-  uid: string;
-  displayName: string;
-  photoURL?: string | null;
-  createdAt?: string;
-}
-
-export interface HomePriceAlert {
-  id: string;
-  gameId: string;
-  title: string;
-  source: "Steam" | "Epic" | "Manual";
-}
+type HomeSocialFriend = SocialFriend;
+type HomeCheckpointFriendRequest = CheckpointFriendRequest;
+type HomePriceAlert = PriceAlert;
 
 export interface LanguageOption {
   id: LauncherLanguage;
@@ -266,7 +257,6 @@ export const SettingsPageV2: React.FC<{
   appThemeOptions,
   SteamIcon,
   DiscordIcon,
-  EpicIcon,
   onLanguageChange,
   onEffectsVolumeChange,
   onMusicVolumeChange,
@@ -289,6 +279,8 @@ export const SettingsPageV2: React.FC<{
   onTestOverlayWelcome,
   onTestOverlayAchievement,
 }) => {
+    const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
+    const led = useControllerLedStatus();
     const activeAppTheme =
       visualTheme === "checkpoint"
         ? "default"
@@ -396,6 +388,58 @@ export const SettingsPageV2: React.FC<{
           </div>
         </section>
 
+        <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+          <SettingsHeader
+            icon={<Gamepad2 className="h-5 w-5 text-white/70" />}
+            title="Controle"
+            description="Status da navegacao e da iluminacao do controle conectado."
+          />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
+            <div className="flex min-w-0 items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">
+              <div className={`h-3 w-3 shrink-0 rounded-full ${isGamepadConnected ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.7)]" : "bg-white/20"}`} />
+              <div className="min-w-0">
+                <p className="text-sm font-black text-white">
+                  {isGamepadConnected ? "Controle conectado" : "Nenhum controle conectado"}
+                </p>
+                <p className="mt-1 truncate text-xs text-white/40">
+                  {connectedGamepadId || "Conecte via USB ou Bluetooth para navegar pelo launcher."}
+                </p>
+              </div>
+              {isGamepadConnected && (
+                <span className="ml-auto rounded-lg bg-white/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white/55">
+                  {gamepadFamily}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 lg:min-w-[360px]">
+              <div className={`h-3 w-3 shrink-0 rounded-full ${led.status === "connected" ? "bg-[rgb(var(--launcher-accent))] shadow-[0_0_14px_rgb(var(--launcher-accent)/.7)]" : led.status === "error" ? "bg-red-400" : "bg-amber-300"}`} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-white">LED PlayStation</p>
+                <p className="mt-1 text-xs text-white/40">{led.message}</p>
+              </div>
+              {led.status !== "unsupported" && (
+                <button
+                  type="button"
+                  onClick={led.status === "connected" ? led.testLed : led.requestAccess}
+                  disabled={led.status === "connecting"}
+                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-white/85"
+                >
+                  {led.status === "connected" ? "Testar LED" : led.status === "connecting" ? "Enviando" : "Autorizar"}
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="mt-4 text-[11px] leading-relaxed text-white/35">
+            Direcional ou analógico esquerdo move o foco, X confirma, O volta e o analógico direito rola a pagina.
+          </p>
+          {led.status === "connected" && (
+            <p className="mt-2 text-[11px] leading-relaxed text-white/35">
+              Se o teste RGB não aparecer, feche temporariamente o Steam Input ou DS4Windows: outro processo pode sobrescrever a lightbar.
+            </p>
+          )}
+        </section>
+
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
             <SettingsHeader
@@ -494,12 +538,12 @@ export const SettingsPageV2: React.FC<{
           </div>
         </section>
 
-        <AppUpdateSection t={t} />
+        <AppUpdateSection />
       </SystemPageShell>
     );
   };
 
-const AppUpdateSection: React.FC<{ t: TranslationFn }> = ({ t }) => {
+const AppUpdateSection: React.FC = () => {
   const [currentVersion, setCurrentVersion] = useState<string>("0.0.0");
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error" | "dev">("idle");
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
@@ -860,7 +904,7 @@ export const FriendsPage: React.FC<{
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {visibleFriends.length === 0 ? (
             <div className="rounded-[28px] border border-white/10 bg-black/35 p-8 text-center md:col-span-2">
               <Users className="mx-auto mb-4 h-8 w-8 text-white/35" />
@@ -879,7 +923,7 @@ export const FriendsPage: React.FC<{
             visibleFriends.map((friend) => (
               <div
                 key={friend.id}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                className="flex min-h-[108px] flex-col justify-between gap-4 rounded-[22px] border border-white/10 bg-gradient-to-br from-white/[0.055] to-white/[0.02] p-4 sm:flex-row sm:items-center"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
@@ -922,9 +966,10 @@ export const FriendsPage: React.FC<{
                       onClick={() => onOpenChat(friend)}
                       aria-label="Abrir chat"
                       title="Abrir chat"
-                      className="relative rounded-lg p-2.5 text-white/60 hover:bg-white/10 hover:text-white"
+                      className="relative flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-white/85"
                     >
                       <MessageSquare className="h-4 w-4" />
+                      Chat
                       {Number(unreadMessagesByFriend[friend.id.split(":")[1]] || 0) > 0 && (
                         <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black leading-none text-white shadow-[0_0_12px_rgba(239,68,68,0.35)]">
                           {Math.min(unreadMessagesByFriend[friend.id.split(":")[1]], 99)}
@@ -946,9 +991,10 @@ export const FriendsPage: React.FC<{
                         ? "Abrindo perfil"
                         : "Ver perfil"
                     }
-                    className="rounded-lg p-2.5 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40"
+                    className="flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3.5 text-[10px] font-black uppercase tracking-wider text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
                   >
                     <User className="h-4 w-4" />
+                    Perfil
                   </button>
                   {!friend.source?.startsWith("discord") && (
                     <button
@@ -956,7 +1002,7 @@ export const FriendsPage: React.FC<{
                       onClick={() => onRemoveFriend(friend)}
                       aria-label="Remover amigo"
                       title="Remover amigo"
-                      className="shrink-0 rounded-lg p-2.5 text-red-300/70 hover:bg-red-500/10"
+                      className="flex h-10 shrink-0 items-center justify-center rounded-xl border border-red-400/10 px-3 text-red-300/70 hover:bg-red-500/10"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -1111,12 +1157,18 @@ export const AddFriendModal: React.FC<{
     if (!isOpen) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <ModalShell
+        isOpen={isOpen}
+        onClose={handleClose}
+        maxWidthClassName="max-w-md"
+        className="rounded-[28px] border border-white/10 bg-[#0A0A0C] shadow-2xl"
+        ariaLabel={t("addFriendTitle")}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-[#0A0A0C] p-6 shadow-2xl"
+          className="relative w-full overflow-hidden rounded-[28px] p-6"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/[0.02] to-transparent" />
           <div className="relative mb-6 flex items-center justify-between">
@@ -1268,7 +1320,7 @@ export const AddFriendModal: React.FC<{
             </div>
           )}
         </motion.div>
-      </div>
+      </ModalShell>
     );
   };
 

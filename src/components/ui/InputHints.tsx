@@ -127,9 +127,9 @@ const getPSHint = (button: string) => {
         </div>
       );
     case "OPTIONS":
-      return <PsIcon svg={psShare} label="Options" className="h-6 w-6" />;
+      return <PsIcon svg={psOptions} label="Options" className="h-6 w-6" />;
     case "SHARE":
-      return <PsIcon svg={psOptions} label="Create" className="h-6 w-6" />;
+      return <PsIcon svg={psShare} label="Create" className="h-6 w-6" />;
     case "DPAD":
       return <PsIcon svg={psDpadHorizontal} label="D-pad" className="h-6 w-6" />;
     case "SCROLL":
@@ -160,6 +160,27 @@ const getXboxHint = (button: string) => {
   return <KeyboardHint>{xboxMap[button] ?? button}</KeyboardHint>;
 };
 
+const getGenericHint = (button: string) => {
+  const genericMap: Record<string, string> = {
+    X: "1",
+    O: "2",
+    SQUARE: "3",
+    TRIANGLE: "4",
+    L1: "L1",
+    R1: "R1",
+    L2: "L2",
+    R2: "R2",
+    L1_R1: "L1/R1",
+    L2_R2: "L2/R2",
+    DPAD: "D-Pad",
+    SCROLL: "RS",
+    SHARE: "Select",
+    OPTIONS: "Start",
+  };
+
+  return <KeyboardHint>{genericMap[button] ?? button}</KeyboardHint>;
+};
+
 const InputHints: React.FC<InputHintProps> = ({ hints }) => {
   const { activeInputType, isGamepadConnected, gamepadFamily } = useGamepad();
   const isGamepad = activeInputType === "gamepad" && isGamepadConnected;
@@ -167,7 +188,8 @@ const InputHints: React.FC<InputHintProps> = ({ hints }) => {
   const renderHint = (button: string) => {
     if (!isGamepad) return getPCHint(button);
     if (gamepadFamily === "xbox") return getXboxHint(button);
-    return getPSHint(button);
+    if (gamepadFamily === "playstation") return getPSHint(button);
+    return getGenericHint(button);
   };
 
   return (

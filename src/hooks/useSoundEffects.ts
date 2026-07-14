@@ -49,7 +49,6 @@ import xbEditModalSound from "../sounds/Xbox 360 Metro UI Sounds/SelectA.wav";
 import xbFavoriteOnSound from "../sounds/Xbox 360 Metro UI Sounds/RareAchievementStart.wav";
 import xbFavoriteOffSound from "../sounds/Xbox 360 Metro UI Sounds/Back2.wav";
 import xbDeleteSound from "../sounds/Xbox 360 Metro UI Sounds/Unknown1.wav";
-import xbPlaySoundEffect from "../sounds/Xbox 360 Metro UI Sounds/Achievement.wav";
 import xbGameBootSound from "../sounds/Xbox 360 Metro UI Sounds/Launch.wav";
 import xbSearchSound from "../sounds/Xbox 360 Metro UI Sounds/Bing.wav";
 import xbDetailOpenSound from "../sounds/Xbox 360 Metro UI Sounds/PageLeft.wav";

@@ -36,10 +36,23 @@ const BUTTON_MAP: Record<number, GamepadButtonName> = {
   15: "DPAD_RIGHT",
 };
 
-const gamepadEventTarget = new EventTarget();
+interface GamepadButtonSubscriber {
+  id: symbol;
+  callback: () => void;
+  priority: number;
+}
+
+const gamepadButtonSubscribers = new Map<GamepadButtonName, Set<GamepadButtonSubscriber>>();
 
 export function detectGamepadFamily(id: string): GamepadFamily {
   const lower = id.toLowerCase();
+  if (
+    lower.includes("xbox") ||
+    lower.includes("045e") ||
+    lower.includes("xinput")
+  ) {
+    return "xbox";
+  }
   if (
     lower.includes("dualsense") ||
     lower.includes("dualshock") ||
@@ -50,14 +63,6 @@ export function detectGamepadFamily(id: string): GamepadFamily {
     lower.includes("ps4")
   ) {
     return "playstation";
-  }
-  if (
-    lower.includes("xbox") ||
-    lower.includes("045e") ||
-    lower.includes("xinput") ||
-    lower.includes("gamepad")
-  ) {
-    return "xbox";
   }
   return "generic";
 }
@@ -87,7 +92,8 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     document.body.style.cursor = "none";
   }, []);
 
-  const handleGamepadDisconnected = useCallback((e: GamepadEvent) => {
+  const handleGamepadDisconnected = useCallback((event: GamepadEvent) => {
+    if (connectedGamepadId && event.gamepad.id !== connectedGamepadId) return;
     setIsGamepadConnected(false);
     setConnectedGamepadId(null);
     setGamepadFamily("generic");
@@ -95,22 +101,31 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     document.body.style.cursor = "default";
     lastButtonState.current = {};
     resetCachedLedDevice();
-  }, []);
+  }, [connectedGamepadId]);
 
   const dispatchButtonPress = useCallback((buttonName: GamepadButtonName) => {
-    gamepadEventTarget.dispatchEvent(new CustomEvent(`gamepad:${buttonName}`));
+    const subscribers = Array.from(gamepadButtonSubscribers.get(buttonName) ?? []);
+    if (subscribers.length === 0) return;
+
+    const highestPriority = Math.max(...subscribers.map((subscriber) => subscriber.priority));
+    subscribers
+      .filter((subscriber) => subscriber.priority === highestPriority)
+      .forEach((subscriber) => subscriber.callback());
   }, []);
 
   const pollGamepads = useCallback(() => {
     const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let gamepadFound = false;
-    let activeGamepad: Gamepad | null = null;
+    const connectedGamepads = Array.from(gamepads).filter(
+      (gamepad): gamepad is Gamepad => gamepad !== null,
+    );
+    const activeGamepad =
+      connectedGamepads.find((gamepad) => gamepad.id === connectedGamepadId) ??
+      connectedGamepads[0] ??
+      null;
+    const gamepadFound = activeGamepad !== null;
 
-    for (let i = 0; i < gamepads.length; i++) {
-      const gp = gamepads[i];
-      if (gp) {
-        gamepadFound = true;
-        activeGamepad = gp;
+    if (activeGamepad) {
+        const gp = activeGamepad;
         let inputDetected = false;
 
         gp.buttons.forEach((button, buttonIndex) => {
@@ -118,7 +133,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (buttonIndex === 6 || buttonIndex === 7) return;
 
           const isPressed = button.pressed || button.value > 0.5;
-          const stateKey = `btn:${buttonIndex}`;
+          const stateKey = `${gp.index}:btn:${buttonIndex}`;
           const wasPressed = lastButtonState.current[stateKey];
 
           if (isPressed && !wasPressed) {
@@ -136,7 +151,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         (["L2", "R2"] as const).forEach((trigger) => {
           const value = readTriggerValue(gp, trigger);
           const isPressed = value > 0.55;
-          const stateKey = `trigger:${trigger}`;
+          const stateKey = `${gp.index}:trigger:${trigger}`;
           const wasPressed = lastButtonState.current[stateKey];
 
           if (isPressed && !wasPressed) {
@@ -198,7 +213,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setActiveInputType("gamepad");
           document.body.style.cursor = "none";
         }
-      }
     }
 
     if (gamepadFound && activeGamepad) {
@@ -282,13 +296,30 @@ export const useGamepad = () => {
   return context;
 };
 
-export const useGamepadButton = (button: GamepadButtonName, callback: () => void, enabled = true) => {
+export const useGamepadButton = (
+  button: GamepadButtonName,
+  callback: () => void,
+  enabled = true,
+  priority = 0,
+) => {
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
   useEffect(() => {
     if (!enabled) return;
-    const handleEvent = () => callback();
-    gamepadEventTarget.addEventListener(`gamepad:${button}`, handleEvent);
-    return () => {
-      gamepadEventTarget.removeEventListener(`gamepad:${button}`, handleEvent);
+
+    const subscriber: GamepadButtonSubscriber = {
+      id: Symbol(button),
+      callback: () => callbackRef.current(),
+      priority,
     };
-  }, [button, callback, enabled]);
+    const subscribers = gamepadButtonSubscribers.get(button) ?? new Set<GamepadButtonSubscriber>();
+    subscribers.add(subscriber);
+    gamepadButtonSubscribers.set(button, subscribers);
+
+    return () => {
+      subscribers.delete(subscriber);
+      if (subscribers.size === 0) gamepadButtonSubscribers.delete(button);
+    };
+  }, [button, enabled, priority]);
 };

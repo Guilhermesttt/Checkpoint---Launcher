@@ -1,3 +1,4 @@
+import React from "react";
 import { Flame, Users2 } from "lucide-react";
 import type { TranslationKey } from "../context/PreferencesContext";
 import type { Game } from "../types/domain";
@@ -28,7 +29,7 @@ interface HomeOverviewPanelsProps {
   t: (key: TranslationKey) => string;
 }
 
-export function HomeOverviewPanels({
+export const HomeOverviewPanels = React.memo(function HomeOverviewPanels({
   friendsPlaying,
   recentActivity,
 }: HomeOverviewPanelsProps) {
@@ -67,4 +68,4 @@ export function HomeOverviewPanels({
       )}
     </div>
   );
-}
+});

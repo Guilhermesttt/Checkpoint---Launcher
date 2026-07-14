@@ -12,6 +12,8 @@ dist
 dist-ssr
 release
 release-next
+coverage
+.firebase
 public/download
 *.local
 

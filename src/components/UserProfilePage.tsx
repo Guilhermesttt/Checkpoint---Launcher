@@ -1,15 +1,17 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { Clock, Gamepad2, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { Game, UserProfile } from "../types/domain";
+import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 
 interface UserProfilePageProps {
   userProfile: UserProfile | null;
   user: { email?: string | null; photoURL?: string | null } | null;
   games: Game[];
+  onOpenGame?: (game: Game) => void;
 }
 
 const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -105,7 +107,14 @@ const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React
   </section>
 );
 
-const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, games }) => {
+const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, games, onOpenGame }) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useGamepadNavigation({
+    scrollRef: scrollRef as React.RefObject<HTMLElement>,
+    scrollSpeed: 25,
+    disableX: true,
+    disableO: true,
+  });
   const displayName = userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
   const email = userProfile?.email || user?.email || "";
 
@@ -141,6 +150,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
 
   return (
     <motion.div
+      ref={scrollRef}
+      data-system-page
       initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
@@ -270,7 +281,13 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                   {topGames.map((game, index) => {
                     const pct = ((game.hoursPlayed || 0) / maxHours) * 100;
                     return (
-                      <div key={game.id} className="grid grid-cols-[20px_42px_1fr_auto] items-center gap-3">
+                      <button
+                        key={game.id}
+                        type="button"
+                        onClick={() => onOpenGame?.(game)}
+                        disabled={!onOpenGame}
+                        className="grid w-full grid-cols-[20px_42px_1fr_auto] items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
+                      >
                         <span className="text-right text-xs font-black text-white/25">{index + 1}</span>
                         <div className="h-12 w-9 overflow-hidden rounded-lg bg-white/8">
                           {(game.cardImage || game.image) && (
@@ -291,7 +308,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                         <span className="flex items-center gap-1 text-[10px] font-semibold text-white/35">
                           <Clock className="h-3 w-3" /> {game.hoursPlayed || 0}h
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -304,14 +321,20 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
               {favoriteGames.length > 0 ? (
                 <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                   {favoriteGames.map((game) => (
-                    <div key={game.id} className="w-[74px] shrink-0">
+                    <button
+                      key={game.id}
+                      type="button"
+                      onClick={() => onOpenGame?.(game)}
+                      disabled={!onOpenGame}
+                      className="w-[82px] shrink-0 rounded-2xl p-1 text-left transition-colors hover:bg-white/[0.07] disabled:cursor-default disabled:hover:bg-transparent"
+                    >
                       <div className="h-[90px] w-[74px] overflow-hidden rounded-xl bg-white/8">
                         {(game.cardImage || game.image) && (
                           <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover" />
                         )}
                       </div>
                       <p className="mt-2 truncate text-center text-[10px] text-white/45">{game.title}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (

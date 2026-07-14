@@ -1,5 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
 
 const LoadingSkeleton: React.FC = () => {
   const items = [1, 2, 3, 4, 5, 6];
@@ -16,7 +15,7 @@ const LoadingSkeleton: React.FC = () => {
               height: i === 1 ? 340 : 260,
             }}
           >
-            <div className="w-full h-full rounded-2xl bg-white/[0.03] border border-white/5 animate-pulse shadow-[0_0_20px_rgba(255,255,255,0.02)] backdrop-blur-sm" />
+            <div className="w-full h-full rounded-2xl bg-white/0.03 border border-white/5 animate-pulse shadow-[0_0_20px_rgba(255,255,255,0.02)] backdrop-blur-sm" />
           </div>
         ))}
       </div>

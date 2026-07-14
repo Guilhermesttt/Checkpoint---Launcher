@@ -11,6 +11,7 @@ import { PreferencesProvider, usePreferences } from "./context/PreferencesContex
 import { GamepadProvider } from "./context/GamepadContext";
 import { GamepadStatusOverlay } from "./components/ui/GamepadStatusOverlay";
 import { useControllerLed } from "./hooks/useControllerLed";
+import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
@@ -33,6 +34,22 @@ const AppContent: React.FC = () => {
   const musicStartTimerRef = React.useRef<number | null>(null);
   const pendingMusicStartRef = React.useRef(false);
   const loadedMusicSrcRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, []);
 
   const clearMusicFade = React.useCallback(() => {
     if (musicFadeRef.current) {
@@ -232,10 +249,11 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="overflow-hidden select-none h-screen w-full">
+    <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
       <MainVideoBackground />
       <Home />
       <GamepadStatusOverlay />
+      <ControllerVirtualKeyboard />
       <AnimatePresence mode="wait">
         {isIntroVisible && (
           <GameBootIntro

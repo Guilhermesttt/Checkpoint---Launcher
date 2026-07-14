@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Gamepad2, Zap, Shield, Star } from "lucide-react";
 
 const features = [
@@ -126,7 +126,6 @@ function ParticleVisualization() {
 
 export function FeaturesSection() {
   const [isVisible, setIsVisible] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,7 +172,6 @@ export function FeaturesSection() {
             className={`lg:col-span-12 relative bg-black border border-foreground/10 min-h-[500px] overflow-hidden group transition-all duration-700 flex ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
             }`}
-            onMouseEnter={() => setActiveFeature(0)}
           >
             <div className="relative flex-1 p-8 lg:p-12 bg-black">
               <ParticleVisualization />
@@ -216,7 +214,6 @@ export function FeaturesSection() {
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 }`}
                 style={{ transitionDelay: `${(i + 1) * 100}ms` }}
-                onMouseEnter={() => setActiveFeature(i + 1)}
               >
                 <span className="font-mono text-sm text-muted-foreground">{feature.number}</span>
                 <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mt-4 mb-6 group-hover:scale-110 transition-transform">

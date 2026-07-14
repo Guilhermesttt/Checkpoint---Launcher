@@ -1,7 +1,7 @@
 {
   "name": "checkpoint",
   "private": true,
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
@@ -16,6 +16,15 @@
     "dist:windows": "node scripts/build-portable.cjs",
     "publish": "npm run build && electron-builder --win --publish always",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:typecheck": "tsc -p tsconfig.test.json",
+    "test:coverage": "vitest run --coverage",
+    "test:rules": "firebase emulators:exec --only firestore --project checkpoint-rules-test \"vitest run --config vitest.rules.config.ts\"",
+    "test:ci": "npm run test:typecheck && npm run test && npm run test:rules",
+    "audit:ci": "npm audit --omit=dev --audit-level=high",
+    "release:verify": "node scripts/verify-release.cjs",
+    "release:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installer.ps1",
     "preview": "vite preview",
     "server": "node ./server/index.mjs"
   },
@@ -26,6 +35,7 @@
   "build": {
     "appId": "com.checkpoint.launcher",
     "productName": "Checkpoint Launcher",
+    "artifactName": "Checkpoint-Launcher-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -61,7 +71,6 @@
     }
   },
   "dependencies": {
-    "cloudscraper": "^4.6.0",
     "cors": "^2.8.5",
     "discord-rpc": "^4.0.1",
     "dotenv": "^17.2.3",
@@ -76,6 +85,7 @@
     "@emnapi/core": "1.10.0",
     "@emnapi/runtime": "1.10.0",
     "@eslint/js": "^9.39.4",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@fortawesome/fontawesome-svg-core": "7.3.0",
     "@fortawesome/free-brands-svg-icons": "7.3.0",
     "@fortawesome/react-fontawesome": "3.3.1",
@@ -111,12 +121,17 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@tailwindcss/vite": "^4.2.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/discord-rpc": "^4.0.11",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/supertest": "^7.2.1",
     "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -133,10 +148,12 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "fast-average-color": "^9.5.2",
     "firebase": "^12.12.0",
+    "firebase-tools": "^15.23.0",
     "framer-motion": "^12.38.0",
     "geist": "^1.7.0",
     "globals": "^17.4.0",
     "input-otp": "^1.4.2",
+    "jsdom": "^29.1.1",
     "liquid-glass-react": "^1.1.1",
     "lottie-react": "^2.4.1",
     "lucide-react": "^1.8.0",
@@ -153,6 +170,7 @@
     "react-router-dom": "^6.26.1",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
+    "supertest": "^7.2.2",
     "tailwind-merge": "^3.5.0",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.2.2",
@@ -161,6 +179,7 @@
     "typescript-eslint": "^8.58.0",
     "vaul": "^1.1.2",
     "vite": "^8.0.4",
+    "vitest": "^4.1.10",
     "wait-on": "^9.0.10",
     "zod": "^4.3.6"
   }

@@ -27,7 +27,7 @@ const CARD_FRAME_HEIGHT = 260;
 const CARD_WIDTH = 156;
 const CARD_HEIGHT = 236;
 const FALLBACK_CARD_BACKGROUND =
-  "radial-gradient(circle at top, rgba(255,255,255,0.12), rgba(255,255,255,0.04) 35%, rgba(5,5,7,0.96) 100%)";
+  "radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(255,255,255,0.02) 40%, rgba(5,5,7,0.98) 100%)";
 
 const GameCard: React.FC<GameCardProps> = ({
   title,
@@ -50,15 +50,15 @@ const GameCard: React.FC<GameCardProps> = ({
   const mouseXSpring = useSpring(x, { stiffness: 400, damping: 30 });
   const mouseYSpring = useSpring(y, { stiffness: 400, damping: 30 });
 
-  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["12deg", "-12deg"]);
-  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-12deg", "12deg"]);
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["10deg", "-10deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-10deg", "10deg"]);
 
   const glareX = useTransform(mouseXSpring, [-0.5, 0.5], ["100%", "0%"]);
   const glareY = useTransform(mouseYSpring, [-0.5, 0.5], ["100%", "0%"]);
   const glareOpacity = useTransform(
     mouseXSpring,
     [-0.5, 0, 0.5],
-    [0.3, 0, 0.3],
+    [0.4, 0, 0.4],
   );
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -90,6 +90,7 @@ const GameCard: React.FC<GameCardProps> = ({
         label: "Steam",
         color: "#67b676",
         border: "rgba(103,182,118,0.35)",
+        background: "rgba(20, 24, 20, 0.6)",
         icon: (
           <FontAwesomeIcon
             icon={faSteam}
@@ -104,7 +105,8 @@ const GameCard: React.FC<GameCardProps> = ({
       return {
         label: "Epic",
         color: "#f5f5f5",
-        border: "rgba(255,255,255,0.3)",
+        border: "rgba(255,255,255,0.2)",
+        background: "rgba(15, 15, 15, 0.6)",
         icon: (
           <img
             src={EPIC_GAMES_ICON_PATH}
@@ -144,16 +146,17 @@ const GameCard: React.FC<GameCardProps> = ({
         perspective: reduceMotion ? undefined : 1200,
       }}
     >
+      {/* Glow externo quando ativo */}
       {visuallyActive && (
         <motion.div
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.6 }}
-          transition={{ duration: 0.4 }}
+          animate={{ opacity: 0.8 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
           className="pointer-events-none absolute inset-0 rounded-2xl"
           style={{
-            background: "var(--launcher-accent-soft, rgba(255,255,255,0.18))",
-            filter: "blur(24px)",
-            transform: "translateY(12px) scale(0.9)",
+            background: "var(--launcher-accent-soft, rgba(255,255,255,0.15))",
+            filter: "blur(28px)",
+            transform: "translateY(8px) scale(0.95)",
             zIndex: 0,
           }}
         />
@@ -166,36 +169,37 @@ const GameCard: React.FC<GameCardProps> = ({
           height: CARD_HEIGHT,
           rotateX: visuallyActive && !reduceMotion ? rotateX : 0,
           rotateY: visuallyActive && !reduceMotion ? rotateY : 0,
-          scale: visuallyActive ? 1.02 : 0.9,
+          scale: visuallyActive ? 1.03 : 0.92,
           transformStyle: "preserve-3d",
         }}
         transition={
           reduceMotion
-            ? { duration: 0.18 }
-            : { type: "spring", stiffness: 300, damping: 20 }
+            ? { duration: 0.2 }
+            : { type: "spring", stiffness: 350, damping: 25 }
         }
       >
         <div
-          className={`relative h-full w-full overflow-hidden rounded-2xl bg-gray-900 transition-all duration-300 ease-out transform group-hover:scale-105 group-hover:ring-2 group-hover:ring-orange-500/50 ${visuallyActive
-              ? "shadow-[0_20px_48px_rgba(0,0,0,0.78),0_0_20px_rgba(255,255,255,0.15)] ring-2 ring-white/20"
-              : "shadow-[0_8px_32px_rgba(0,0,0,0.6)] group-hover:shadow-[0_12px_40px_rgba(0,0,0,0.8),0_0_15px_rgba(255,165,0,0.15)]"
+          className={`relative h-full w-full overflow-hidden rounded-2xl bg-[#08080c] transition-all duration-400 ease-out transform group-hover:scale-[1.02] ${visuallyActive
+              ? "shadow-[0_24px_56px_rgba(0,0,0,0.85),0_0_32px_rgba(255,255,255,0.15)] ring-2 ring-white/30"
+              : "shadow-[0_8px_32px_rgba(0,0,0,0.5)] ring-1 ring-white/10 group-hover:shadow-[0_16px_48px_rgba(0,0,0,0.7),0_0_24px_var(--launcher-accent-soft,rgba(255,255,255,0.15))] group-hover:ring-white/20"
             }`}
           style={
             visuallyActive
               ? {
                 boxShadow:
-                  "0 20px 48px rgba(0,0,0,0.78), 0 0 0 1px rgba(255,255,255,0.22), 0 0 28px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
+                  "0 24px 56px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.25), 0 0 32px var(--launcher-accent-soft, rgba(255,255,255,0.2))",
               }
               : undefined
           }
         >
+          {/* Borda interna premium */}
           <div
             className="pointer-events-none absolute inset-0 z-[1] rounded-2xl"
             style={{
               padding: 1,
               background: visuallyActive
-                ? "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.08) 100%)"
-                : "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 100%)",
+                ? "linear-gradient(180deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 30%, rgba(255,255,255,0.05) 100%)"
+                : "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.02) 100%)",
               WebkitMask:
                 "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
               WebkitMaskComposite: "xor",
@@ -208,7 +212,7 @@ const GameCard: React.FC<GameCardProps> = ({
               className="absolute inset-0 flex items-end p-4"
               style={{ background: FALLBACK_CARD_BACKGROUND }}
             >
-              <span className="line-clamp-3 text-sm font-semibold leading-snug text-white/90">
+              <span className="line-clamp-3 text-sm font-semibold leading-snug text-white/80">
                 {title}
               </span>
             </div>
@@ -217,7 +221,7 @@ const GameCard: React.FC<GameCardProps> = ({
               src={image}
               alt={title}
               className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !reduceMotion
-                  ? "scale-110 duration-[10000ms]"
+                  ? "scale-110 duration-[12000ms]"
                   : "scale-100 duration-500"
                 }`}
               loading="lazy"
@@ -228,46 +232,49 @@ const GameCard: React.FC<GameCardProps> = ({
             />
           )}
 
+          {/* Vinheta escura no fundo */}
           <div
             className="absolute inset-0 transition-colors duration-500"
             style={{
               background: visuallyActive
-                ? "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.1) 35%, rgba(0,0,0,0.75) 75%, rgba(0,0,0,0.95) 100%)"
-                : "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.2) 45%, rgba(0,0,0,0.75) 100%)",
+                ? "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.05) 40%, rgba(0,0,0,0.85) 85%, rgba(0,0,0,0.98) 100%)"
+                : "linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.8) 100%)",
             }}
           />
 
           {visuallyActive && (
             <>
+              {/* Brilho varrendo o card */}
               {!reduceMotion && (
                 <motion.div
                   initial={{ x: "-150%" }}
                   animate={{ x: "150%" }}
-                  transition={{ duration: 0.7, ease: "easeInOut" }}
+                  transition={{ duration: 0.9, ease: "easeInOut" }}
                   className="pointer-events-none absolute inset-0 z-20"
                   style={{
                     background:
-                      "linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.3) 50%, transparent 80%)",
+                      "linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.25) 50%, transparent 80%)",
                     mixBlendMode: "overlay",
                   }}
                 />
               )}
 
+              {/* Reflexo estático superior */}
               <div
                 className="pointer-events-none absolute inset-0 z-10"
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 48%)",
-                  boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+                    "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 45%)",
                 }}
               />
 
+              {/* Brilho dinâmico do mouse */}
               {!reduceMotion && (
                 <motion.div
                   className="pointer-events-none absolute inset-0 z-20 mix-blend-overlay"
                   style={{
                     background:
-                      "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8) 0%, transparent 60%)",
+                      "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9) 0%, transparent 55%)",
                     left: glareX,
                     top: glareY,
                     opacity: glareOpacity,
@@ -281,21 +288,21 @@ const GameCard: React.FC<GameCardProps> = ({
           )}
 
           <div
-            className="absolute left-2.5 right-2.5 top-2.5 z-30 flex items-start justify-between"
+            className="absolute left-3 right-3 top-3 z-30 flex items-start justify-between"
             style={{ transform: "translateZ(20px)" }}
           >
             {platformBadge ? (
               <div
-                className="flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                className="flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
                 style={{
-                  background: "rgba(0,0,0,0.4)",
+                  background: platformBadge.background,
                   border: `1px solid ${platformBadge.border}`,
-                  backdropFilter: "blur(8px)",
+                  backdropFilter: "blur(12px)",
                 }}
               >
                 {platformBadge.icon}
                 <span
-                  className="text-[10px] font-bold uppercase tracking-widest"
+                  className="text-[9px] font-bold uppercase tracking-widest drop-shadow-sm"
                   style={{ color: platformBadge.color }}
                 >
                   {platformBadge.label}
@@ -307,40 +314,41 @@ const GameCard: React.FC<GameCardProps> = ({
 
             {isFavorite && (
               <div
-                className="flex h-6 w-6 items-center justify-center rounded-full"
+                className="flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-md"
                 style={{
                   background: "rgba(251,191,36,0.15)",
-                  border: "1px solid rgba(251,191,36,0.5)",
-                  backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(251,191,36,0.4)",
+                  backdropFilter: "blur(12px)",
                 }}
               >
-                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" />
               </div>
             )}
           </div>
 
-          {/* NOVO: Layout cinematográfico integrado de texto sem caixa sólida de fundo */}
           <div
-            className={`absolute bottom-0 left-0 right-0 z-30 px-3.5 pb-4 pt-10 transition-all duration-400 bg-gradient-to-t from-black/95 via-black/50 to-transparent backdrop-blur-2xs ${visuallyActive ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+            className={`absolute bottom-0 left-0 right-0 z-30 px-4 pb-4 pt-12 transition-all duration-500 ease-out bg-gradient-to-t from-[#050507] via-black/60 to-transparent ${visuallyActive ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
               }`}
             style={{ transform: "translateZ(30px)" }}
           >
-            <p className="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-400 flex items-center gap-1.5">
+            <p className="mb-1 text-[8.5px] font-bold uppercase tracking-[0.25em] text-white/50 flex items-center gap-1.5">
               Iniciar
               {visuallyActive && (
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"></span>
                 </span>
               )}
             </p>
-            <h3 className="line-clamp-2 text-xs font-bold leading-snug text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
+            <h3 className="line-clamp-2 text-[13px] font-black leading-snug text-white tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               {title}
             </h3>
           </div>
 
+          {/* Botão Play central refinado */}
           <div
-            className={`absolute inset-0 z-30 flex items-center justify-center transition-opacity duration-300 ${visuallyActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+            className={`absolute inset-0 z-30 flex items-center justify-center transition-all duration-400 ease-out ${visuallyActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              }`}
             style={{ transform: "translateZ(40px)" }}
           >
             <motion.div
@@ -348,16 +356,13 @@ const GameCard: React.FC<GameCardProps> = ({
               animate={{ scale: 1, opacity: 1 }}
               transition={
                 reduceMotion
-                  ? { duration: 0.18 }
-                  : { type: "spring", stiffness: 400, damping: 25, delay: 0.1 }
+                  ? { duration: 0.2 }
+                  : { type: "spring", stiffness: 400, damping: 25, delay: 0.05 }
               }
-              className="flex h-14 w-14 items-center justify-center rounded-full shadow-2xl backdrop-blur-xl bg-white/10 border border-white/20"
+              className="group/play flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md bg-white/10 border border-white/20 transition-all duration-300 hover:scale-110 hover:bg-white/25 hover:border-white/40 cursor-pointer"
             >
-              <div
-                className="absolute inset-0 rounded-full bg-white opacity-0 transition-opacity duration-300 group-hover:opacity-10"
-              />
               <Play
-                className="h-6 w-6 fill-white text-white"
+                className="h-5 w-5 fill-white text-white drop-shadow-md transition-transform duration-300 group-hover/play:scale-105"
                 style={{ marginLeft: 3 }}
               />
             </motion.div>
@@ -366,11 +371,12 @@ const GameCard: React.FC<GameCardProps> = ({
 
         {visuallyActive && (
           <div
-            className="absolute -bottom-3 left-1/2 h-0.5 -translate-x-1/2 rounded-full"
+            className="absolute -bottom-4 left-1/2 h-1 -translate-x-1/2 rounded-full opacity-60"
             style={{
-              width: 32,
+              width: 40,
               background:
-                "linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent)",
+                "linear-gradient(90deg, transparent, var(--launcher-accent-soft, rgba(255,255,255,0.8)), transparent)",
+              filter: "blur(2px)",
             }}
           />
         )}

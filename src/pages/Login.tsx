@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, AlertCircle, ArrowRight, Gamepad2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -50,7 +50,7 @@ const LoginContent: React.FC = () => {
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
         setError("E-mail ou senha incorretos.");
       } else if (err.code === "auth/email-already-in-use") {
-        setError("Este e-mail jÃ¡ estÃ¡ em uso.");
+        setError("Este e-mail já está em uso.");
       } else if (err.code === "auth/weak-password") {
         setError("A senha deve ter pelo menos 6 caracteres.");
       } else {
@@ -202,14 +202,14 @@ const LoginContent: React.FC = () => {
               className="text-sm text-white/30 hover:text-white/60 transition-colors"
             >
               {mode === "login"
-                ? "NÃ£o tem conta? Cadastre-se grÃ¡tis"
-                : "JÃ¡ tem conta? FaÃ§a o login"}
+                ? "Não tem conta? Cadastre-se grátis"
+                : "Já tem conta? Faça o login"}
             </button>
           </div>
         </div>
 
         <p className="text-center text-[10px] text-white/20 font-mono mt-6 uppercase tracking-[0.2em]">
-          AutenticaÃ§Ã£o segura Â· Firebase Auth
+          Autenticação segura · Firebase Auth
         </p>
       </motion.div>
     </div>

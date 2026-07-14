@@ -4,12 +4,14 @@ const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
+const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { detectEmulator, parseAchievementState, getGoldbergV1Paths } = require("./emulator-detector.cjs");
 
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
 const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
 const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
+const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
@@ -66,7 +68,7 @@ let tray = null;
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
 
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const hasSingleInstanceLock = IS_SMOKE_TEST || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 }
@@ -107,6 +109,12 @@ const isLocalAppUrl = (rawUrl) => {
     return false;
   }
 };
+
+const registerSecureIpcHandler = createSecureIpcRegistrar({
+  ipcMain,
+  isAllowedUrl: isLocalAppUrl,
+  getExpectedWebContents: () => mainWindow?.webContents ?? null,
+});
 
 const isExternalProtocol = (rawUrl) => {
   try {
@@ -186,15 +194,26 @@ const fetchHealth = async () => {
 };
 
 const waitForServer = async () => {
-  for (let attempt = 0; attempt < HEALTH_CHECK_MAX_ATTEMPTS; attempt += 1) {
+  const BASE_MS = 500;
+  const MAX_DELAY_MS = 8_000;
+  const TOTAL_TIMEOUT_MS = 65_000;
+  const deadline = Date.now() + TOTAL_TIMEOUT_MS;
+
+  let attempt = 0;
+  while (Date.now() < deadline) {
     if (await fetchHealth()) return;
-    await sleep(HEALTH_CHECK_INTERVAL_MS);
+    // Exponential backoff com jitter ±20% para evitar thundering herd no Render
+    const base = Math.min(BASE_MS * 2 ** attempt, MAX_DELAY_MS);
+    const jitter = base * (0.8 + Math.random() * 0.4);
+    await sleep(Math.round(jitter));
+    attempt++;
   }
 
   throw new Error(
-    `Backend nao respondeu em ${APP_URL}/health apos ${(HEALTH_CHECK_MAX_ATTEMPTS * HEALTH_CHECK_INTERVAL_MS) / 1000}s. Verifique sua conexao com a internet.`,
+    `Backend nao respondeu em ${APP_URL}/health apos ${TOTAL_TIMEOUT_MS / 1000}s. Verifique sua conexao com a internet.`,
   );
 };
+
 
 const loadMainWindow = async () => {
   const preferredUrl = process.env.ELECTRON_START_URL || APP_URL;
@@ -490,7 +509,7 @@ const startAchievementBridge = async () => {
   return achievementBridge.start();
 };
 
-ipcMain.handle("achievement:get-definitions", async (_event, gameId) => {
+registerSecureIpcHandler("achievement:get-definitions", async (_event, gameId) => {
   try {
     const achievementsDir = path.join(app.getPath("userData"), "achievements");
     const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
@@ -504,7 +523,7 @@ ipcMain.handle("achievement:get-definitions", async (_event, gameId) => {
   return null;
 });
 
-ipcMain.handle("achievement:get-progress", async (_event, gameId) => {
+registerSecureIpcHandler("achievement:get-progress", async (_event, gameId) => {
   try {
     const progressPath = path.join(app.getPath("userData"), `user_progress_${gameId}.json`);
     if (fs.existsSync(progressPath)) {
@@ -518,7 +537,7 @@ ipcMain.handle("achievement:get-progress", async (_event, gameId) => {
 });
 
 const { readLocalSavesRetroactive } = require("./emulator-detector.cjs");
-ipcMain.handle("achievement:get-local-state", async (_event, appId) => {
+registerSecureIpcHandler("achievement:get-local-state", async (_event, appId) => {
   try {
     if (!appId) return {};
     return readLocalSavesRetroactive(appId);
@@ -528,7 +547,7 @@ ipcMain.handle("achievement:get-local-state", async (_event, appId) => {
   }
 });
 
-ipcMain.handle("achievement:save-definitions", async (_event, gameId, definitions, steamAppId) => {
+registerSecureIpcHandler("achievement:save-definitions", async (_event, gameId, definitions, steamAppId) => {
   try {
     const achievementsDir = path.join(app.getPath("userData"), "achievements");
     const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
@@ -543,7 +562,7 @@ ipcMain.handle("achievement:save-definitions", async (_event, gameId, definition
   }
 });
 
-ipcMain.handle("achievement:unlock", async (_event, gameId, achievementId) => {
+registerSecureIpcHandler("achievement:unlock", async (_event, gameId, achievementId) => {
   try {
     if (achievementBridge) {
       return await achievementBridge.unlockAchievement(gameId, achievementId);
@@ -555,12 +574,12 @@ ipcMain.handle("achievement:unlock", async (_event, gameId, achievementId) => {
   }
 });
 
-ipcMain.handle("overlay:show-achievement", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-achievement", async (_event, payload) => {
   sendOverlayEvent("achievement:unlock", payload);
   playOverlaySound("achievement-unlock");
 });
 
-ipcMain.handle("overlay:show-friend-message", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) => {
   const senderName = String(payload?.senderName || "").trim() || "Amigo";
   const messageText = String(payload?.messageText || "").trim() || "Nova mensagem";
   const avatarUrl = String(payload?.avatarUrl || "").trim();
@@ -778,7 +797,7 @@ async function injectGenericIniDefinitions(appId, savePath) {
   }
 }
 
-ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
+registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) {
     throw new Error("Caminho do executavel vazio.");
@@ -851,7 +870,7 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
 
       if (appId) {
         // Injeta as definições das conquistas antes do jogo abrir
-        await injectGoldbergDefinitions(appId, settingsPath);
+
       }
 
       if (appId) {
@@ -1060,13 +1079,35 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     }
   };
 
-  const detectedEmulator = detectedGameAppId
+  // ─── Injector unificado ──────────────────────────────────────────────────
+  // Delega ao injector correto com base no tipo de emulador detectado,
+  // evitando a dupla chamada a getSchemaByAppIdOrGameId que havia antes.
+  const injectAchievementDefinitions = async (appId, emulator, settingsPath) => {
+    if (!appId) return;
+    if (emulator?.emulatorType === "generic_ini") {
+      await injectGenericIniDefinitions(appId, emulator.savePath);
+    } else if (settingsPath) {
+      await injectGoldbergDefinitions(appId, settingsPath);
+    }
+  };
+
+  let detectedEmulator = detectedGameAppId
     ? detectEmulator(gameDir, detectedGameAppId)
     : null;
 
-  if (detectedGameAppId && detectedEmulator?.emulatorType === "generic_ini") {
-    await injectGenericIniDefinitions(detectedGameAppId, detectedEmulator.savePath);
-  }
+  // Resolve o settingsPath novamente (já foi calculado acima no bloco de autoconfig)
+  const _settingsPathForInject = (() => {
+    const candidates = [
+      path.join(gameDir, "steam_settings"),
+      path.join(path.dirname(gameDir), "steam_settings"),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return null;
+  })();
+
+  await injectAchievementDefinitions(detectedGameAppId, detectedEmulator, _settingsPathForInject);
 
   try {
     const child = spawn(normalizedTarget, [], {
@@ -1107,6 +1148,28 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
     // Inicia o watcher usando o hook de saída do child process.
     if (detectedEmulator) {
       startGameWatcher(detectedEmulator, registerExitHook);
+    } else if (detectedGameAppId) {
+      // ── Re-scan loop: emuladores como RUNE/CODEX criam o arquivo de save ──────
+      // somente APÓS o jogo inicializar (2-5s de delay típico). Tentamos
+      // re-detectar a cada 3s por até 30s antes de desistir.
+      console.info(`[achievement-watcher] Emulador não encontrado imediatamente para appId ${detectedGameAppId}. Iniciando re-scan por 30s...`);
+      const RESCAN_INTERVAL_MS = 3000;
+      const RESCAN_MAX_ATTEMPTS = 10; // 10 * 3s = 30s
+      let rescanAttempt = 0;
+      const rescanTimer = setInterval(() => {
+        rescanAttempt++;
+        const found = detectEmulator(gameDir, detectedGameAppId);
+        if (found) {
+          clearInterval(rescanTimer);
+          console.info(`[achievement-watcher] Emulador encontrado após ${rescanAttempt * RESCAN_INTERVAL_MS / 1000}s: ${found.emulatorType}`);
+          // Injeta definições agora que o arquivo de save foi criado
+          injectAchievementDefinitions(detectedGameAppId, found, _settingsPathForInject).catch(() => {});
+          startGameWatcher(found, registerExitHook);
+        } else if (rescanAttempt >= RESCAN_MAX_ATTEMPTS) {
+          clearInterval(rescanTimer);
+          console.warn(`[achievement-watcher] Re-scan encerrado: nenhum emulador encontrado para appId ${detectedGameAppId} após 30s.`);
+        }
+      }, RESCAN_INTERVAL_MS);
     }
 
     child.on("error", async (err) => {
@@ -1138,39 +1201,45 @@ ipcMain.handle("launcher:open-executable", async (_event, executablePath) => {
   }
 });
 
-ipcMain.handle("launcher:is-executable-running", async (_event, executablePath) => {
-  const target = String(executablePath || "").trim();
-  if (!target) {
-    return false;
-  }
+// ─── Cache de processos em execução (TTL 1.5s) ─────────────────────────────────────────
+let _processListCache = { names: new Set(), expiresAt: 0 };
 
-  const normalizedTarget = path.normalize(target);
-  const executableName = path.basename(normalizedTarget);
-  if (!executableName || path.extname(executableName).toLowerCase() !== ".exe") {
-    return false;
+const getRunningProcessNames = async () => {
+  if (Date.now() < _processListCache.expiresAt) {
+    return _processListCache.names;
   }
 
   const output = await new Promise((resolve, reject) => {
-    execFile(
-      "tasklist",
-      ["/fo", "csv", "/nh", "/fi", `imagename eq ${executableName}`],
-      { windowsHide: true },
-      (error, stdout = "") => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(stdout);
-      },
-    );
+    execFile("tasklist", ["/fo", "csv", "/nh"], { windowsHide: true }, (error, stdout = "") => {
+      if (error) { reject(error); return; }
+      resolve(stdout);
+    });
   }).catch(() => "");
 
-  return String(output)
-    .split(/\r?\n/)
-    .some((line) => line.trim().toLowerCase().startsWith(`"${executableName.toLowerCase()}"`));
+  const names = new Set(
+    String(output)
+      .split(/\r?\n/)
+      .map((line) => line.match(/^"([^"]+)"/)?.[1]?.toLowerCase())
+      .filter(Boolean),
+  );
+
+  _processListCache = { names, expiresAt: Date.now() + 1500 };
+  return names;
+};
+
+registerSecureIpcHandler("launcher:is-executable-running", async (_event, executablePath) => {
+  const target = String(executablePath || "").trim();
+  if (!target) return false;
+
+  const normalizedTarget = path.normalize(target);
+  const executableName = path.basename(normalizedTarget);
+  if (!executableName || path.extname(executableName).toLowerCase() !== ".exe") return false;
+
+  const runningNames = await getRunningProcessNames().catch(() => new Set());
+  return runningNames.has(executableName.toLowerCase());
 });
 
-ipcMain.handle("launcher:detect-running-games", async (_event, executablePaths) => {
+registerSecureIpcHandler("launcher:detect-running-games", async (_event, executablePaths) => {
   const normalizedTargets = Array.isArray(executablePaths)
     ? executablePaths
       .map((value) => String(value || "").trim())
@@ -1179,35 +1248,15 @@ ipcMain.handle("launcher:detect-running-games", async (_event, executablePaths) 
       .filter((value) => path.isAbsolute(value) && path.extname(value).toLowerCase() === ".exe")
     : [];
 
-  if (normalizedTargets.length === 0) {
-    return [];
-  }
+  if (normalizedTargets.length === 0) return [];
 
-  const output = await new Promise((resolve, reject) => {
-    execFile("tasklist", ["/fo", "csv", "/nh"], { windowsHide: true }, (error, stdout = "") => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(stdout);
-    });
-  }).catch(() => "");
-
-  const runningNames = new Set(
-    String(output)
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => line.match(/^"([^"]+)"/)?.[1]?.toLowerCase())
-      .filter(Boolean),
-  );
-
+  const runningNames = await getRunningProcessNames().catch(() => new Set());
   return normalizedTargets.filter((target) =>
     runningNames.has(path.basename(target).toLowerCase()),
   );
 });
 
-ipcMain.handle("auth:start-google-browser", async () => {
+registerSecureIpcHandler("auth:start-google-browser", async () => {
   const state = crypto.randomUUID();
   const authUrl = new URL("/auth/google/start", APP_URL);
   authUrl.searchParams.set("state", state);
@@ -1215,7 +1264,7 @@ ipcMain.handle("auth:start-google-browser", async () => {
   return { state };
 });
 
-ipcMain.handle("shell:open-external", async (_event, url) => {
+registerSecureIpcHandler("shell:open-external", async (_event, url) => {
   const rawUrl = String(url || "").trim();
   if (!isSafeOpenExternalUrl(rawUrl)) {
     throw new Error("Protocolo nao permitido.");
@@ -1223,7 +1272,7 @@ ipcMain.handle("shell:open-external", async (_event, url) => {
   await shell.openExternal(rawUrl);
 });
 
-ipcMain.handle("overlay:test-welcome", async () => {
+registerSecureIpcHandler("overlay:test-welcome", async () => {
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
     title: "Divirta-se",
@@ -1231,7 +1280,7 @@ ipcMain.handle("overlay:test-welcome", async () => {
   });
 });
 
-ipcMain.handle("overlay:test-achievement", async () => {
+registerSecureIpcHandler("overlay:test-achievement", async () => {
   sendOverlayEvent("achievement:unlock", {
     gameId: "checkpoint-lab",
     achievementId: "overlay-smoke-test",
@@ -1247,7 +1296,7 @@ ipcMain.handle("overlay:test-achievement", async () => {
   playOverlaySound("achievement-unlock");
 });
 
-ipcMain.handle("overlay:show-game-start", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
   const gameTitle = String(payload?.gameTitle || "").trim();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
@@ -1258,7 +1307,7 @@ ipcMain.handle("overlay:show-game-start", async (_event, payload) => {
   });
 });
 
-ipcMain.handle("overlay:show-friend-playing", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-friend-playing", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
   const gameTitle = String(payload?.gameTitle || "").trim() || "agora";
   const avatarUrl = String(payload?.avatarUrl || "").trim();
@@ -1271,7 +1320,7 @@ ipcMain.handle("overlay:show-friend-playing", async (_event, payload) => {
   });
 });
 
-ipcMain.handle("overlay:show-friend-request", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
   const avatarUrl = String(payload?.avatarUrl || "").trim();
 
@@ -1283,7 +1332,7 @@ ipcMain.handle("overlay:show-friend-request", async (_event, payload) => {
   });
 });
 
-ipcMain.handle("overlay:show-friend-accepted", async (_event, payload) => {
+registerSecureIpcHandler("overlay:show-friend-accepted", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
   const avatarUrl = String(payload?.avatarUrl || "").trim();
 
@@ -1318,33 +1367,55 @@ const pushExeResult = (filePath, results, seenPaths) => {
   });
 };
 
-const scanForExe = async (dir, results = [], seenPaths = new Set(), depth = 0) => {
-  if (depth > MAX_DEPTH || results.length >= MAX_RESULTS) return results;
-  let entries;
-  try {
-    entries = await fs.promises.readdir(dir, { withFileTypes: true });
-  } catch {
-    return results;
-  }
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    if (results.length >= MAX_RESULTS) break;
-    if (index > 0 && index % 40 === 0) {
-      await yieldToEventLoop();
+// ─── Scheduler de concorrência limitada para scanForExe ────────────────────────────
+// Processa até SCAN_CONCURRENCY diretórios em paralelo sem dependência externa.
+const SCAN_CONCURRENCY = 4;
+
+const makePLimit = (limit) => {
+  let active = 0;
+  const queue = [];
+  const next = () => {
+    if (active >= limit || queue.length === 0) return;
+    active++;
+    const { fn, resolve, reject } = queue.shift();
+    Promise.resolve().then(fn).then(resolve, reject).finally(() => { active--; next(); });
+  };
+  return (fn) => new Promise((resolve, reject) => { queue.push({ fn, resolve, reject }); next(); });
+};
+
+const scanForExe = async (rootDir, results = [], seenPaths = new Set()) => {
+  const run = makePLimit(SCAN_CONCURRENCY);
+
+  const scan = async (dir, depth) => {
+    if (depth > MAX_DEPTH || results.length >= MAX_RESULTS) return;
+    let entries;
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
     }
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      // Skip hidden and system dirs
-      if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "$RECYCLE.BIN") continue;
-      await scanForExe(fullPath, results, seenPaths, depth + 1);
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".exe")) {
-      pushExeResult(fullPath, results, seenPaths);
+
+    const subdirs = [];
+    for (const entry of entries) {
+      if (results.length >= MAX_RESULTS) break;
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "$RECYCLE.BIN") continue;
+        subdirs.push(fullPath);
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".exe")) {
+        pushExeResult(fullPath, results, seenPaths);
+      }
     }
-  }
+
+    // Processa subdiretórios em paralelo (até SCAN_CONCURRENCY simultâneos)
+    await Promise.all(subdirs.map((subdir) => run(() => scan(subdir, depth + 1))));
+  };
+
+  await scan(rootDir, 0);
   return results;
 };
 
-ipcMain.handle("game:scan-local", async (_event) => {
+registerSecureIpcHandler("game:scan-local", async (_event) => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
     title: "Selecione pastas ou executaveis para buscar jogos",
     properties: ["openDirectory", "openFile", "multiSelections"],
@@ -1364,6 +1435,7 @@ ipcMain.handle("game:scan-local", async (_event) => {
     }
 
     if (stats.isDirectory()) {
+      // Cada pasta raiz selecionada inicia seu próprio scan paralelo
       await scanForExe(selectedPath, results, seenPaths);
       continue;
     }
@@ -1418,11 +1490,11 @@ autoUpdater.on("update-downloaded", (info) => {
   }
 });
 
-ipcMain.handle("app:get-version", () => {
+registerSecureIpcHandler("app:get-version", () => {
   return app.getVersion();
 });
 
-ipcMain.handle("update:check-for-updates", async () => {
+registerSecureIpcHandler("update:check-for-updates", async () => {
   try {
     if (!app.isPackaged) {
       return { status: "development", message: "O atualizador não funciona em ambiente de desenvolvimento." };
@@ -1435,7 +1507,7 @@ ipcMain.handle("update:check-for-updates", async () => {
   }
 });
 
-ipcMain.handle("update:start-download", async () => {
+registerSecureIpcHandler("update:start-download", async () => {
   try {
     return await autoUpdater.downloadUpdate();
   } catch (error) {
@@ -1444,7 +1516,7 @@ ipcMain.handle("update:start-download", async () => {
   }
 });
 
-ipcMain.handle("update:quit-and-install", () => {
+registerSecureIpcHandler("update:quit-and-install", () => {
   isQuitting = true;
   autoUpdater.quitAndInstall();
 });
@@ -1453,6 +1525,21 @@ app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
   try {
+    if (IS_SMOKE_TEST) {
+      const requiredFiles = [
+        path.join(app.getAppPath(), "dist", "index.html"),
+        path.join(app.getAppPath(), "electron", "preload.cjs"),
+        path.join(app.getAppPath(), "assets", "icon.png"),
+      ];
+      const missingFiles = requiredFiles.filter((filePath) => !fs.existsSync(filePath));
+      if (missingFiles.length > 0) {
+        throw new Error(`Smoke test falhou; arquivos ausentes: ${missingFiles.join(", ")}`);
+      }
+      console.log(`[smoke] Checkpoint Launcher ${app.getVersion()} validado.`);
+      app.exit(0);
+      return;
+    }
+
     const iconPath = path.join(app.getAppPath(), "assets", "icon.png");
     try {
       if (fs.existsSync(iconPath)) {

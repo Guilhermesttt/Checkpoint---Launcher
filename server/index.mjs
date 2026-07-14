@@ -1,6 +1,5 @@
 import "dotenv/config";
 import crypto from "node:crypto";
-import { createRequire } from "node:module";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -13,9 +12,7 @@ import { OAuth2Client } from "google-auth-library";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const app = express();
-const require = createRequire(import.meta.url);
-const cloudscraper = require("cloudscraper");
+export const app = express();
 const port = Number(process.env.PORT ?? 8787);
 const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(
   /\/$/,
@@ -503,20 +500,7 @@ const postEpicGraphql = async (query, variables) => {
     return { ok: true, status: response.status, payload: await response.json().catch(() => ({})) };
   }
 
-  if (response.status !== 403) {
-    return { ok: false, status: response.status, payload: null };
-  }
-
-  try {
-    const raw = await cloudscraper.post({
-      uri: epicStoreGraphqlEndpoint,
-      headers,
-      body,
-    });
-    return { ok: true, status: 200, payload: JSON.parse(raw) };
-  } catch {
-    return { ok: false, status: 403, payload: null };
-  }
+  return { ok: false, status: response.status, payload: null };
 };
 
 const buildEpicDetails = (catalogId, namespace, catalogItem) => {
@@ -1948,7 +1932,7 @@ app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
   const catalogId = String(req.query.catalogId ?? "").trim();
   const namespace = String(req.query.namespace ?? epicSandboxId ?? "").trim();
   if (!catalogId || !namespace) {
-    res.status(400).json({ error: "catalogId ou namespace invÃ¡lido." });
+    res.status(400).json({ error: "catalogId ou namespace inválido." });
     return;
   }
 
@@ -1962,7 +1946,7 @@ app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
   try {
     const catalogItem = await fetchEpicCatalogItem(namespace, catalogId);
     if (!catalogItem) {
-      res.status(404).json({ error: "Detalhes nÃ£o encontrados para este item Epic." });
+      res.status(404).json({ error: "Detalhes não encontrados para este item Epic." });
       return;
     }
 
@@ -2229,6 +2213,10 @@ app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/index.html"));
 });
 
-app.listen(port, () => {
+export const startServer = () => app.listen(port, () => {
   console.log(`Backend ativo em http://localhost:${port}`);
 });
+
+if (process.env.NODE_ENV !== "test") {
+  startServer();
+}

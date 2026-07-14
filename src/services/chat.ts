@@ -118,6 +118,7 @@ export const setChatTyping = async (friendUid: string, typing: boolean) => {
 };
 
 export const cleanupExpiredChatMessages = async (friendUid: string) => {
+  void friendUid;
   return Promise.resolve();
 };
 

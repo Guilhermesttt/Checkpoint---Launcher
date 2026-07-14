@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Gamepad2, Zap, Lock } from "lucide-react";
 
 export function CtaSection() {

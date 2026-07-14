@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Shield, Lock, Eye, Database } from "lucide-react";
 
 const securityPoints = [

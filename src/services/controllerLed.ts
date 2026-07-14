@@ -1,10 +1,25 @@
 import type { VisualTheme } from "../context/PreferencesContext";
 
-export const THEME_LED_COLORS: Record<VisualTheme, { r: number; g: number; b: number }> = {
+export interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** Mesmos valores de --launcher-accent em index.css. */
+export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
   checkpoint: { r: 255, g: 255, b: 255 },
   playstation: { r: 37, g: 99, b: 235 },
   gamecube: { r: 124, g: 58, b: 237 },
   xbox360: { r: 132, g: 204, b: 22 },
+};
+
+/** Presets ajustados visualmente para a lightbar física do controle. */
+export const THEME_LED_COLORS: Record<VisualTheme, RgbColor> = {
+  checkpoint: { r: 255, g: 255, b: 255 },
+  playstation: { r: 0, g: 4, b: 255 }, // #0004FF
+  gamecube: { r: 167, g: 0, b: 255 }, // #A700FF
+  xbox360: { r: 33, g: 255, b: 0 }, // #21FF00
 };
 
 const SONY_VENDOR_ID = 0x054c;
@@ -19,8 +34,43 @@ interface LedDevice {
   kind: LedDeviceKind;
 }
 
+export type ControllerLedStatus =
+  | "unsupported"
+  | "permission-required"
+  | "connecting"
+  | "connected"
+  | "error";
+
+export interface ControllerLedState {
+  status: ControllerLedStatus;
+  message: string;
+}
+
 let cachedDevice: LedDevice | null = null;
 let crc32Table: Uint32Array | null = null;
+let dualsenseOutputSequence = 0;
+let ledState: ControllerLedState = {
+  status: typeof navigator !== "undefined" && "hid" in navigator ? "permission-required" : "unsupported",
+  message: typeof navigator !== "undefined" && "hid" in navigator
+    ? "Autorize o controle PlayStation para sincronizar a luz."
+    : "WebHID nao esta disponivel neste ambiente.",
+};
+const ledStateListeners = new Set<(state: ControllerLedState) => void>();
+
+function updateLedState(status: ControllerLedStatus, message: string): void {
+  ledState = { status, message };
+  ledStateListeners.forEach((listener) => listener(ledState));
+}
+
+export function getControllerLedState(): ControllerLedState {
+  return ledState;
+}
+
+export function subscribeControllerLedState(listener: (state: ControllerLedState) => void): () => void {
+  ledStateListeners.add(listener);
+  listener(ledState);
+  return () => ledStateListeners.delete(listener);
+}
 
 function isHidSupported(): boolean {
   return typeof navigator !== "undefined" && "hid" in navigator;
@@ -77,14 +127,32 @@ function writeLe32(target: Uint8Array, offset: number, value: number): void {
 }
 
 export async function requestControllerLedAccess(): Promise<boolean> {
-  if (!isHidSupported()) return false;
+  if (!isHidSupported()) {
+    updateLedState("unsupported", "WebHID nao esta disponivel neste ambiente.");
+    return false;
+  }
 
   try {
+    updateLedState("connecting", "Aguardando autorizacao do controle...");
     const devices = await navigator.hid.requestDevice({
       filters: [{ vendorId: SONY_VENDOR_ID }],
     });
-    return devices.length > 0;
-  } catch {
+    const device = devices.find(
+      (candidate) => candidate.vendorId === SONY_VENDOR_ID && SONY_LED_PRODUCT_IDS.has(candidate.productId),
+    );
+    if (!device) {
+      updateLedState("permission-required", "Nenhum DualShock 4 ou DualSense foi autorizado.");
+      return false;
+    }
+    cachedDevice = { device, kind: resolveLedKind(device.productId) };
+    updateLedState("connecting", `Conectando a ${device.productName || "controle PlayStation"}...`);
+    return true;
+  } catch (error) {
+    const wasCancelled = error instanceof DOMException && error.name === "NotFoundError";
+    updateLedState(
+      wasCancelled ? "permission-required" : "error",
+      wasCancelled ? "Autorizacao cancelada. Tente novamente nos Ajustes." : "Nao foi possivel solicitar acesso ao LED.",
+    );
     return false;
   }
 }
@@ -124,120 +192,160 @@ async function ensureOpenDevice(): Promise<LedDevice | null> {
   return cachedDevice;
 }
 
-async function sendDs4Lightbar(device: HIDDevice, r: number, g: number, b: number): Promise<void> {
-  const reportIds = getOutputReportIds(device);
-  const supportsUsbReport = reportIds.size === 0 || reportIds.has(0x05);
-  const supportsBtReport = reportIds.size === 0 || reportIds.has(0x11);
-  const attempts: Array<() => Promise<void>> = [];
+interface HidReportAttempt {
+  label: string;
+  send: () => Promise<void>;
+}
 
-  if (supportsUsbReport) {
-    attempts.push(async () => {
-      // DualShock 4 USB/dongle output report 0x05. WebHID receives the reportId separately.
-      const report = new Uint8Array(31);
-      report[0] = 0x02; // valid_flag0: LED
-      report[1] = 0x00; // valid_flag1
-      report[2] = 0x00; // reserved
-      report[3] = 0x00; // small rumble
-      report[4] = 0x00; // big rumble
-      report[5] = r;
-      report[6] = g;
-      report[7] = b;
-      report[8] = 0x00; // flash on
-      report[9] = 0x00; // flash off
-      await device.sendReport(0x05, report);
-    });
-
-    attempts.push(async () => {
-      // Fallback used by some DS4 tooling/firmwares.
-      const report = new Uint8Array(31);
-      report[0] = 0xff;
-      report[1] = 0x04;
-      report[2] = 0x00;
-      report[3] = 0x00;
-      report[4] = 0x00;
-      report[5] = r;
-      report[6] = g;
-      report[7] = b;
-      report[8] = 0x00;
-      report[9] = 0x00;
-      await device.sendReport(0x05, report);
-    });
-  }
-
-  if (supportsBtReport) {
-    attempts.push(async () => {
-      // DualShock 4 Bluetooth output report 0x11. The CRC covers seed 0xa2,
-      // the report id, and the payload excluding the final CRC bytes.
-      const reportId = 0x11;
-      const report = new Uint8Array(77);
-      report[0] = 0xc0; // hw_control: HID + CRC32
-      report[1] = 0x00; // audio_control
-      report[2] = 0x02; // valid_flag0: LED
-      report[3] = 0x00; // valid_flag1
-      report[4] = 0x00; // reserved
-      report[5] = 0x00; // small rumble
-      report[6] = 0x00; // big rumble
-      report[7] = r;
-      report[8] = g;
-      report[9] = b;
-      report[10] = 0x00; // flash on
-      report[11] = 0x00; // flash off
-
-      const crcInput = new Uint8Array(1 + report.length - 4);
-      crcInput[0] = reportId;
-      crcInput.set(report.subarray(0, report.length - 4), 1);
-      const seedCrc = crc32Le(0xffffffff, new Uint8Array([0xa2]));
-      const crc = (~crc32Le(seedCrc, crcInput)) >>> 0;
-      writeLe32(report, report.length - 4, crc);
-
-      await device.sendReport(reportId, report);
-    });
-  }
-
+async function sendCompatibleReports(attempts: HidReportAttempt[], errorMessage: string): Promise<string[]> {
+  const successfulReports: string[] = [];
   let lastError: unknown = null;
+
+  // Windows may resolve an incompatible output report and silently discard it.
+  // Send the same color through every plausible transport instead of stopping early.
   for (const attempt of attempts) {
     try {
-      await attempt();
-      return;
+      await attempt.send();
+      successfulReports.push(attempt.label);
     } catch (error) {
       lastError = error;
     }
   }
 
-  throw lastError ?? new Error("Nenhum output report DS4 compativel encontrado.");
+  if (successfulReports.length > 0) return successfulReports;
+  throw lastError ?? new Error(errorMessage);
 }
 
-async function sendDualSenseLightbar(device: HIDDevice, r: number, g: number, b: number): Promise<void> {
+export function buildDs4UsbLightbarReport(
+  r: number,
+  g: number,
+  b: number,
+): Uint8Array<ArrayBuffer> {
+  const report = new Uint8Array(31);
+  // O driver HID do DS4 no Windows espera o conjunto completo de recursos.
+  // Os motores continuam desligados porque seus bytes permanecem em zero.
+  report[0] = 0x07;
+  report[5] = clampRgb(r);
+  report[6] = clampRgb(g);
+  report[7] = clampRgb(b);
+  return report;
+}
+
+export function buildDs4BluetoothLightbarReport(
+  r: number,
+  g: number,
+  b: number,
+): Uint8Array<ArrayBuffer> {
+  const reportId = 0x11;
+  const report = new Uint8Array(77);
+  report[0] = 0xc0; // HID + CRC32
+  // Mesmo formato aceito pelo DS4 Bluetooth no Windows (report 0x11 + CRC).
+  // Os bytes dos dois motores permanecem em zero.
+  report[2] = 0x07;
+  report[7] = clampRgb(r);
+  report[8] = clampRgb(g);
+  report[9] = clampRgb(b);
+
+  const crcInput = new Uint8Array(1 + report.length - 4);
+  crcInput[0] = reportId;
+  crcInput.set(report.subarray(0, report.length - 4), 1);
+  const seedCrc = crc32Le(0xffffffff, new Uint8Array([0xa2]));
+  writeLe32(report, report.length - 4, (~crc32Le(seedCrc, crcInput)) >>> 0);
+  return report;
+}
+
+async function sendDs4Lightbar(
+  device: HIDDevice,
+  r: number,
+  g: number,
+  b: number,
+): Promise<string[]> {
+  const reportIds = getOutputReportIds(device);
+  const supportsUsbReport = reportIds.size === 0 || reportIds.has(0x05);
+  const supportsBtReport = reportIds.size === 0 || reportIds.has(0x11);
+  const attempts: HidReportAttempt[] = [];
+
+  // DS4 Bluetooth uses 0x11. Try it first when Windows omits descriptors.
+  if (supportsBtReport) {
+    attempts.push({
+      label: "Bluetooth 0x11",
+      send: () => device.sendReport(0x11, buildDs4BluetoothLightbarReport(r, g, b)),
+    });
+  }
+
+  if (supportsUsbReport) {
+    attempts.push({
+      label: "USB 0x05",
+      send: () => device.sendReport(0x05, buildDs4UsbLightbarReport(r, g, b)),
+    });
+  }
+
+  return sendCompatibleReports(attempts, "Nenhum output report DS4 compativel encontrado.");
+}
+
+async function sendDualSenseLightbar(device: HIDDevice, r: number, g: number, b: number): Promise<string[]> {
   // USB output report 0x02 (48 bytes) — lightbar + player LED
-  const report = new Uint8Array(47);
-  report[0] = 0x00;
-  report[1] = 0x14;
-  report[38] = 0x01;
-  report[42] = 0x00;
-  report[43] = 0x04;
-  report[44] = r;
-  report[45] = g;
-  report[46] = b;
-  await device.sendReport(0x02, report);
+  const reportIds = getOutputReportIds(device);
+  const attempts: HidReportAttempt[] = [];
+
+  if (reportIds.size === 0 || reportIds.has(0x02)) {
+    attempts.push({ label: "USB 0x02", send: async () => {
+      const report = new Uint8Array(62);
+      report[0] = 0x00;
+      report[1] = 0x04;
+      report[44] = r;
+      report[45] = g;
+      report[46] = b;
+      await device.sendReport(0x02, report);
+    } });
+  }
+
+  if (reportIds.size === 0 || reportIds.has(0x31)) {
+    attempts.push({ label: "Bluetooth 0x31", send: async () => {
+      const reportId = 0x31;
+      const report = new Uint8Array(77);
+      report[0] = (dualsenseOutputSequence++ & 0x0f) << 4;
+      report[1] = 0x10;
+      report[2] = 0x00;
+      report[3] = 0x04;
+      report[46] = r;
+      report[47] = g;
+      report[48] = b;
+      const crcInput = new Uint8Array(1 + report.length - 4);
+      crcInput[0] = reportId;
+      crcInput.set(report.subarray(0, report.length - 4), 1);
+      const seedCrc = crc32Le(0xffffffff, new Uint8Array([0xa2]));
+      writeLe32(report, report.length - 4, (~crc32Le(seedCrc, crcInput)) >>> 0);
+      await device.sendReport(reportId, report);
+    } });
+  }
+
+  return sendCompatibleReports(attempts, "Nenhum output report DualSense compativel encontrado.");
 }
 
 export async function setControllerLedColor(r: number, g: number, b: number): Promise<boolean> {
+  updateLedState("connecting", "Sincronizando a luz do controle...");
   const led = await ensureOpenDevice();
-  if (!led) return false;
+  if (!led) {
+    updateLedState("permission-required", "Autorize o controle PlayStation para sincronizar a luz.");
+    return false;
+  }
 
   try {
     const red = clampRgb(r);
     const green = clampRgb(g);
     const blue = clampRgb(b);
-
-    if (led.kind === "ds4") {
-      await sendDs4Lightbar(led.device, red, green, blue);
-    } else {
-      await sendDualSenseLightbar(led.device, red, green, blue);
-    }
+    const reports = led.kind === "ds4"
+      ? await sendDs4Lightbar(led.device, red, green, blue)
+      : await sendDualSenseLightbar(led.device, red, green, blue);
+    updateLedState(
+      "connected",
+      `Comando enviado para ${led.device.productName || "controle PlayStation"} (${reports.join(" + ")}).`,
+    );
     return true;
   } catch {
     cachedDevice = null;
+    updateLedState("error", "O controle foi encontrado, mas nao aceitou o comando de LED.");
     return false;
   }
 }
@@ -252,4 +360,26 @@ export function resetCachedLedDevice(): void {
     cachedDevice.device.close().catch(() => undefined);
   }
   cachedDevice = null;
+  if (isHidSupported()) {
+    updateLedState("permission-required", "Conecte e autorize o controle PlayStation.");
+  }
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+/** Ciclo visual: WebHID confirma o envio, mas não confirma que a luz física mudou. */
+export async function testControllerLed(theme: VisualTheme): Promise<boolean> {
+  const colors = [
+    { r: 255, g: 0, b: 80 },
+    { r: 0, g: 180, b: 255 },
+    { r: 120, g: 255, b: 0 },
+  ];
+
+  for (const color of colors) {
+    if (!await setControllerLedColor(color.r, color.g, color.b)) return false;
+    await wait(450);
+  }
+  return applyThemeLed(theme);
 }

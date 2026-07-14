@@ -25,7 +25,33 @@ service cloud.firestore {
 
     function validProfileUpdate(userId) {
       return isSignedInOwner(userId)
-        && request.resource.data.uid == userId;
+        && request.resource.data.uid == userId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'createdAt',
+          'updatedAt',
+          'steamId',
+          'steamUsername',
+          'steamAvatar',
+          'discordId',
+          'discordUsername',
+          'discordAvatar',
+          'discordFriends',
+          'checkpointFriends',
+          'checkpointFriendRequestsIncoming',
+          'checkpointFriendRequestsOutgoing',
+          'presence',
+          'status',
+          'playing',
+          'lastSteamSyncAt',
+          'gamesMigratedAt',
+          'migrationSkippedReason',
+          'onboardingCompletedAt'
+        ]);
     }
 
     match /profiles/{userId} {

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useGamepadButton } from "../context/GamepadContext";
+import { activateElementWithController } from "../utils/controllerTextInput";
 
 interface UseGamepadNavigationProps {
   onClose?: () => void;
@@ -10,6 +11,8 @@ interface UseGamepadNavigationProps {
   /** Desabilita O (útil quando o painel define ação própria de fechar) */
   disableO?: boolean;
   enabled?: boolean;
+  /** Camada de entrada. Modais devem usar prioridade maior que paginas. */
+  priority?: number;
 }
 
 export function useGamepadNavigation({
@@ -19,15 +22,17 @@ export function useGamepadNavigation({
   disableX = false,
   disableO = false,
   enabled = true,
+  priority = 0,
 }: UseGamepadNavigationProps = {}) {
   useGamepadButton(
     "X",
     () => {
       if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.click();
+        activateElementWithController(document.activeElement);
       }
     },
     enabled && !disableX,
+    priority,
   );
 
   useGamepadButton(
@@ -36,6 +41,7 @@ export function useGamepadNavigation({
       if (onClose) onClose();
     },
     enabled && !disableO,
+    priority,
   );
 
   useEffect(() => {

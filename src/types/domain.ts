@@ -112,3 +112,23 @@ export interface Chat {
   lastMessage?: string;
   lastMessageAt?: string;
 }
+
+export interface SocialFriend {
+  id: string;
+  name: string;
+  status: "online" | "playing" | "offline";
+  playing?: string;
+  avatar?: string;
+  source?: "discord" | "discord_friend" | "local" | "checkpoint";
+}
+
+export type CheckpointFriendRequest = NonNullable<
+  UserProfile["checkpointFriendRequestsIncoming"]
+>[number];
+
+export interface PriceAlert {
+  id: string;
+  gameId: string;
+  title: string;
+  source: "Steam" | "Epic" | "Manual";
+}

@@ -92,6 +92,7 @@ const parseGenericIniAchievements = (content) => {
   const sections = parseIniSections(content);
   const result = {};
 
+  // ── Passo 1: seções nomeadas (cada seção = um achievement) ───────────────────
   for (const [sectionName, section] of sections.entries()) {
     if (!sectionName || /^(?:Steam)?Achievements$/i.test(sectionName) || /^UserStats$/i.test(sectionName)) {
       continue;
@@ -116,30 +117,41 @@ const parseGenericIniAchievements = (content) => {
     };
   }
 
+  // ── Passo 2: seção [Achievements] / [SteamAchievements] plana ───────────────
+  // Suporta dois sub-formatos:
+  //   a) KEY=1|0|true|false          (Goldberg legacy, CODEX, RUNE)
+  //   b) Achievement0=ACH_ID         (índice numérico → earned=true)
+  // Bonus: KEY_TIME=<unix>  para forks CODEX que emitem o timestamp separado.
   for (const [sectionName, section] of sections.entries()) {
     if (!/^(?:Steam)?Achievements$/i.test(sectionName)) continue;
 
+    // Primeiro coletamos todos os timestamps disponíveis (KEY_TIME=unix)
+    const timeMap = new Map();
     for (const [key, value] of section.entries()) {
-      if (!key || key.toLowerCase() === "count") continue;
+      if (!key) continue;
+      const timeMatch = key.match(/^(.+)_TIME$/i);
+      if (timeMatch) {
+        const baseKey = timeMatch[1];
+        const ts = Number(value || 0);
+        if (Number.isFinite(ts) && ts > 0) timeMap.set(baseKey.toLowerCase(), ts);
+      }
+    }
+
+    for (const [key, value] of section.entries()) {
+      if (!key || key.toLowerCase() === "count" || /_TIME$/i.test(key)) continue;
 
       const booleanValue = parseBooleanLike(value);
       if (booleanValue !== null) {
-        result[key] = {
-          earned: booleanValue,
-          earnedTime: booleanValue ? Date.now() / 1000 : 0,
-        };
+        const ts = timeMap.get(key.toLowerCase()) || (booleanValue ? Date.now() / 1000 : 0);
+        result[key] = { earned: booleanValue, earnedTime: ts };
         continue;
       }
 
+      // Formato índice: Achievement0=ACH_ID
       if (!/^Achievement\d+$/i.test(key)) continue;
-
       const achievementId = String(value || "").trim();
       if (!achievementId || result[achievementId]) continue;
-
-      result[achievementId] = {
-        earned: true,
-        earnedTime: Date.now() / 1000,
-      };
+      result[achievementId] = { earned: true, earnedTime: Date.now() / 1000 };
     }
   }
 
@@ -526,6 +538,61 @@ const getScannedEmulator = (appId, gameDir) => {
       emulatorType: EMULATOR_TYPES.GENERIC_INI,
       savePath: path.join(appData, "RLE", String(appId), "Achievements.ini"),
       watchDir: path.join(appData, "RLE", String(appId))
+    },
+    // 3DM
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "3DM", String(appId), "User", "achievements.ini"),
+      watchDir: path.join(appData, "3DM", String(appId), "User")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+      savePath: path.join(appData, "3DM", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "3DM", String(appId))
+    },
+    // FLT (FearLess Revolution)
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "FLT", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "FLT", String(appId), "stats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "FLT", String(appId), "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "FLT", String(appId))
+    },
+    // CPY
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "CPY", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "CPY", String(appId), "stats")
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(programData, "Steam", "CPY", String(appId), "achievements.ini"),
+      watchDir: path.join(programData, "Steam", "CPY", String(appId))
+    },
+    // Empress
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+      savePath: path.join(appData, "Empress", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "Empress", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "Empress", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(appData, "Empress", String(appId), "stats")
+    },
+    // Ali213 AppData (variante além da pasta do jogo)
+    {
+      emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
+      savePath: path.join(appData, "Ali213", String(appId), "achievements.json"),
+      watchDir: path.join(appData, "Ali213", String(appId))
+    },
+    {
+      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      savePath: path.join(appData, "Ali213", String(appId), "stats", "achievements.ini"),
+      watchDir: path.join(appData, "Ali213", String(appId), "stats")
     }
   ];
 
@@ -555,11 +622,74 @@ const getScannedEmulator = (appId, gameDir) => {
     );
   }
 
-  // Verifica se algum arquivo dos emuladores realmente existe no disco
+  // ── Passo 1: verifica caminhos exatos da lista de candidates ─────────────────
   for (const cand of candidates) {
     if (fs.existsSync(cand.savePath)) {
-      console.log(`[EmulatorDetector] Arquivo existente encontrado: ${cand.savePath} (Emulador: ${cand.emulatorType})`);
+      console.log(`[EmulatorDetector] Arquivo exato encontrado: ${cand.savePath} (Emulador: ${cand.emulatorType})`);
       return cand;
+    }
+  }
+
+  // ── Passo 2: busca em profundidade (depth 2) nos diretórios raiz conhecidos ──
+  // Cobre variações de layout que não estão na lista estática (ex: RUNE/<id>/remote/stats/)
+  const rootDirs = [
+    path.join(appData, "Goldberg SteamEmu Saves", String(appId)),
+    path.join(appData, "GSE Saves", String(appId)),
+    path.join(appData, "Goldberg Socialclub Emu Saves", String(appId)),
+    path.join(localAppData, "TENOKE", String(appId)),
+    path.join(publicDocs, "Steam", "RUNE", String(appId)),
+    path.join(publicDocs, "Steam", "CODEX", String(appId)),
+    path.join(publicDocs, "Steam", "FLT", String(appId)),
+    path.join(publicDocs, "Steam", "CPY", String(appId)),
+    path.join(publicDocs, "OnlineFix", String(appId)),
+    path.join(programData, "RLD!", String(appId)),
+    path.join(appData, "SmartSteamEmu", String(appId)),
+    path.join(appData, "3DM", String(appId)),
+    path.join(appData, "Empress", String(appId)),
+    path.join(appData, "Ali213", String(appId)),
+    ...(gameDir ? [gameDir] : []),
+  ];
+
+  const ACH_FILENAMES = [
+    "achievements.json", "achievements.ini", "Achievements.ini",
+    "achiev.ini", "CreamAPI.Achievements.cfg", "user_stats.ini",
+  ];
+
+  const scanDepth = (dir, depth) => {
+    if (depth > 2) return null;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return null; }
+
+    // Primeiro checa arquivos no nível atual
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const lname = entry.name.toLowerCase();
+      if (ACH_FILENAMES.some(n => n.toLowerCase() === lname)) {
+        const fullPath = path.join(dir, entry.name);
+        const isJson = lname.endsWith(".json");
+        return {
+          emulatorType: isJson ? EMULATOR_TYPES.GOLDBERG_V1 : EMULATOR_TYPES.GENERIC_INI,
+          savePath: fullPath,
+          watchDir: dir,
+        };
+      }
+    }
+    // Depois desce nos subdiretórios
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const found = scanDepth(path.join(dir, entry.name), depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  for (const rootDir of rootDirs) {
+    if (!fs.existsSync(rootDir)) continue;
+    const found = scanDepth(rootDir, 0);
+    if (found) {
+      console.log(`[EmulatorDetector] Arquivo encontrado via busca profunda: ${found.savePath} (Emulador: ${found.emulatorType})`);
+      return found;
     }
   }
 

@@ -168,7 +168,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   onSaved,
 }) => {
   const { user } = useAuth();
-  const { t, language } = usePreferences();
+  const { language } = usePreferences();
   const copy = {
     "pt-BR": {
       editInfo: "Editar informações",
@@ -377,8 +377,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       );
       const data = await resp.json();
       setSearchResults(data.items || []);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       setSearchResults([]);
       notify(copy.searchError, "error");
     } finally {
@@ -430,8 +430,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }
       setSearchResults([]);
       setSearchQuery("");
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
       notify(copy.searchError, "error");
     } finally {
       setLoading(false);
@@ -695,7 +695,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }
       onClose(true);
       onSaved?.();
-    } catch (e) {
+    } catch {
       notify("Erro ao salvar jogo.", "error");
     } finally {
       setLoading(false);
@@ -709,8 +709,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       maxWidthClassName="max-w-4xl"
       className="p-0! border-0! bg-transparent shadow-none!"
     >
-      <div className="w-full bg-[#0a0a0c]/98 backdrop-blur-3xl rounded-[40px] overflow-hidden border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.9)]">
-        <div className="flex justify-between items-center px-10 py-8 border-b border-white/5 relative bg-white/0.01">
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#0a0a0c]/98 shadow-[0_32px_128px_rgba(0,0,0,0.9)] backdrop-blur-3xl md:rounded-[40px]">
+        <div className="relative flex shrink-0 items-center justify-between border-b border-white/5 bg-white/0.01 px-6 py-5 md:px-10 md:py-8">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/10 rounded-full" />
           <div>
             <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">
@@ -732,8 +732,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] min-h-[540px]">
-          <div className="p-10 space-y-8 border-r border-white/5 overflow-y-auto max-h-[600px] no-scrollbar">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain md:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-8 border-r border-white/5 p-6 md:p-10">
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
                 <Globe size={14} className="text-white/20" /> {copy.platform}

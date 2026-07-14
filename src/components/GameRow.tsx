@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import useEmblaCarousel from "embla-carousel-react";
+import ContextMenu from "./ContextMenu";
 import GameCard from "./GameCard";
 import type { Game } from "../types/domain";
 
@@ -7,7 +8,7 @@ interface GameRowProps {
   games: Game[];
   selectedIndex: number;
   onSelect: (index: number, openGame?: Game) => void;
-  onContextMenu?: (e: React.MouseEvent, game: Game) => void;
+  onContextMenu?: (action: string, game: Game) => void;
   playSound: (type: "select" | "back" | "navigate") => void;
 }
 
@@ -26,7 +27,7 @@ const GameCardSlot = React.memo(
     index: number;
     isActive: boolean;
     onSelect: (index: number, openGame?: Game) => void;
-    onContextMenu?: (e: React.MouseEvent, game: Game) => void;
+    onContextMenu?: (action: string, game: Game) => void;
     playSound: (type: "select" | "back" | "navigate") => void;
   }) => {
     const handleClick = useCallback(() => {
@@ -37,23 +38,28 @@ const GameCardSlot = React.memo(
       }
     }, [game, index, isActive, onSelect]);
 
-    const handleContextMenu = useCallback(
-      (e: React.MouseEvent) => onContextMenu?.(e, game),
+    const handleMenuAction = useCallback(
+      (action: string) => onContextMenu?.(action as any, game),
       [game, onContextMenu],
     );
 
     return (
       <div className="shrink-0">
-        <GameCard
-          title={game.title}
-          image={game.cardImage || game.image}
-          isActive={isActive}
-          isSteam={game.source === "steam" || game.launcherType === "steam"}
-          isEpic={game.source === "epic" || game.launcherType === "epic"}
+        <ContextMenu
+          onAction={handleMenuAction}
           isFavorite={game.isFavorite}
-          onClick={handleClick}
-          onContextMenu={handleContextMenu}
-        />
+          playSound={playSound}
+        >
+          <GameCard
+            title={game.title}
+            image={game.cardImage || game.image}
+            isActive={isActive}
+            isSteam={game.source === "steam" || game.launcherType === "steam"}
+            isEpic={game.source === "epic" || game.launcherType === "epic"}
+            isFavorite={game.isFavorite}
+            onClick={handleClick}
+          />
+        </ContextMenu>
       </div>
     );
   },

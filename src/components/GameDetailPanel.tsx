@@ -63,7 +63,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [achievementSourceAppId, setAchievementSourceAppId] = React.useState<string>("");
   const [isAchievementsLoading, setIsAchievementsLoading] = React.useState(false);
   const [achievementsError, setAchievementsError] = React.useState<string | null>(null);
-  const [achievementsRequested, setAchievementsRequested] = React.useState(false);
   const [isAddAchModalOpen, setIsAddAchModalOpen] = React.useState(false);
   const [newAchName, setNewAchName] = React.useState("");
   const [newAchDesc, setNewAchDesc] = React.useState("");
@@ -321,7 +320,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setNewAchDesc("");
   };
 
-  const launchRef = React.useRef<() => void>(() => {});
+  const launchRef = React.useRef<() => void>(() => { });
 
   const TABS = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabManage];
 
@@ -353,7 +352,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     const i = TABS.indexOf(activeTab);
     if (i > 0) {
       setActiveTab(TABS[i - 1]);
-      if (TABS[i - 1] === copy.tabAchievements) setAchievementsRequested(true);
       playSound("navigate");
     }
   });
@@ -363,7 +361,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     const i = TABS.indexOf(activeTab);
     if (i >= 0 && i < TABS.length - 1) {
       setActiveTab(TABS[i + 1]);
-      if (TABS[i + 1] === copy.tabAchievements) setAchievementsRequested(true);
       playSound("navigate");
     }
   });
@@ -380,7 +377,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setCurrentGalleryIndex(0);
     setDeleteModalOpen(false);
     setIsDeleting(false);
-    setAchievementsRequested(false);
   }, [game?.id]);
 
   React.useEffect(() => {
@@ -802,7 +798,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   active={activeTab === copy.tabAchievements}
                   onClick={() => {
                     setActiveTab(copy.tabAchievements);
-                    setAchievementsRequested(true);
                     playSound("navigate");
                   }}
                 />
