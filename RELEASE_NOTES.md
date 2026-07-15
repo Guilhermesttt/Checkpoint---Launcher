@@ -1,4 +1,27 @@
+## Checkpoint Launcher — v1.0.8
+
+Atualização focada na robustez do sistema de conquistas para jogos locais com emuladores Steam.
+
+### Melhorias e correções desta versão
+
+#### 🏆 Sistema de Conquistas — Correções
+- **Nome e descrição reais no overlay:** Conquistas agora mostram o nome e descrição corretos ao invés do ID técnico bruto (ex: `ACH_WIN_000`). O sistema resolve metadados em duas etapas: primeiro no cache da Steam API salvo pelo launcher, depois no `steam_settings/achievements.json` local do Goldberg
+- **Ícone da conquista no overlay:** O card de conquista agora exibe o ícone real da conquista (URL da CDN Steam). Fallback para o ícone de troféu quando não disponível
+- **Conquistas subsequentes funcionando:** Corrigido bug em que apenas a primeira conquista aparecia no overlay. A causa era o mecanismo de detecção de duplicatas do bridge silenciando conquistas novas. O overlay agora recebe notificações diretamente do watcher, sem passar pela camada de persistência
+- **Proteção contra parse errors:** O estado de conquistas não é mais zerado quando o arquivo do emulador está sendo escrito ao mesmo tempo que é lido, evitando falsos positivos
+
+#### 🕹️ Detecção de Emuladores — Novo suporte
+- **`readGoldbergSettingsAchievements`:** Nova função que lê o schema de conquistas diretamente do `steam_settings/achievements.json` do Goldberg, incluindo nome display multilíngue, descrição e caminho de ícone local. Serve como fallback universal quando o schema remoto da Steam não está disponível
+- Suporte aprimorado ao formato Goldberg com `display_name: { english: "..." }` e `description: { english: "..." }`
+
+#### 🛡️ Estabilidade
+- Callbacks de watcher (`setInterval` / `setTimeout`) agora tratam erros do handler async com `.catch()` explícito, evitando unhandled rejections silenciosas
+
+---
+
 ## Checkpoint Launcher — v0.0.1
+
+
 
 Primeira release pública estável do Checkpoint Launcher, um hub pessoal de jogos com sincronização da Steam, overlay in-game e recursos sociais integrados.
 

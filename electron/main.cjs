@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
-const { detectEmulator, parseAchievementState, getGoldbergV1Paths } = require("./emulator-detector.cjs");
+const { detectEmulator, parseAchievementState, getGoldbergV1Paths, readGoldbergSettingsAchievements } = require("./emulator-detector.cjs");
 
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
@@ -960,54 +960,113 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   stopGameWatcher(watcherKey);
 
   // Função chamada pelo watcher quando o arquivo de saves muda.
-  // Compara o estado novo com o estado anterior e dispara IPC para cada
-  // conquista recém-desbloqueada.
-  const handleAchievementFileChange = (detectedEmulator) => {
-    const newState = parseAchievementState(detectedEmulator);
-    const entry = activeWatchers.get(watcherKey);
-    if (!entry) return;
+  // Async: resolve metadados de conquistas diretamente e envia ao overlay.
+  const handleAchievementFileChange = async (detectedEmulator) => {
+    try {
+      const newState = parseAchievementState(detectedEmulator);
+      const entry = activeWatchers.get(watcherKey);
+      if (!entry) return;
 
-    const prevState = entry.lastState;
-    const newlyUnlocked = [];
+      const prevState = entry.lastState;
+      const newlyUnlocked = [];
 
-    for (const [id, current] of Object.entries(newState)) {
-      const previous = prevState[id];
-      const justUnlocked = current.earned && (!previous || !previous.earned);
-      if (justUnlocked) {
-        newlyUnlocked.push({ id, earnedTime: current.earnedTime });
-      }
-    }
-
-    // Atualiza o estado armazenado independentemente de ter desbloqueado algo.
-    entry.lastState = newState;
-
-    if (newlyUnlocked.length === 0) return;
-
-    // Resolve os metadados (nome, ícone) via achievement-bridge e dispara IPC.
-    for (const { id, earnedTime } of newlyUnlocked) {
-      if (achievementBridge) {
-        achievementBridge
-          .unlockAchievement(watcherKey, id)
-          .catch((err) => console.error("[achievement-watcher] unlockAchievement error:", err));
-      }
-
-      // Envia evento em tempo real para o renderer atualizar a UI.
-      const payload = {
-        gameId: watcherKey,
-        achievementId: id,
-        earnedTime,   // Unix timestamp (segundos) vindo do emulador
-        unlockedAt: earnedTime > 0
-          ? new Date(earnedTime * 1000).toISOString()
-          : new Date().toISOString(),
-      };
-
-      try {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("achievement:realtime-unlock", payload);
+      for (const [id, current] of Object.entries(newState)) {
+        const previous = prevState[id];
+        const justUnlocked = current.earned && (!previous || !previous.earned);
+        if (justUnlocked) {
+          newlyUnlocked.push({ id, earnedTime: current.earnedTime });
         }
-      } catch (e) {
-        console.error("[achievement-watcher] IPC send error:", e);
       }
+
+      // Atualiza o estado — SÓ se o parse retornou dados úteis.
+      // Um parse vazio (erro de leitura durante escrita) não deve zerar o
+      // estado anterior, evitando falsos positivos na próxima verificação.
+      if (Object.keys(newState).length > 0) {
+        entry.lastState = newState;
+      }
+
+      if (newlyUnlocked.length === 0) return;
+
+      // ── Resolve metadados das conquistas ─────────────────────────────────
+      // 1º) Schema remoto (cache da Steam API salvo pelo renderer)
+      // 2º) steam_settings/achievements.json do Goldberg no dir do jogo
+      const remoteSchema = await getSchemaByAppIdOrGameId(watcherKey).catch(() => null);
+      const localSchema = readGoldbergSettingsAchievements(gameDir);
+
+      for (const { id, earnedTime } of newlyUnlocked) {
+        // Busca no schema remoto (case-insensitive)
+        const remoteAch = remoteSchema?.find(
+          (a) => String(a.id || a.apiName || "").toLowerCase() === id.toLowerCase()
+        );
+        // Busca no schema local Goldberg (case-insensitive)
+        const localAchKey = localSchema
+          ? Object.keys(localSchema).find((k) => k.toLowerCase() === id.toLowerCase())
+          : undefined;
+        const localAch = localSchema?.[localAchKey ?? id];
+
+        // Ícone: prefere URL HTTPS do schema remoto (CDN Steam).
+        // Fallback: constrói file:// do ícone local do Goldberg.
+        const remoteIcon = String(remoteAch?.icon || "").trim();
+        let resolvedIcon = remoteIcon;
+        if (!resolvedIcon && localAch?.icon) {
+          const localIconName = localAch.icon;
+          const iconAbs = path.isAbsolute(localIconName)
+            ? localIconName
+            : path.join(gameDir, "steam_settings", localIconName);
+          resolvedIcon = `file:///${iconAbs.replace(/\\/g, "/")}`;
+        }
+
+        const achievement = {
+          id,
+          name: remoteAch?.name || localAch?.name || id,
+          description: remoteAch?.description || localAch?.description || "",
+          icon: resolvedIcon,
+        };
+
+        const unlockedAt =
+          earnedTime > 0 ? new Date(earnedTime * 1000).toISOString() : new Date().toISOString();
+
+        // Envia DIRETO ao overlay com metadados já resolvidos.
+        // Não passa pelo onAchievementUnlocked do bridge para evitar que a
+        // detecção de duplicata silencie conquistas novas (causa raiz do bug
+        // em que apenas a 1ª conquista aparecia no overlay).
+        try {
+          sendOverlayEvent("achievement:unlock", {
+            gameId: watcherKey,
+            achievementId: id,
+            achievement,
+            unlockedAt,
+            duplicate: false,
+          });
+          playOverlaySound("achievement-unlock");
+        } catch (overlayErr) {
+          console.error("[achievement-watcher] Erro ao enviar ao overlay:", overlayErr);
+        }
+
+        // Persiste o progresso via bridge (fire-and-forget).
+        if (achievementBridge) {
+          achievementBridge
+            .unlockAchievement(watcherKey, id)
+            .catch((err) => console.error("[achievement-watcher] unlockAchievement error:", err));
+        }
+
+        // Envia evento em tempo real para o renderer atualizar a UI.
+        try {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send("achievement:realtime-unlock", {
+              gameId: watcherKey,
+              achievementId: id,
+              achievement,
+              earnedTime,
+              unlockedAt,
+            });
+          }
+        } catch (e) {
+          console.error("[achievement-watcher] IPC send error:", e);
+        }
+      }
+    } catch (err) {
+      console.error("[achievement-watcher] Erro em handleAchievementFileChange:", err);
     }
   };
 
@@ -1033,7 +1092,9 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
     if (detectedEmulator.emulatorType === "generic_ini") {
       console.info(`[achievement-watcher] Usando Polling de 3s para o emulador INI em: ${detectedEmulator.savePath}`);
       intervalTimer = setInterval(() => {
-        handleAchievementFileChange(detectedEmulator);
+        handleAchievementFileChange(detectedEmulator).catch(
+          (err) => console.error("[achievement-watcher] Polling error:", err)
+        );
       }, 3000);
     } else {
       // Para Goldberg/Tenoke (.json), fs.watch funciona perfeitamente.
@@ -1044,7 +1105,9 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
 
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
-            handleAchievementFileChange(detectedEmulator);
+            handleAchievementFileChange(detectedEmulator).catch(
+              (err) => console.error("[achievement-watcher] Watch error:", err)
+            );
           }, 300);
 
           const entry = activeWatchers.get(watcherKey);

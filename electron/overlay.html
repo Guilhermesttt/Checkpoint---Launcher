@@ -608,7 +608,12 @@
       const shell = document.createElement("div");
       shell.className = "overlay-shell";
 
-      shell.appendChild(createIconColumn({ avatarSvg: trophySvg() }));
+      const _achIconUrl = payload.achievement?.icon || "";
+      shell.appendChild(createIconColumn(
+        _achIconUrl
+          ? { avatarSrc: _achIconUrl, isLogo: true }
+          : { avatarSvg: trophySvg() }
+      ));
 
       const content = document.createElement("div");
       content.className = "overlay-content";

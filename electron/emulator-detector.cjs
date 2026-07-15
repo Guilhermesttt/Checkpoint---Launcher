@@ -768,11 +768,84 @@ function getGoldbergV1Paths(appId) {
   return new GoldbergAdapter()._getPaths(appId);
 }
 
+/**
+ * Lê o arquivo steam_settings/achievements.json gerado pelo Goldberg Emulator
+ * (e compatíveis) a partir do diretório do jogo, extraindo nome, descrição e
+ * ícone de cada conquista.
+ *
+ * Formatos suportados:
+ *  - Goldberg: array de objetos com { name, display_name: { english }, description: { english }, icon }
+ *  - Flat: array com { id/name, name/display_name (string), description (string), icon }
+ *
+ * @param {string|null} gameDir  Pasta raiz do executável do jogo.
+ * @returns {Record<string, {id:string,name:string,description:string,icon:string}>|null}
+ */
+function readGoldbergSettingsAchievements(gameDir) {
+  if (!gameDir) return null;
+
+  // Procura em game_dir/steam_settings e em parent/steam_settings
+  const candidates = [
+    path.join(gameDir, "steam_settings", "achievements.json"),
+    path.join(path.dirname(gameDir), "steam_settings", "achievements.json"),
+  ];
+
+  for (const filePath of candidates) {
+    const data = tryReadJson(filePath);
+    if (!data) continue;
+
+    // Aceita tanto array direto quanto { achievements: [...] }
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data.achievements)
+        ? data.achievements
+        : null;
+    if (!list || list.length === 0) continue;
+
+    const result = {};
+    for (const entry of list) {
+      // ID técnico: campo "name" no Goldberg, "id" em outros
+      const id = String(entry.name || entry.id || "").trim();
+      if (!id) continue;
+
+      // display_name pode ser objeto { english: "..." } ou string direta
+      const rawName = entry.display_name;
+      const name =
+        typeof rawName === "object" && rawName !== null
+          ? String(rawName.english || rawName.default || Object.values(rawName)[0] || id)
+          : String(rawName || entry.display_name_en || id);
+
+      // description também pode ser objeto ou string
+      const rawDesc = entry.description;
+      const description =
+        typeof rawDesc === "object" && rawDesc !== null
+          ? String(rawDesc.english || rawDesc.default || Object.values(rawDesc)[0] || "")
+          : String(rawDesc || "");
+
+      // Ícone: string relativa ("icons/ach.jpg") ou vazio
+      const icon = String(entry.icon || "").trim();
+
+      result[id] = { id, name, description, icon };
+    }
+
+    if (Object.keys(result).length > 0) {
+      console.log(
+        `[EmulatorDetector] readGoldbergSettingsAchievements: leu ${
+          Object.keys(result).length
+        } conquistas de ${filePath}`
+      );
+      return result;
+    }
+  }
+
+  return null;
+}
+
 module.exports = {
   EMULATOR_TYPES,
   getGoldbergV1Paths,
   detectEmulator,
   parseAchievementState,
   readLocalSavesRetroactive,
+  readGoldbergSettingsAchievements,
   getEmulatorForGame
 };
