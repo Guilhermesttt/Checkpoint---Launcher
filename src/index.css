@@ -149,6 +149,41 @@ html[data-launcher-theme="sunset"] {
     scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   }
 
+  .add-game-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-gutter: stable;
+  }
+  .add-game-scrollbar::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  .add-game-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .add-game-scrollbar::-webkit-scrollbar-thumb {
+    min-height: 54px;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.28),
+      rgba(255, 255, 255, 0.11)
+    );
+    background-clip: padding-box;
+  }
+  .add-game-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.46),
+      rgba(255, 255, 255, 0.2)
+    );
+    background-clip: padding-box;
+  }
+  .add-game-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   .chat-scrollbar::-webkit-scrollbar {
     width: 10px;
   }

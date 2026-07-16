@@ -1,4 +1,4 @@
-import type { Game } from "../types/domain";
+import type { Game, GameLaunchProfile } from "../types/domain";
 
 const EPIC_LAUNCH_URI_PREFIX = "com.epicgames.launcher://apps/";
 
@@ -56,6 +56,13 @@ const buildEpicLaunchUri = (game: Game): string | null => {
   return `${EPIC_LAUNCH_URI_PREFIX}${epicAppId}?action=launch&silent=true`;
 };
 
+const launchLocalExecutable = async (
+  executablePath: string,
+  launchProfile?: GameLaunchProfile,
+) => {
+  await window.electronAPI?.launchExecutable(executablePath, launchProfile);
+};
+
 export const launchGame = async (game: Game): Promise<void> => {
   if (!game.executablePath && !game.epicCatalogId && !game.epicLaunchId && !game.epicStoreUrl) {
     throw new Error("Jogo sem caminho de execucao ou link da loja configurado.");
@@ -66,7 +73,7 @@ export const launchGame = async (game: Game): Promise<void> => {
       window.electronAPI?.launchExecutable &&
       getMonitorableExecutablePath(game)
     ) {
-      await window.electronAPI.launchExecutable(String(game.executablePath).trim());
+      await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
       return;
     }
 
@@ -91,9 +98,7 @@ export const launchGame = async (game: Game): Promise<void> => {
       window.electronAPI?.launchExecutable &&
       getMonitorableExecutablePath(game)
     ) {
-      await window.electronAPI.launchExecutable(
-        String(game.executablePath).trim(),
-      );
+      await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
       return;
     }
 
@@ -113,9 +118,7 @@ export const launchGame = async (game: Game): Promise<void> => {
     window.electronAPI?.launchExecutable &&
     getMonitorableExecutablePath(game)
   ) {
-    await window.electronAPI.launchExecutable(
-      String(game.executablePath).trim(),
-    );
+    await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
     return;
   }
 

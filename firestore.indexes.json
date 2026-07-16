@@ -71,6 +71,22 @@
         { "fieldPath": "receiverId", "mode": "ASCENDING" },
         { "fieldPath": "read", "mode": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "audienceIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "mode": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "mode": "ASCENDING" },
+        { "fieldPath": "audienceIds", "arrayConfig": "CONTAINS" }
+      ]
     }
   ],
   "fieldOverrides": []

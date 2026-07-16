@@ -29,4 +29,15 @@ contextBridge.exposeInMainWorld("achievementOverlay", {
       ipcRenderer.removeListener("overlay:play-sound", listener);
     };
   },
+  onPanelVisibility: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("overlay:panel-visibility", listener);
+    return () => ipcRenderer.removeListener("overlay:panel-visibility", listener);
+  },
+  onPanelState: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("overlay:panel-state", listener);
+    return () => ipcRenderer.removeListener("overlay:panel-state", listener);
+  },
+  panelAction: (action) => ipcRenderer.invoke("overlay:panel-action", action),
 });

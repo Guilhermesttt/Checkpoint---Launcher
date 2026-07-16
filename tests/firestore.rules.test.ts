@@ -45,6 +45,25 @@ describe("regras Firestore", () => {
       updatedAt: 1,
     }));
     await assertFails(updateDoc(doc(alice, "profiles/alice"), { admin: true }));
+    await assertFails(updateDoc(doc(alice, "profiles/alice"), {
+      checkpointFriends: [{ uid: "victim", displayName: "Victim" }],
+    }));
+    await assertSucceeds(updateDoc(doc(alice, "profiles/alice"), {
+      achievementSummary: {
+        unlocked: 12,
+        available: 100,
+        gamesWithAchievements: 3,
+        totalGames: 8,
+        updatedAt: "2026-07-16T12:00:00.000Z",
+      },
+      steamAchievementSync: {
+        requested: 8,
+        resolved: 7,
+        failed: 1,
+        failedAppIds: ["123"],
+        updatedAt: "2026-07-16T12:00:00.000Z",
+      },
+    }));
   });
 
   it("isola bibliotecas por usuario e impede exclusao do perfil", async () => {
@@ -82,5 +101,32 @@ describe("regras Firestore", () => {
     await assertSucceeds(getDoc(doc(bob, "messages/message-1")));
     await assertSucceeds(updateDoc(doc(bob, "messages/message-1"), { read: true }));
     await assertFails(updateDoc(doc(bob, "messages/message-1"), { text: "alterado" }));
+  });
+
+  it("permite ler atividades da audiencia, mas bloqueia toda escrita direta do cliente", async () => {
+    const alice = environment.authenticatedContext("alice").firestore();
+    const bob = environment.authenticatedContext("bob").firestore();
+    const activity = {
+      userId: "alice",
+      userName: "Alice",
+      userAvatar: null,
+      audienceIds: ["alice", "bob"],
+      kind: "achievement",
+      gameId: "portal",
+      gameTitle: "Portal",
+      achievementId: "FIRST",
+      achievementName: "Primeiro portal",
+      createdAt: "2026-07-16T12:00:00.000Z",
+    };
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "activities/activity-1"), activity);
+    });
+    await assertFails(setDoc(doc(alice, "activities/activity-2"), activity));
+    await assertSucceeds(getDoc(doc(bob, "activities/activity-1")));
+    const mallory = environment.authenticatedContext("mallory").firestore();
+    await assertFails(getDoc(doc(mallory, "activities/activity-1")));
+    await assertFails(setDoc(doc(bob, "activities/activity-2"), activity));
+    await assertFails(updateDoc(doc(alice, "activities/activity-1"), { caption: "alterado" }));
+    await assertFails(deleteDoc(doc(alice, "activities/activity-1")));
   });
 });

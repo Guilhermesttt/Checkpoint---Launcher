@@ -17,7 +17,7 @@ const GamepadContext = createContext<GamepadContextValue | null>(null);
 export type GamepadButtonName = 
   | "X" | "O" | "SQUARE" | "TRIANGLE"
   | "L1" | "R1" | "L2" | "R2"
-  | "SHARE" | "OPTIONS"
+  | "SHARE" | "OPTIONS" | "GUIDE"
   | "DPAD_UP" | "DPAD_DOWN" | "DPAD_LEFT" | "DPAD_RIGHT";
 
 const BUTTON_MAP: Record<number, GamepadButtonName> = {
@@ -35,6 +35,7 @@ const BUTTON_MAP: Record<number, GamepadButtonName> = {
   13: "DPAD_DOWN",
   14: "DPAD_LEFT",
   15: "DPAD_RIGHT",
+  16: "GUIDE",
 };
 
 interface GamepadButtonSubscriber {
@@ -84,6 +85,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const requestRef = useRef<number>(0);
   const lastButtonState = useRef<Record<string, boolean>>({});
   const lastAxisMove = useRef<number>(0);
+  const lastGuideToggle = useRef<number>(0);
 
   const handleGamepadConnected = useCallback((e: GamepadEvent) => {
     setIsGamepadConnected(true);
@@ -125,6 +127,20 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       connectedGamepads[0] ??
       null;
     const gamepadFound = activeGamepad !== null;
+
+    const guidePollTime = performance.now();
+    connectedGamepads.forEach((gamepad) => {
+      const guideButton = gamepad.buttons[16];
+      const isGuidePressed = Boolean(guideButton?.pressed || (guideButton?.value ?? 0) > 0.5);
+      const stateKey = `${gamepad.index}:guide-toggle`;
+      const wasGuidePressed = lastButtonState.current[stateKey];
+      const outsideCooldown = lastGuideToggle.current === 0 || guidePollTime - lastGuideToggle.current > 650;
+      if (isGuidePressed && !wasGuidePressed && outsideCooldown) {
+        lastGuideToggle.current = guidePollTime;
+        void window.electronAPI?.toggleOverlayPanel().catch(() => undefined);
+      }
+      lastButtonState.current[stateKey] = isGuidePressed;
+    });
 
     if (activeGamepad) {
         const gp = activeGamepad;

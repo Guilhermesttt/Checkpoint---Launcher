@@ -45,13 +45,14 @@ import { useNotification } from "../components/NotificationCenter";
 import ModalShell from "../components/ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 // Correção 1: Importando Game, UserProfile e SocialFriend no mesmo lugar
-import type { Game, SocialFriend, UserProfile } from "../types/domain";
+import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/domain";
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
 import Sidebar, { CATEGORIES, SIDEBAR_CATEGORIES, SteamBrandIcon, DiscordBrandIcon, EpicBrandIcon } from '../components/Sidebar';
 import { useGamepadFocusNavigation } from '../hooks/useGamepadFocusNavigation';
 import { useGamePresence } from '../hooks/useGamePresence';
+import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
 import { useAccountConnections } from '../hooks/useAccountConnections';
 import { buildLocalFriendProfile, useFriendsSystem } from '../hooks/useFriendsSystem';
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
@@ -62,12 +63,24 @@ import {
   type VisualTheme,
 } from "../context/PreferencesContext";
 import { useGameLibraryView } from "../hooks/useGameLibraryView";
+import {
+  closeChatConnection,
+  establishChatConnection,
+  markMessagesAsRead,
+  sendChatMessage,
+  subscribeToChatMessages,
+  subscribeToFriendTyping,
+} from "../services/chat";
+import {
+  fetchSteamAchievementDetails,
+  fetchSteamAchievementSchema,
+  type SteamAchievement,
+} from "../services/steam";
 
 import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
-import { discordRichPresence, useDiscordRichPresence } from "../services/discordRichPresence";
 import {
   profileDocRef,
   userDocRef,
@@ -76,11 +89,13 @@ import {
 } from "../services/firestorePaths";
 import { useGamepadButton, useGamepad } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
+import { calculateAchievementTotals } from "../utils/achievementTotals";
 import InputHints from "../components/ui/InputHints";
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
 const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
+const SocialFeedPage = React.lazy(() => import("../components/SocialFeedPage"));
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
@@ -190,13 +205,6 @@ const Home: React.FC = () => {
     t,
   } = usePreferences();
   const { playSound } = useSoundEffects(effectsVolume / 100, soundTheme);
-  const {
-    setGameActivity,
-    setBrowsingActivity,
-    clearActivity,
-    setEnabled: setRichPresenceEnabled,
-    isEnabled: isRichPresenceEnabled
-  } = useDiscordRichPresence();
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
   const resolvedSteamId = useMemo(
@@ -208,11 +216,15 @@ const Home: React.FC = () => {
     [userProfile?.discordId],
   );
 
+  useAchievementLibrarySync(user?.uid, resolvedSteamId, games, !isLoading);
+
   // Correção 2: Desestruturando as funções faltantes
   const {
     currentPresenceGame,
-    setCurrentPresenceGame,
-    setCurrentPresenceExecutablePath,
+    currentPresenceExecutablePath,
+    sessionStartedAt: overlaySessionStartedAt,
+    presenceVerification,
+    markCurrentPresence,
   } = useGamePresence({
     userUid: user?.uid,
     userProfile,
@@ -260,6 +272,34 @@ const Home: React.FC = () => {
     setLocalSocialStateLoaded,
     setIsAddFriendModalOpen,
   });
+
+  const [overlayAchievements, setOverlayAchievements] = useState<{
+    loading: boolean;
+    items: SteamAchievement[];
+    unlocked: number;
+    available: number;
+  }>({ loading: false, items: [], unlocked: 0, available: 0 });
+  const [overlayAchievementRevision, setOverlayAchievementRevision] = useState(0);
+  const [overlayChatFriendId, setOverlayChatFriendId] = useState<string | null>(null);
+  const [overlayChatMessages, setOverlayChatMessages] = useState<ChatMessage[]>([]);
+  const [overlayChatTyping, setOverlayChatTyping] = useState(false);
+  const [overlayChatSending, setOverlayChatSending] = useState(false);
+  const [overlayChatError, setOverlayChatError] = useState<string | null>(null);
+
+  const overlayCurrentGame = useMemo(() => {
+    if (!currentPresenceGame) return null;
+    const normalizedPresence = currentPresenceGame.trim().toLowerCase();
+    return games.find((game) =>
+      game.title.trim().toLowerCase() === normalizedPresence
+      || game.title.toLowerCase().includes(normalizedPresence)
+      || normalizedPresence.includes(game.title.toLowerCase()),
+    ) || null;
+  }, [currentPresenceGame, games]);
+
+  const overlayChatFriend = useMemo(
+    () => socialFriends.find((friend) => friend.id === overlayChatFriendId) || null,
+    [overlayChatFriendId, socialFriends],
+  );
 
 
   useEffect(() => {
@@ -337,47 +377,14 @@ const Home: React.FC = () => {
     );
   }, [user?.uid, userProfile?.onboardingCompletedAt]);
 
-  // Discord Rich Presence: Inicialização
   useEffect(() => {
-    const initializeRichPresence = async () => {
-      if (resolvedDiscordId && user?.uid) {
-        const success = await discordRichPresence.initialize();
-        if (success) {
-          setRichPresenceEnabled(true);
-          await setBrowsingActivity();
-        }
-      }
-    };
-
-    initializeRichPresence();
-  }, [resolvedDiscordId, user?.uid, setBrowsingActivity, setRichPresenceEnabled]);
-
-  // Discord Rich Presence: Atualizar quando jogo atual mudar
-  useEffect(() => {
-    if (!isRichPresenceEnabled || !currentPresenceGame) {
-      if (isRichPresenceEnabled && !currentPresenceGame) {
-        setBrowsingActivity();
-      }
+    if (!user?.uid) {
+      closeChatConnection();
       return;
     }
-
-    const playingGame = games.find(game =>
-      game.title.toLowerCase().includes(currentPresenceGame.toLowerCase()) ||
-      currentPresenceGame.toLowerCase().includes(game.title.toLowerCase())
-    );
-
-    if (playingGame) {
-      setGameActivity(playingGame, 'playing');
-    }
-  }, [currentPresenceGame, games, isRichPresenceEnabled, setGameActivity, setBrowsingActivity]);
-
-  // Discord Rich Presence: Limpar quando sair ou desconectar Discord
-  useEffect(() => {
-    if (!resolvedDiscordId || !user?.uid) {
-      clearActivity();
-      setRichPresenceEnabled(false);
-    }
-  }, [resolvedDiscordId, user?.uid, clearActivity, setRichPresenceEnabled]);
+    void establishChatConnection();
+    return () => closeChatConnection();
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -403,26 +410,13 @@ const Home: React.FC = () => {
       const title = detail?.title?.trim();
       if (!title) return;
 
-      setCurrentPresenceGame(title);
-      setCurrentPresenceExecutablePath(detail?.executablePath || null);
+      markCurrentPresence(title, detail?.executablePath || null);
       void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
-
-      if (isRichPresenceEnabled) {
-        const launchedGame = games.find(
-          (game) =>
-            game.title.toLowerCase().includes(title.toLowerCase()) ||
-            title.toLowerCase().includes(game.title.toLowerCase()),
-        );
-
-        if (launchedGame) {
-          setGameActivity(launchedGame, "playing");
-        }
-      }
     };
 
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
-  }, [games, isRichPresenceEnabled, setGameActivity, setCurrentPresenceGame, setCurrentPresenceExecutablePath]);
+  }, [markCurrentPresence]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -603,7 +597,7 @@ const Home: React.FC = () => {
     [playSound],
   );
 
-  const isSystemCategory = ["FRIENDS", "SETTINGS", "PROFILE", "DEALS"].includes(activeCategory);
+  const isSystemCategory = ["FRIENDS", "FEED", "SETTINGS", "PROFILE", "DEALS"].includes(activeCategory);
 
   const { moveSystemFocus, adjustFocusedRange } = useGamepadFocusNavigation({
     playSound,
@@ -900,6 +894,269 @@ const Home: React.FC = () => {
     },
     [playSound, setActiveChatFriend, socialFriends],
   );
+
+  useEffect(() => {
+    const api = window.electronAPI;
+    if (!api?.onRealtimeAchievementUnlock) return;
+    const handler = api.onRealtimeAchievementUnlock(() => {
+      setOverlayAchievementRevision((current) => current + 1);
+    });
+    return () => api.removeRealtimeAchievementUnlock(handler);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAchievements = async () => {
+      const game = overlayCurrentGame;
+      if (!game) {
+        setOverlayAchievements({ loading: false, items: [], unlocked: 0, available: 0 });
+        return;
+      }
+
+      setOverlayAchievements((current) => ({ ...current, loading: true }));
+      const appId = String(game.steamAppId || "").trim();
+      if (!appId) {
+        setOverlayAchievements({
+          loading: false,
+          items: [],
+          unlocked: game.completedAchievements || 0,
+          available: game.totalAchievements || 0,
+        });
+        return;
+      }
+
+      try {
+        const result = userProfile?.steamId && game.launcherType !== "local"
+          ? await fetchSteamAchievementDetails(userProfile.steamId, appId)
+          : await fetchSteamAchievementSchema(appId);
+        let items = result.achievements;
+
+        if (game.launcherType === "local" && window.electronAPI) {
+          if (items.length === 0) {
+            const cached = await window.electronAPI.getLocalAchievementDefinitions(game.id).catch(() => null);
+            const cachedItems = Array.isArray(cached?.achievements) ? cached.achievements : [];
+            items = cachedItems.map((raw) => {
+              const achievement = raw as Record<string, unknown>;
+              const id = String(achievement.id || achievement.apiName || "");
+              return {
+                apiName: id,
+                achieved: false,
+                unlockTime: 0,
+                name: String(achievement.name || id),
+                description: String(achievement.description || ""),
+                icon: String(achievement.icon || ""),
+                iconGray: String(achievement.iconGray || ""),
+                hidden: Boolean(achievement.hidden),
+              };
+            }).filter((achievement) => achievement.apiName);
+          }
+          const [progress, localState] = await Promise.all([
+            window.electronAPI.getLocalAchievementProgress(game.id).catch(() => null),
+            window.electronAPI.getLocalAchievementState(appId).catch(() => (
+              {} as Record<string, { earned: boolean; earnedTime: number }>
+            )),
+          ]);
+          const progressById = new Map(
+            Object.entries(progress?.unlockedAchievements || {}).map(([id, value]) => [id.toLowerCase(), value]),
+          );
+          items = items.map((achievement) => {
+            const saved = progressById.get(achievement.apiName.toLowerCase());
+            const retroactive = localState[achievement.apiName];
+            if (!saved && !retroactive?.earned) return achievement;
+            const unlockedAt = saved?.unlockedAt
+              ? Math.floor(Date.parse(saved.unlockedAt) / 1000)
+              : retroactive?.earnedTime || 0;
+            return { ...achievement, achieved: true, unlockTime: unlockedAt };
+          });
+        }
+
+        if (!cancelled) {
+          setOverlayAchievements({
+            loading: false,
+            items,
+            unlocked: items.filter((achievement) => achievement.achieved).length,
+            available: items.length || game.totalAchievements || 0,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setOverlayAchievements({
+            loading: false,
+            items: [],
+            unlocked: game.completedAchievements || 0,
+            available: game.totalAchievements || 0,
+          });
+        }
+      }
+    };
+
+    void loadAchievements();
+    return () => { cancelled = true; };
+  }, [overlayAchievementRevision, overlayCurrentGame, userProfile?.steamId]);
+
+  const overlayChatFriendUid = overlayChatFriend?.id.startsWith("cp-friend:")
+    ? overlayChatFriend.id.split(":")[1]
+    : null;
+
+  useEffect(() => {
+    if (!overlayChatFriendUid) {
+      return;
+    }
+    void markMessagesAsRead(overlayChatFriendUid);
+    const unsubscribeMessages = subscribeToChatMessages(overlayChatFriendUid, setOverlayChatMessages);
+    const unsubscribeTyping = subscribeToFriendTyping(overlayChatFriendUid, setOverlayChatTyping);
+    return () => {
+      unsubscribeMessages();
+      unsubscribeTyping();
+    };
+  }, [overlayChatFriendUid]);
+
+  useEffect(() => {
+    if (!window.electronAPI?.updateOverlayPanel) return;
+    void window.electronAPI.updateOverlayPanel({
+      friends: socialFriends.map((friend) => ({
+        id: friend.id,
+        name: friend.name,
+        status: friend.status,
+        playing: friend.playing,
+        avatar: friend.avatar,
+        unread: friend.id.startsWith("cp-friend:")
+          ? unreadMessagesByFriend[friend.id.split(":")[1]] || 0
+          : 0,
+        canChat: friend.id.startsWith("cp-friend:"),
+      })),
+      achievements: {
+        unlocked: overlayAchievements.unlocked,
+        available: overlayAchievements.available,
+        loading: overlayAchievements.loading,
+        items: overlayAchievements.items.map((achievement) => ({
+          id: achievement.apiName,
+          name: achievement.name,
+          description: achievement.description,
+          icon: achievement.icon || achievement.iconGray,
+          achieved: achievement.achieved,
+          unlockedAt: achievement.unlockTime > 0
+            ? new Date(achievement.unlockTime * 1000).toISOString()
+            : "",
+        })),
+      },
+      currentGame: overlayCurrentGame ? {
+        id: overlayCurrentGame.id,
+        title: overlayCurrentGame.title,
+        image: overlayCurrentGame.backgroundImage || overlayCurrentGame.cardImage || overlayCurrentGame.image,
+        platform: overlayCurrentGame.launcherType === "steam"
+          ? "Steam"
+          : overlayCurrentGame.launcherType === "epic" ? "Epic Games" : "Jogo local",
+        category: overlayCurrentGame.category || "",
+        developer: overlayCurrentGame.developer || "",
+        releaseDate: overlayCurrentGame.releaseDate || "",
+        executableName: String(overlayCurrentGame.executablePath || "").split(/[\\/]/).pop() || "",
+        totalPlaytimeMinutes: overlayCurrentGame.steamPlaytimeMinutes
+          ?? Math.round(Math.max(0, Number(overlayCurrentGame.hoursPlayed || 0)) * 60),
+        sessionStartedAt: overlaySessionStartedAt || "",
+        windowMode: overlayCurrentGame.launchProfile?.windowMode || "default",
+        resolution: overlayCurrentGame.launchProfile?.resolutionWidth && overlayCurrentGame.launchProfile?.resolutionHeight
+          ? `${overlayCurrentGame.launchProfile.resolutionWidth} × ${overlayCurrentGame.launchProfile.resolutionHeight}`
+          : "Automática",
+        monitoring: presenceVerification === "process" || presenceVerification === "steam"
+          ? "verified"
+          : "unverified",
+      } : null,
+      chat: overlayChatFriend && overlayChatFriendUid ? {
+        friendId: overlayChatFriend.id,
+        friendName: overlayChatFriend.name,
+        friendAvatar: overlayChatFriend.avatar,
+        typing: overlayChatTyping,
+        sending: overlayChatSending,
+        error: overlayChatError || "",
+        messages: overlayChatMessages.map((message) => ({
+          id: message.id || `${message.senderId}:${message.createdAt}`,
+          text: message.text,
+          createdAt: message.createdAt,
+          mine: message.senderId === user?.uid || message.senderId === "me",
+          pending: String(message.id || "").startsWith("overlay-pending-"),
+        })),
+      } : null,
+      profile: {
+        name: userProfile?.displayName || userProfile?.steamUsername || userDisplay,
+        avatar: userProfile?.discordAvatar || userProfile?.photoURL || userProfile?.steamAvatar || "",
+        discordConnected: Boolean(userProfile?.discordId),
+        discordUsername: userProfile?.discordUsername || "",
+        achievements: calculateAchievementTotals(games).unlocked,
+      },
+    }).catch(() => undefined);
+  }, [
+    overlayAchievements,
+    overlayChatError,
+    overlayChatFriend,
+    overlayChatFriendUid,
+    overlayChatMessages,
+    overlayChatSending,
+    overlayChatTyping,
+    overlayCurrentGame,
+    overlaySessionStartedAt,
+    currentPresenceExecutablePath,
+    presenceVerification,
+    games,
+    socialFriends,
+    unreadMessagesByFriend,
+    user?.uid,
+    userDisplay,
+    userProfile?.displayName,
+    userProfile?.discordAvatar,
+    userProfile?.discordId,
+    userProfile?.discordUsername,
+    userProfile?.photoURL,
+    userProfile?.steamAvatar,
+    userProfile?.steamUsername,
+  ]);
+
+  useEffect(() => {
+    if (!window.electronAPI?.onOverlayPanelAction) return;
+    return window.electronAPI.onOverlayPanelAction((action) => {
+      if (action.kind === "select-chat") {
+        const friend = socialFriends.find((candidate) => candidate.id === action.friendId);
+        if (friend?.id.startsWith("cp-friend:")) {
+          setOverlayChatMessages([]);
+          setOverlayChatTyping(false);
+          setOverlayChatError(null);
+          setOverlayChatFriendId(friend.id);
+        }
+        return;
+      }
+      if (action.kind === "close-chat") {
+        setOverlayChatMessages([]);
+        setOverlayChatTyping(false);
+        setOverlayChatError(null);
+        setOverlayChatFriendId(null);
+        return;
+      }
+      if (action.kind !== "send-message" || !overlayChatFriendUid || overlayChatSending) return;
+      const text = action.text.trim();
+      if (!text) return;
+      const pendingId = `overlay-pending-${Date.now()}`;
+      setOverlayChatSending(true);
+      setOverlayChatError(null);
+      setOverlayChatMessages((current) => [...current, {
+        id: pendingId,
+        chatId: overlayChatFriendUid,
+        senderId: user?.uid || "me",
+        receiverId: overlayChatFriendUid,
+        text,
+        createdAt: new Date().toISOString(),
+        read: true,
+      }]);
+      void sendChatMessage(overlayChatFriendUid, text).then((message) => {
+        setOverlayChatMessages((current) => [
+          ...current.filter((item) => item.id !== pendingId && item.id !== message.id),
+          message,
+        ].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)));
+      }).catch((error) => {
+        setOverlayChatMessages((current) => current.filter((item) => item.id !== pendingId));
+        setOverlayChatError(error instanceof Error ? error.message : "Não foi possível enviar a mensagem.");
+      }).finally(() => setOverlayChatSending(false));
+    });
+  }, [overlayChatFriendUid, overlayChatSending, socialFriends, user?.uid]);
 
   const onSelectHandler = useCallback(
     (index: number, openGame?: Game) => {
@@ -1300,6 +1557,17 @@ const Home: React.FC = () => {
                 setActiveChatFriend(friend);
               }}
             />
+          ) : activeCategory === "FEED" ? (
+            <React.Suspense fallback={
+              <div className="flex flex-1 items-center justify-center text-white/40">Carregando feed...</div>
+            }>
+              <SocialFeedPage
+                userIds={[
+                  user?.uid || "",
+                  ...(userProfile?.checkpointFriends || []).map((friend) => friend.uid),
+                ].filter(Boolean)}
+              />
+            </React.Suspense>
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
               <div className="flex items-center justify-center flex-1">

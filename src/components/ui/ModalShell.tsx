@@ -11,6 +11,7 @@ interface ModalShellProps {
   maxWidthClassName?: string;
   className?: string;
   backdropClassName?: string;
+  containerClassName?: string;
   zIndexClassName?: string;
   reducedEffects?: boolean;
   ariaLabel?: string;
@@ -33,6 +34,7 @@ const ModalShell: React.FC<ModalShellProps> = ({
   maxWidthClassName = "max-w-2xl",
   className,
   backdropClassName,
+  containerClassName,
   zIndexClassName = "z-[100]",
   reducedEffects = false,
   gamepadPriority = 100,
@@ -144,7 +146,8 @@ const ModalShell: React.FC<ModalShellProps> = ({
         <div
           className={cn(
             "fixed inset-0 flex items-center justify-center p-4 md:p-8",
-            zIndexClassName
+            zIndexClassName,
+            containerClassName,
           )}
         >
           {/* Backdrop */}

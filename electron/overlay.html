@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
 
 <head>
   <meta charset="UTF-8" />
@@ -13,25 +13,26 @@
       --overlay-font-display: "Outfit", "Segoe UI", sans-serif;
       --overlay-font-body: "Outfit", "Segoe UI", sans-serif;
       --overlay-width: min(392px, calc(100vw - 32px));
-      --accent: 255 255 255;
-      --accent-soft: rgba(255, 255, 255, 0.14);
-      --card-duration: 4200ms;
 
-      /* ---- context colors (achievement / social kinds) ---- */
-      --color-achievement: 251 191 36;
-      /* amber/gold mais vibrante */
-      --color-friend-request: 139 92 246;
-      /* violeta elegante */
-      --color-friend-accepted: 56 189 248;
-      /* azul claro */
+      /* Context Colors */
+      --color-achievement: 255 255 255;
+      --color-friend-request: 236 72 153;
+      --color-friend-accepted: 14 165 233;
       --color-friend-playing: 16 185 129;
-      /* esmeralda */
-      --color-friend-message: 99 102 241;
-      /* cyan */
-      --color-controller: 203 213 225;
-      /* neutral silver */
+      --color-friend-message: 255 255 255;
+      --color-controller: 148 163 184;
       --color-game-start: 255 255 255;
-      /* neutral white */
+      --color-overlay-hint: 255 255 255;
+      --color-capture: 34 211 238;
+
+      /* UI Concept Palette */
+      --panel-accent: 255, 255, 255;
+      --panel-bg: #050507;
+      --panel-surface: #101014;
+      --panel-surface-hover: #17171c;
+      --panel-border: rgba(255, 255, 255, 0.09);
+      --text-muted: rgba(255, 255, 255, 0.48);
+      --card-duration: 4200ms;
     }
 
     html,
@@ -54,12 +55,18 @@
       box-sizing: border-box;
     }
 
+    /* =========================================================
+       TOASTS (Notificações Flutuantes)
+       ========================================================= */
     #achievement-stack,
     #social-stack {
       position: fixed;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      z-index: 9999;
+      max-height: calc(100vh - 48px);
+      transition: opacity 180ms ease, visibility 180ms ease;
     }
 
     #achievement-stack {
@@ -74,26 +81,28 @@
       width: var(--overlay-width);
     }
 
-    /* ---------- card shell ---------- */
-
     .overlay-card {
       container-type: inline-size;
-      container-name: overlay;
+      container-name: overlay-toast;
       position: relative;
       width: var(--overlay-width);
       aspect-ratio: 447 / 157;
+      min-height: 0;
+      flex: 0 0 auto;
       opacity: 0;
       --ctx-color: var(--color-game-start);
-      animation: overlay-in 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      --entry-x: -18px;
+      animation: overlay-in 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
       animation-delay: var(--stagger, 0ms);
     }
 
     .overlay-card.is-leaving {
-      animation: overlay-out 350ms cubic-bezier(0.4, 0, 1, 1) forwards;
+      animation: overlay-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
     }
 
     .achievement-card {
       --ctx-color: var(--color-achievement);
+      --entry-x: 18px;
     }
 
     .social-card.kind-friend-request {
@@ -120,6 +129,14 @@
       --ctx-color: var(--color-game-start);
     }
 
+    .social-card.kind-overlay-hint {
+      --ctx-color: var(--color-overlay-hint);
+    }
+
+    .social-card.kind-capture-saved {
+      --ctx-color: var(--color-capture);
+    }
+
     .overlay-shell {
       position: absolute;
       inset: 0;
@@ -128,34 +145,39 @@
       gap: 4cqw;
       padding: 6.2cqw;
       border-radius: 20px;
-      background: linear-gradient(135deg, rgba(15, 15, 20, 0.85) 0%, rgba(5, 5, 8, 0.95) 100%);
-      -webkit-backdrop-filter: blur(24px) saturate(160%);
-      backdrop-filter: blur(24px) saturate(160%);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.15),
-        inset 0 0 0 1px rgba(var(--ctx-color), 0.15),
-        0 16px 40px rgba(0, 0, 0, 0.7),
-        0 0 32px rgba(var(--ctx-color), 0.2);
+      background:
+        radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.075), transparent 36%),
+        linear-gradient(145deg, rgba(18, 18, 22, 0.97), rgba(6, 6, 8, 0.985));
+      -webkit-backdrop-filter: blur(15px);
+      backdrop-filter: blur(15px);
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58), inset 0 1px rgba(255, 255, 255, 0.04);
       overflow: hidden;
+    }
+
+    .overlay-shell::before {
+      content: "";
+      position: absolute;
+      top: 18%;
+      bottom: 18%;
+      left: 0;
+      width: 2px;
+      border-radius: 0 99px 99px 0;
+      background: rgba(var(--ctx-color), 0.82);
+      box-shadow: 0 0 18px rgba(var(--ctx-color), 0.28);
+      pointer-events: none;
     }
 
     .overlay-shell::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(115deg,
-          transparent 20%,
-          rgba(var(--ctx-color), 0.25) 45%,
-          rgba(255, 255, 255, 0.4) 50%,
-          transparent 55%);
+      background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.14) 50%, transparent 58%);
       transform: translateX(-120%);
-      animation: shine-sweep 1200ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+      animation: shine-sweep 900ms cubic-bezier(0.16, 1, 0.3, 1) 1;
       animation-delay: calc(var(--stagger, 0ms) + 150ms);
       pointer-events: none;
     }
-
-    /* ---------- icon column ---------- */
 
     .overlay-icon {
       position: relative;
@@ -168,35 +190,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      perspective: 400px;
-    }
-
-    .overlay-icon::before {
-      content: "";
-      position: absolute;
-      inset: -15%;
-      border-radius: 30%;
-      opacity: 0;
-      pointer-events: none;
-      animation: icon-ring-burst 800ms ease-out 1;
-      animation-delay: calc(var(--stagger, 0ms) + 250ms);
-      border: 2px solid rgba(var(--ctx-color), 0.5);
-      box-shadow: 0 0 24px rgba(var(--ctx-color), 0.4);
+      isolation: isolate;
     }
 
     .icon-ring {
       position: absolute;
-      inset: -22%;
-      color: rgba(var(--ctx-color), 0.9);
-      animation: ring-spin 12s linear infinite;
+      inset: -6px;
+      color: rgba(var(--ctx-color), 0.2);
       pointer-events: none;
-      filter: drop-shadow(0 0 4px rgba(var(--ctx-color), 0.5));
     }
 
     .icon-ring svg {
+      display: block;
       width: 100%;
       height: 100%;
-      display: block;
     }
 
     .icon-avatar {
@@ -208,46 +215,45 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
-      border: 1px solid rgba(var(--ctx-color), 0.4);
-      box-shadow:
-        inset 0 1px 3px rgba(255, 255, 255, 0.3),
-        0 0 20px rgba(var(--ctx-color), 0.25);
-      transform-style: preserve-3d;
-      animation:
-        icon-breathe 3000ms ease-in-out infinite,
-        icon-tilt 5000ms ease-in-out infinite;
-      animation-delay: calc(var(--stagger, 0ms) + 500ms);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(var(--ctx-color), 0.42);
+      z-index: 1;
     }
 
     .icon-avatar img {
-      width: 75%;
-      height: 75%;
-      object-fit: contain;
-      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4));
-    }
-
-    .icon-avatar.is-photo img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      filter: none;
+    }
+
+    .icon-avatar.is-logo {
+      padding: 12px;
+      border-radius: 14px;
+      background: #0b0b0e;
     }
 
     .icon-avatar.is-logo img {
-      width: 70%;
-      height: 70%;
       object-fit: contain;
+    }
+
+    .achievement-card .icon-avatar {
+      border-radius: 14px;
+    }
+
+    .achievement-card .icon-avatar.is-photo {
+      padding: 0;
+    }
+
+    .social-card.kind-game-start .icon-ring,
+    .social-card.kind-overlay-hint .icon-ring {
+      display: none;
     }
 
     .icon-avatar svg {
       width: 50%;
       height: 50%;
       color: rgba(var(--ctx-color), 1);
-      filter: drop-shadow(0 0 8px rgba(var(--ctx-color), 0.6));
     }
-
-    /* ---------- content column ---------- */
 
     .overlay-content {
       flex: 1 1 auto;
@@ -259,94 +265,62 @@
     }
 
     .overlay-text {
+      min-width: 0;
       display: flex;
       flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
     }
 
     .achievement-eyebrow,
     .social-badge {
-      display: inline-flex;
-      align-items: center;
-      align-self: flex-start;
-      border-radius: 8px;
-      font-family: var(--overlay-font-display);
-      font-weight: 900;
+      width: max-content;
+      max-width: 100%;
+      padding: 3px 6px;
+      border: 1px solid rgba(var(--ctx-color), 0.16);
+      border-radius: 999px;
+      background: rgba(var(--ctx-color), 0.055);
+      font-size: 8px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.18em;
-      white-space: nowrap;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .achievement-eyebrow {
+      letter-spacing: 0.1em;
       color: rgba(var(--ctx-color), 1);
-      font-size: clamp(8px, 2.2cqw, 10px);
-      line-height: 1;
-      margin-bottom: 0.5cqw;
-    }
-
-    .social-badge {
-      gap: 6px;
-      margin-bottom: 1.6cqw;
-      padding: 1.5cqw 3cqw;
-      background: rgba(var(--ctx-color), 0.15);
-      border: 1px solid rgba(var(--ctx-color), 0.3);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.95);
-      font-size: clamp(9px, 2.4cqw, 11px);
-      line-height: 1;
-      animation: badge-breathe 2500ms ease-in-out infinite;
-    }
-
-    .social-badge::before {
-      content: "";
-      width: 0;
-      height: 0;
-      border-top: 5px solid transparent;
-      border-bottom: 5px solid transparent;
-      border-left: 8px solid rgba(var(--ctx-color), 1);
-      animation: triangle-glow 2000ms ease-in-out infinite;
+      margin-bottom: 5px;
     }
 
     .achievement-title,
     .social-title {
       margin: 0;
-      color: #ffffff;
-      font-family: var(--overlay-font-display);
+      color: #fff;
+      font-size: clamp(15px, 4.5cqw, 18px);
       font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.01em;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-    }
-
-    .achievement-title {
-      margin-top: 1cqw;
-      font-size: clamp(16px, 4.5cqw, 22px);
-    }
-
-    .social-title {
-      font-size: clamp(16px, 4.5cqw, 22px);
+      line-height: 1.08;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
 
     .achievement-description,
     .social-description {
-      margin: 1.5cqw 0 0;
+      margin: 4px 0 0;
       color: rgba(255, 255, 255, 0.6);
-      font-family: var(--overlay-font-body);
-      font-size: clamp(11px, 2.6cqw, 14px);
+      font-size: clamp(10px, 2.6cqw, 12px);
       line-height: 1.3;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
 
-    /* ---------- dismiss-timer progress bar ---------- */
-
     .overlay-progress {
-      position: relative;
-      height: 4px;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 3px;
       width: 100%;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.4);
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.05);
-      overflow: hidden;
+      background: rgba(0, 0, 0, 0.5);
     }
 
     .overlay-progress::after {
@@ -355,100 +329,708 @@
       height: 100%;
       width: 100%;
       transform-origin: left;
-      background: linear-gradient(90deg,
-          rgba(var(--ctx-color), 0.4),
-          rgba(var(--ctx-color), 1));
-      box-shadow: 0 0 8px rgba(var(--ctx-color), 0.8);
+      background: rgba(var(--ctx-color), 1);
       animation: progress-drain linear forwards;
       animation-duration: var(--card-duration);
     }
 
-    /* ---------- keyframes ---------- */
+    /* =========================================================
+       COMMAND PANEL — CHECKPOINT CONCEPT UI (EXACT MATCH)
+       ========================================================= */
 
+    #command-panel {
+      position: fixed;
+      inset: 5vh 5vw;
+      display: none;
+      pointer-events: auto;
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      background: var(--panel-bg);
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.9), 0 0 80px rgba(var(--panel-accent), 0.1);
+      overflow: hidden;
+      color: white;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: scale(0.98);
+      opacity: 0;
+    }
+
+    #command-panel.is-open {
+      display: grid;
+      grid-template-columns: 88px 1fr 340px;
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    /* ---- Sidebar Esquerda ---- */
+    .panel-sidebar {
+      background: rgba(14, 14, 20, 0.5);
+      border-right: 1px solid var(--panel-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 12px;
+      z-index: 10;
+    }
+
+    .panel-logo {
+      width: 44px;
+      height: 44px;
+      background: rgba(255, 255, 255, 0.07);
+      color: white;
+      font-size: 20px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 32px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-brand,
+    .panel-hint {
+      display: none;
+    }
+
+    .panel-navigation {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .panel-tab {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 4px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .panel-tab .nav-icon {
+      font-size: 22px;
+      font-weight: normal;
+    }
+
+    .panel-tab::before {
+      content: "";
+      position: absolute;
+      left: -12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 0;
+      background: rgb(var(--panel-accent));
+      border-radius: 0 4px 4px 0;
+      transition: height 0.2s ease;
+    }
+
+    .panel-tab:hover {
+      color: white;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .panel-tab.is-active {
+      color: white;
+      background: linear-gradient(90deg, rgba(var(--panel-accent), 0.15) 0%, transparent 100%);
+    }
+
+    .panel-tab.is-active::before {
+      height: 24px;
+      box-shadow: 0 0 10px rgba(var(--panel-accent), 0.8);
+    }
+
+    .nav-notification {
+      position: absolute;
+      top: 6px;
+      right: 12px;
+      background: #ec4899;
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sidebar-spacer {
+      flex: 1;
+    }
+
+    .panel-action {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      margin-bottom: 24px;
+    }
+
+    .panel-action:hover {
+      color: #f87171;
+    }
+
+    .panel-action .nav-icon {
+      font-size: 22px;
+    }
+
+    .sidebar-profile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      position: relative;
+    }
+
+    .sidebar-profile img {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 2px solid rgba(var(--panel-accent), 0.5);
+    }
+
+    .sidebar-profile i {
+      position: absolute;
+      bottom: 16px;
+      right: -2px;
+      width: 12px;
+      height: 12px;
+      background: #10b981;
+      border-radius: 50%;
+      border: 2px solid var(--panel-bg);
+    }
+
+    /* ---- Área Central (Workspace) ---- */
+    .panel-workspace {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .panel-topbar {
+      padding: 32px 40px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .welcome-copy h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .welcome-copy p {
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .wave {
+      animation: wave-hand 2.4s ease-in-out infinite;
+      transform-origin: 70% 70%;
+      display: inline-block;
+    }
+
+    .friend-search {
+      background: var(--panel-surface);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 0 16px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 260px;
+      transition: all 0.2s;
+    }
+
+    .friend-search:focus-within {
+      border-color: rgba(var(--panel-accent), 0.5);
+      background: var(--panel-surface-hover);
+    }
+
+    .friend-search span {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+
+    .friend-search input {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+
+    .top-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-surface);
+      border: 1px solid var(--panel-border);
+      padding: 6px 16px 6px 6px;
+      border-radius: 30px;
+      cursor: pointer;
+    }
+
+    .top-profile img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .top-profile span {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .top-profile b {
+      color: var(--text-muted);
+      font-size: 10px;
+      margin-left: 4px;
+    }
+
+    .top-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 28px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      transition: color 0.2s;
+    }
+
+    .top-close:hover {
+      color: white;
+    }
+
+    .panel-layout {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .panel-content {
+      flex: 1;
+      padding: 24px 40px;
+      overflow-y: auto;
+    }
+
+    .panel-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .panel-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+    }
+
+    .panel-view {
+      display: none;
+      animation: fade-in 300ms ease forwards;
+    }
+
+    .panel-view.is-active {
+      display: block;
+    }
+
+    /* ---- Friends Grid & List ---- */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+
+    .section-heading button {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      background: #64748b;
+    }
+
+    .status-dot.online {
+      background: #10b981;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+    }
+
+    /* Online Grid - Cards Verticais */
+    .online-friends-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 40px;
+    }
+
+    .online-friends-grid .friend-card {
+      background: var(--panel-surface);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .online-friends-grid .friend-card:hover {
+      border-color: rgb(var(--panel-accent));
+      background: var(--panel-surface-hover);
+      transform: translateY(-2px);
+    }
+
+    .online-friends-grid .friend-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .online-friends-grid .friend-copy {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .online-friends-grid .friend-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .online-friends-grid .friend-status {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.62);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+    }
+
+    .online-friends-grid .friend-status::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: #10b981;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .online-friends-grid .chat-button {
+      width: 100%;
+      margin-top: auto;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: white;
+      transition: all 0.2s;
+    }
+
+    .online-friends-grid .friend-card:hover .chat-button {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Offline List - Linhas Horizontais */
+    .offline-friends-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .offline-friends-list .friend-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: transparent;
+      border: 1px solid transparent;
+      transition: background 0.2s;
+    }
+
+    .offline-friends-list .friend-card:hover {
+      background: var(--panel-surface);
+    }
+
+    .offline-friends-list .friend-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      opacity: 0.6;
+    }
+
+    .offline-friends-list .friend-copy {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .offline-friends-list .friend-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .offline-friends-list .friend-status {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .offline-friends-list .chat-button {
+      background: transparent;
+      border: none;
+      padding: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .offline-friends-list .chat-button:hover {
+      color: white;
+    }
+
+    /* ---- Context Panel (Painel Direito) ---- */
+    .context-panel {
+      border-left: 1px solid var(--panel-border);
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      background: rgba(10, 10, 15, 0.4);
+    }
+
+    .context-game-card {
+      background: var(--panel-surface);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .context-game-art {
+      height: 140px;
+      background: linear-gradient(180deg, #1f1f2e 0%, #151520 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .context-game-icon {
+      font-size: 48px;
+      color: rgb(var(--panel-accent));
+    }
+
+    .context-game-copy {
+      padding: 20px;
+      text-align: center;
+    }
+
+    .context-game-copy h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .context-game-copy p {
+      margin: 0 0 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .context-primary {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      background: #fff;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s;
+    }
+
+    .context-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+    }
+
+    .quick-access h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 12px;
+    }
+
+    .quick-access button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      margin-bottom: 8px;
+      background: var(--panel-surface);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: white;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .quick-access button:hover {
+      background: var(--panel-surface-hover);
+      border-color: rgba(var(--panel-accent), 0.3);
+    }
+
+    .quick-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .quick-icon.purple {
+      background: rgba(255, 255, 255, 0.065);
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .quick-icon.blue {
+      background: rgba(59, 130, 246, 0.1);
+      color: #60a5fa;
+    }
+
+    .quick-icon.pink {
+      background: rgba(236, 72, 153, 0.1);
+      color: #f472b6;
+    }
+
+    .quick-access span:nth-child(2) {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .quick-access b {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .quick-access small {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .quick-access i {
+      color: var(--text-muted);
+      font-size: 16px;
+      font-style: normal;
+    }
+
+    .context-panel footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .context-panel footer .notif {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 600;
+    }
+
+    .context-panel footer .notif i {
+      font-style: normal;
+    }
+
+    /* ---- Animations ---- */
     @keyframes overlay-in {
       0% {
         opacity: 0;
-        transform: translateY(30px) scale(0.9);
-      }
-
-      50% {
-        opacity: 1;
-        transform: translateY(-5px) scale(1.02);
+        transform: translateX(var(--entry-x)) scale(0.97);
       }
 
       100% {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateX(0) scale(1);
       }
     }
 
     @keyframes overlay-out {
       from {
         opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
+        transform: translateX(0) scale(1);
       }
 
       to {
         opacity: 0;
-        transform: translateY(-20px) scale(0.95);
-        filter: blur(4px);
-      }
-    }
-
-    @keyframes icon-ring-burst {
-      0% {
-        opacity: 1;
-        transform: scale(0.8);
-      }
-
-      100% {
-        opacity: 0;
-        transform: scale(1.6);
-      }
-    }
-
-    @keyframes ring-spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    @keyframes icon-breathe {
-
-      0%,
-      100% {
-        transform: scale(1);
-      }
-
-      50% {
-        transform: scale(1.05);
-      }
-    }
-
-    @keyframes icon-tilt {
-
-      0%,
-      100% {
-        transform: rotateY(0deg) rotateX(0deg);
-      }
-
-      25% {
-        transform: rotateY(5deg) rotateX(-3deg);
-      }
-
-      75% {
-        transform: rotateY(-5deg) rotateX(3deg);
-      }
-    }
-
-    @keyframes shine-sweep {
-      0% {
-        transform: translateX(-120%) skewX(-15deg);
-      }
-
-      100% {
-        transform: translateX(150%) skewX(-15deg);
+        transform: translateX(var(--entry-x)) scale(0.98);
       }
     }
 
@@ -462,41 +1044,834 @@
       }
     }
 
-    @keyframes badge-breathe {
-
-      0%,
-      100% {
-        transform: translateY(0);
-        box-shadow: 0 0 12px rgba(var(--ctx-color), 0.15);
+    @keyframes shine-sweep {
+      0% {
+        transform: translateX(-120%) skewX(-15deg);
       }
 
-      50% {
-        transform: translateY(-1px);
-        box-shadow: 0 0 20px rgba(var(--ctx-color), 0.3);
+      100% {
+        transform: translateX(150%) skewX(-15deg);
       }
     }
 
-    @keyframes triangle-glow {
-
-      0%,
-      100% {
-        filter: drop-shadow(0 0 4px rgba(var(--ctx-color), 0.3));
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
       }
 
-      50% {
-        filter: drop-shadow(0 0 10px rgba(var(--ctx-color), 0.6));
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes wave-hand {
+
+      0%,
+      55%,
+      100% {
+        transform: rotate(0)
+      }
+
+      65% {
+        transform: rotate(16deg)
+      }
+
+      75% {
+        transform: rotate(-10deg)
+      }
+
+      85% {
+        transform: rotate(12deg)
+      }
+    }
+
+    /* Utilitarios para manter compatibilidade JS Oculta */
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    .panel-game-backdrop {
+      display: none;
+    }
+
+    .unread-badge {
+      display: none !important;
+    }
+
+    body.panel-open #achievement-stack,
+    body.panel-open #social-stack {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    /* Tema nativo do launcher e acabamento de interacao */
+    .ui-icon {
+      width: 20px;
+      height: 20px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    #command-panel {
+      background:
+        radial-gradient(circle at 72% 8%, rgba(255, 255, 255, 0.055), transparent 28%),
+        linear-gradient(145deg, rgba(12, 12, 15, 0.985), rgba(4, 4, 6, 0.99));
+      box-shadow: 0 42px 120px rgba(0, 0, 0, 0.82), inset 0 1px rgba(255, 255, 255, 0.035);
+    }
+
+    .panel-sidebar {
+      background: rgba(5, 5, 7, 0.82);
+      backdrop-filter: blur(24px);
+    }
+
+    .panel-logo {
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      clip-path: none;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), inset 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .panel-tab .nav-icon,
+    .panel-action .nav-icon {
+      width: 34px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      transition: background 180ms ease, transform 180ms ease;
+    }
+
+    .panel-tab:hover .nav-icon,
+    .panel-tab.is-active .nav-icon {
+      background: rgba(255, 255, 255, 0.09);
+      transform: translateY(-1px);
+    }
+
+    .panel-tab.is-active {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
+    }
+
+    .panel-action:hover { color: #fff; }
+
+    .panel-tab::before {
+      background: #fff;
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
+    }
+
+    .nav-notification {
+      background: #fff;
+      color: #050507;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .nav-notification[hidden] { display: none !important; }
+
+    .friend-search:focus-within {
+      border-color: rgba(255, 255, 255, 0.32);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.045);
+    }
+
+    .welcome-mark {
+      width: 22px;
+      height: 22px;
+      color: rgba(255, 255, 255, 0.64);
+    }
+
+    .online-friends-grid .friend-card:hover {
+      border-color: rgba(255, 255, 255, 0.28);
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3);
+    }
+
+    .online-friends-grid .friend-status {
+      color: rgba(255, 255, 255, 0.62);
+    }
+
+    .context-panel {
+      background: rgba(5, 5, 7, 0.52);
+      backdrop-filter: blur(22px);
+    }
+
+    .context-game-art {
+      background: linear-gradient(145deg, #18181d, #0b0b0e);
+    }
+
+    .context-game-icon {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .context-game-icon .ui-icon {
+      width: 46px;
+      height: 46px;
+      stroke-width: 1.35;
+    }
+
+    .context-primary {
+      background: #fff;
+      color: #08080a;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+    }
+
+    .context-primary:hover {
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42), 0 0 0 3px rgba(255, 255, 255, 0.08);
+    }
+
+    .quick-icon.purple,
+    .quick-icon.blue,
+    .quick-icon.pink {
+      background: rgba(255, 255, 255, 0.065);
+      color: rgba(255, 255, 255, 0.78);
+    }
+
+    .quick-access button:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+      transform: translateX(2px);
+    }
+
+    .context-panel footer .notif {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Chat ocupa a area de trabalho e preserva o contexto do jogo. */
+    #panel-chat-view,
+    .chat-layout {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .panel-view[data-panel-view="chats"].is-active {
+      height: 100%;
+      min-height: clamp(480px, calc(90vh - 160px), 780px);
+    }
+
+    .panel-view[data-panel-view="chats"] #panel-chat-view:not([hidden]) {
+      height: 100%;
+      min-height: inherit;
+    }
+
+    .chat-layout {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: inherit;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      border-radius: 18px;
+      background: rgba(9, 9, 12, 0.78);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .chat-header {
+      min-height: 74px;
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: auto auto 1fr;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .chat-back {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid var(--panel-border);
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.035);
+      color: rgba(255, 255, 255, 0.72);
+      cursor: pointer;
+    }
+
+    .chat-back:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .chat-header .friend-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .chat-header .friend-name {
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .chat-header .friend-status {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .chat-messages {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+    }
+
+    .chat-message {
+      align-self: flex-start;
+      max-width: min(72%, 520px);
+      padding: 11px 14px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px 16px 16px 16px;
+      background: #17171c;
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 13px;
+      line-height: 1.48;
+      overflow-wrap: anywhere;
+    }
+
+    .chat-message.is-mine {
+      align-self: flex-end;
+      border-color: rgba(255, 255, 255, 0.16);
+      border-radius: 16px 5px 16px 16px;
+      background: #f1f1f3;
+      color: #0a0a0c;
+    }
+
+    .chat-message.is-pending {
+      opacity: 0.56;
+    }
+
+    .chat-time {
+      display: block;
+      margin-top: 5px;
+      font-size: 9px;
+      text-align: right;
+      opacity: 0.48;
+    }
+
+    .chat-empty {
+      margin: auto;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .chat-composer {
+      padding: 0 18px 18px;
+      background: linear-gradient(180deg, transparent, rgba(5, 5, 7, 0.86) 24%);
+    }
+
+    .chat-typing {
+      min-height: 22px;
+      padding: 5px 4px;
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .chat-error {
+      min-height: 0;
+      padding: 0 4px;
+      color: #ff9d9d;
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .chat-error:not(:empty) {
+      padding-bottom: 7px;
+    }
+
+    .chat-form {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 42px;
+      gap: 8px;
+      padding: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.035);
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .chat-form:focus-within {
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.045);
+    }
+
+    .chat-input {
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      padding: 0 10px;
+      background: transparent;
+      color: #fff;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .chat-send {
+      width: 42px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 10px;
+      background: #fff;
+      color: #08080a;
+      cursor: pointer;
+      transition: transform 160ms ease, opacity 160ms ease;
+    }
+
+    .chat-send:hover { transform: translateY(-1px); }
+    .chat-send:disabled { opacity: 0.42; cursor: wait; }
+
+    .achievement-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .game-page, .media-page { min-height: 100%; animation: fade-in 240ms ease both; }
+    .game-session-card {
+      min-height: 280px; display: grid; grid-template-columns: minmax(240px, 42%) 1fr; overflow: hidden;
+      border: 1px solid var(--panel-border); border-radius: 18px; background: rgba(255, 255, 255, 0.025);
+    }
+    .game-session-art {
+      min-height: 280px; display: grid; place-items: center; background-color: #101014; background-position: center;
+      background-size: cover; position: relative; color: rgba(255, 255, 255, 0.35);
+    }
+    .game-session-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 55%, rgba(7, 7, 9, 0.9)); }
+    .game-session-art .ui-icon { width: 58px; height: 58px; }
+    .game-session-copy { padding: 32px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; }
+    .game-session-copy h2 { margin: 10px 0 8px; font-size: 25px; }
+    .game-session-copy p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+    .game-session-copy button { margin-top: 24px; padding: 11px 15px; border: 0; border-radius: 10px; background: #fff; color: #08080a; font-weight: 750; cursor: pointer; }
+    .game-live { display: flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, 0.58); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
+    .game-live i { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 9px rgba(16, 185, 129, .5); }
+    .game-live b { font: inherit; }
+    .game-live.is-idle i { background: #64748b; box-shadow: none; }
+    .game-live.is-unverified i { background: #f59e0b; box-shadow: 0 0 9px rgba(245, 158, 11, .45); }
+    .panel-view[data-panel-view="game"].is-active, .panel-view[data-panel-view="media"].is-active { height: clamp(480px, calc(90vh - 160px), 780px); overflow-y: auto; padding-right: 7px; }
+    .game-metrics { margin-top: 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .game-metrics article { min-width: 0; padding: 14px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 3px 9px; border: 1px solid var(--panel-border); border-radius: 13px; background: rgba(255, 255, 255, .025); }
+    .game-metrics .ui-icon { grid-row: 1 / 3; width: 19px; height: 19px; color: rgba(255, 255, 255, .5); }
+    .game-metrics span { color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+    .game-metrics strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+    .game-details-card { margin-top: 12px; padding: 4px 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(255, 255, 255, .02); }
+    .game-details-card div { min-width: 0; padding: 13px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05); }
+    .game-details-card div:nth-last-child(-n+3) { border-bottom: 0; }
+    .game-details-card span, .game-details-card strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .game-details-card span { color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+    .game-details-card strong { margin-top: 5px; color: rgba(255, 255, 255, .82); font-size: 11px; }
+
+    .achievement-summary { margin-bottom: 18px; padding: 16px 18px; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 9px; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(255, 255, 255, .025); }
+    .achievement-summary strong { font-size: 20px; }
+    .achievement-summary > span { color: var(--text-muted); font-size: 11px; }
+    .achievement-progress-track { grid-column: 1 / -1; height: 4px; margin-top: 9px; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, .07); }
+    #panel-achievement-progress { display: block; width: 0; height: 100%; border-radius: inherit; background: #fff; transition: width 300ms ease; }
+    .achievement-item { min-height: 68px; padding: 10px 13px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 13px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 13px; background: rgba(255, 255, 255, .025); }
+    .achievement-item.is-locked { opacity: .46; filter: grayscale(1); }
+    .achievement-icon { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; }
+    .achievement-copy { min-width: 0; }
+    .achievement-name { color: #fff; font-size: 13px; font-weight: 750; }
+    .achievement-description-small { margin-top: 3px; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .achievement-state { margin-top: 5px; color: rgba(255, 255, 255, .65); font-size: 9px; text-transform: uppercase; letter-spacing: .07em; }
+    .panel-view[data-panel-view="achievements"].is-active { height: clamp(480px, calc(90vh - 160px), 780px); min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .panel-view[data-panel-view="achievements"] .achievement-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding-right: 8px; align-content: start; }
+    .panel-view[data-panel-view="achievements"] .achievement-list::-webkit-scrollbar,
+    .capture-gallery::-webkit-scrollbar,
+    .panel-view[data-panel-view="game"].is-active::-webkit-scrollbar,
+    .panel-view[data-panel-view="media"].is-active::-webkit-scrollbar { width: 5px; }
+    .panel-view[data-panel-view="achievements"] .achievement-list::-webkit-scrollbar-thumb,
+    .capture-gallery::-webkit-scrollbar-thumb,
+    .panel-view[data-panel-view="game"].is-active::-webkit-scrollbar-thumb,
+    .panel-view[data-panel-view="media"].is-active::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(255, 255, 255, .16); }
+
+    .media-player-card { padding: 28px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px; border: 1px solid var(--panel-border); border-radius: 18px; background: radial-gradient(circle at 0 0, rgba(255, 255, 255, .07), transparent 35%), rgba(255, 255, 255, .025); }
+    .media-cover { width: 92px; height: 92px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .09); border-radius: 18px; background: #151519; color: rgba(255, 255, 255, .45); }
+    .media-cover .ui-icon { width: 34px; height: 34px; }
+    .media-copy span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+    .media-copy h2 { margin: 8px 0 5px; font-size: 19px; }
+    .media-copy p { margin: 0; color: var(--text-muted); font-size: 11px; }
+    .media-controls { display: flex; align-items: center; gap: 8px; }
+    .media-controls button { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .1); border-radius: 12px; background: rgba(255, 255, 255, .04); color: #fff; cursor: pointer; }
+    .media-controls button:hover { background: rgba(255, 255, 255, .09); }
+    .media-controls .media-play { width: 48px; height: 48px; background: #fff; color: #08080a; }
+    .capture-hero { padding: 22px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 17px; border: 1px solid var(--panel-border); border-radius: 17px; background: radial-gradient(circle at 0 0, rgba(255, 255, 255, .08), transparent 42%), rgba(255, 255, 255, .025); }
+    .capture-hero-icon { width: 58px; height: 58px; display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, .1); border-radius: 15px; background: rgba(255, 255, 255, .055); }
+    .capture-hero-icon .ui-icon { width: 27px; height: 27px; }
+    .capture-hero > div > span { color: var(--text-muted); font-size: 9px; font-weight: 800; letter-spacing: .11em; }
+    .capture-hero h2 { margin: 7px 0 4px; font-size: 18px; }
+    .capture-hero p { margin: 0; color: var(--text-muted); font-size: 10px; }
+    .capture-hero > button { min-height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 0; border-radius: 11px; background: #fff; color: #08080a; font-weight: 750; cursor: pointer; }
+    .capture-hero > button .ui-icon { width: 17px; height: 17px; }
+    .capture-hero kbd { padding: 4px 6px; border-radius: 5px; background: rgba(0, 0, 0, .1); font: inherit; font-size: 9px; }
+    .capture-heading { margin: 20px 0 10px; display: flex; align-items: center; justify-content: space-between; }
+    .capture-heading h3 { margin: 0; font-size: 13px; }
+    .capture-heading button { display: flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+    .capture-heading button:hover { color: #fff; }
+    .capture-heading .ui-icon { width: 15px; height: 15px; }
+    .capture-feedback { min-height: 15px; margin: 7px 0 0; color: var(--text-muted); font-size: 9px; }
+    .capture-gallery { max-height: 390px; overflow-y: auto; padding-right: 7px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+    .capture-card { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid rgba(255, 255, 255, .08); border-radius: 11px; background: #101014; transition: opacity 180ms ease, border-color 180ms ease; }
+    .capture-card.is-deleting { opacity: .46; pointer-events: none; }
+    .capture-card img { width: 100%; height: 100%; object-fit: cover; transition: transform 220ms ease; }
+    .capture-card:hover img { transform: scale(1.035); }
+    .capture-card .capture-date { position: absolute; right: 7px; bottom: 7px; padding: 4px 6px; border-radius: 6px; background: rgba(0, 0, 0, .68); color: rgba(255, 255, 255, .75); font-size: 8px; backdrop-filter: blur(8px); }
+    .capture-delete { position: absolute; top: 7px; right: 7px; width: 28px; height: 28px; padding: 0; display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 8px; background: rgba(5, 5, 7, .76); color: rgba(255, 255, 255, .72); opacity: 0; transform: translateY(-3px); cursor: pointer; backdrop-filter: blur(10px); transition: width 160ms ease, opacity 160ms ease, transform 160ms ease, color 160ms ease, background 160ms ease, border-color 160ms ease; }
+    .capture-card:hover .capture-delete, .capture-delete:focus-visible, .capture-delete.is-confirming { opacity: 1; transform: translateY(0); }
+    .capture-delete:hover { color: #fff; background: rgba(18, 18, 22, .92); }
+    .capture-delete.is-confirming { width: 72px; border-color: rgba(248, 113, 113, .6); background: rgba(127, 29, 29, .88); color: #fff; }
+    .capture-delete.is-confirming::after { content: "Excluir?"; font-size: 8px; font-weight: 800; }
+    .capture-delete .ui-icon { width: 14px; height: 14px; }
+    .capture-empty { grid-column: 1 / -1; padding: 38px 16px; border: 1px dashed rgba(255, 255, 255, .1); border-radius: 13px; color: var(--text-muted); text-align: center; font-size: 11px; }
+
+    .top-profile { color: #fff; font: inherit; }
+    .top-profile:hover { background: var(--panel-surface-hover); border-color: rgba(255, 255, 255, 0.16); }
+    .top-profile .ui-icon { width: 15px; height: 15px; color: var(--text-muted); }
+
+    .conversation-page, .settings-page, .profile-page { min-height: 100%; animation: fade-in 240ms ease both; }
+    .view-title { margin-bottom: 22px; }
+    .view-title h2 { margin: 0; font-size: 24px; letter-spacing: -0.025em; }
+    .view-title p { margin: 6px 0 0; color: var(--text-muted); font-size: 12px; }
+
+    .conversation-list { display: flex; flex-direction: column; gap: 7px; }
+    .conversation-row {
+      width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+      gap: 14px; padding: 12px 14px; border: 1px solid transparent; border-radius: 14px;
+      background: rgba(255, 255, 255, 0.025); color: #fff; text-align: left; cursor: pointer;
+      transition: background 170ms ease, border-color 170ms ease, transform 170ms ease;
+    }
+    .conversation-row:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1); transform: translateX(2px); }
+    .conversation-row img { width: 46px; height: 46px; border-radius: 14px; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.1); }
+    .conversation-copy { min-width: 0; }
+    .conversation-copy strong, .conversation-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .conversation-copy strong { font-size: 14px; }
+    .conversation-copy span { margin-top: 4px; color: var(--text-muted); font-size: 11px; }
+    .conversation-meta { display: flex; align-items: center; gap: 8px; }
+    .conversation-unread {
+      min-width: 22px; height: 22px; padding: 0 7px; display: grid; place-items: center;
+      border-radius: 999px; background: #fff; color: #050507; font-size: 10px; font-weight: 800;
+    }
+    .conversation-empty { padding: 48px 18px; border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 16px; color: var(--text-muted); text-align: center; font-size: 12px; }
+
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .settings-card, .profile-card { border: 1px solid var(--panel-border); border-radius: 16px; background: rgba(255, 255, 255, 0.025); overflow: hidden; }
+    .settings-card h3 { margin: 0; padding: 16px 18px 12px; font-size: 13px; }
+    .setting-row { min-height: 58px; padding: 10px 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(255, 255, 255, 0.055); }
+    .setting-row .quick-icon { flex: 0 0 auto; }
+    .setting-copy { flex: 1; min-width: 0; }
+    .setting-copy b { display: block; font-size: 12px; }
+    .setting-copy small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+    .setting-switch {
+      width: 38px; height: 22px; position: relative; appearance: none; border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 999px; background: rgba(255, 255, 255, 0.07); cursor: pointer; transition: background 160ms ease;
+    }
+    .setting-switch::after {
+      content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.5); transition: transform 160ms ease, background 160ms ease;
+    }
+    .setting-switch:checked { background: #fff; }
+    .setting-switch:checked::after { transform: translateX(16px); background: #08080a; }
+    .shortcut-key { padding: 6px 9px; border: 1px solid rgba(255, 255, 255, 0.12); border-bottom-color: rgba(255, 255, 255, 0.25); border-radius: 7px; background: rgba(255, 255, 255, 0.055); color: rgba(255, 255, 255, 0.74); font-size: 10px; white-space: nowrap; }
+    .shortcut-recorder { min-width: 148px; padding: 6px 7px 6px 10px; display: flex; align-items: center; justify-content: flex-end; gap: 9px; border: 1px solid rgba(255, 255, 255, .12); border-radius: 9px; background: #151519; color: rgba(255, 255, 255, .68); font: inherit; font-size: 9px; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease; }
+    .shortcut-recorder:hover { border-color: rgba(255, 255, 255, .24); background: #1a1a1f; color: #fff; }
+    .shortcut-recorder.is-recording { border-color: rgba(255, 255, 255, .48); background: rgba(255, 255, 255, .09); color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, .045); }
+    .shortcut-recorder kbd { padding: 5px 7px; border: 1px solid rgba(255, 255, 255, .14); border-bottom-color: rgba(255, 255, 255, .32); border-radius: 6px; background: rgba(255, 255, 255, .055); color: #fff; font: inherit; font-size: 9px; white-space: nowrap; }
+    .settings-card-wide { grid-column: 1 / -1; }
+    .setting-feedback { min-height: 15px; margin: 0; padding: 0 17px 10px; color: var(--text-muted); font-size: 9px; }
+
+    .profile-hero { padding: 24px; display: flex; align-items: center; gap: 18px; background: radial-gradient(circle at 12% 0, rgba(255, 255, 255, 0.08), transparent 42%); }
+    .profile-hero img { width: 82px; height: 82px; border-radius: 22px; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.16); box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32); }
+    .profile-identity h2 { margin: 0; font-size: 22px; }
+    .profile-identity p { margin: 6px 0 0; color: var(--text-muted); font-size: 12px; }
+    .discord-pill { width: fit-content; margin-top: 10px; padding: 6px 9px; display: flex; align-items: center; gap: 7px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; background: rgba(255, 255, 255, 0.045); color: rgba(255, 255, 255, 0.72); font-size: 10px; }
+    .discord-pill[hidden] { display: none !important; }
+    .discord-pill i { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.45); }
+    .profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--panel-border); }
+    .profile-stat { padding: 18px; text-align: center; border-right: 1px solid var(--panel-border); }
+    .profile-stat:last-child { border-right: 0; }
+    .profile-stat strong { display: block; font-size: 20px; }
+    .profile-stat span { display: block; margin-top: 4px; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    body.overlay-reduced-motion *, body.overlay-reduced-motion *::before, body.overlay-reduced-motion *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+
+    @media (max-width: 1180px) {
+      #command-panel.is-open { grid-template-columns: 76px minmax(0, 1fr) 300px; }
+      .panel-topbar { padding-inline: 24px; }
+      .panel-content { padding-inline: 24px; }
+      .friend-search { width: 210px; }
+      .settings-grid { grid-template-columns: 1fr; }
+      .settings-card-wide { grid-column: auto; }
+      .game-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .capture-hero { grid-template-columns: auto 1fr; }
+      .capture-hero > button { grid-column: 1 / -1; justify-content: center; }
+    }
+
+    @media (max-height: 700px) {
+      .panel-view[data-panel-view="chats"].is-active {
+        min-height: calc(90vh - 130px);
       }
     }
   </style>
 </head>
 
 <body>
+  <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden">
+    <defs>
+      <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z" /></symbol>
+      <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a4 4 0 0 1-1-2.6V7a4 4 0 0 1 4-4h11a4 4 0 0 1 4 4Z" /></symbol>
+      <symbol id="icon-gamepad" viewBox="0 0 24 24"><path d="M7 8h10a5 5 0 0 1 4.7 6.7l-1.2 3.2a2.4 2.4 0 0 1-4.1.7L14.7 17H9.3l-1.7 1.6a2.4 2.4 0 0 1-4.1-.7l-1.2-3.2A5 5 0 0 1 7 8Z" /><path d="M7 11v4M5 13h4M16.5 12.5h.01M18.5 14.5h.01" /></symbol>
+      <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></symbol>
+      <symbol id="icon-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0Z" /><path d="M7 6H4v2a4 4 0 0 0 4 4M17 6h3v2a4 4 0 0 1-4 4" /></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></symbol>
+      <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></symbol>
+      <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+      <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></symbol>
+      <symbol id="icon-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></symbol>
+      <symbol id="icon-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></symbol>
+      <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3" /></symbol>
+      <symbol id="icon-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></symbol>
+      <symbol id="icon-sparkles" viewBox="0 0 24 24"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2ZM19 14l.7 2.3L22 17l-2.3.7L19 20l-.7-2.3L16 17l2.3-.7ZM5 14l.7 1.3L7 16l-1.3.7L5 18l-.7-1.3L3 16l1.3-.7Z" /></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z" /></symbol>
+      <symbol id="icon-skip-back" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z" /></symbol>
+      <symbol id="icon-skip-forward" viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z" /></symbol>
+      <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M14.5 5 13 3h-2L9.5 5H5a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V8a3 3 0 0 0-3-3Z" /><circle cx="12" cy="13" r="4" /></symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></symbol>
+      <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7" /></symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></symbol>
+      <symbol id="icon-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /></symbol>
+    </defs>
+  </svg>
   <div id="achievement-stack"></div>
   <div id="social-stack"></div>
+  <section id="command-panel" aria-hidden="true">
+    <div class="panel-game-backdrop" id="panel-game-backdrop"></div>
+    <aside class="panel-sidebar">
+      <div class="panel-logo" aria-label="Checkpoint"><img src="../public/Checkpoint_Logo.png" alt="" /></div>
+      <nav class="panel-navigation" aria-label="Navegação do overlay">
+        <button class="panel-tab is-active" data-panel-tab="friends"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-home" /></svg></span><span>Início</span></button>
+        <button class="panel-tab" data-panel-tab="chats"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-chat" /></svg></span><span>Chat</span><b class="nav-notification" id="nav-unread" hidden></b></button>
+        <button class="panel-tab" data-panel-tab="game"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span><span>Jogo</span></button>
+        <button class="panel-tab" data-panel-tab="media"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-image" /></svg></span><span>Mídia</span></button>
+        <button class="panel-tab" data-panel-tab="achievements"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span><span>Conquistas</span></button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <button class="panel-action panel-tab" data-panel-tab="settings"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-settings" /></svg></span><span>Config.</span></button>
+      <div class="sidebar-profile">
+        <img id="sidebar-profile-avatar" alt="" />
+        <span id="sidebar-profile-name">Guilherme</span>
+        <i class="status-dot online"></i>
+      </div>
+    </aside>
+
+    <div class="panel-workspace">
+      <header class="panel-topbar">
+        <div class="welcome-copy">
+          <h1>Olá, <span id="panel-profile-name">Guilherme</span> <svg class="ui-icon welcome-mark"><use href="#icon-sparkles" /></svg></h1>
+          <p><span id="panel-friend-count">6 amigos</span> &bull; <span id="panel-online-count">2 online</span></p>
+        </div>
+        <label class="friend-search">
+          <svg class="ui-icon"><use href="#icon-search" /></svg>
+          <input id="friend-search" type="search" placeholder="Buscar amigos..." autocomplete="off" />
+        </label>
+        <button class="top-profile" data-panel-tab="profile" type="button">
+          <img id="panel-profile-avatar" alt="" />
+          <span>Meu perfil</span><svg class="ui-icon" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+        </button>
+        <button class="top-close" id="panel-close-top" aria-label="Fechar overlay"><svg class="ui-icon"><use href="#icon-close" /></svg></button>
+      </header>
+
+      <div class="panel-layout">
+        <main class="panel-content">
+          <div class="panel-view is-active" data-panel-view="friends">
+            <div id="panel-friends-view">
+              <section class="friend-section">
+                <div class="section-heading">
+                  <h2><i class="status-dot online"></i> Amigos online <span id="online-heading-count">(3)</span></h2>
+                  <button id="show-all-friends">Ver todos ›</button>
+                </div>
+                <div class="online-friends-grid" id="panel-friends-online"></div>
+              </section>
+
+              <section class="friend-section offline-section">
+                <div class="section-heading">
+                  <h2><i class="status-dot"></i> Amigos offline <span id="offline-heading-count">(12)</span></h2>
+                </div>
+                <div class="offline-friends-list" id="panel-friends-offline"></div>
+              </section>
+              <p class="sr-only" id="panel-game">Nenhum jogo detectado.</p>
+            </div>
+          </div>
+          <div class="panel-view" data-panel-view="chats">
+            <div class="conversation-page" id="panel-chat-list">
+              <div class="view-title"><h2>Conversas</h2><p>Continue suas conversas sem sair do jogo.</p></div>
+              <div class="conversation-list" id="conversation-list"></div>
+            </div>
+            <div id="panel-chat-view" hidden>
+              <div class="chat-layout">
+                <header class="chat-header">
+                  <button class="chat-back" id="chat-back" aria-label="Voltar para amigos"><svg class="ui-icon"><use href="#icon-back" /></svg></button>
+                  <img class="friend-avatar" id="chat-avatar" alt="" />
+                  <div class="friend-copy">
+                    <div class="friend-name" id="chat-name">Amigo</div>
+                    <div class="friend-status" id="chat-status">Conversa</div>
+                  </div>
+                </header>
+                <div class="chat-messages" id="chat-messages"></div>
+                <div class="chat-composer">
+                  <div class="chat-typing" id="chat-typing"></div>
+                  <div class="chat-error" id="chat-error" role="status" aria-live="polite"></div>
+                  <form class="chat-form" id="chat-form"><input class="chat-input" id="chat-input"
+                      autocomplete="off" placeholder="Escreva uma mensagem..." aria-label="Mensagem" /><button class="chat-send" id="chat-send" type="submit" aria-label="Enviar mensagem"><svg class="ui-icon"><use href="#icon-send" /></svg></button></form>
+              </div>
+            </div>
+          </div>
+          </div>
+          <div class="panel-view" data-panel-view="game">
+            <div class="game-page">
+              <div class="view-title"><h2>Jogo em execução</h2><p>Informações da sua sessão atual.</p></div>
+              <section class="game-session-card">
+                <div class="game-session-art" id="game-page-art"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></div>
+                <div class="game-session-copy"><span class="game-live" id="game-live-status"><i></i><b id="game-live-label">AGUARDANDO JOGO</b></span><h2 id="game-page-title">Nenhum jogo detectado</h2><p id="game-page-message">Abra um jogo pela biblioteca para acompanhar sua sessão.</p><button type="button" data-context-tab="achievements">Ver conquistas</button></div>
+              </section>
+              <div class="game-metrics">
+                <article><svg class="ui-icon"><use href="#icon-clock" /></svg><span>Sessão atual</span><strong id="game-session-duration">00:00:00</strong></article>
+                <article><svg class="ui-icon"><use href="#icon-gamepad" /></svg><span>Tempo total</span><strong id="game-total-playtime">0h</strong></article>
+                <article><svg class="ui-icon"><use href="#icon-trophy" /></svg><span>Conquistas</span><strong id="game-achievement-ratio">0/0</strong></article>
+                <article><svg class="ui-icon"><use href="#icon-users" /></svg><span>Amigos jogando</span><strong id="game-friends-playing">0</strong></article>
+              </div>
+              <section class="game-details-card">
+                <div><span>Plataforma</span><strong id="game-platform">—</strong></div><div><span>Executável</span><strong id="game-executable">—</strong></div><div><span>Desenvolvedor</span><strong id="game-developer">—</strong></div><div><span>Lançamento</span><strong id="game-release-date">—</strong></div><div><span>Modo de janela</span><strong id="game-window-mode">Padrão do jogo</strong></div><div><span>Resolução</span><strong id="game-resolution">Automática</strong></div>
+              </section>
+            </div>
+          </div>
+          <div class="panel-view" data-panel-view="achievements">
+            <div class="view-title"><h2>Conquistas</h2><p id="achievement-game-label">Inicie um jogo para acompanhar o progresso.</p></div>
+            <div class="achievement-summary"><strong><span id="panel-unlocked">0</span>/<span id="panel-available">0</span></strong><span>desbloqueadas</span><div class="achievement-progress-track"><i id="panel-achievement-progress"></i></div></div>
+            <div class="achievement-list" id="panel-achievements"></div>
+          </div>
+          <div class="panel-view" data-panel-view="media">
+            <div class="media-page">
+              <div class="view-title"><h2>Capturas</h2><p>Registre seus melhores momentos sem sair da partida.</p></div>
+              <section class="capture-hero">
+                <span class="capture-hero-icon"><svg class="ui-icon"><use href="#icon-camera" /></svg></span>
+                <div><span>CAPTURA DE TELA</span><h2>Capture o monitor do jogo</h2><p>Os arquivos são salvos automaticamente em Imagens/Checkpoint Captures.</p></div>
+                <button type="button" id="capture-now"><svg class="ui-icon"><use href="#icon-camera" /></svg>Capturar agora <kbd id="capture-shortcut-label">F8</kbd></button>
+              </section>
+              <div class="capture-heading"><h3>Capturas recentes</h3><button type="button" id="open-captures-folder"><svg class="ui-icon"><use href="#icon-folder" /></svg>Abrir pasta</button></div>
+              <div class="capture-gallery" id="capture-gallery"></div>
+              <p class="capture-feedback" id="capture-gallery-feedback" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="panel-view" data-panel-view="settings">
+            <div class="settings-page">
+              <div class="view-title"><h2>Configurações do overlay</h2><p>Personalize o comportamento durante suas partidas.</p></div>
+              <div class="settings-grid">
+                <section class="settings-card">
+                  <h3>Notificações</h3>
+                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-bell" /></svg></span><span class="setting-copy"><b>Atividade social</b><small>Mensagens e atividades dos amigos</small></span><input class="setting-switch" id="setting-social" type="checkbox" checked /></label>
+                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span><span class="setting-copy"><b>Conquistas</b><small>Mostrar conquistas desbloqueadas</small></span><input class="setting-switch" id="setting-achievements" type="checkbox" checked /></label>
+                </section>
+                <section class="settings-card">
+                  <h3>Experiência</h3>
+                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-sparkles" /></svg></span><span class="setting-copy"><b>Animações</b><small>Transições e movimentos da interface</small></span><input class="setting-switch" id="setting-animations" type="checkbox" checked /></label>
+                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-settings" /></svg></span><span class="setting-copy"><b>Abrir overlay</b><small>Atalho global durante o jogo</small></span><kbd class="shortcut-key">Ctrl + Shift + O</kbd></label>
+                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span><span class="setting-copy"><b>Atalho no controle</b><small>Xbox Guide, PS ou Home</small></span><kbd class="shortcut-key">Botão central</kbd></div>
+                </section>
+                <section class="settings-card settings-card-wide">
+                  <h3>Captura de tela</h3>
+                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-camera" /></svg></span><span class="setting-copy"><b>Atalho de captura</b><small>F1–F24, Print Screen ou combinação com Ctrl, Alt e Shift</small></span><button class="shortcut-recorder" id="record-capture-shortcut" type="button" aria-pressed="false"><span id="record-shortcut-label">Alterar</span><kbd id="capture-shortcut-value">F8</kbd></button></div>
+                  <p class="setting-feedback" id="capture-setting-feedback"></p>
+                </section>
+              </div>
+            </div>
+          </div>
+          <div class="panel-view" data-panel-view="profile">
+            <div class="profile-page">
+              <div class="view-title"><h2>Meu perfil</h2><p>Sua identidade e atividade no Checkpoint.</p></div>
+              <section class="profile-card">
+                <div class="profile-hero">
+                  <img id="profile-page-avatar" alt="" />
+                  <div class="profile-identity"><h2 id="profile-page-name">Jogador</h2><p id="profile-page-status">Online no Checkpoint</p><div class="discord-pill" id="profile-discord"><i></i><span id="profile-discord-name">Discord conectado</span></div></div>
+                </div>
+                <div class="profile-stats">
+                  <div class="profile-stat"><strong id="profile-friends-total">0</strong><span>Amigos</span></div>
+                  <div class="profile-stat"><strong id="profile-online-total">0</strong><span>Online</span></div>
+                  <div class="profile-stat"><strong id="profile-achievements-total">0</strong><span>Conquistas</span></div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <aside class="context-panel">
+      <div class="context-game-card">
+        <div class="context-game-art" id="context-game-art">
+          <div class="context-game-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></div>
+        </div>
+        <div class="context-game-copy">
+          <h2 id="context-game-title">Nenhum jogo detectado</h2>
+          <p id="context-game-message">Inicie um jogo para acessar capturas, conquistas e ferramentas do overlay
+            mais.</p>
+          <button class="context-primary" data-context-tab="achievements">Ver biblioteca</button>
+        </div>
+      </div>
+
+      <div class="quick-access">
+        <h3>Acesso rápido</h3>
+        <button data-context-tab="media">
+          <span class="quick-icon purple"><svg class="ui-icon"><use href="#icon-image" /></svg></span>
+          <span><b>Capturas de tela</b><small>Ver suas imagens</small></span><i><svg class="ui-icon"><use href="#icon-chevron" /></svg></i>
+        </button>
+        <button data-context-tab="achievements">
+          <span class="quick-icon pink"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span>
+          <span><b>Conquistas</b><small>Ver progresso e conquistas</small></span><i><svg class="ui-icon"><use href="#icon-chevron" /></svg></i>
+        </button>
+      </div>
+    </aside>
+  </section>
+
+  <!-- JS LOGIC REMAINS 100% UNCHANGED -->
   <script>
     const achievementStack = document.getElementById("achievement-stack");
     const socialStack = document.getElementById("social-stack");
+    const commandPanel = document.getElementById("command-panel");
     const checkpointIconUrl = new URL("../assets/icon.png", window.location.href).toString();
+    const overlayPreferences = {
+      social: localStorage.getItem("checkpoint-overlay-social") !== "false",
+      achievements: localStorage.getItem("checkpoint-overlay-achievements") !== "false",
+      animations: localStorage.getItem("checkpoint-overlay-animations") !== "false",
+    };
     const overlaySoundMap = {
       "achievement-unlock": new URL("../assets/Achievment_Unlock.mp3", window.location.href).toString(),
     };
@@ -521,6 +1896,14 @@
       card.style.setProperty("--stagger", `${Math.min(visibleSiblings, 3) * 80}ms`);
     };
 
+    const limitOverlayStack = (stack, maxCards = 3) => {
+      const cards = Array.from(stack.querySelectorAll(".overlay-card:not(.is-leaving)"));
+      cards.slice(0, Math.max(0, cards.length - maxCards)).forEach((card) => {
+        card.classList.add("is-leaving");
+        setTimeout(() => card.remove(), 300);
+      });
+    };
+
     const reticleSvg = () => `
         <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <circle cx="50" cy="50" r="42" stroke="currentColor" stroke-width="2.5" opacity="0.82" />
@@ -529,10 +1912,6 @@
           <line x1="50" y1="88" x2="50" y2="98" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
           <line x1="2" y1="50" x2="12" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
           <line x1="88" y1="50" x2="98" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-          <line x1="21" y1="21" x2="27" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35" />
-          <line x1="79" y1="21" x2="73" y2="27" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35" />
-          <line x1="21" y1="79" x2="27" y2="73" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35" />
-          <line x1="79" y1="79" x2="73" y2="73" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.35" />
         </svg>
       `;
 
@@ -605,6 +1984,8 @@
     };
 
     const socialBadgeLabel = (kind) => {
+      if (kind === "capture-saved") return "Captura de tela";
+      if (kind === "overlay-hint") return "Overlay disponível";
       if (kind === "controller-connected") return "Controle conectado";
       if (kind === "friend-request") return "Pedido de amizade";
       if (kind === "friend-accepted") return "Pedido aceito";
@@ -613,7 +1994,77 @@
       return "Jogo iniciado";
     };
 
+    const formatPlaytime = (minutes) => {
+      const total = Math.max(0, Number(minutes) || 0);
+      if (total < 60) return `${Math.round(total)}min`;
+      const hours = Math.floor(total / 60);
+      const remaining = Math.round(total % 60);
+      return remaining > 0 ? `${hours}h ${remaining}min` : `${hours}h`;
+    };
+
+    const formatShortcut = (shortcut) => String(shortcut || "F8")
+      .split("+")
+      .map((part) => part === "CommandOrControl" ? "Ctrl" : part)
+      .join(" + ");
+
+    const setCaptureFeedback = (message) => {
+      ["capture-setting-feedback", "capture-gallery-feedback"].forEach((id) => {
+        const node = document.getElementById(id);
+        if (node) node.textContent = message;
+      });
+    };
+
+    const captureKeyFromEvent = (event) => {
+      if (/^Key[A-Z]$/.test(event.code)) return event.code.slice(3);
+      if (/^Digit[0-9]$/.test(event.code)) return event.code.slice(5);
+      if (/^F(?:[1-9]|1[0-9]|2[0-4])$/.test(event.code)) return event.code;
+      const keyMap = {
+        Space: "Space",
+        ArrowUp: "Up",
+        ArrowDown: "Down",
+        ArrowLeft: "Left",
+        ArrowRight: "Right",
+        Home: "Home",
+        End: "End",
+        PageUp: "PageUp",
+        PageDown: "PageDown",
+        Insert: "Insert",
+        Delete: "Delete",
+        Backspace: "Backspace",
+        PrintScreen: "PrintScreen",
+      };
+      return keyMap[event.code] || "";
+    };
+
+    const shortcutFromEvent = (event) => {
+      const key = captureKeyFromEvent(event);
+      if (!key) return "";
+      const modifiers = [
+        event.ctrlKey || event.metaKey ? "CommandOrControl" : "",
+        event.altKey ? "Alt" : "",
+        event.shiftKey ? "Shift" : "",
+      ].filter(Boolean);
+      if (modifiers.length === 0 && !/^(?:F(?:[1-9]|1[0-9]|2[0-4])|PrintScreen)$/.test(key)) return "";
+      return [...modifiers, key].join("+");
+    };
+
+    const updateSessionDuration = () => {
+      const node = document.getElementById("game-session-duration");
+      if (!node) return;
+      const startedAt = Date.parse(latestPanelState.currentGame?.sessionStartedAt || "");
+      if (!Number.isFinite(startedAt)) {
+        node.textContent = "00:00:00";
+        return;
+      }
+      const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const hours = String(Math.floor(elapsed / 3600)).padStart(2, "0");
+      const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0");
+      const seconds = String(elapsed % 60).padStart(2, "0");
+      node.textContent = `${hours}:${minutes}:${seconds}`;
+    };
+
     const enqueueAchievement = (payload) => {
+      if (!overlayPreferences.achievements) return;
       const duration = 5000;
       const card = document.createElement("article");
       card.className = "overlay-card achievement-card";
@@ -626,7 +2077,7 @@
       const _achIconUrl = payload.achievement?.icon || "";
       shell.appendChild(createIconColumn(
         _achIconUrl
-          ? { avatarSrc: _achIconUrl, fallbackSvg: trophySvg(), isLogo: true }
+          ? { avatarSrc: _achIconUrl, fallbackSvg: trophySvg(), isPhoto: true }
           : { avatarSvg: trophySvg() }
       ));
 
@@ -638,7 +2089,7 @@
 
       const eyebrow = document.createElement("div");
       eyebrow.className = "achievement-eyebrow";
-      eyebrow.textContent = payload.duplicate ? "ACHIEVEMENT ATUALIZADO" : "ACHIEVEMENT DESBLOQUEADO";
+      eyebrow.textContent = payload.duplicate ? "CONQUISTA ATUALIZADA" : "CONQUISTA DESBLOQUEADA";
 
       const title = document.createElement("h2");
       title.className = "achievement-title";
@@ -657,11 +2108,13 @@
       shell.appendChild(content);
       card.appendChild(shell);
       achievementStack.appendChild(card);
+      limitOverlayStack(achievementStack);
       scheduleRemoval(card, duration);
     };
 
     const enqueueSocial = (payload) => {
-      const duration = payload.kind === "game-start" ? 6000 : 5000;
+      if (!overlayPreferences.social) return;
+      const duration = payload.kind === "overlay-hint" ? 6500 : payload.kind === "game-start" ? 6000 : 5000;
       const card = document.createElement("article");
       card.className = `overlay-card social-card kind-${payload.kind || "game-start"}`;
       card.style.setProperty("--card-duration", `${duration}ms`);
@@ -675,18 +2128,19 @@
 
       const isGameStart = payload.kind === "game-start";
       const isControllerConnected = payload.kind === "controller-connected";
+      const isOverlayHint = payload.kind === "overlay-hint";
       shell.appendChild(
         createIconColumn({
-          ring: true,
+          ring: !isGameStart && !isOverlayHint,
           avatarSrc:
             isGameStart
               ? checkpointIconUrl
-              : isControllerConnected
+              : isControllerConnected || isOverlayHint
                 ? ""
                 : payload.avatarUrl || checkpointIconUrl,
-          avatarSvg: isControllerConnected ? controllerSvg() : "",
-          isPhoto: !isGameStart && !isControllerConnected && Boolean(payload.avatarUrl),
-          isLogo: isGameStart || isControllerConnected,
+          avatarSvg: isControllerConnected || isOverlayHint ? controllerSvg() : "",
+          isPhoto: !isGameStart && !isControllerConnected && !isOverlayHint && Boolean(payload.avatarUrl),
+          isLogo: isGameStart || isControllerConnected || isOverlayHint,
         }),
       );
 
@@ -706,7 +2160,7 @@
 
       const description = document.createElement("p");
       description.className = "social-description";
-      description.textContent = payload.description || "Aproveite sua experiencia com o Checkpoint Launcher";
+      description.textContent = payload.description || "Aproveite sua experiência com o Checkpoint Launcher";
 
       text.appendChild(badge);
       text.appendChild(title);
@@ -716,13 +2170,477 @@
       shell.appendChild(content);
       card.appendChild(shell);
       socialStack.appendChild(card);
+      limitOverlayStack(socialStack);
       scheduleRemoval(card, duration);
     };
 
-    window.achievementOverlay.onUnlock(enqueueAchievement);
-    window.achievementOverlay.onWelcome(enqueueSocial);
-    window.achievementOverlay.onSocial(enqueueSocial);
-    window.achievementOverlay.onPlaySound(({ sound }) => playOverlaySound(sound));
+    let latestPanelState = {};
+    let showAllOnlineFriends = false;
+    let captureShortcutRecording = false;
+    const renderPanelState = (state = {}) => {
+      latestPanelState = state;
+      const onlineRoot = document.getElementById("panel-friends-online");
+      const offlineRoot = document.getElementById("panel-friends-offline");
+      if (!onlineRoot || !offlineRoot) return;
+      const currentGame = state.currentGame || null;
+      const gameBackdrop = document.getElementById("panel-game-backdrop");
+      const gameImage = safeImageUrl(currentGame?.image);
+      if (gameBackdrop) gameBackdrop.style.backgroundImage = gameImage ? `url("${gameImage}")` : "none";
+      document.getElementById("panel-game").textContent = currentGame?.title
+        ? `Jogando agora: ${currentGame.title}`
+        : "Nenhum jogo detectado.";
+      document.getElementById("achievement-game-label").textContent = currentGame?.title
+        ? `Progresso atual em ${currentGame.title}`
+        : "Inicie um jogo para acompanhar o progresso.";
+
+      const profile = state.profile || {};
+      const profileName = profile.name || "Jogador";
+      const profileAvatar = safeImageUrl(profile.avatar) || checkpointIconUrl;
+      document.getElementById("panel-profile-name").textContent = profileName.split(" ")[0];
+      document.getElementById("sidebar-profile-name").textContent = profileName.split(" ")[0];
+      document.getElementById("sidebar-profile-avatar").src = profileAvatar;
+      document.getElementById("panel-profile-avatar").src = profileAvatar;
+      document.getElementById("profile-page-avatar").src = profileAvatar;
+      document.getElementById("profile-page-name").textContent = profileName;
+      const discordPill = document.getElementById("profile-discord");
+      discordPill.hidden = !profile.discordConnected;
+      document.getElementById("profile-discord-name").textContent = profile.discordUsername || "Discord conectado";
+
+      const allFriends = Array.isArray(state.friends) ? state.friends : [];
+      const searchTerm = document.getElementById("friend-search").value.trim().toLowerCase();
+      const friends = searchTerm
+        ? allFriends.filter((friend) => String(friend.name || "").toLowerCase().includes(searchTerm))
+        : allFriends;
+      const onlineFriends = friends.filter((friend) => friend.status !== "offline");
+      const offlineFriends = friends.filter((friend) => friend.status === "offline");
+      document.getElementById("panel-friend-count").textContent = `${allFriends.length} amigos`;
+      document.getElementById("panel-online-count").textContent = `${allFriends.filter((friend) => friend.status !== "offline").length} online`;
+      document.getElementById("online-heading-count").textContent = `(${onlineFriends.length})`;
+      document.getElementById("offline-heading-count").textContent = `(${offlineFriends.length})`;
+      document.getElementById("profile-friends-total").textContent = String(allFriends.length);
+      document.getElementById("profile-online-total").textContent = String(allFriends.filter((friend) => friend.status !== "offline").length);
+      const totalUnread = allFriends.reduce((sum, friend) => sum + Number(friend.unread || 0), 0);
+      const navUnread = document.getElementById("nav-unread");
+      navUnread.hidden = totalUnread === 0;
+      navUnread.textContent = String(Math.min(99, totalUnread));
+
+      const createFriendCard = (friend) => {
+        const card = document.createElement("article");
+        card.className = `panel-card friend-card status-${friend.status || "offline"}`;
+        const avatar = document.createElement("img");
+        avatar.className = "friend-avatar";
+        avatar.src = safeImageUrl(friend.avatar) || checkpointIconUrl;
+        avatar.alt = "";
+        const copy = document.createElement("div");
+        copy.className = "friend-copy";
+        const name = document.createElement("div");
+        name.className = "friend-name";
+        name.textContent = friend.name || "Jogador";
+        const status = document.createElement("div");
+        status.className = "friend-status";
+        status.textContent = friend.playing ? `Jogando ${friend.playing}` : friend.status === "online" ? "Online" : "Offline";
+        copy.append(name, status);
+        card.append(avatar, copy);
+        if (friend.unread > 0) {
+          const unread = document.createElement("span");
+          unread.className = "unread-badge";
+          unread.textContent = String(Math.min(99, friend.unread));
+          card.appendChild(unread);
+        }
+        const chat = document.createElement("button");
+        chat.className = "chat-button";
+        chat.textContent = friend.canChat ? "Chat" : "Indisponível";
+        chat.disabled = !friend.canChat;
+        chat.addEventListener("click", () => {
+          const chatNav = document.querySelector('[data-panel-tab="chats"]');
+          activatePanelTab("chats", chatNav);
+          window.achievementOverlay.panelAction({ kind: "select-chat", friendId: friend.id });
+        });
+        card.appendChild(chat);
+        return card;
+      };
+
+      onlineRoot.replaceChildren();
+      offlineRoot.replaceChildren();
+      const visibleOnline = showAllOnlineFriends ? onlineFriends : onlineFriends.slice(0, 3);
+      if (visibleOnline.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "panel-card";
+        empty.textContent = searchTerm ? "Nenhum amigo online corresponde à busca." : "Nenhum amigo online agora.";
+        onlineRoot.appendChild(empty);
+      }
+      visibleOnline.forEach((friend) => onlineRoot.appendChild(createFriendCard(friend)));
+      if (offlineFriends.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "panel-card";
+        empty.textContent = searchTerm ? "Nenhum amigo offline corresponde à busca." : "Nenhum amigo offline.";
+        offlineRoot.appendChild(empty);
+      }
+      offlineFriends.forEach((friend) => offlineRoot.appendChild(createFriendCard(friend)));
+
+      const conversationRoot = document.getElementById("conversation-list");
+      conversationRoot.replaceChildren();
+      const chatFriends = allFriends
+        .filter((friend) => friend.canChat)
+        .sort((a, b) => Number(b.unread || 0) - Number(a.unread || 0) || Number(a.status === "offline") - Number(b.status === "offline"));
+      if (chatFriends.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "conversation-empty";
+        empty.textContent = "Suas conversas com amigos do Checkpoint aparecerão aqui.";
+        conversationRoot.appendChild(empty);
+      }
+      chatFriends.forEach((friend) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "conversation-row";
+        const avatar = document.createElement("img");
+        avatar.src = safeImageUrl(friend.avatar) || checkpointIconUrl;
+        avatar.alt = "";
+        const copy = document.createElement("span");
+        copy.className = "conversation-copy";
+        const name = document.createElement("strong");
+        name.textContent = friend.name || "Jogador";
+        const preview = document.createElement("span");
+        preview.textContent = friend.playing ? `Jogando ${friend.playing}` : friend.status === "offline" ? "Offline" : "Disponível para conversar";
+        copy.append(name, preview);
+        const meta = document.createElement("span");
+        meta.className = "conversation-meta";
+        if (friend.unread > 0) {
+          const unread = document.createElement("span");
+          unread.className = "conversation-unread";
+          unread.textContent = String(Math.min(99, friend.unread));
+          meta.appendChild(unread);
+        }
+        row.append(avatar, copy, meta);
+        row.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "select-chat", friendId: friend.id }));
+        conversationRoot.appendChild(row);
+      });
+
+      const contextArt = document.getElementById("context-game-art");
+      contextArt.style.backgroundImage = gameImage ? `url("${gameImage}")` : "";
+      document.getElementById("context-game-title").textContent = currentGame?.title || "Nenhum jogo detectado";
+      document.getElementById("context-game-message").textContent = currentGame
+        ? "Acompanhe conquistas e converse com amigos sem sair da partida."
+        : "Inicie um jogo para acessar conquistas e recursos do overlay.";
+      const gamePageArt = document.getElementById("game-page-art");
+      gamePageArt.style.backgroundImage = gameImage ? `url("${gameImage}")` : "";
+      document.getElementById("game-page-title").textContent = currentGame?.title || "Nenhum jogo detectado";
+      document.getElementById("game-page-message").textContent = currentGame
+        ? currentGame.monitoring === "verified"
+          ? "O processo está sendo acompanhado pelo Checkpoint em segundo plano."
+          : "Jogo iniciado pelo launcher; o encerramento automático não pode ser confirmado nesta plataforma."
+        : "Abra um jogo pela biblioteca para acompanhar sua sessão.";
+      document.getElementById("game-live-label").textContent = !currentGame
+        ? "AGUARDANDO JOGO"
+        : currentGame.monitoring === "verified" ? "SESSÃO VERIFICADA" : "STATUS NÃO VERIFICADO";
+      document.getElementById("game-live-status").classList.toggle("is-idle", !currentGame);
+      document.getElementById("game-live-status").classList.toggle("is-unverified", Boolean(currentGame && currentGame.monitoring !== "verified"));
+      const platformLabels = { steam: "Steam", epic: "Epic Games", local: "Jogo local" };
+      document.getElementById("game-platform").textContent = platformLabels[String(currentGame?.platform || "").toLowerCase()] || currentGame?.platform || "—";
+      document.getElementById("game-executable").textContent = currentGame?.executableName || "Não informado";
+      document.getElementById("game-developer").textContent = currentGame?.developer || "Não informado";
+      document.getElementById("game-release-date").textContent = currentGame?.releaseDate || "Não informado";
+      document.getElementById("game-window-mode").textContent = currentGame?.windowMode === "borderless"
+        ? "Sem bordas" : currentGame?.windowMode === "windowed" ? "Janela" : "Padrão do jogo";
+      document.getElementById("game-resolution").textContent = currentGame?.resolution || "Automática";
+      document.getElementById("game-total-playtime").textContent = formatPlaytime(currentGame?.totalPlaytimeMinutes);
+      const friendsPlaying = allFriends.filter((friend) => currentGame?.title && String(friend.playing || "").toLowerCase() === String(currentGame.title).toLowerCase()).length;
+      document.getElementById("game-friends-playing").textContent = String(friendsPlaying);
+      updateSessionDuration();
+
+      const achievements = state.achievements || {};
+      const unlocked = Number(achievements.unlocked || 0);
+      const available = Number(achievements.available || 0);
+      document.getElementById("game-achievement-ratio").textContent = `${unlocked}/${available}`;
+      document.getElementById("panel-unlocked").textContent = String(unlocked);
+      document.getElementById("panel-available").textContent = String(available);
+      document.getElementById("profile-achievements-total").textContent = String(Math.max(0, Number(profile.achievements || 0)));
+      document.getElementById("panel-achievement-progress").style.width = `${available > 0 ? Math.min(100, (unlocked / available) * 100) : 0}%`;
+      const achievementsRoot = document.getElementById("panel-achievements");
+      achievementsRoot.replaceChildren();
+      const achievementItems = Array.isArray(achievements.items) ? achievements.items : [];
+      if (achievements.loading) {
+        const loading = document.createElement("div");
+        loading.className = "panel-card";
+        loading.textContent = "Carregando conquistas do jogo...";
+        achievementsRoot.appendChild(loading);
+      } else if (!currentGame) {
+        const empty = document.createElement("div");
+        empty.className = "panel-card";
+        empty.textContent = "Inicie um jogo para ver suas conquistas aqui.";
+        achievementsRoot.appendChild(empty);
+      } else if (achievementItems.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "panel-card";
+        empty.textContent = "Este jogo não possui uma lista detalhada de conquistas disponível.";
+        achievementsRoot.appendChild(empty);
+      } else {
+        achievementItems
+          .slice()
+          .sort((a, b) => Number(b.achieved) - Number(a.achieved) || a.name.localeCompare(b.name))
+          .forEach((achievement) => {
+            const item = document.createElement("article");
+            item.className = `achievement-item${achievement.achieved ? "" : " is-locked"}`;
+            const icon = document.createElement("img");
+            icon.className = "achievement-icon";
+            icon.src = safeImageUrl(achievement.icon) || checkpointIconUrl;
+            icon.alt = "";
+            const copy = document.createElement("div");
+            copy.className = "achievement-copy";
+            const name = document.createElement("div");
+            name.className = "achievement-name";
+            name.textContent = achievement.name || achievement.id;
+            const description = document.createElement("div");
+            description.className = "achievement-description-small";
+            description.textContent = achievement.description || "Sem descrição.";
+            const status = document.createElement("div");
+            status.className = "achievement-state";
+            status.textContent = achievement.achieved
+              ? `Desbloqueada${achievement.unlockedAt ? ` · ${new Date(achievement.unlockedAt).toLocaleDateString("pt-BR")}` : ""}`
+              : "Bloqueada";
+            copy.append(name, description, status);
+            item.append(icon, copy);
+            achievementsRoot.appendChild(item);
+          });
+      }
+
+      const settings = state.settings || {};
+      const captureShortcut = settings.captureShortcut || "F8";
+      document.getElementById("capture-shortcut-label").textContent = formatShortcut(captureShortcut);
+      if (!captureShortcutRecording) {
+        document.getElementById("capture-shortcut-value").textContent = formatShortcut(captureShortcut);
+      }
+      const captureRoot = document.getElementById("capture-gallery");
+      captureRoot.replaceChildren();
+      const captures = Array.isArray(state.captures) ? state.captures : [];
+      if (captures.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "capture-empty";
+        empty.textContent = "Nenhuma captura ainda. Use o botão acima ou o atalho configurado.";
+        captureRoot.appendChild(empty);
+      }
+      captures.forEach((capture) => {
+        const card = document.createElement("article");
+        card.className = "capture-card";
+        const image = document.createElement("img");
+        image.src = safeImageUrl(capture.url);
+        image.alt = capture.name || "Captura de tela";
+        const date = document.createElement("span");
+        date.className = "capture-date";
+        const createdAt = Date.parse(capture.createdAt || "");
+        date.textContent = Number.isFinite(createdAt)
+          ? new Date(createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+          : "Captura";
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "capture-delete";
+        deleteButton.setAttribute("aria-label", `Excluir ${capture.name || "captura"}`);
+        deleteButton.title = "Excluir captura";
+        deleteButton.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-trash"></use></svg>';
+        let confirmationTimer = 0;
+        deleteButton.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (!deleteButton.classList.contains("is-confirming")) {
+            deleteButton.classList.add("is-confirming");
+            deleteButton.setAttribute("aria-label", `Confirmar exclusão de ${capture.name || "captura"}`);
+            deleteButton.title = "Clique novamente para excluir";
+            setCaptureFeedback("Clique novamente em Excluir para confirmar.");
+            confirmationTimer = window.setTimeout(() => {
+              deleteButton.classList.remove("is-confirming");
+              deleteButton.setAttribute("aria-label", `Excluir ${capture.name || "captura"}`);
+              deleteButton.title = "Excluir captura";
+            }, 2500);
+            return;
+          }
+          window.clearTimeout(confirmationTimer);
+          card.classList.add("is-deleting");
+          const result = await window.achievementOverlay.panelAction({ kind: "delete-capture", captureId: capture.id });
+          if (result?.ok) {
+            setCaptureFeedback("Captura movida para a Lixeira.");
+            return;
+          }
+          card.classList.remove("is-deleting");
+          deleteButton.classList.remove("is-confirming");
+          setCaptureFeedback(result?.error || "Não foi possível excluir a captura.");
+        });
+        card.append(image, date, deleteButton);
+        captureRoot.appendChild(card);
+      });
+
+      const chat = state.chat || null;
+      document.getElementById("panel-chat-list").hidden = Boolean(chat);
+      document.getElementById("panel-chat-view").hidden = !chat;
+      if (chat) {
+        document.getElementById("chat-name").textContent = chat.friendName || "Amigo";
+        document.getElementById("chat-avatar").src = safeImageUrl(chat.friendAvatar) || checkpointIconUrl;
+        document.getElementById("chat-status").textContent = chat.typing ? "digitando..." : "Conversa pelo Checkpoint";
+        document.getElementById("chat-typing").textContent = chat.typing ? `${chat.friendName} está digitando...` : "";
+        document.getElementById("chat-error").textContent = chat.error || "";
+        document.getElementById("chat-send").disabled = Boolean(chat.sending);
+        const messagesRoot = document.getElementById("chat-messages");
+        messagesRoot.replaceChildren();
+        if (!chat.messages?.length) {
+          const empty = document.createElement("div");
+          empty.className = "chat-empty";
+          empty.textContent = "Comece a conversa por aqui.";
+          messagesRoot.appendChild(empty);
+        } else {
+          chat.messages.forEach((message) => {
+            const bubble = document.createElement("div");
+            bubble.className = `chat-message${message.mine ? " is-mine" : ""}${message.pending ? " is-pending" : ""}`;
+            bubble.textContent = message.text;
+            const time = document.createElement("span");
+            time.className = "chat-time";
+            time.textContent = message.pending
+              ? "enviando..."
+              : new Date(message.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            bubble.appendChild(time);
+            messagesRoot.appendChild(bubble);
+          });
+        }
+        messagesRoot.scrollTop = messagesRoot.scrollHeight;
+      }
+    };
+
+    const activatePanelTab = (tab, activeButton) => {
+      document.querySelectorAll("[data-panel-tab]").forEach((item) => item.classList.toggle("is-active", item === activeButton));
+      document.querySelectorAll("[data-panel-view]").forEach((view) => view.classList.toggle("is-active", view.dataset.panelView === tab));
+    };
+    document.querySelectorAll("[data-panel-tab]").forEach((button) => button.addEventListener("click", () => {
+      activatePanelTab(button.dataset.panelTab, button);
+      if (button.dataset.panelTab !== "chats" && latestPanelState.chat) {
+        window.achievementOverlay.panelAction({ kind: "close-chat" });
+      }
+
+    }));
+    document.querySelectorAll("[data-context-tab]").forEach((button) => button.addEventListener("click", () => {
+      const tab = button.dataset.contextTab;
+      const navButton = document.querySelector(`[data-panel-tab="${tab}"]`);
+      activatePanelTab(tab, navButton);
+    }));
+    document.getElementById("panel-close-top")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close" }));
+    document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
+    document.getElementById("show-all-friends")?.addEventListener("click", (event) => {
+      showAllOnlineFriends = !showAllOnlineFriends;
+      event.currentTarget.textContent = showAllOnlineFriends ? "Mostrar menos" : "Ver todos ›";
+      renderPanelState(latestPanelState);
+    });
+    document.getElementById("chat-back")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close-chat" }));
+    const syncOverlayPreferences = () => {
+      overlayPreferences.social = document.getElementById("setting-social").checked;
+      overlayPreferences.achievements = document.getElementById("setting-achievements").checked;
+      overlayPreferences.animations = document.getElementById("setting-animations").checked;
+      localStorage.setItem("checkpoint-overlay-social", String(overlayPreferences.social));
+      localStorage.setItem("checkpoint-overlay-achievements", String(overlayPreferences.achievements));
+      localStorage.setItem("checkpoint-overlay-animations", String(overlayPreferences.animations));
+      document.body.classList.toggle("overlay-reduced-motion", !overlayPreferences.animations);
+    };
+    document.getElementById("setting-social").checked = overlayPreferences.social;
+    document.getElementById("setting-achievements").checked = overlayPreferences.achievements;
+    document.getElementById("setting-animations").checked = overlayPreferences.animations;
+    document.querySelectorAll(".setting-switch").forEach((input) => input.addEventListener("change", syncOverlayPreferences));
+    syncOverlayPreferences();
+    document.getElementById("capture-now")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      setCaptureFeedback("Capturando tela...");
+      const result = await window.achievementOverlay.panelAction({ kind: "capture-screen" });
+      setCaptureFeedback(result?.ok ? "Captura salva em Imagens/Checkpoint Captures." : result?.error || "Não foi possível capturar a tela.");
+      button.disabled = false;
+    });
+    document.getElementById("open-captures-folder")?.addEventListener("click", () => {
+      window.achievementOverlay.panelAction({ kind: "open-captures-folder" });
+    });
+    const captureShortcutRecorder = document.getElementById("record-capture-shortcut");
+    const stopCaptureShortcutRecording = () => {
+      captureShortcutRecording = false;
+      captureShortcutRecorder?.classList.remove("is-recording");
+      captureShortcutRecorder?.setAttribute("aria-pressed", "false");
+      const label = document.getElementById("record-shortcut-label");
+      if (label) label.textContent = "Alterar";
+      const shortcut = latestPanelState.settings?.captureShortcut || "F8";
+      const value = document.getElementById("capture-shortcut-value");
+      if (value) value.textContent = formatShortcut(shortcut);
+    };
+    captureShortcutRecorder?.addEventListener("click", () => {
+      if (captureShortcutRecording) {
+        stopCaptureShortcutRecording();
+        setCaptureFeedback("Alteração cancelada.");
+        return;
+      }
+      captureShortcutRecording = true;
+      captureShortcutRecorder.classList.add("is-recording");
+      captureShortcutRecorder.setAttribute("aria-pressed", "true");
+      document.getElementById("record-shortcut-label").textContent = "Gravando";
+      document.getElementById("capture-shortcut-value").textContent = "Pressione...";
+      setCaptureFeedback("Pressione F1–F24, Print Screen ou uma combinação com Ctrl, Alt ou Shift. Esc cancela.");
+      captureShortcutRecorder.focus();
+    });
+    document.getElementById("chat-form")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+      if (!text) return;
+      window.achievementOverlay.panelAction({ kind: "send-message", text });
+      input.value = "";
+    });
+    document.querySelectorAll("[data-media]").forEach((button) => button.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: button.dataset.media })));
+    window.setInterval(updateSessionDuration, 1000);
+    window.addEventListener("keydown", async (event) => {
+      if (captureShortcutRecording) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (event.repeat) return;
+        if (event.key === "Escape") {
+          stopCaptureShortcutRecording();
+          setCaptureFeedback("Alteração cancelada.");
+          return;
+        }
+        if (["Control", "Alt", "Shift", "Meta"].includes(event.key)) {
+          setCaptureFeedback("Agora pressione a tecla principal da combinação.");
+          return;
+        }
+        const shortcut = shortcutFromEvent(event);
+        if (!shortcut) {
+          setCaptureFeedback("Use F1–F24, Print Screen ou combine a tecla com Ctrl, Alt ou Shift.");
+          return;
+        }
+        document.getElementById("capture-shortcut-value").textContent = formatShortcut(shortcut);
+        const result = await window.achievementOverlay.panelAction({ kind: "set-capture-shortcut", shortcut });
+        if (!result?.ok) {
+          setCaptureFeedback("Esse atalho é inválido, reservado ou já está em uso por outro aplicativo.");
+          return;
+        }
+        const savedShortcut = result.shortcut || shortcut;
+        latestPanelState = {
+          ...latestPanelState,
+          settings: { ...latestPanelState.settings, captureShortcut: savedShortcut },
+        };
+        stopCaptureShortcutRecording();
+        document.getElementById("capture-shortcut-label").textContent = formatShortcut(savedShortcut);
+        setCaptureFeedback(`Atalho alterado para ${formatShortcut(savedShortcut)}.`);
+        return;
+      }
+      if (event.key !== "Escape" || !commandPanel?.classList.contains("is-open")) return;
+      if (latestPanelState.chat) window.achievementOverlay.panelAction({ kind: "close-chat" });
+      else window.achievementOverlay.panelAction({ kind: "close" });
+    }, true);
+
+    // Mock API Binding (Mantenha sem alterações)
+    if (window.achievementOverlay) {
+      window.achievementOverlay.onUnlock(enqueueAchievement);
+      window.achievementOverlay.onWelcome(enqueueSocial);
+      window.achievementOverlay.onSocial(enqueueSocial);
+      window.achievementOverlay.onPlaySound(({ sound }) => playOverlaySound(sound));
+      window.achievementOverlay.onPanelVisibility(({ open, state }) => {
+        commandPanel?.classList.toggle("is-open", Boolean(open));
+        commandPanel?.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("panel-open", Boolean(open));
+        if (!open && captureShortcutRecording) stopCaptureShortcutRecording();
+        if (state) renderPanelState(state);
+      });
+      window.achievementOverlay.onPanelState(renderPanelState);
+    }
   </script>
 </body>
 

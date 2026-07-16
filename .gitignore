@@ -34,3 +34,9 @@ public/download
 .env.*
 .env.*.local
 !.env.example
+
+# Code-signing certificates and private keys
+*.pfx
+*.p12
+*.pem
+*.key

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpotify } from "@fortawesome/free-brands-svg-icons";
@@ -46,6 +46,7 @@ import type {
 import { useGamepadNavigation } from "../../hooks/useGamepadNavigation";
 import { useControllerLedStatus } from "../../hooks/useControllerLed";
 import { useGamepad } from "../../context/GamepadContext";
+import { CONTROLLER_KEYBOARD_VISIBILITY_EVENT } from "../../utils/controllerTextInput";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -53,6 +54,10 @@ type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProp
 type HomeSocialFriend = SocialFriend;
 type HomeCheckpointFriendRequest = CheckpointFriendRequest;
 type HomePriceAlert = PriceAlert;
+
+type AchievementDiagnostics = Awaited<
+  ReturnType<NonNullable<Window["electronAPI"]>["getAchievementDiagnostics"]>
+>;
 
 export interface LanguageOption {
   id: LauncherLanguage;
@@ -281,6 +286,19 @@ export const SettingsPageV2: React.FC<{
 }) => {
     const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
     const led = useControllerLedStatus();
+    const [achievementDiagnostics, setAchievementDiagnostics] = useState<AchievementDiagnostics | null>(null);
+    const refreshAchievementDiagnostics = useCallback(async () => {
+      if (!window.electronAPI?.getAchievementDiagnostics) return;
+      setAchievementDiagnostics(await window.electronAPI.getAchievementDiagnostics());
+    }, []);
+    useEffect(() => {
+      const initial = window.setTimeout(() => void refreshAchievementDiagnostics(), 0);
+      const interval = window.setInterval(() => void refreshAchievementDiagnostics(), 5000);
+      return () => {
+        window.clearTimeout(initial);
+        window.clearInterval(interval);
+      };
+    }, [refreshAchievementDiagnostics]);
     const activeAppTheme =
       visualTheme === "checkpoint"
         ? "default"
@@ -536,6 +554,32 @@ export const SettingsPageV2: React.FC<{
               </span>
             </button>
           </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 text-xs md:grid-cols-4">
+            <div>
+              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Ponte local</span>
+              <span className="mt-1 block font-bold text-white/70">
+                {achievementDiagnostics?.bridgePort ? `Porta ${achievementDiagnostics.bridgePort}` : "Indisponivel"}
+              </span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Watchers</span>
+              <span className="mt-1 block font-bold text-white/70">{achievementDiagnostics?.watcherKeys.length ?? 0} ativos</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Processos</span>
+              <span className="mt-1 block font-bold text-white/70">{achievementDiagnostics?.monitoredGameKeys.length ?? 0} monitorados</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refreshAchievementDiagnostics()}
+              className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/65 hover:bg-white/10"
+            >
+              Atualizar status
+            </button>
+          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-white/35">
+            O overlay nativo funciona em janela e tela cheia sem bordas. Tela cheia exclusiva pode ficar acima das janelas do Windows; para compatibilidade, use o modo sem bordas enquanto o companion da Game Bar nao estiver instalado.
+          </p>
         </section>
 
         <AppUpdateSection />
@@ -1598,6 +1642,7 @@ export const ChatModal: React.FC<{
   const [inputText, setInputText] = useState("");
   const [friendTyping, setFriendTyping] = useState(false);
   const [spamLockedUntil, setSpamLockedUntil] = useState<number | null>(null);
+  const [controllerKeyboardOpen, setControllerKeyboardOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const recentSendTimestampsRef = useRef<number[]>([]);
   const lastTypingSentRef = useRef(false);
@@ -1606,6 +1651,16 @@ export const ChatModal: React.FC<{
   const friendUidRef = useRef<string | null>(null);
 
   const friendUid = friend?.id.split(":")[1] ?? null;
+
+  useEffect(() => {
+    const handleKeyboardVisibility = (event: Event) => {
+      setControllerKeyboardOpen(Boolean(
+        (event as CustomEvent<{ isOpen?: boolean }>).detail?.isOpen,
+      ));
+    };
+    window.addEventListener(CONTROLLER_KEYBOARD_VISIBILITY_EVENT, handleKeyboardVisibility);
+    return () => window.removeEventListener(CONTROLLER_KEYBOARD_VISIBILITY_EVENT, handleKeyboardVisibility);
+  }, []);
 
   // ── Subscrições Firebase ──────────────────────────────────────────────────
   useEffect(() => {
@@ -1797,11 +1852,14 @@ export const ChatModal: React.FC<{
         playSound("back");
         onClose();
       }}
-      maxWidthClassName="max-w-md"
+      maxWidthClassName={controllerKeyboardOpen ? "max-w-md md:max-w-[38vw]" : "max-w-md"}
       zIndexClassName="z-[180]"
+      containerClassName={controllerKeyboardOpen
+        ? "items-start justify-center p-2 md:items-center md:justify-start md:p-3"
+        : undefined}
       className="p-0 border-0 overflow-hidden rounded-[24px]"
     >
-      <div className="flex h-[550px] w-[450px] flex-col bg-[#050507]">
+      <div className="flex h-[550px] w-full flex-col bg-[#050507]">
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-white/5 bg-white/[0.02] px-6 py-4">
           <div className="flex items-center gap-3">

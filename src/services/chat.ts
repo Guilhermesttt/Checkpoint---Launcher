@@ -2,8 +2,10 @@ import { auth } from "../../Firebase";
 import { apiUrl } from "./api";
 import type { ChatMessage } from "../types/domain";
 
-// Conexão SSE Global ativa
-let eventSource: EventSource | null = null;
+// Conexão SSE global autenticada por header. O token nunca entra na URL.
+let streamAbortController: AbortController | null = null;
+let reconnectTimer: number | null = null;
+let connectedUserUid: string | null = null;
 const messageListeners = new Set<(msg: ChatMessage) => void>();
 const typingListeners = new Set<(data: { senderId: string; typing: boolean }) => void>();
 
@@ -21,71 +23,120 @@ const getAuthHeaders = async () => {
   };
 };
 
-/**
- * Garante que a conexão SSE esteja ativa e escutando eventos globais
- */
+const dispatchChatStreamData = (rawData: string) => {
+  if (!rawData) return;
+  try {
+    const data = JSON.parse(rawData) as {
+      type?: string;
+      message?: ChatMessage;
+      senderId?: string;
+      typing?: boolean;
+    };
+    if (data.type === "message" && data.message) {
+      const msg = data.message;
+      if (
+        activeChatFriendUid !== msg.senderId
+        && !unreadMessages.some((message) => message.id === msg.id)
+      ) {
+        unreadMessages.push(msg);
+        unreadListeners.forEach((listener) => listener([...unreadMessages]));
+      }
+      messageListeners.forEach((listener) => listener(msg));
+      return;
+    }
+    if (data.type === "typing" && data.senderId) {
+      typingListeners.forEach((listener) => listener({
+        senderId: String(data.senderId),
+        typing: Boolean(data.typing),
+      }));
+    }
+  } catch {
+    console.error("[ChatClient] Evento SSE inválido recebido.");
+  }
+};
+
+const consumeChatStream = async (response: Response, signal: AbortSignal) => {
+  if (!response.body) throw new Error("Stream de chat indisponível.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (!signal.aborted) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary >= 0) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const data = block
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      dispatchChatStreamData(data);
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+};
+
+/** Garante que a conexão SSE autenticada esteja ativa. */
 export const establishChatConnection = async () => {
   const user = auth.currentUser;
   if (!user) return;
+  if (streamAbortController && connectedUserUid === user.uid) return;
 
-  if (eventSource) {
-    if (eventSource.readyState === EventSource.OPEN || eventSource.readyState === EventSource.CONNECTING) {
-      return;
-    }
-    eventSource.close();
+  if (streamAbortController) streamAbortController.abort();
+  if (reconnectTimer != null) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
 
-  const token = await user.getIdToken();
-  const streamUrl = apiUrl(`/api/chat/stream?token=${encodeURIComponent(token)}`);
+  const controller = new AbortController();
+  streamAbortController = controller;
+  connectedUserUid = user.uid;
 
-  console.log("[ChatClient] Abrindo conexão SSE em:", streamUrl);
-  eventSource = new EventSource(streamUrl);
-
-  eventSource.onmessage = (event) => {
-    // Tratamento de ping silencioso
-    if (!event.data) return;
-
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === "message" && data.message) {
-        console.log("[ChatClient] Nova mensagem recebida via SSE:", data.message);
-        const msg = data.message as ChatMessage;
-
-        // Se a mensagem for recebida e NÃO for do amigo cujo chat está aberto
-        if (activeChatFriendUid !== msg.senderId) {
-          if (!unreadMessages.some((m) => m.id === msg.id)) {
-            unreadMessages.push(msg);
-            unreadListeners.forEach((listener) => listener([...unreadMessages]));
-          }
-        }
-
-        messageListeners.forEach((listener) => listener(msg));
-      } else if (data.type === "typing") {
-        console.log("[ChatClient] Evento de digitação recebido via SSE:", data);
-        typingListeners.forEach((listener) => listener({ senderId: data.senderId, typing: data.typing }));
-      }
-    } catch (err) {
-      console.error("[ChatClient] Erro ao parsear dados do SSE:", err);
+  try {
+    const response = await fetch(apiUrl("/api/chat/stream"), {
+      headers: await getAuthHeaders(),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Chat SSE respondeu ${response.status}.`);
+    await consumeChatStream(response, controller.signal);
+    if (!controller.signal.aborted) throw new Error("Stream de chat encerrado.");
+  } catch {
+    if (!controller.signal.aborted) {
+      console.error("[ChatClient] Conexão em tempo real interrompida; nova tentativa agendada.");
     }
-  };
-
-  eventSource.onerror = (err) => {
-    console.error("[ChatClient] Erro na conexão SSE. Tentando reconectar...", err);
-    eventSource?.close();
-    eventSource = null;
-    // Tenta reconectar após 5 segundos
-    setTimeout(establishChatConnection, 5000);
-  };
+  } finally {
+    if (streamAbortController === controller) {
+      streamAbortController = null;
+      connectedUserUid = null;
+      if (!controller.signal.aborted && auth.currentUser) {
+        reconnectTimer = window.setTimeout(() => {
+          reconnectTimer = null;
+          void establishChatConnection();
+        }, 5000);
+      }
+    }
+  }
 };
 
 /**
  * Fecha a conexão SSE
  */
 export const closeChatConnection = () => {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-    console.log("[ChatClient] Conexão SSE encerrada manualmente.");
+  if (reconnectTimer != null) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  streamAbortController?.abort();
+  streamAbortController = null;
+  connectedUserUid = null;
+  activeChatFriendUid = null;
+  if (unreadMessages.length > 0) {
+    unreadMessages.splice(0, unreadMessages.length);
+    unreadListeners.forEach((listener) => listener([]));
   }
 };
 

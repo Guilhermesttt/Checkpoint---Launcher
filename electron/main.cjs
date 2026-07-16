@@ -1,9 +1,17 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen, Tray } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer } = require("electron");
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL, fileURLToPath } = require("node:url");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
+const { readAchievementLibrarySummary } = require("./achievement-summary.cjs");
+const { normalizeLaunchProfile } = require("./launch-profile.cjs");
+const {
+  createGameProcessTracker,
+  normalizeWindowsPath,
+  parseProcessSnapshot,
+} = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const {
   detectEmulator,
@@ -24,6 +32,8 @@ const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_IN
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
 const activeWatchers = new Map();
+const activeGameMonitors = new Map();
+const activeRescanTimers = new Map();
 
 /**
  * Para e remove o watcher ativo de um jogo, se existir.
@@ -69,6 +79,42 @@ const HEALTH_CHECK_INTERVAL_MS = 500;
 let mainWindow;
 let overlayWindow;
 let overlayReady = false;
+let overlayDisplayId = null;
+let overlayPanelOpen = false;
+let overlayPanelState = {
+  friends: [],
+  achievements: { unlocked: 0, available: 0, items: [], loading: false },
+  currentGame: null,
+  captures: [],
+  settings: { captureShortcut: "F8" },
+  chat: null,
+  profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
+};
+let captureShortcut = "F8";
+let recentCaptures = [];
+let captureInProgress = false;
+
+const normalizeCaptureShortcut = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw || raw.length > 64) return null;
+  const parts = raw.split("+").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const rawKey = parts.at(-1);
+  const modifiers = new Set(parts.slice(0, -1));
+  if ([...modifiers].some((modifier) => !["CommandOrControl", "Alt", "Shift"].includes(modifier))) return null;
+  const key = /^(?:[A-Z]|[0-9]|F(?:[1-9]|1[0-9]|2[0-4])|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|Insert|Delete|Backspace|PrintScreen)$/.test(rawKey || "")
+    ? rawKey
+    : null;
+  if (!key) return null;
+  if (modifiers.size === 0 && !/^(?:F(?:[1-9]|1[0-9]|2[0-4])|PrintScreen)$/.test(key)) return null;
+  const normalized = [
+    modifiers.has("CommandOrControl") ? "CommandOrControl" : "",
+    modifiers.has("Alt") ? "Alt" : "",
+    modifiers.has("Shift") ? "Shift" : "",
+    key,
+  ].filter(Boolean).join("+");
+  return normalized === "CommandOrControl+Shift+O" ? null : normalized;
+};
 const pendingOverlayEvents = [];
 let achievementBridge;
 let startupErrorShown = false;
@@ -281,6 +327,7 @@ const createWindow = async () => {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
+      backgroundThrottling: false,
     },
   });
 
@@ -340,20 +387,24 @@ const createWindow = async () => {
       };
     }
 
-    shell.openExternal(url);
+    if (isSafeOpenExternalUrl(url)) {
+      void shell.openExternal(url);
+    }
     return { action: "deny" };
   });
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
     if (isExternalProtocol(url)) {
       event.preventDefault();
-      shell.openExternal(url);
+      void shell.openExternal(url);
       return;
     }
 
     if (!isLocalAppUrl(url)) {
       event.preventDefault();
-      shell.openExternal(url);
+      if (isSafeOpenExternalUrl(url)) {
+        void shell.openExternal(url);
+      }
     }
   });
 
@@ -363,7 +414,9 @@ const createWindow = async () => {
     }
 
     event.preventDefault();
-    shell.openExternal(url);
+    if (isSafeOpenExternalUrl(url)) {
+      void shell.openExternal(url);
+    }
   });
 
   mainWindow.on("close", (event) => {
@@ -410,8 +463,44 @@ const syncOverlayBounds = () => {
     return;
   }
 
-  const display = screen.getPrimaryDisplay();
+  const displays = screen.getAllDisplays();
+  const display = displays.find((candidate) => candidate.id === overlayDisplayId)
+    || (mainWindow && !mainWindow.isDestroyed()
+      ? screen.getDisplayMatching(mainWindow.getBounds())
+      : screen.getPrimaryDisplay());
+  overlayDisplayId = display.id;
   overlayWindow.setBounds(display.bounds);
+};
+
+const selectOverlayDisplayFromLauncher = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  overlayDisplayId = screen.getDisplayMatching(mainWindow.getBounds()).id;
+  syncOverlayBounds();
+};
+
+const applyWindowProfile = (executablePath, launchProfile) => {
+  if (!launchProfile || launchProfile.windowMode === "default") return;
+  const display = screen.getAllDisplays().find((candidate) => candidate.id === launchProfile.monitorId)
+    || screen.getPrimaryDisplay();
+  const targetBounds = launchProfile.windowMode === "borderless" ? display.bounds : display.workArea;
+  const width = launchProfile.resolutionWidth || targetBounds.width;
+  const height = launchProfile.resolutionHeight || targetBounds.height;
+  const x = targetBounds.x + Math.max(0, Math.floor((targetBounds.width - width) / 2));
+  const y = targetBounds.y + Math.max(0, Math.floor((targetBounds.height - height) / 2));
+  execFile("powershell.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy", "Bypass",
+    "-File", path.join(__dirname, "apply-window-profile.ps1"),
+    "-ExecutablePath", executablePath,
+    "-WindowMode", launchProfile.windowMode,
+    "-X", String(x),
+    "-Y", String(y),
+    "-Width", String(width),
+    "-Height", String(height),
+  ], { windowsHide: true }, (error) => {
+    if (error) console.warn("[launcher] Perfil de janela nao foi aplicado:", error.message);
+  });
 };
 
 const createOverlayWindow = () => {
@@ -485,8 +574,321 @@ const sendOverlayEvent = (channel, payload) => {
     return;
   }
 
+  try {
+    overlayWindow.setAlwaysOnTop(true, "screen-saver");
+    overlayWindow.moveTop();
+    overlayWindow.showInactive();
+  } catch (error) {
+    console.warn("[overlay] Nao foi possivel reafirmar a ordem da janela:", error);
+  }
   overlayWindow.webContents.send(channel, payload);
 };
+
+const setOverlayPanelOpen = (open) => {
+  createOverlayWindow();
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  overlayPanelOpen = Boolean(open);
+  overlayWindow.setFocusable(overlayPanelOpen);
+  overlayWindow.setIgnoreMouseEvents(!overlayPanelOpen, { forward: !overlayPanelOpen });
+  sendOverlayEvent("overlay:panel-visibility", {
+    open: overlayPanelOpen,
+    state: overlayPanelState,
+  });
+  if (overlayPanelOpen) {
+    overlayWindow.show();
+    overlayWindow.focus();
+  }
+};
+
+const overlaySettingsFile = () => path.join(app.getPath("userData"), "overlay-settings.json");
+const captureDirectory = () => path.join(app.getPath("pictures"), "Checkpoint Captures");
+
+const saveOverlaySettings = () => {
+  try {
+    fs.mkdirSync(path.dirname(overlaySettingsFile()), { recursive: true });
+    fs.writeFileSync(overlaySettingsFile(), JSON.stringify({ captureShortcut }, null, 2), "utf8");
+  } catch (error) {
+    console.warn("[overlay] Nao foi possivel salvar as configuracoes:", error);
+  }
+};
+
+const loadRecentCaptures = () => {
+  try {
+    const directory = captureDirectory();
+    fs.mkdirSync(directory, { recursive: true });
+    recentCaptures = fs.readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && /\.(png|jpe?g)$/i.test(entry.name))
+      .map((entry) => {
+        const filePath = path.join(directory, entry.name);
+        const stat = fs.statSync(filePath);
+        return {
+          id: `${stat.mtimeMs}:${entry.name}`,
+          name: entry.name,
+          url: pathToFileURL(filePath).toString(),
+          createdAt: stat.mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 12);
+  } catch (error) {
+    console.warn("[overlay] Nao foi possivel carregar as capturas:", error);
+    recentCaptures = [];
+  }
+};
+
+const captureCurrentDisplay = async () => {
+  const display = overlayDisplayId != null
+    ? screen.getAllDisplays().find((candidate) => candidate.id === overlayDisplayId)
+    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const targetDisplay = display || screen.getPrimaryDisplay();
+  const restoreOverlay = Boolean(overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible());
+  const restorePanel = overlayPanelOpen;
+
+  try {
+    if (restoreOverlay) {
+      overlayWindow.hide();
+      await sleep(120);
+    }
+    const scaleFactor = Math.max(1, Number(targetDisplay.scaleFactor) || 1);
+    const sources = await desktopCapturer.getSources({
+      types: ["screen"],
+      thumbnailSize: {
+        width: Math.max(1, Math.round(targetDisplay.size.width * scaleFactor)),
+        height: Math.max(1, Math.round(targetDisplay.size.height * scaleFactor)),
+      },
+    });
+    const source = sources.find((candidate) => String(candidate.display_id) === String(targetDisplay.id)) || sources[0];
+    if (!source || source.thumbnail.isEmpty()) throw new Error("Nenhuma imagem de tela foi retornada.");
+
+    const directory = captureDirectory();
+    fs.mkdirSync(directory, { recursive: true });
+    const gameTitle = String(overlayPanelState.currentGame?.title || "Desktop")
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 70) || "Desktop";
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `${gameTitle} ${stamp}.png`;
+    const filePath = path.join(directory, fileName);
+    fs.writeFileSync(filePath, source.thumbnail.toPNG());
+    const capture = {
+      id: `${Date.now()}:${fileName}`,
+      name: fileName,
+      url: pathToFileURL(filePath).toString(),
+      createdAt: new Date().toISOString(),
+      gameId: String(overlayPanelState.currentGame?.id || ""),
+      gameTitle: String(overlayPanelState.currentGame?.title || ""),
+    };
+    recentCaptures = [capture, ...recentCaptures.filter((item) => item.url !== capture.url)].slice(0, 12);
+    overlayPanelState = { ...overlayPanelState, captures: recentCaptures };
+    return capture;
+  } finally {
+    if (restoreOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.showInactive();
+      overlayWindow.setAlwaysOnTop(true, "screen-saver");
+      if (restorePanel) {
+        overlayWindow.setFocusable(true);
+        overlayWindow.focus();
+      }
+    }
+  }
+};
+
+const runCapture = async () => {
+  if (captureInProgress) return { ok: false, error: "Uma captura ja esta em andamento." };
+  captureInProgress = true;
+  try {
+    const capture = await captureCurrentDisplay();
+    if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
+    sendOverlayEvent("overlay:social", {
+      kind: "capture-saved",
+      title: "Captura salva",
+      description: capture.name,
+    });
+    return { ok: true, capture };
+  } catch (error) {
+    console.error("[overlay] Falha ao capturar a tela:", error);
+    return { ok: false, error: error instanceof Error ? error.message : "Falha ao capturar a tela." };
+  } finally {
+    captureInProgress = false;
+  }
+};
+
+const deleteCapture = async (captureId) => {
+  const normalizedId = String(captureId || "").slice(0, 256);
+  const capture = recentCaptures.find((item) => item.id === normalizedId);
+  if (!capture) return { ok: false, error: "Captura nao encontrada." };
+
+  try {
+    const directory = path.resolve(captureDirectory());
+    const filePath = path.resolve(fileURLToPath(capture.url));
+    const relativePath = path.relative(directory, filePath);
+    if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+      return { ok: false, error: "Arquivo de captura invalido." };
+    }
+    if (fs.existsSync(filePath)) await shell.trashItem(filePath);
+    recentCaptures = recentCaptures.filter((item) => item.id !== normalizedId);
+    overlayPanelState = { ...overlayPanelState, captures: recentCaptures };
+    if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
+    return { ok: true, trashed: true };
+  } catch (error) {
+    console.error("[overlay] Falha ao excluir a captura:", error);
+    return { ok: false, error: error instanceof Error ? error.message : "Falha ao excluir a captura." };
+  }
+};
+
+const registerCaptureShortcut = (requestedShortcut) => {
+  const nextShortcut = normalizeCaptureShortcut(requestedShortcut);
+  if (!nextShortcut) return false;
+  const previousShortcut = captureShortcut;
+  if (nextShortcut === previousShortcut && globalShortcut.isRegistered(nextShortcut)) return true;
+  if (previousShortcut && globalShortcut.isRegistered(previousShortcut)) {
+    globalShortcut.unregister(previousShortcut);
+  }
+  let registered = false;
+  try {
+    registered = globalShortcut.register(nextShortcut, () => { void runCapture(); });
+  } catch (error) {
+    console.warn(`[overlay] Atalho de captura invalido: ${nextShortcut}`, error);
+  }
+  if (!registered) {
+    if (previousShortcut && previousShortcut !== nextShortcut) {
+      try {
+        globalShortcut.register(previousShortcut, () => { void runCapture(); });
+      } catch (error) {
+        console.warn(`[overlay] Nao foi possivel restaurar o atalho ${previousShortcut}:`, error);
+      }
+    }
+    return false;
+  }
+  captureShortcut = nextShortcut;
+  overlayPanelState = {
+    ...overlayPanelState,
+    settings: { ...overlayPanelState.settings, captureShortcut },
+  };
+  saveOverlaySettings();
+  return true;
+};
+
+registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
+  const friends = Array.isArray(payload?.friends) ? payload.friends.slice(0, 30).map((friend) => ({
+    id: String(friend?.id || "").slice(0, 128),
+    name: String(friend?.name || "Jogador").slice(0, 80),
+    status: ["online", "playing", "offline"].includes(friend?.status) ? friend.status : "offline",
+    playing: String(friend?.playing || "").slice(0, 120),
+    avatar: String(friend?.avatar || "").slice(0, 2048),
+    unread: Math.max(0, Number(friend?.unread) || 0),
+    canChat: Boolean(friend?.canChat),
+  })).filter((friend) => friend.id) : [];
+  const achievementItems = Array.isArray(payload?.achievements?.items)
+    ? payload.achievements.items.slice(0, 300).map((achievement) => ({
+      id: String(achievement?.id || "").slice(0, 160),
+      name: String(achievement?.name || "Conquista").slice(0, 160),
+      description: String(achievement?.description || "").slice(0, 500),
+      icon: String(achievement?.icon || "").slice(0, 2048),
+      achieved: Boolean(achievement?.achieved),
+      unlockedAt: String(achievement?.unlockedAt || "").slice(0, 64),
+    })).filter((achievement) => achievement.id)
+    : [];
+  const messages = Array.isArray(payload?.chat?.messages)
+    ? payload.chat.messages.slice(-80).map((message) => ({
+      id: String(message?.id || "").slice(0, 180),
+      text: String(message?.text || "").slice(0, 2000),
+      createdAt: String(message?.createdAt || "").slice(0, 64),
+      mine: Boolean(message?.mine),
+      pending: Boolean(message?.pending),
+    })).filter((message) => message.id && message.text)
+    : [];
+  overlayPanelState = {
+    friends,
+    achievements: {
+      unlocked: Math.max(0, Number(payload?.achievements?.unlocked) || 0),
+      available: Math.max(0, Number(payload?.achievements?.available) || 0),
+      loading: Boolean(payload?.achievements?.loading),
+      items: achievementItems,
+    },
+    currentGame: payload?.currentGame ? {
+      id: String(payload.currentGame.id || "").slice(0, 160),
+      title: String(payload.currentGame.title || "").slice(0, 160),
+      image: String(payload.currentGame.image || "").slice(0, 2048),
+      platform: String(payload.currentGame.platform || "").slice(0, 40),
+      category: String(payload.currentGame.category || "").slice(0, 80),
+      developer: String(payload.currentGame.developer || "").slice(0, 120),
+      releaseDate: String(payload.currentGame.releaseDate || "").slice(0, 80),
+      executableName: String(payload.currentGame.executableName || "").slice(0, 160),
+      totalPlaytimeMinutes: Math.max(0, Number(payload.currentGame.totalPlaytimeMinutes) || 0),
+      sessionStartedAt: String(payload.currentGame.sessionStartedAt || "").slice(0, 64),
+      windowMode: String(payload.currentGame.windowMode || "").slice(0, 40),
+      resolution: String(payload.currentGame.resolution || "").slice(0, 40),
+      monitoring: payload.currentGame.monitoring === "verified" ? "verified" : "unverified",
+    } : null,
+    captures: recentCaptures,
+    settings: { captureShortcut },
+    chat: payload?.chat ? {
+      friendId: String(payload.chat.friendId || "").slice(0, 128),
+      friendName: String(payload.chat.friendName || "Amigo").slice(0, 80),
+      friendAvatar: String(payload.chat.friendAvatar || "").slice(0, 2048),
+      typing: Boolean(payload.chat.typing),
+      sending: Boolean(payload.chat.sending),
+      error: String(payload.chat.error || "").slice(0, 300),
+      messages,
+    } : null,
+    profile: {
+      name: String(payload?.profile?.name || "Jogador").slice(0, 80),
+      avatar: String(payload?.profile?.avatar || "").slice(0, 2048),
+      discordConnected: Boolean(payload?.profile?.discordConnected),
+      discordUsername: String(payload?.profile?.discordUsername || "").slice(0, 80),
+      achievements: Math.max(0, Number(payload?.profile?.achievements) || 0),
+    },
+  };
+  if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
+});
+
+ipcMain.handle("overlay:panel-action", async (event, action) => {
+  if (!overlayWindow || event.sender !== overlayWindow.webContents) {
+    throw new Error("Origem do overlay nao autorizada.");
+  }
+  const kind = String(action?.kind || "");
+  if (kind === "toggle") {
+    setOverlayPanelOpen(!overlayPanelOpen);
+    return { ok: true, open: overlayPanelOpen };
+  }
+  if (kind === "close") {
+    setOverlayPanelOpen(false);
+    return;
+  }
+  if (kind === "capture-screen") {
+    return runCapture();
+  }
+  if (kind === "open-captures-folder") {
+    fs.mkdirSync(captureDirectory(), { recursive: true });
+    const error = await shell.openPath(captureDirectory());
+    return { ok: !error, error };
+  }
+  if (kind === "delete-capture") {
+    return deleteCapture(action?.captureId);
+  }
+  if (kind === "set-capture-shortcut") {
+    const shortcut = String(action?.shortcut || "");
+    const ok = registerCaptureShortcut(shortcut);
+    if (ok && overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
+    return { ok, shortcut: captureShortcut };
+  }
+  if (["media-play-pause", "media-next", "media-previous"].includes(kind)) {
+    const keyCode = kind === "media-play-pause" ? 179 : kind === "media-next" ? 176 : 177;
+    execFile("powershell.exe", [
+      "-NoProfile", "-NonInteractive", "-Command",
+      `$shell = New-Object -ComObject WScript.Shell; $shell.SendKeys([char]${keyCode})`,
+    ], { windowsHide: true }, () => undefined);
+    return;
+  }
+  if (["select-chat", "close-chat", "send-message"].includes(kind)) {
+    const payload = { kind };
+    if (kind === "select-chat") payload.friendId = String(action?.friendId || "").slice(0, 128);
+    if (kind === "send-message") payload.text = String(action?.text || "").trim().slice(0, 2000);
+    mainWindow?.webContents.send("overlay:panel-action", payload);
+  }
+});
 
 const playOverlaySound = (sound) => {
   createOverlayWindow();
@@ -548,6 +950,7 @@ const startAchievementBridge = async () => {
           gameId: payload.gameId,
           achievementId: payload.achievementId,
           achievement: payload.achievement,
+          earnedTime: Math.floor(new Date(payload.unlockedAt).getTime() / 1000),
           unlockedAt: payload.unlockedAt,
         });
       }
@@ -622,6 +1025,25 @@ registerSecureIpcHandler("achievement:get-local-state", async (_event, appId) =>
     return {};
   }
 });
+
+registerSecureIpcHandler("achievement:get-library-summary", async () => {
+  try {
+    return await readAchievementLibrarySummary(app.getPath("userData"));
+  } catch (error) {
+    console.error("Error reading achievement library summary:", error);
+    return { byGameId: {}, bySteamAppId: {}, updatedAt: new Date().toISOString() };
+  }
+});
+
+registerSecureIpcHandler("achievement:get-diagnostics", async () => ({
+  bridgePort: Number(achievementBridge?.getAddress?.()?.port || 0),
+  watcherKeys: Array.from(activeWatchers.keys()),
+  monitoredGameKeys: Array.from(activeGameMonitors.keys()),
+  pendingRescanKeys: Array.from(activeRescanTimers.keys()),
+  overlayReady,
+  overlayDisplayId,
+  overlayVisible: Boolean(overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()),
+}));
 
 registerSecureIpcHandler("achievement:save-definitions", async (_event, gameId, definitions, steamAppId) => {
   try {
@@ -868,7 +1290,15 @@ async function injectGenericIniDefinitions(appId, savePath) {
   }
 }
 
-registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath) => {
+registerSecureIpcHandler("launcher:get-displays", async () => screen.getAllDisplays().map((display, index) => ({
+  id: display.id,
+  label: `Monitor ${index + 1}`,
+  primary: display.id === screen.getPrimaryDisplay().id,
+  width: display.bounds.width,
+  height: display.bounds.height,
+})));
+
+registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath, rawLaunchProfile) => {
   const target = String(executablePath || "").trim();
   if (!target) {
     throw new Error("Caminho do executavel vazio.");
@@ -892,6 +1322,15 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
 
   if (!stats.isFile()) {
     throw new Error("Executavel invalido.");
+  }
+
+  const launchProfile = normalizeLaunchProfile(rawLaunchProfile, path.dirname(normalizedTarget));
+  if (!fs.existsSync(launchProfile.workingDirectory) || !fs.statSync(launchProfile.workingDirectory).isDirectory()) {
+    throw new Error("Diretorio de trabalho nao encontrado.");
+  }
+  if (launchProfile.monitorId != null && screen.getAllDisplays().some((display) => display.id === launchProfile.monitorId)) {
+    overlayDisplayId = launchProfile.monitorId;
+    syncOverlayBounds();
   }
 
   if (ENABLE_EMULATOR_FILE_INJECTION) {
@@ -923,7 +1362,13 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
     }
 
     if (settingsPath) {
-      fs.writeFileSync(path.join(settingsPath, "achievements_receiver.txt"), "http://127.0.0.1:3000", "utf8");
+      const bridgeAddress = achievementBridge?.getAddress?.();
+      const bridgePort = Number(bridgeAddress?.port || 3000);
+      fs.writeFileSync(
+        path.join(settingsPath, "achievements_receiver.txt"),
+        `http://127.0.0.1:${bridgePort}`,
+        "utf8",
+      );
 
       // Tenta obter o App ID para configurar as conquistas no emulador Goldberg
       let appId = null;
@@ -1031,6 +1476,7 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   const watcherKey = detectedGameAppId ? `steam_${detectedGameAppId}` : path.basename(normalizedTarget, ".exe");
 
   // Para qualquer watcher anterior do mesmo jogo antes de iniciar um novo.
+  stopGameProcessMonitor(watcherKey);
   stopGameWatcher(watcherKey);
 
   // Função chamada pelo watcher quando o arquivo de saves muda.
@@ -1182,45 +1628,42 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
 
   await injectAchievementDefinitions(detectedGameAppId, detectedEmulator, _settingsPathForInject);
 
+  // A baseline lets the monitor distinguish a process started by this launch
+  // from another executable that was already open in the same directory.
+  const launchProcessBaseline = await getRunningProcesses({ forceRefresh: true }).catch(() => []);
+
   try {
-    const child = spawn(normalizedTarget, [], {
-      cwd: gameDir,
+    const child = spawn(normalizedTarget, launchProfile.arguments, {
+      cwd: launchProfile.workingDirectory,
       detached: true,
       stdio: "ignore",
     });
 
-    // Flag: true apenas se o processo filho realmente iniciou (evento "spawn" do Node).
-    // Quando o spawn falha (EACCES, etc.) o Node dispara "error" + "exit"/"close" com
-    // código null, mas NÃO dispara "spawn". Usamos isso para não encerrar o watcher
-    // prematuramente quando o jogo é iniciado via shell.openPath como fallback.
-    let didSpawn = false;
+    // A sessao passa a ser acompanhada pelo executavel real depois do spawn.
     child.once("spawn", () => {
-      didSpawn = true;
+      if (launchProfile.monitorId == null) selectOverlayDisplayFromLauncher();
+      try {
+        const priority = launchProfile.processPriority === "high"
+          ? -14
+          : launchProfile.processPriority === "above-normal" ? -7 : 0;
+        process.setPriority(child.pid, priority);
+      } catch (error) {
+        console.warn("[launcher] Nao foi possivel aplicar prioridade ao processo:", error);
+      }
+      applyWindowProfile(normalizedTarget, launchProfile);
+      startGameProcessMonitor(watcherKey, normalizedTarget, {
+        rootPid: child.pid,
+        baselineProcesses: launchProcessBaseline,
+      });
       if (mainWindow) {
         mainWindow.hide();
       }
     });
 
-    // Registra os hooks de saída ANTES do unref() — o evento ainda é emitido
-    // mesmo após o processo pai "desacoplar" do filho via unref().
-    // Só encerra o watcher se o processo realmente havia iniciado.
-    const registerExitHook = (stopFn) => {
-      const handleExit = () => {
-        if (didSpawn) {
-          stopFn();
-          if (mainWindow) {
-            mainWindow.show();
-            mainWindow.focus();
-          }
-        }
-      };
-      child.once("exit", handleExit);
-      child.once("close", handleExit);
-    };
-
-    // Inicia o watcher usando o hook de saída do child process.
+    // O watcher nao depende do evento de saida do processo retornado por spawn:
+    // launchers intermediarios podem encerrar antes do executavel real do jogo.
     if (detectedEmulator) {
-      startGameWatcher(detectedEmulator, registerExitHook);
+      startGameWatcher(detectedEmulator, null);
     } else if (detectedGameAppId) {
       // ── Re-scan loop: emuladores como RUNE/CODEX criam o arquivo de save ──────
       // somente APÓS o jogo inicializar (2-5s de delay típico). Tentamos
@@ -1234,6 +1677,7 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
         const found = detectEmulator(gameDir, detectedGameAppId);
         if (found) {
           clearInterval(rescanTimer);
+          activeRescanTimers.delete(watcherKey);
           console.info(`[achievement-watcher] Emulador encontrado após ${rescanAttempt * RESCAN_INTERVAL_MS / 1000}s: ${found.emulatorType}`);
           // Injeta definições agora que o arquivo de save foi criado
           injectAchievementDefinitions(detectedGameAppId, found, _settingsPathForInject).catch(() => {});
@@ -1241,12 +1685,14 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
           achievementBridge?.migrateAchievementAliases(watcherKey, aliases).catch(
             (error) => console.error("[achievement-migration] Falha:", error),
           );
-          startGameWatcher(found, registerExitHook);
+          startGameWatcher(found, null);
         } else if (rescanAttempt >= RESCAN_MAX_ATTEMPTS) {
           clearInterval(rescanTimer);
+          activeRescanTimers.delete(watcherKey);
           console.warn(`[achievement-watcher] Re-scan encerrado: nenhum emulador encontrado para appId ${detectedGameAppId} após 30s.`);
         }
       }, RESCAN_INTERVAL_MS);
+      activeRescanTimers.set(watcherKey, rescanTimer);
     }
 
     child.on("error", async (err) => {
@@ -1261,6 +1707,12 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
         stopGameWatcher(watcherKey);
       } else {
         console.info("[achievement-watcher] Jogo aberto via shell.openPath — watcher mantido ativo.");
+        if (launchProfile.monitorId == null) selectOverlayDisplayFromLauncher();
+        applyWindowProfile(normalizedTarget, launchProfile);
+        startGameProcessMonitor(watcherKey, normalizedTarget, {
+          baselineProcesses: launchProcessBaseline,
+        });
+        if (mainWindow) mainWindow.hide();
       }
     });
 
@@ -1274,6 +1726,12 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
       throw new Error(openError);
     } else {
       console.info("[achievement-watcher] Jogo aberto via shell.openPath (fallback síncrono) — watcher mantido ativo.");
+      if (launchProfile.monitorId == null) selectOverlayDisplayFromLauncher();
+      applyWindowProfile(normalizedTarget, launchProfile);
+      startGameProcessMonitor(watcherKey, normalizedTarget, {
+        baselineProcesses: launchProcessBaseline,
+      });
+      if (mainWindow) mainWindow.hide();
     }
   }
 });
@@ -1304,6 +1762,150 @@ const getRunningProcessNames = async () => {
   return names;
 };
 
+const PROCESS_SNAPSHOT_COMMAND = [
+  "$ErrorActionPreference = 'Stop'",
+  "$items = Get-CimInstance Win32_Process | ForEach-Object { [PSCustomObject]@{ pid = [int]$_.ProcessId; parentPid = [int]$_.ParentProcessId; name = [string]$_.Name; executablePath = [string]$_.ExecutablePath } }",
+  "$items | ConvertTo-Json -Compress",
+].join("; ");
+
+let _processSnapshotCache = { processes: [], expiresAt: 0, pending: null };
+
+const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
+  if (!forceRefresh && Date.now() < _processSnapshotCache.expiresAt) {
+    return _processSnapshotCache.processes;
+  }
+  if (_processSnapshotCache.pending) return _processSnapshotCache.pending;
+
+  const pending = new Promise((resolve, reject) => {
+    execFile("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      PROCESS_SNAPSHOT_COMMAND,
+    ], { windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout = "") => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      try {
+        resolve(parseProcessSnapshot(stdout));
+      } catch (parseError) {
+        reject(parseError);
+      }
+    });
+  });
+
+  _processSnapshotCache.pending = pending;
+  try {
+    const processes = await pending;
+    _processSnapshotCache = {
+      processes,
+      expiresAt: Date.now() + 1500,
+      pending: null,
+    };
+    return processes;
+  } catch (error) {
+    _processSnapshotCache.pending = null;
+    throw error;
+  }
+};
+
+const getProcessSnapshotWithFallback = async ({ forceRefresh = false } = {}) => {
+  try {
+    return await getRunningProcesses({ forceRefresh });
+  } catch (error) {
+    console.warn(
+      "[launcher] Snapshot detalhado de processos indisponivel; usando tasklist:",
+      error instanceof Error ? error.message : error,
+    );
+    const runningNames = await getRunningProcessNames().catch(() => new Set());
+    return Array.from(runningNames, (name) => ({
+      pid: 0,
+      parentPid: 0,
+      name,
+      executablePath: "",
+    }));
+  }
+};
+
+const stopGameProcessMonitor = (watcherKey) => {
+  const monitor = activeGameMonitors.get(watcherKey);
+  if (monitor) {
+    clearInterval(monitor.timer);
+    activeGameMonitors.delete(watcherKey);
+  }
+  const rescanTimer = activeRescanTimers.get(watcherKey);
+  if (rescanTimer) {
+    clearInterval(rescanTimer);
+    activeRescanTimers.delete(watcherKey);
+  }
+};
+
+const finishMonitoredGameSession = (watcherKey) => {
+  stopGameProcessMonitor(watcherKey);
+  stopGameWatcher(watcherKey);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+};
+
+const startGameProcessMonitor = (watcherKey, executablePath, options = {}) => {
+  const existingMonitor = activeGameMonitors.get(watcherKey);
+  if (existingMonitor) {
+    clearInterval(existingMonitor.timer);
+    activeGameMonitors.delete(watcherKey);
+  }
+  const tracker = createGameProcessTracker({
+    targetPath: executablePath,
+    rootPid: options.rootPid,
+    baselineProcesses: options.baselineProcesses || [],
+    startedAt: Date.now(),
+  });
+  const monitor = {
+    timer: null,
+    checking: false,
+    requestedExecutablePath: normalizeWindowsPath(executablePath),
+    activeExecutablePath: normalizeWindowsPath(executablePath),
+    lastStatus: "starting",
+    tracker,
+  };
+
+  const check = async () => {
+    if (monitor.checking) return;
+    monitor.checking = true;
+    try {
+      const processes = await getProcessSnapshotWithFallback({ forceRefresh: true });
+      const previousActivePath = monitor.activeExecutablePath;
+      const result = tracker.observe(processes, Date.now());
+      monitor.lastStatus = result.status;
+      monitor.activeExecutablePath = result.activeExecutablePath;
+
+      if (result.adopted && previousActivePath !== result.activeExecutablePath) {
+        console.info(
+          `[launcher] Processo real adotado para ${watcherKey}: ${result.activeExecutablePath}`,
+        );
+      }
+      if (result.status === "finished") finishMonitoredGameSession(watcherKey);
+    } finally {
+      monitor.checking = false;
+    }
+  };
+
+  monitor.timer = setInterval(() => void check(), 3000);
+  activeGameMonitors.set(watcherKey, monitor);
+  void check();
+};
+
+const isManagedExecutableActive = (executablePath) => {
+  const normalizedTarget = normalizeWindowsPath(executablePath);
+  if (!normalizedTarget) return false;
+  return Array.from(activeGameMonitors.values()).some((monitor) => (
+    monitor.requestedExecutablePath === normalizedTarget
+    && monitor.lastStatus !== "finished"
+  ));
+};
+
 registerSecureIpcHandler("launcher:is-executable-running", async (_event, executablePath) => {
   const target = String(executablePath || "").trim();
   if (!target) return false;
@@ -1311,6 +1913,10 @@ registerSecureIpcHandler("launcher:is-executable-running", async (_event, execut
   const normalizedTarget = path.normalize(target);
   const executableName = path.basename(normalizedTarget);
   if (!executableName || path.extname(executableName).toLowerCase() !== ".exe") return false;
+
+  // The configured launcher may have exited after spawning the real game.
+  // Keep renderer presence qualified while the managed replacement is alive.
+  if (isManagedExecutableActive(normalizedTarget)) return true;
 
   const runningNames = await getRunningProcessNames().catch(() => new Set());
   return runningNames.has(executableName.toLowerCase());
@@ -1328,9 +1934,10 @@ registerSecureIpcHandler("launcher:detect-running-games", async (_event, executa
   if (normalizedTargets.length === 0) return [];
 
   const runningNames = await getRunningProcessNames().catch(() => new Set());
-  return normalizedTargets.filter((target) =>
-    runningNames.has(path.basename(target).toLowerCase()),
-  );
+  return normalizedTargets.filter((target) => (
+    isManagedExecutableActive(target)
+    || runningNames.has(path.basename(target).toLowerCase())
+  ));
 });
 
 registerSecureIpcHandler("auth:start-google-browser", async () => {
@@ -1350,6 +1957,7 @@ registerSecureIpcHandler("shell:open-external", async (_event, url) => {
 });
 
 registerSecureIpcHandler("overlay:test-welcome", async () => {
+  selectOverlayDisplayFromLauncher();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
     title: "Divirta-se",
@@ -1358,6 +1966,7 @@ registerSecureIpcHandler("overlay:test-welcome", async () => {
 });
 
 registerSecureIpcHandler("overlay:test-achievement", async () => {
+  selectOverlayDisplayFromLauncher();
   sendOverlayEvent("achievement:unlock", {
     gameId: "checkpoint-lab",
     achievementId: "overlay-smoke-test",
@@ -1373,15 +1982,28 @@ registerSecureIpcHandler("overlay:test-achievement", async () => {
   playOverlaySound("achievement-unlock");
 });
 
+registerSecureIpcHandler("overlay:toggle-panel", async () => {
+  setOverlayPanelOpen(!overlayPanelOpen);
+  return { open: overlayPanelOpen };
+});
+
 registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
+  selectOverlayDisplayFromLauncher();
   const gameTitle = String(payload?.gameTitle || "").trim();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
     title: "Divirta-se",
     description: gameTitle
-      ? `Voce esta jogando agora ${gameTitle}`
-      : "O overlay esta ativo enquanto voce joga.",
+      ? `Você está jogando agora ${gameTitle}`
+      : "O overlay está ativo enquanto você joga.",
   });
+  setTimeout(() => {
+    sendOverlayEvent("overlay:social", {
+      kind: "overlay-hint",
+      title: "Abra sem sair do jogo",
+      description: "Use o botão central do controle ou Ctrl + Shift + O.",
+    });
+  }, 1400);
 });
 
 registerSecureIpcHandler("overlay:show-friend-playing", async (_event, payload) => {
@@ -1617,6 +2239,20 @@ app.whenReady().then(async () => {
       return;
     }
 
+    try {
+      const saved = JSON.parse(fs.readFileSync(overlaySettingsFile(), "utf8"));
+      const savedShortcut = normalizeCaptureShortcut(saved?.captureShortcut);
+      if (savedShortcut) captureShortcut = savedShortcut;
+    } catch {
+      // Primeira execucao ou configuracao ainda nao criada.
+    }
+    loadRecentCaptures();
+    overlayPanelState = {
+      ...overlayPanelState,
+      captures: recentCaptures,
+      settings: { captureShortcut },
+    };
+
     const iconPath = path.join(app.getAppPath(), "assets", "icon.png");
     try {
       if (fs.existsSync(iconPath)) {
@@ -1639,6 +2275,10 @@ app.whenReady().then(async () => {
     }
 
     createOverlayWindow();
+    globalShortcut.register("CommandOrControl+Shift+O", () => setOverlayPanelOpen(!overlayPanelOpen));
+    if (!registerCaptureShortcut(captureShortcut)) {
+      console.warn(`[overlay] O atalho de captura ${captureShortcut} ja esta em uso.`);
+    }
     screen.on("display-metrics-changed", syncOverlayBounds);
     screen.on("display-added", syncOverlayBounds);
     screen.on("display-removed", syncOverlayBounds);
@@ -1673,11 +2313,18 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
   process.exit(0);
 });
 
 app.on("before-quit", () => {
   isQuitting = true;
+  for (const watcherKey of Array.from(activeGameMonitors.keys())) {
+    stopGameProcessMonitor(watcherKey);
+  }
+  for (const watcherKey of Array.from(activeWatchers.keys())) {
+    stopGameWatcher(watcherKey);
+  }
   screen.removeListener("display-metrics-changed", syncOverlayBounds);
   screen.removeListener("display-added", syncOverlayBounds);
   screen.removeListener("display-removed", syncOverlayBounds);

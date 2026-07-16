@@ -1,4 +1,5 @@
 export const CONTROLLER_KEYBOARD_EVENT = "checkpoint:controller-keyboard";
+export const CONTROLLER_KEYBOARD_VISIBILITY_EVENT = "checkpoint:controller-keyboard-visibility";
 
 export type ControllerTextTarget = HTMLInputElement | HTMLTextAreaElement;
 

@@ -1,5 +1,15 @@
 export type LauncherType = "steam" | "local" | "epic";
 
+export interface GameLaunchProfile {
+  arguments?: string;
+  workingDirectory?: string;
+  monitorId?: number | null;
+  windowMode?: "default" | "borderless" | "windowed";
+  resolutionWidth?: number | null;
+  resolutionHeight?: number | null;
+  processPriority?: "normal" | "above-normal" | "high";
+}
+
 export interface Game {
   id: string;
   title: string;
@@ -34,6 +44,24 @@ export interface Game {
   tags?: string[];
   totalAchievements?: number;
   completedAchievements?: number;
+  launchProfile?: GameLaunchProfile;
+}
+
+export interface SocialActivity {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string | null;
+  audienceIds: string[];
+  kind: "game-start" | "achievement" | "capture";
+  gameId?: string;
+  gameTitle?: string;
+  gameImage?: string;
+  achievementId?: string;
+  achievementName?: string;
+  achievementIcon?: string;
+  caption?: string;
+  createdAt: string;
 }
 
 export interface UserProfile {
@@ -79,6 +107,13 @@ export interface UserProfile {
   lastSteamSyncAt?: string;
   gamesMigratedAt?: string;
   onboardingCompletedAt?: string;
+  achievementSummary?: {
+    unlocked: number;
+    available: number;
+    gamesWithAchievements?: number;
+    totalGames?: number;
+    updatedAt?: string;
+  };
 }
 
 export interface SteamOwnedGame {

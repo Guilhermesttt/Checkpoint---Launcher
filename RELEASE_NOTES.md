@@ -1,4 +1,70 @@
-## Checkpoint Launcher — v1.0.8
+## Checkpoint Launcher — v2.0.0
+
+Lançamento: 16 de julho de 2026.
+
+A versão 2.0.0 amplia o Checkpoint de um launcher de biblioteca para uma experiência desktop e in-game integrada. O foco desta versão é o novo overlay, a confiabilidade das conquistas, a continuidade em segundo plano e um fluxo mais completo para jogos locais.
+
+### Novo overlay in-game
+
+- Central multipágina no tema preto e branco do Checkpoint, com páginas de Início, Chat, Jogo, Mídia, Conquistas, Configurações e Perfil.
+- Amigos online e offline, busca, perfil próprio e avatar do Discord quando a conta está conectada.
+- Chat em tempo real dentro do jogo, com lista de conversas separada, envio, exibição do indicador de digitação do amigo e feedback de erro.
+- Badge de chat exibido somente quando há mensagens não lidas.
+- Página do jogo em execução com duração da sessão, tempo total, conquistas, amigos jogando, plataforma, executável, desenvolvedor, lançamento, modo de janela e resolução.
+- Lista rolável de conquistas do jogo atual, com ícone, descrição, data e estados bloqueado/desbloqueado.
+- Galeria de capturas recentes, captura imediata, abertura da pasta e exclusão para a Lixeira com confirmação dupla.
+- Atalho de captura personalizável com `F1`–`F24`, `Print Screen` e combinações com `Ctrl`, `Alt` ou `Shift`.
+- Abertura por `Ctrl + Shift + O` e suporte ao botão Guide/PS/Home do controle quando disponibilizado pelo sistema.
+- Novos toasts compactos para jogo iniciado, dica de abertura do overlay e conquista desbloqueada.
+
+### Conquistas e perfis
+
+- Totais canônicos calculados sobre toda a biblioteca, sem o antigo limite de 80 jogos.
+- Agregação de conquistas locais por jogo e Steam App ID, com deduplicação de caches e tolerância a cache corrompido.
+- Sincronização Steam em lotes, com registro de cobertura e preservação de totais válidos quando um jogo falha.
+- Perfil próprio e perfis de amigos passam a consumir o mesmo resumo consolidado.
+- Receiver de emulador passa a usar a porta realmente escolhida pela bridge local.
+- Filhos iniciados pelo mesmo launcher ou no diretório do jogo podem ser adotados como o processo real; se nenhum processo qualificado for encontrado, a sessão local é encerrada após o timeout.
+
+### Segundo plano e jogos locais
+
+- Presença, sessões, polling da Steam e watchers de conquistas continuam ativos com a janela escondida ou minimizada na bandeja.
+- Sessões Steam abertas por URI usam a presença pública da conta para confirmar início e encerramento; sessões não observáveis ficam marcadas como provisórias e possuem expiração de segurança.
+- Perfis de inicialização por jogo local com monitor, modo padrão/borderless/janela, resolução, prioridade, argumentos e diretório de trabalho.
+- Tentativa de aplicar monitor, modo de janela e resolução a jogos locais; o overlay exibe o perfil solicitado, sem afirmar que o jogo aceitou a configuração.
+- Encerramento mais seguro de watchers, timers e processos auxiliares ao sair do launcher.
+
+### Interface e experiência
+
+- Modal Adicionar/Editar jogo redesenhado em seções para plataforma, preenchimento automático, identidade e artes.
+- Prévia fixa do card, checklist de cadastro, validação visível e ação correta para criar ou editar.
+- Buscas Steam/Epic cancelam respostas atrasadas ao trocar de plataforma ou fechar o modal.
+- No chat da janela principal, teclado virtual do controle e conversa passam a ocupar áreas lado a lado.
+- Feed de atividade para jogos iniciados e conquistas de amigos.
+- Publicação do feed passa pelo backend, que deriva identidade, amizade, audiência e horário sem confiar nesses campos enviados pelo cliente.
+- Artes locais do modal são validadas, redimensionadas e comprimidas antes de entrarem no documento do jogo.
+
+### Qualidade e segurança
+
+- Novos testes para overlay, chat, capturas, controle, perfis de inicialização, polling oculto, resumo de conquistas e bibliotecas com mais de 80 jogos.
+- Regras e índices do Firestore atualizados para o feed social.
+- IPCs do desktop permanecem restritos pelo preload e pelas validações de segurança.
+
+### Limitações conhecidas
+
+- Fullscreen exclusivo pode impedir que uma janela externa apareça sobre o jogo. Para o overlay, use modo janela ou borderless.
+- O botão Guide/PS/Home pode ser capturado pela Xbox Game Bar, Steam ou pelo driver do controle.
+- Feed social e resumo agregado da Steam exigem que o backend, as regras e os índices desta versão estejam publicados.
+- Capturas são armazenadas localmente. Backup de saves na nuvem e coleções inteligentes não fazem parte desta versão.
+- Chat e histórico recente são transitórios: o backend mantém até 30 mensagens por conversa em memória e pode perdê-las ao reiniciar.
+
+---
+
+## Versões anteriores
+
+O histórico completo, inclusive a v1.0.9, está disponível em [GitHub Releases](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases).
+
+### Checkpoint Launcher — v1.0.8
 
 Atualização focada na robustez do sistema de conquistas para jogos locais com emuladores Steam.
 

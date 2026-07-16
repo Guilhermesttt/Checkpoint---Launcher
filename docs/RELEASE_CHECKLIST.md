@@ -12,6 +12,8 @@ Use este documento para todo release público. O responsável pelo release deve 
 - [ ] `npm run release:verify` confirmou o SHA-512 usado pelo auto-update.
 - [ ] `npm run release:smoke` validou instalação, `--smoke-test` e desinstalação.
 - [ ] Assinatura Authenticode válida no artefato público (`REQUIRE_SIGNED_RELEASE=1`).
+- [ ] O bundle de produção aponta para o backend público, sem depender do `.env` local.
+- [ ] Backend, regras e índices do Firestore compatíveis com a versão foram publicados e verificados.
 
 ## Privacidade e dados
 

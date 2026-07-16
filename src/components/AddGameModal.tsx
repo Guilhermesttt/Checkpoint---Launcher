@@ -4,7 +4,6 @@ import {
   X,
   ImageIcon,
   Type,
-  Play,
   Search,
   Tags,
   Globe,
@@ -12,10 +11,15 @@ import {
   RefreshCw,
   FolderOpen,
   HardDrive,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  LibraryBig,
+  Sparkles,
+  Upload,
 } from "lucide-react";
 import { addDoc, updateDoc, deleteField } from "firebase/firestore";
 import ModalShell from "./ui/ModalShell";
-import GameCard from "./GameCard";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -106,12 +110,13 @@ const isWindowsExecutablePath = (value: string) =>
 // Dropdown de busca reutilizado entre Steam e Epic — antes era duplicado
 // quase inteiro em dois blocos JSX separados.
 const GameSearchDropdown: React.FC<{
+  id: string;
   results: any[];
   isSearching: boolean;
   hasQuery: boolean;
   noResultsLabel: string;
   onSelect: (game: any) => void;
-}> = ({ results, isSearching, hasQuery, noResultsLabel, onSelect }) => {
+}> = ({ id, results, isSearching, hasQuery, noResultsLabel, onSelect }) => {
   const showEmptyState =
     hasQuery && !isSearching && results.length === 0;
 
@@ -120,6 +125,9 @@ const GameSearchDropdown: React.FC<{
   return (
     <AnimatePresence>
       <motion.div
+        id={id}
+        role="listbox"
+        aria-label="Resultados da busca"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}
@@ -137,6 +145,9 @@ const GameSearchDropdown: React.FC<{
         {!isSearching &&
           results.map((g) => (
             <button
+              type="button"
+              role="option"
+              aria-selected="false"
               key={g.id}
               onClick={() => onSelect(g)}
               className="w-full flex items-center gap-4 p-3 hover:bg-white/5 transition-colors text-left group"
@@ -201,10 +212,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       missingCoverOrExe:
         "Adicione uma capa ou selecione um executável antes de salvar.",
       viewOnEpicStore: "Ver na Epic Games Store",
-      ownGameConfirmed: "✓ Tenho esse jogo",
+      ownGameConfirmed: "Tenho esse jogo",
       ownGameConfirm: "Confirmar que possuo este jogo",
       previewPanel: "Prévia no Painel",
       wallpaper: "Wallpaper",
+      libraryKicker: "Biblioteca Checkpoint",
+      addSubtitle: "Adicione, organize e prepare um novo jogo para iniciar pelo launcher.",
+      editSubtitle: "Atualize os dados, as artes e a forma de inicialização deste jogo.",
+      localDescription: "Jogos instalados no PC e executáveis personalizados.",
+      steamDescription: "Metadados, biblioteca e inicialização pela Steam.",
+      epicDescription: "Catálogo da Epic com inicialização local opcional.",
+      automaticFill: "Preenchimento automático",
+      automaticFillHint: "Busque o jogo para importar capa, descrição e metadados.",
+      gameDetails: "Identidade do jogo",
+      gameDetailsHint: "Revise como o jogo será exibido na sua biblioteca.",
+      visualAssets: "Artes da biblioteca",
+      visualAssetsHint: "Use links ou envie arquivos locais para personalizar o card.",
+      description: "Descrição",
+      descriptionPlaceholder: "Uma breve descrição do jogo...",
+      cancel: "Cancelar",
+      saveChanges: "Salvar alterações",
+      ready: "Pronto para salvar",
+      missingFields: "Complete os itens necessários",
+      setupStatus: "Status do cadastro",
+      sourceReady: "Plataforma definida",
+      titleReady: "Título informado",
+      launchReady: "Jogo confirmado",
+      selected: "Selecionado",
+      imageTooLarge: "A imagem ficou grande demais. Escolha uma arte menor ou use um link.",
     },
     "en-US": {
       editInfo: "Edit information",
@@ -237,10 +272,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       missingCoverOrExe:
         "Add a cover image or select an executable before saving.",
       viewOnEpicStore: "View on Epic Games Store",
-      ownGameConfirmed: "✓ I own this game",
+      ownGameConfirmed: "I own this game",
       ownGameConfirm: "Confirm you own this game",
       previewPanel: "Dashboard Preview",
       wallpaper: "Wallpaper",
+      libraryKicker: "Checkpoint Library",
+      addSubtitle: "Add, organize and prepare a new game to launch from Checkpoint.",
+      editSubtitle: "Update this game's details, artwork and launch method.",
+      localDescription: "Installed PC games and custom executables.",
+      steamDescription: "Steam metadata, library ownership and launch support.",
+      epicDescription: "Epic catalog metadata with optional local launching.",
+      automaticFill: "Automatic details",
+      automaticFillHint: "Search for a game to import artwork, description and metadata.",
+      gameDetails: "Game identity",
+      gameDetailsHint: "Review how the game will appear in your library.",
+      visualAssets: "Library artwork",
+      visualAssetsHint: "Use links or local files to customize the game card.",
+      description: "Description",
+      descriptionPlaceholder: "A short description of the game...",
+      cancel: "Cancel",
+      saveChanges: "Save changes",
+      ready: "Ready to save",
+      missingFields: "Complete the required items",
+      setupStatus: "Setup status",
+      sourceReady: "Platform selected",
+      titleReady: "Title provided",
+      launchReady: "Game confirmed",
+      selected: "Selected",
+      imageTooLarge: "The image is too large. Choose a smaller file or use an image URL.",
     },
     "es-ES": {
       editInfo: "Editar información",
@@ -273,10 +332,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       missingCoverOrExe:
         "Añade una portada o selecciona un ejecutable antes de guardar.",
       viewOnEpicStore: "Ver en Epic Games Store",
-      ownGameConfirmed: "✓ Tengo este juego",
+      ownGameConfirmed: "Tengo este juego",
       ownGameConfirm: "Confirmar que posees este juego",
       previewPanel: "Vista previa del panel",
       wallpaper: "Fondo",
+      libraryKicker: "Biblioteca Checkpoint",
+      addSubtitle: "Añade, organiza y prepara un nuevo juego para iniciarlo desde Checkpoint.",
+      editSubtitle: "Actualiza los datos, las imágenes y el método de inicio del juego.",
+      localDescription: "Juegos instalados en PC y ejecutables personalizados.",
+      steamDescription: "Metadatos, biblioteca e inicio mediante Steam.",
+      epicDescription: "Catálogo de Epic con inicio local opcional.",
+      automaticFill: "Relleno automático",
+      automaticFillHint: "Busca el juego para importar imágenes, descripción y metadatos.",
+      gameDetails: "Identidad del juego",
+      gameDetailsHint: "Revisa cómo aparecerá el juego en tu biblioteca.",
+      visualAssets: "Imágenes de la biblioteca",
+      visualAssetsHint: "Usa enlaces o archivos locales para personalizar la tarjeta.",
+      description: "Descripción",
+      descriptionPlaceholder: "Una breve descripción del juego...",
+      cancel: "Cancelar",
+      saveChanges: "Guardar cambios",
+      ready: "Listo para guardar",
+      missingFields: "Completa los elementos necesarios",
+      setupStatus: "Estado del registro",
+      sourceReady: "Plataforma definida",
+      titleReady: "Título informado",
+      launchReady: "Juego confirmado",
+      selected: "Seleccionado",
+      imageTooLarge: "La imagen es demasiado grande. Elige un archivo menor o usa un enlace.",
     },
   }[language];
   const { notify } = useNotification();
@@ -284,7 +367,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const coverInputRef = React.useRef<HTMLInputElement>(null);
   const wallpaperInputRef = React.useRef<HTMLInputElement>(null);
   const searchDebounceRef = React.useRef<number | null>(null);
+  const searchRequestRef = React.useRef(0);
+  const detailsRequestRef = React.useRef(0);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -301,6 +387,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      searchRequestRef.current += 1;
+      detailsRequestRef.current += 1;
+      if (searchDebounceRef.current) {
+        window.clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
+      }
       if (gameToEdit) {
         setFormData({
           title: gameToEdit.title || "",
@@ -325,7 +417,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           trailerUrl: gameToEdit.trailerUrl || "",
           screenshots: gameToEdit.screenshots || [],
           source: gameToEdit.source || "manual",
-          hasGame: gameToEdit.hasGame ?? false,
+          hasGame:
+            gameToEdit.hasGame ??
+            Boolean(gameToEdit.steamAppId || gameToEdit.epicCatalogId),
         });
       } else {
         setFormData({
@@ -344,6 +438,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       setSearchQuery("");
       setSearchResults([]);
       setIsSearching(false);
+      setLoading(false);
+      setIsSaving(false);
     }
   }, [isOpen, gameToEdit]);
 
@@ -352,6 +448,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       if (searchDebounceRef.current) {
         window.clearTimeout(searchDebounceRef.current);
       }
+      searchRequestRef.current += 1;
+      detailsRequestRef.current += 1;
     },
     [],
   );
@@ -364,7 +462,75 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       reader.readAsDataURL(file);
     });
 
+  const optimizeArtwork = async (
+    file: File,
+    maxWidth: number,
+    maxHeight: number,
+  ) => {
+    const MAX_ART_DATA_URL_LENGTH = 230_000;
+    const MAX_ART_FILE_BYTES = 12 * 1024 * 1024;
+    const MAX_SOURCE_PIXELS = 32_000_000;
+    const supportedMimeType = /^(?:image\/(?:jpeg|png|webp|gif))$/i.test(file.type);
+    const supportedExtension = /\.(?:jpe?g|png|webp|gif)$/i.test(file.name);
+    if (
+      file.size <= 0
+      || file.size > MAX_ART_FILE_BYTES
+      || (!supportedMimeType && !supportedExtension)
+    ) {
+      throw new Error(copy.imageTooLarge);
+    }
+
+    const original = await fileToDataUrl(file);
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const nextImage = new Image();
+      nextImage.onload = () => resolve(nextImage);
+      nextImage.onerror = () => reject(new Error(copy.imageTooLarge));
+      nextImage.src = original;
+    });
+
+    if (
+      image.naturalWidth <= 0
+      || image.naturalHeight <= 0
+      || image.naturalWidth > 10_000
+      || image.naturalHeight > 10_000
+      || image.naturalWidth * image.naturalHeight > MAX_SOURCE_PIXELS
+    ) {
+      throw new Error(copy.imageTooLarge);
+    }
+
+    if (
+      original.length <= MAX_ART_DATA_URL_LENGTH
+      && image.naturalWidth <= maxWidth
+      && image.naturalHeight <= maxHeight
+    ) {
+      return original;
+    }
+
+    const initialScale = Math.min(
+      1,
+      maxWidth / Math.max(1, image.naturalWidth),
+      maxHeight / Math.max(1, image.naturalHeight),
+    );
+    let scale = initialScale;
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) break;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const quality = Math.max(0.48, 0.84 - (attempt % 3) * 0.14);
+      const optimized = canvas.toDataURL("image/webp", quality);
+      if (optimized.length <= MAX_ART_DATA_URL_LENGTH) return optimized;
+      if (attempt % 3 === 2) scale *= 0.78;
+    }
+
+    throw new Error(copy.imageTooLarge);
+  };
+
   const handleSteamSearch = async (query: string) => {
+    const requestId = ++searchRequestRef.current;
     if (query.length < 3) {
       setSearchResults([]);
       setIsSearching(false);
@@ -376,22 +542,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
       );
       const data = await resp.json();
-      setSearchResults(data.items || []);
+      if (requestId === searchRequestRef.current) {
+        setSearchResults(data.items || []);
+      }
     } catch (error) {
       console.error(error);
-      setSearchResults([]);
-      notify(copy.searchError, "error");
+      if (requestId === searchRequestRef.current) {
+        setSearchResults([]);
+        notify(copy.searchError, "error");
+      }
     } finally {
-      setIsSearching(false);
+      if (requestId === searchRequestRef.current) {
+        setIsSearching(false);
+      }
     }
   };
 
   const handleSelectSteamGame = async (game: any) => {
     playSound("select");
+    resetSearch();
+    const requestId = ++detailsRequestRef.current;
     const appId = String(game.id);
     setLoading(true);
     try {
       const details = await fetchSteamAppDetailsResult(appId);
+      if (requestId !== detailsRequestRef.current) return;
       if (details.ok) {
         const d = details.data;
         const steamCover =
@@ -428,17 +603,20 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       } else {
         notify(copy.searchError, "error");
       }
-      setSearchResults([]);
-      setSearchQuery("");
     } catch (error) {
       console.error(error);
-      notify(copy.searchError, "error");
+      if (requestId === detailsRequestRef.current) {
+        notify(copy.searchError, "error");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === detailsRequestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const handleEpicSearch = async (query: string) => {
+    const requestId = ++searchRequestRef.current;
     if (query.length < 3) {
       setSearchResults([]);
       setIsSearching(false);
@@ -447,20 +625,28 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     setIsSearching(true);
     try {
       const data = await searchEpicGames(query);
-      setSearchResults(data.items || []);
+      if (requestId === searchRequestRef.current) {
+        setSearchResults(data.items || []);
+      }
     } catch (e) {
       console.error(e);
-      setSearchResults([]);
-      notify(copy.searchError, "error");
+      if (requestId === searchRequestRef.current) {
+        setSearchResults([]);
+        notify(copy.searchError, "error");
+      }
     } finally {
-      setIsSearching(false);
+      if (requestId === searchRequestRef.current) {
+        setIsSearching(false);
+      }
     }
   };
 
   const scheduleSearch = (query: string, platform: "steam" | "epic") => {
+    searchRequestRef.current += 1;
     setSearchQuery(query);
     if (searchDebounceRef.current) {
       window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
     }
     if (query.length < 3) {
       setSearchResults([]);
@@ -468,6 +654,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       return;
     }
     searchDebounceRef.current = window.setTimeout(() => {
+      searchDebounceRef.current = null;
       if (platform === "steam") {
         handleSteamSearch(query);
         return;
@@ -478,16 +665,24 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
   const handleSelectEpicGame = async (game: any) => {
     playSound("select");
+    resetSearch();
+    const requestId = ++detailsRequestRef.current;
     setLoading(true);
     try {
       const catalogId = String(game.id || game.catalogId || "").trim();
       const namespace = String(game.namespace || "").trim();
-      const launchId = namespace && catalogId ? `${namespace}:${catalogId}` : catalogId;
+      let launchId = namespace && catalogId ? `${namespace}:${catalogId}` : catalogId;
       const details =
         catalogId && namespace
           ? await fetchEpicAppDetailsResult(catalogId, namespace).catch(() => null)
           : null;
       const d = details?.ok ? details.data : null;
+      if (requestId !== detailsRequestRef.current) return;
+
+      const appName = String(d?.appName || game.appName || "").trim();
+      if (namespace && catalogId && appName) {
+        launchId = `${namespace}:${catalogId}:${appName}`;
+      }
 
       const gameTitle = d?.title || game.title || game.name || "";
       let resolvedSteamAppId = "";
@@ -514,6 +709,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         }
       }
 
+      if (requestId !== detailsRequestRef.current) return;
       setFormData((prev) => ({
         ...prev,
         title: gameTitle,
@@ -539,13 +735,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         source: "epic",
         hasGame: false,
       }));
-      setSearchResults([]);
-      setSearchQuery("");
     } catch (e) {
       console.error(e);
-      notify(copy.searchError, "error");
+      if (requestId === detailsRequestRef.current) {
+        notify(copy.searchError, "error");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === detailsRequestRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -592,7 +790,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await optimizeArtwork(file, 720, 1080);
       setFormData((prev) => ({
         ...prev,
         cardImage: dataUrl,
@@ -600,8 +798,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         source: "manual",
       }));
       playSound("select");
-    } catch {
-      notify("Erro ao carregar imagem.", "error");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : copy.imageTooLarge, "error");
     } finally {
       e.target.value = "";
     }
@@ -613,7 +811,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await optimizeArtwork(file, 1600, 900);
       setFormData((prev) => ({
         ...prev,
         backgroundImage: dataUrl,
@@ -621,8 +819,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         source: "manual",
       }));
       playSound("select");
-    } catch {
-      notify("Erro ao carregar imagem.", "error");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : copy.imageTooLarge, "error");
     } finally {
       e.target.value = "";
     }
@@ -640,8 +838,73 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
+  const resetSearch = () => {
+    searchRequestRef.current += 1;
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearching(false);
+  };
+
+  const handleClose = (silent?: boolean) => {
+    detailsRequestRef.current += 1;
+    setLoading(false);
+    resetSearch();
+    onClose(silent);
+  };
+
+  const selectLauncherType = (launcherType: GameFormData["launcherType"]) => {
+    playSound("navigate");
+    detailsRequestRef.current += 1;
+    setLoading(false);
+    resetSearch();
+    setFormData((prev) => {
+      const platformChanged = prev.launcherType !== launcherType;
+      if (launcherType === "local") {
+        return {
+          ...prev,
+          launcherType,
+          executablePath: platformChanged ? "" : prev.executablePath,
+          steamAppId: "",
+          epicCatalogId: "",
+          epicLaunchId: "",
+          epicStoreUrl: "",
+          hasGame: false,
+          source: "manual",
+        };
+      }
+      if (launcherType === "steam") {
+        return {
+          ...prev,
+          launcherType,
+          executablePath: platformChanged ? "" : prev.steamAppId || prev.executablePath,
+          steamAppId: platformChanged ? "" : prev.steamAppId,
+          epicCatalogId: "",
+          epicLaunchId: "",
+          epicStoreUrl: "",
+          hasGame: platformChanged ? false : prev.hasGame,
+          source: "manual",
+        };
+      }
+      return {
+        ...prev,
+        launcherType,
+        executablePath: platformChanged ? "" : prev.executablePath,
+        steamAppId: platformChanged ? "" : prev.steamAppId,
+        epicCatalogId: platformChanged ? "" : prev.epicCatalogId,
+        epicLaunchId: platformChanged ? "" : prev.epicLaunchId,
+        epicStoreUrl: platformChanged ? "" : prev.epicStoreUrl,
+        hasGame: platformChanged ? false : prev.hasGame,
+        source: "manual",
+      };
+    });
+  };
+
   const isFormValid = () => {
-    if (!formData.title) return false;
+    if (!formData.title.trim()) return false;
     if (
       (formData.launcherType === "epic" || formData.launcherType === "steam") &&
       !formData.hasGame
@@ -656,14 +919,34 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     return true;
   };
 
+  const previewImage = formData.cardImage || formData.image || formData.backgroundImage || "";
+  const previewWallpaper = formData.backgroundImage || formData.cardImage || formData.image || "";
+  const platformLabel =
+    formData.launcherType === "steam"
+      ? copy.steam
+      : formData.launcherType === "epic"
+        ? copy.epic
+        : copy.local;
+  const launchRequirementReady = formData.launcherType === "local"
+    ? Boolean(formData.executablePath || formData.cardImage || formData.image)
+    : Boolean(formData.hasGame);
+  const setupChecks = [
+    { label: copy.sourceReady, ready: true },
+    { label: copy.titleReady, ready: Boolean(formData.title.trim()) },
+    { label: copy.launchReady, ready: launchRequirementReady },
+  ];
+  const completedSetupChecks = setupChecks.filter((item) => item.ready).length;
+  const setupProgress = Math.round((completedSetupChecks / setupChecks.length) * 100);
+
   const handleSubmit = async () => {
+    if (isSaving || loading) return;
     if (!user?.uid || !isFormValid()) {
       if (formData.title && formData.launcherType === "local") {
         notify(copy.missingCoverOrExe, "error");
       }
       return;
     }
-    setLoading(true);
+    setIsSaving(true);
     playSound("select");
     try {
       const image =
@@ -673,6 +956,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         image,
         updatedAt: new Date().toISOString(),
       });
+      if (new Blob([JSON.stringify(data)]).size > 850_000) {
+        notify(copy.imageTooLarge, "error");
+        return;
+      }
       if (gameToEdit) {
         await updateDoc(userGameDocRef(user.uid, gameToEdit.id), {
           ...data,
@@ -693,284 +980,285 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         });
         notify("Jogo adicionado!", "success");
       }
-      onClose(true);
+      handleClose(true);
       onSaved?.();
     } catch {
       notify("Erro ao salvar jogo.", "error");
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   return (
     <ModalShell
       isOpen={isOpen}
-      onClose={onClose}
-      maxWidthClassName="max-w-4xl"
+      onClose={handleClose}
+      maxWidthClassName="max-w-6xl"
       className="p-0! border-0! bg-transparent shadow-none!"
+      backdropClassName="bg-black/80 backdrop-blur-xl"
+      ariaLabel={gameToEdit ? copy.editInfo : copy.addGame}
     >
-      <div className="flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#0a0a0c]/98 shadow-[0_32px_128px_rgba(0,0,0,0.9)] backdrop-blur-3xl md:rounded-[40px]">
-        <div className="relative flex shrink-0 items-center justify-between border-b border-white/5 bg-white/0.01 px-6 py-5 md:px-10 md:py-8">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-white/10 rounded-full" />
-          <div>
-            <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">
-              {gameToEdit ? copy.editInfo : copy.addGame}
-            </h2>
-            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] mt-1">
-              Biblioteca Digital • Checkpoint v.2
-            </p>
+      <div
+        aria-busy={isSaving || loading}
+        className="relative flex h-[calc(100dvh-2rem)] max-h-[860px] w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#08080b]/98 shadow-[0_36px_140px_rgba(0,0,0,0.92)] backdrop-blur-3xl md:h-[calc(100dvh-4rem)] md:rounded-[32px]"
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_22%_-15%,rgba(255,255,255,0.12),transparent_44%)]" />
+        <header className="relative flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.07] bg-white/[0.015] px-5 py-4 md:px-7 md:py-5">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/[0.06] shadow-[inset_0_1px_rgba(255,255,255,0.08)]">
+              <LibraryBig size={20} className="text-white/80" />
+            </div>
+            <div className="min-w-0">
+              <p className="mb-1 text-[9px] font-black uppercase tracking-[0.24em] text-white/32">
+                {copy.libraryKicker}
+              </p>
+              <h2 className="truncate text-xl font-black tracking-[-0.035em] text-white md:text-2xl">
+                {gameToEdit ? copy.editInfo : copy.addGame}
+              </h2>
+              <p className="mt-1 hidden max-w-xl truncate text-[11px] text-white/38 sm:block">
+                {gameToEdit ? copy.editSubtitle : copy.addSubtitle}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              playSound("back");
-              onClose();
-            }}
-            aria-label="Fechar"
-            className="w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-all border border-white/5"
-          >
-            <X className="text-white/40" size={20} />
-          </button>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain md:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-8 border-r border-white/5 p-6 md:p-10">
-            <div className="space-y-4">
-              <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                <Globe size={14} className="text-white/20" /> {copy.platform}
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => {
-                    playSound("navigate");
-                    setSearchResults([]);
-                    setSearchQuery("");
-                    setFormData((prev) => ({
-                      ...prev,
-                      launcherType: "local",
-                      epicCatalogId: "",
-                      epicLaunchId: "",
-                      epicStoreUrl: "",
-                      executablePath:
-                        prev.launcherType === "steam" || prev.launcherType === "epic"
-                          ? ""
-                          : prev.executablePath,
-                      source: "manual",
-                    }));
-                  }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "local"
-                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                    }`}
-                >
-                  {copy.local}
-                </button>
-                <button
-                  onClick={() => {
-                    playSound("navigate");
-                    setSearchResults([]);
-                    setSearchQuery("");
-                    setFormData((prev) => ({
-                      ...prev,
-                      launcherType: "steam",
-                      executablePath: prev.steamAppId || "",
-                      epicLaunchId: "",
-                      epicStoreUrl: "",
-                      source: "manual",
-                    }));
-                  }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "steam"
-                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                    }`}
-                >
-                  {copy.steam}
-                </button>
-                <button
-                  onClick={() => {
-                    playSound("navigate");
-                    setSearchResults([]);
-                    setSearchQuery("");
-                    setFormData((prev) => ({
-                      ...prev,
-                      launcherType: "epic",
-                      executablePath:
-                        prev.launcherType === "epic" ? prev.executablePath : "",
-                      source: "manual",
-                    }));
-                  }}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.launcherType === "epic"
-                    ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                    : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                    }`}
-                >
-                  {copy.epic}
-                </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="hidden items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 sm:flex">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-white/42">
+                {completedSetupChecks}/3
+              </span>
+              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.07]">
+                <div className="h-full rounded-full bg-white transition-all duration-300" style={{ width: `${setupProgress}%` }} />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => handleClose()}
+              aria-label={copy.cancel}
+              className="grid h-10 w-10 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.025] text-white/42 transition-all hover:border-white/15 hover:bg-white/[0.08] hover:text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </header>
 
-            {formData.launcherType !== "epic" && (
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <Search size={14} className="text-white/20" /> {copy.steamSearch}
-                  ({copy.optional})
-                </label>
-                <div className="relative">
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => {
-                      scheduleSearch(e.target.value, "steam");
-                    }}
-                    placeholder={copy.searchPlaceholder}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
-                  />
-                  <GameSearchDropdown
-                    results={searchResults}
-                    isSearching={isSearching}
-                    hasQuery={searchQuery.length >= 3}
-                    noResultsLabel={copy.noSearchResults}
-                    onSelect={handleSelectSteamGame}
-                  />
+        <div className="add-game-scrollbar grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleSubmit();
+            }}
+            className="add-game-scrollbar min-h-0 space-y-5 border-white/[0.07] p-5 lg:overflow-y-auto lg:border-r lg:p-7"
+          >
+            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">01</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">{copy.platform}</h3>
+                  <p className="mt-0.5 text-[10px] text-white/34">{copy.addSubtitle}</p>
                 </div>
               </div>
-            )}
-
-            {formData.launcherType === "epic" && (
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                  <Search size={14} className="text-white/20" /> {copy.epicSearch} ({copy.optional})
-                </label>
-                <div className="relative">
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => {
-                      scheduleSearch(e.target.value, "epic");
-                    }}
-                    placeholder={copy.searchPlaceholder}
-                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-white outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all placeholder:text-white/20"
-                  />
-                  <GameSearchDropdown
-                    results={searchResults}
-                    isSearching={isSearching}
-                    hasQuery={searchQuery.length >= 3}
-                    noResultsLabel={copy.noSearchResults}
-                    onSelect={handleSelectEpicGame}
-                  />
-                </div>
-
-                {formData.epicStoreUrl && (
-                  <a
-                    href={formData.epicStoreUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/70"
-                  >
-                    <EpicIcon className="h-3.5 w-3.5 opacity-50" /> {copy.viewOnEpicStore}
-                  </a>
-                )}
-
-                <div className="space-y-4 pt-2">
-                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
-                    <FolderOpen size={14} className="text-white/20" /> {copy.executable}
-                  </label>
-                  <input
-                    ref={executableInputRef}
-                    type="file"
-                    accept=".exe,application/x-msdownload"
-                    className="hidden"
-                    onChange={handleEpicExecutableSelect}
-                  />
-                  <div className="flex gap-3">
+              <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
+                {([
+                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: <HardDrive size={17} /> },
+                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: <Globe size={17} /> },
+                  { id: "epic" as const, label: copy.epic, description: copy.epicDescription, icon: <EpicIcon className="h-[17px] w-[17px] opacity-80" /> },
+                ]).map((option) => {
+                  const selected = formData.launcherType === option.id;
+                  return (
                     <button
+                      key={option.id}
                       type="button"
-                      onClick={() => executableInputRef.current?.click()}
-                      className="shrink-0 px-4 py-3 rounded-2xl bg-white/8 border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70 hover:bg-white/12 hover:text-white transition-all"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => selectLauncherType(option.id)}
+                      className={"group relative min-h-[104px] rounded-2xl border p-3.5 text-left transition-all " + (selected
+                        ? "border-white/45 bg-white text-black shadow-[0_14px_36px_rgba(0,0,0,0.32)]"
+                        : "border-white/[0.07] bg-black/20 text-white hover:border-white/16 hover:bg-white/[0.045]")}
                     >
-                      {copy.chooseExe}
+                      <div className="flex items-start justify-between gap-3">
+                        <span className={"grid h-8 w-8 place-items-center rounded-xl border " + (selected ? "border-black/10 bg-black/[0.06]" : "border-white/[0.08] bg-white/[0.04] text-white/58")}>
+                          {option.icon}
+                        </span>
+                        {selected && <CheckCircle2 size={17} className="text-black/70" />}
+                      </div>
+                      <strong className="mt-3 block text-[12px] font-black">{option.label}</strong>
+                      <span className={"mt-1 block text-[9px] leading-relaxed " + (selected ? "text-black/55" : "text-white/34")}>{option.description}</span>
                     </button>
-                    <div className="min-w-0 flex-1 rounded-2xl bg-white/0.03 border border-white/10 px-4 py-3">
-                      <p className="truncate text-xs text-white/70">
-                        {formData.executablePath || copy.noExecutable}
-                      </p>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="relative rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">02</span>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white">{copy.automaticFill}</h3>
+                    <p className="mt-0.5 text-[10px] text-white/34">{copy.automaticFillHint}</p>
+                  </div>
+                </div>
+                {loading && <RefreshCw size={15} className="shrink-0 animate-spin text-white/45" />}
+              </div>
+
+              <label htmlFor="game-metadata-search" className="mb-2 block text-[9px] font-black uppercase tracking-[0.16em] text-white/38">
+                {formData.launcherType === "epic" ? copy.epicSearch : copy.steamSearch}
+                {formData.launcherType === "local" ? ` · ${copy.optional}` : ""}
+              </label>
+              <div className="relative">
+                <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/24" />
+                <input
+                  id="game-metadata-search"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-controls="game-search-results"
+                  aria-expanded={searchQuery.length >= 3}
+                  value={searchQuery}
+                  onChange={(event) => scheduleSearch(event.target.value, formData.launcherType === "epic" ? "epic" : "steam")}
+                  placeholder={copy.searchPlaceholder}
+                  className="w-full rounded-2xl border border-white/[0.09] bg-black/25 py-3.5 pl-11 pr-11 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.045]"
+                />
+                {isSearching && <RefreshCw size={14} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-white/32" />}
+                <GameSearchDropdown
+                  id="game-search-results"
+                  results={searchResults}
+                  isSearching={isSearching}
+                  hasQuery={searchQuery.length >= 3}
+                  noResultsLabel={copy.noSearchResults}
+                  onSelect={formData.launcherType === "epic" ? handleSelectEpicGame : handleSelectSteamGame}
+                />
+              </div>
+
+              {formData.epicStoreUrl && (
+                <a
+                  href={formData.epicStoreUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/38 transition-colors hover:text-white/70"
+                >
+                  <EpicIcon className="h-3.5 w-3.5 opacity-60" /> {copy.viewOnEpicStore}
+                </a>
+              )}
+
+              {formData.launcherType === "epic" && (
+                <div className="mt-4 border-t border-white/[0.06] pt-4">
+                  <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={handleEpicExecutableSelect} />
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button type="button" onClick={() => executableInputRef.current?.click()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white">
+                      <FolderOpen size={14} /> {copy.chooseExe}
+                    </button>
+                    <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
+                      <p className="truncate text-[10px] text-white/52">{formData.executablePath || copy.noExecutable}</p>
                     </div>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-white/28">
-                    {copy.executableHint}
-                  </p>
+                  <p className="mt-2 text-[9px] leading-relaxed text-white/26">{copy.executableHint}</p>
                 </div>
-              </div>
-            )}
+              )}
+            </section>
 
-            {(formData.epicCatalogId || formData.steamAppId) && (
-              <div className="pt-2">
+            {formData.launcherType !== "local" &&
+              (formData.epicCatalogId || formData.steamAppId) && (
+              <div>
                 <button
                   type="button"
+                  aria-pressed={Boolean(formData.hasGame)}
                   onClick={() => {
-                    playSound('select')
-                    setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }))
+                    playSound("select");
+                    setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }));
                   }}
-                  className={`w-full px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all border flex items-center justify-center gap-2 ${formData.hasGame
-                    ? "bg-emerald-500/90 text-black border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                    : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10"
+                  className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${formData.hasGame
+                    ? "border-white/40 bg-white text-black shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
+                    : "border-white/[0.08] bg-white/[0.025] text-white/48 hover:border-white/16 hover:bg-white/[0.055]"
                     }`}
                 >
-                  {formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}
+                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${formData.hasGame ? "border-black/10 bg-black/[0.06]" : "border-white/10 bg-white/[0.04]"}`}>
+                    <Check size={15} strokeWidth={3} />
+                  </span>
+                  <span>
+                    <strong className="block text-[10px] font-black uppercase tracking-[0.12em]">{formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}</strong>
+                    <small className={`mt-1 block text-[9px] ${formData.hasGame ? "text-black/50" : "text-white/28"}`}>{platformLabel}</small>
+                  </span>
                 </button>
               </div>
             )}
 
-            <div className="h-px bg-white/5" />
-
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">03</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">{copy.gameDetails}</h3>
+                  <p className="mt-0.5 text-[10px] text-white/34">{copy.gameDetailsHint}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="game-title" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
                   <Type size={14} className="text-white/20" /> {copy.title}
                 </label>
                 <input
+                  id="game-title"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
                   placeholder={copy.titlePlaceholder}
-                  className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-white/30 transition-all"
+                  className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
                 />
               </div>
 
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+              <div className="space-y-2">
+                <label htmlFor="game-category" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
                   <Tags size={14} className="text-white/20" /> {copy.category}
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        playSound("navigate");
-                        setFormData({ ...formData, category: cat.id });
-                      }}
-                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${formData.category === cat.id
-                        ? "bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                        : "bg-white/5 text-white/40 border-white/5 hover:bg-white/10"
-                        }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <select
+                    id="game-category"
+                    value={formData.category}
+                    onChange={(event) => {
+                      playSound("navigate");
+                      setFormData({ ...formData, category: event.target.value });
+                    }}
+                    className="w-full appearance-none rounded-xl border border-white/[0.09] bg-[#0d0d11] px-4 py-3.5 pr-10 text-[12px] text-white/78 outline-none transition-all focus:border-white/24"
+                  >
+                    {CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
+                  </select>
+                  <ChevronDown size={15} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/30" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="game-description" className="text-[9px] font-black uppercase tracking-[0.16em] text-white/40">{copy.description}</label>
+                <textarea
+                  id="game-description"
+                  rows={3}
+                  value={formData.description}
+                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                  placeholder={copy.descriptionPlaceholder}
+                  className="w-full resize-none rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] leading-relaxed text-white/72 outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
+                />
+              </div>
+
+              <div className="mt-1 border-t border-white/[0.06] pt-5 md:col-span-2">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="grid h-8 w-8 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04]"><Sparkles size={14} className="text-white/44" /></span>
+                  <div><h4 className="text-[11px] font-extrabold text-white/82">{copy.visualAssets}</h4><p className="mt-0.5 text-[9px] text-white/28">{copy.visualAssetsHint}</p></div>
+                </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
+                  <label htmlFor="game-cover-url" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
                     <ImageIcon size={14} className="text-white/20" /> {copy.cover}
-                    ({copy.link})
                   </label>
+                  <div
+                    className="h-24 rounded-xl border border-white/[0.07] bg-[#111116] bg-cover bg-center"
+                    style={formData.cardImage || formData.image ? { backgroundImage: "linear-gradient(to top, rgba(0,0,0,.35), transparent), url(" + JSON.stringify(formData.cardImage || formData.image) + ")" } : undefined}
+                  />
                   <input
+                    id="game-cover-url"
                     value={formData.cardImage}
                     onChange={(e) =>
                       setFormData({ ...formData, cardImage: e.target.value })
                     }
                     placeholder="https://..."
-                    className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5 text-[9px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -984,19 +1272,23 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <button
                         type="button"
                         onClick={() => coverInputRef.current?.click()}
-                        className="w-full px-4 py-3 rounded-2xl bg-white/8 border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70 hover:bg-white/12 hover:text-white transition-all"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.09] bg-white/[0.05] px-3 py-2.5 text-[9px] font-black uppercase tracking-wider text-white/58 transition-all hover:bg-white/10 hover:text-white"
                       >
-                        {copy.upload}
+                        <Upload size={13} /> {copy.upload}
                       </button>
                     </>
                   )}
                 </div>
-                <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
+                  <label htmlFor="game-wallpaper-url" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
                     <ImageIcon size={14} className="text-white/20" /> {copy.wallpaper}
-                    ({copy.link})
                   </label>
+                  <div
+                    className="h-24 rounded-xl border border-white/[0.07] bg-[#111116] bg-cover bg-center"
+                    style={formData.backgroundImage ? { backgroundImage: "linear-gradient(to top, rgba(0,0,0,.35), transparent), url(" + JSON.stringify(formData.backgroundImage) + ")" } : undefined}
+                  />
                   <input
+                    id="game-wallpaper-url"
                     value={formData.backgroundImage}
                     onChange={(e) =>
                       setFormData({
@@ -1005,7 +1297,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       })
                     }
                     placeholder="https://..."
-                    className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5 text-[9px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -1019,33 +1311,35 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <button
                         type="button"
                         onClick={() => wallpaperInputRef.current?.click()}
-                        className="w-full px-4 py-3 rounded-2xl bg-white/8 border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70 hover:bg-white/12 hover:text-white transition-all"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.09] bg-white/[0.05] px-3 py-2.5 text-[9px] font-black uppercase tracking-wider text-white/58 transition-all hover:bg-white/10 hover:text-white"
                       >
-                        {copy.upload}
+                        <Upload size={13} /> {copy.upload}
                       </button>
                     </>
                   )}
                 </div>
               </div>
+              </div>
 
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+              <div className="space-y-2">
+                <label htmlFor="game-size" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
                   <HardDrive size={14} className="text-white/20" /> {copy.sizeGB}
                   ({copy.optional})
                 </label>
                 <input
+                  id="game-size"
                   type="number"
                   min={0}
                   value={formData.sizeGB ?? ""}
                   onChange={handleSizeChange}
                   placeholder={copy.sizePlaceholder}
-                  className="w-full bg-white/0.03 border border-white/10 rounded-2xl p-4 text-xs text-white/70 outline-none focus:border-white/30 transition-all"
+                  className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] text-white/70 outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                 />
               </div>
 
               {formData.launcherType === "local" && (
-                <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">
+                <div className="space-y-3 md:col-span-2">
+                  <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
                     <FolderOpen size={14} className="text-white/20" />{" "}
                     {copy.executable}
                   </label>
@@ -1056,104 +1350,177 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     className="hidden"
                     onChange={handleExecutableSelect}
                   />
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => executableInputRef.current?.click()}
-                      className="shrink-0 px-4 py-3 rounded-2xl bg-white/8 border border-white/10 text-[10px] font-black uppercase tracking-wider text-white/70 hover:bg-white/12 hover:text-white transition-all"
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white"
                     >
-                      {copy.chooseExe}
+                      <FolderOpen size={14} /> {copy.chooseExe}
                     </button>
-                    <div className="min-w-0 flex-1 rounded-2xl bg-white/0.03 border border-white/10 px-4 py-3">
-                      <p className="truncate text-xs text-white/70">
+                    <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
+                      <p className="truncate text-[10px] text-white/52">
                         {formData.executablePath || copy.noExecutable}
                       </p>
                     </div>
                   </div>
-                  <p className="text-[10px] leading-relaxed text-white/28">
+                  <p className="text-[9px] leading-relaxed text-white/26">
                     {copy.executableHint}
                   </p>
                 </div>
               )}
             </div>
+            </section>
 
-            <button
-              disabled={loading || !isFormValid()}
-              onClick={handleSubmit}
-              className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:bg-[#e0e0e0] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4 shadow-[0_20px_40px_rgba(255,255,255,0.1)] disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-              {loading ? (
-                <RefreshCw size={18} className="animate-spin" />
-              ) : (
-                <>
-                  <Play
-                    size={16}
-                    className="fill-current group-hover:scale-110 transition-transform"
-                  />
-                  {copy.confirmAdd}
-                </>
-              )}
-            </button>
-          </div>
+            <footer className="sticky bottom-0 z-20 -mx-5 -mb-5 border-t border-white/[0.08] bg-[#08080b]/92 px-5 pb-5 pt-4 shadow-[0_-20px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl lg:-mx-7 lg:-mb-7 lg:px-7 lg:pb-7">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div aria-live="polite" className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${isFormValid()
+                      ? "border-white/18 bg-white/[0.09] text-white"
+                      : "border-white/[0.08] bg-white/[0.025] text-white/28"
+                      }`}
+                  >
+                    {isFormValid() ? <CheckCircle2 size={17} /> : <Sparkles size={17} />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[10px] font-extrabold text-white/72">
+                      {isFormValid() ? copy.ready : copy.missingFields}
+                    </p>
+                    <p className="mt-0.5 text-[9px] text-white/30">
+                      {completedSetupChecks}/{setupChecks.length} · {copy.setupStatus}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleClose()}
+                    className="rounded-xl border border-white/[0.09] bg-white/[0.025] px-4 py-3 text-[9px] font-black uppercase tracking-[0.14em] text-white/48 transition-all hover:border-white/18 hover:bg-white/[0.06] hover:text-white"
+                  >
+                    {copy.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving || loading || !isFormValid()}
+                    className="group relative inline-flex min-w-40 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em] text-black shadow-[0_14px_34px_rgba(255,255,255,0.09)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/25 disabled:text-black/50 disabled:shadow-none"
+                  >
+                    <span className="pointer-events-none absolute inset-y-0 left-0 w-12 -translate-x-full skew-x-[-18deg] bg-white/60 blur-md transition-transform duration-700 group-hover:translate-x-[260px]" />
+                    {isSaving ? (
+                      <RefreshCw size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} strokeWidth={3} />
+                    )}
+                    <span className="relative">
+                      {isSaving
+                        ? copy.saving
+                        : gameToEdit
+                          ? copy.saveChanges
+                          : copy.confirmAdd}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </footer>
+          </form>
 
-          <div className="bg-black/20 flex flex-col items-center justify-center p-12 relative overflow-hidden group">
-            <div className="absolute inset-0 z-0">
-              {formData.backgroundImage && (
+          <aside
+            aria-label={copy.previewPanel}
+            className="relative flex min-h-[520px] flex-col overflow-hidden bg-[#060608] p-5 lg:min-h-0 lg:p-6"
+          >
+            <div className="pointer-events-none absolute inset-0">
+              {previewWallpaper ? (
                 <img
-                  src={formData.backgroundImage}
-                  className="w-full h-full object-cover opacity-20 blur-3xl scale-110 transition-transform duration-1000 group-hover:scale-125"
+                  src={previewWallpaper}
                   alt=""
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "";
-                  }}
+                  className="h-full w-full scale-110 object-cover opacity-[0.16] blur-2xl"
                 />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0c] via-transparent to-transparent" />
+              ) : null}
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,8,0.58),rgba(6,6,8,0.88)_48%,#060608_82%)]" />
+              <div className="absolute inset-x-8 top-8 h-36 rounded-full bg-white/[0.035] blur-3xl" />
             </div>
 
-            <div className="relative z-10 space-y-8 flex flex-col items-center">
-              <div className="text-center space-y-1">
-                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.4em]">
+            <div className="relative z-10 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/30">
                   {copy.previewPanel}
                 </p>
-                <div className="h-0.5 w-8 bg-white/10 mx-auto rounded-full" />
+                <p className="mt-1 text-[10px] text-white/46">{copy.libraryKicker}</p>
               </div>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.09] bg-black/30 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/48 backdrop-blur-md">
+                <Globe size={11} /> {platformLabel}
+              </span>
+            </div>
 
-              <div className="scale-125 transition-transform duration-500 hover:rotate-1 hover:scale-[1.3]">
-                <GameCard
-                  title={formData.title || "Nome do Jogo"}
-                  image={
-                    formData.cardImage ||
-                    "https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&q=80"
-                  }
-                  isActive={true}
-                  isSteam={formData.launcherType === "steam"}
-                  isEpic={formData.launcherType === "epic"}
-                />
-              </div>
-
-              <div className="pt-8 w-full max-w-[200px]">
-                <div className="h-[1px] bg-white/5 w-full mb-4" />
-                <div className="flex justify-between items-center px-1">
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-black text-white/20 uppercase tracking-widest">
-                      Categoria
-                    </p>
-                    <p className="text-[10px] font-bold text-white/60 uppercase">
-                      {
-                        CATEGORIES.find((c) => c.id === formData.category)
-                          ?.label
-                      }
-                    </p>
+            <div className="relative z-10 mx-auto mt-6 w-full max-w-[230px]">
+              <div className="group relative aspect-[3/4] overflow-hidden rounded-[24px] border border-white/14 bg-[#101014] shadow-[0_28px_65px_rgba(0,0,0,0.62)]">
+                {previewImage ? (
+                  <img
+                    src={previewImage}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.1),transparent_42%),linear-gradient(160deg,#15151a,#08080b)]">
+                    <div className="grid h-20 w-20 place-items-center rounded-[24px] border border-white/10 bg-white/[0.04] text-white/20">
+                      <Gamepad2 size={34} strokeWidth={1.4} />
+                    </div>
                   </div>
-                  <div className="w-8 h-8 rounded-full border border-white/5 flex items-center justify-center">
-                    <Gamepad2 size={12} className="text-white/20" />
-                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-5">
+                  <span className="mb-2 inline-flex rounded-md border border-white/12 bg-black/45 px-2 py-1 text-[7px] font-black uppercase tracking-[0.16em] text-white/55 backdrop-blur-md">
+                    {CATEGORIES.find((category) => category.id === formData.category)?.label || copy.category}
+                  </span>
+                  <h3 className="line-clamp-2 text-xl font-black leading-[1.05] tracking-[-0.035em] text-white drop-shadow-lg">
+                    {formData.title.trim() || copy.titlePlaceholder}
+                  </h3>
+                  <p className="mt-2 text-[9px] font-semibold text-white/45">
+                    {platformLabel}
+                    {formData.sizeGB != null ? ` · ${formData.sizeGB} GB` : ""}
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
+
+            <div className="relative z-10 mt-6 rounded-2xl border border-white/[0.08] bg-black/30 p-4 backdrop-blur-xl">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/38">
+                    {copy.setupStatus}
+                  </p>
+                  <p className="mt-1 text-[10px] text-white/55">
+                    {isFormValid() ? copy.ready : copy.missingFields}
+                  </p>
+                </div>
+                <strong className="text-sm font-black text-white/72">{setupProgress}%</strong>
+              </div>
+              <div
+                className="mb-4 h-1.5 overflow-hidden rounded-full bg-white/[0.07]"
+                role="progressbar"
+                aria-label={copy.setupStatus}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={setupProgress}
+              >
+                <div
+                  className="h-full rounded-full bg-white transition-[width] duration-300"
+                  style={{ width: `${setupProgress}%` }}
+                />
+              </div>
+              <ul className="space-y-2.5">
+                {setupChecks.map((item) => (
+                  <li key={item.label} className="flex items-center gap-2.5 text-[9px] text-white/45">
+                    <CheckCircle2
+                      size={14}
+                      className={item.ready ? "text-white/80" : "text-white/16"}
+                    />
+                    <span className={item.ready ? "text-white/62" : undefined}>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
         </div>
       </div>
     </ModalShell>

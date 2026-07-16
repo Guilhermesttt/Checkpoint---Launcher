@@ -41,6 +41,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      VITE_BACKEND_URL: https://checkpoint-backend-vgvx.onrender.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,4 +59,5 @@ jobs:
           name: windows-installer
           path: |
             release/*.exe
+            release/*.blockmap
             release/latest.yml

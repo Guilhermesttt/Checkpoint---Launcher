@@ -12,6 +12,7 @@ import {
   Crosshair,
   Settings,
   Users,
+  Newspaper,
 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam, faDiscord } from "@fortawesome/free-brands-svg-icons";
@@ -78,6 +79,7 @@ export const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "FRIENDS", label: "Amigos", Icon: Users },
+  { id: "FEED", label: "Feed", Icon: Newspaper },
   { id: "PROFILE", label: "Perfil", Icon: User },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },
@@ -96,7 +98,7 @@ export const CATEGORIES = [
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "FRIENDS", "STEAM", "EPIC", "LOCAL", "PROFILE"].includes(id),
+  ["ALL", "FAVORITES", "FRIENDS", "FEED", "STEAM", "EPIC", "LOCAL", "PROFILE"].includes(id),
 );
 
 interface SidebarProps {

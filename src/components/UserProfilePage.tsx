@@ -6,6 +6,7 @@ import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
+import { calculateAchievementTotals } from "../utils/achievementTotals";
 
 interface UserProfilePageProps {
   userProfile: UserProfile | null;
@@ -120,14 +121,21 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
 
   const stats = useMemo(() => {
     const totalHours = games.reduce((acc, game) => acc + (game.hoursPlayed || 0), 0);
-    const totalAchievements = games.reduce((acc, game) => acc + (game.completedAchievements || 0), 0);
-    const totalPossible = games.reduce((acc, game) => acc + (game.totalAchievements || 0), 0);
+    const achievementTotals = calculateAchievementTotals(games);
+    const storedAchievementSummary = userProfile?.achievementSummary;
+    const hasCanonicalSummary = Boolean(storedAchievementSummary?.updatedAt);
+    const totalAchievements = hasCanonicalSummary
+      ? Number(storedAchievementSummary?.unlocked || 0)
+      : achievementTotals.unlocked;
+    const totalPossible = hasCanonicalSummary
+      ? Math.max(Number(storedAchievementSummary?.available || 0), totalAchievements)
+      : achievementTotals.available;
     const favorites = games.filter((game) => game.isFavorite).length;
     const steamGames = games.filter((game) => game.launcherType === "steam").length;
     const epicGames = games.filter((game) => game.launcherType === "epic").length;
     const localGames = games.filter((game) => !game.launcherType || game.launcherType === "local").length;
     return { totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
-  }, [games]);
+  }, [games, userProfile?.achievementSummary]);
 
   const topGames = useMemo(
     () =>
@@ -175,8 +183,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {userProfile?.steamId && (
                     <button 
+                      type="button"
+                      disabled={!/^\d{10,20}$/.test(userProfile.steamId)}
                       onClick={() => window.electronAPI?.openExternalUrl(`https://steamcommunity.com/profiles/${userProfile.steamId}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-default"
                     >
                       <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> 
                       {userProfile.steamUsername || "Steam"}
@@ -184,8 +194,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                   )}
                   {userProfile?.discordId && (
                     <button 
+                      type="button"
+                      disabled={!/^\d{10,24}$/.test(userProfile.discordId)}
                       onClick={() => window.electronAPI?.openExternalUrl(`https://discordapp.com/users/${userProfile.discordId}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-default"
                     >
                       <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
                       {userProfile.discordUsername || "Discord"}

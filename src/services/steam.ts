@@ -28,6 +28,25 @@ interface SteamLibraryResponse {
   games: SteamOwnedGame[];
 }
 
+type SteamAchievementSummary = Record<
+  string,
+  { total: number; unlocked: number }
+>;
+
+interface SteamAchievementSummaryResult {
+  stats: SteamAchievementSummary;
+  requested: number;
+  resolved: number;
+  failedAppIds: string[];
+}
+
+export interface SteamCurrentGameResult {
+  observable: boolean;
+  appId: string | null;
+  title: string | null;
+  visibilityState: number;
+}
+
 const buildSteamAssets = (appid: number) => ({
   image: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_hero.jpg`,
   cardImage: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900_2x.jpg`,
@@ -276,32 +295,118 @@ export const fetchSteamLibrary = async (
   return (await response.json()) as SteamLibraryResponse;
 };
 
+export const fetchSteamCurrentGame = async (): Promise<SteamCurrentGameResult> => {
+  const response = await fetch(apiUrl("/api/steam/current-game"), {
+    headers: await getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Não foi possível verificar o jogo atual na Steam.");
+  }
+  const payload = (await response.json()) as Partial<SteamCurrentGameResult>;
+  return {
+    observable: Boolean(payload.observable),
+    appId: /^\d+$/.test(String(payload.appId || "")) ? String(payload.appId) : null,
+    title: payload.title ? String(payload.title) : null,
+    visibilityState: Math.max(0, Number(payload.visibilityState || 0)),
+  };
+};
+
+export const fetchSteamAchievementSummary = async (
+  appIds: string[],
+): Promise<SteamAchievementSummaryResult> => {
+  const normalizedAppIds = Array.from(new Set(
+    appIds.map((appId) => String(appId).trim()).filter((appId) => /^\d+$/.test(appId)),
+  ));
+  if (normalizedAppIds.length === 0) {
+    return { stats: {}, requested: 0, resolved: 0, failedAppIds: [] };
+  }
+
+  const stats: SteamAchievementSummary = {};
+  const failedAppIds = new Set<string>();
+  const authHeaders = await getAuthHeaders().catch(() => null);
+  if (!authHeaders) {
+    return {
+      stats,
+      requested: normalizedAppIds.length,
+      resolved: 0,
+      failedAppIds: normalizedAppIds,
+    };
+  }
+
+  const CHUNK_SIZE = 250;
+  for (let index = 0; index < normalizedAppIds.length; index += CHUNK_SIZE) {
+    const chunk = normalizedAppIds.slice(index, index + CHUNK_SIZE);
+    try {
+      const response = await fetch(apiUrl("/api/steam/achievement-summary"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders,
+        },
+        body: JSON.stringify({ appIds: chunk }),
+      });
+      if (!response.ok) {
+        chunk.forEach((appId) => failedAppIds.add(appId));
+        continue;
+      }
+
+      const payload = (await response.json()) as Partial<SteamAchievementSummaryResult>;
+      const chunkStats = payload.stats && typeof payload.stats === "object" ? payload.stats : {};
+      chunk.forEach((appId) => {
+        const entry = chunkStats[appId];
+        if (!entry) {
+          failedAppIds.add(appId);
+          return;
+        }
+        stats[appId] = {
+          total: Math.max(0, Number(entry.total || 0)),
+          unlocked: Math.max(0, Number(entry.unlocked || 0)),
+        };
+      });
+    } catch {
+      chunk.forEach((appId) => failedAppIds.add(appId));
+    }
+  }
+
+  return {
+    stats,
+    requested: normalizedAppIds.length,
+    resolved: Object.keys(stats).length,
+    failedAppIds: Array.from(failedAppIds),
+  };
+};
+
 export const syncSteamLibraryToFirestore = async (
   uid: string,
   steamId: string,
 ) => {
   const payload = await fetchSteamLibrary(steamId);
-  const batch = writeBatch(db);
 
   const existingGamesSnap = await getDocs(
     query(userGamesCollectionRef(uid), where("steamAppId", "!=", "")),
   );
 
   const appIdToDocId = new Map<string, string>();
+  const existingByAppId = new Map<string, Game>();
   existingGamesSnap.docs.forEach((doc) => {
     const data = doc.data() as Game;
     if (data.steamAppId) {
       appIdToDocId.set(String(data.steamAppId), doc.id);
+      existingByAppId.set(String(data.steamAppId), data);
     }
   });
 
   const detailsCache = new Map<string, SteamAppDetails | null>();
 
-  const gamesToSync = payload.games.slice(0, 80);
+  const gamesToSync = payload.games;
+  const gamesToEnrich = payload.games.slice(0, 80);
+  const achievementSummaryPromise = fetchSteamAchievementSummary(
+    gamesToSync.map((game) => String(game.appid)),
+  );
   const CHUNK_SIZE = 10;
 
-  for (let i = 0; i < gamesToSync.length; i += CHUNK_SIZE) {
-    const chunk = gamesToSync.slice(i, i + CHUNK_SIZE);
+  for (let i = 0; i < gamesToEnrich.length; i += CHUNK_SIZE) {
+    const chunk = gamesToEnrich.slice(i, i + CHUNK_SIZE);
     await Promise.all(
       chunk.map(async (owned) => {
         const appId = String(owned.appid);
@@ -311,7 +416,10 @@ export const syncSteamLibraryToFirestore = async (
     );
   }
 
-  payload.games.forEach((owned) => {
+  const achievementSummaryResult = await achievementSummaryPromise;
+  const achievementSummary = achievementSummaryResult.stats;
+
+  const writes = payload.games.map((owned) => {
     const appIdStr = String(owned.appid);
     const existingDocId = appIdToDocId.get(appIdStr);
     const id = existingDocId || `${uid}_steam_${owned.appid}`;
@@ -328,6 +436,8 @@ export const syncSteamLibraryToFirestore = async (
     const resolvedDescription =
       details?.description ??
       `Importado da Steam. Dados da conta conectada. AppID ${owned.appid}.`;
+    const existing = existingByAppId.get(appIdStr);
+    const achievementStats = achievementSummary[appIdStr];
 
     const mapped: Omit<Game, "id"> = {
       title: details?.title || owned.name || `Steam App ${owned.appid}`,
@@ -345,8 +455,8 @@ export const syncSteamLibraryToFirestore = async (
       steamLastPlayedAt,
       hoursPlayed: normalizedHours,
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
-      totalAchievements: 0,
-      completedAchievements: 0,
+      totalAchievements: achievementStats?.total ?? existing?.totalAchievements ?? 0,
+      completedAchievements: achievementStats?.unlocked ?? existing?.completedAchievements ?? 0,
       trailerUrl: details?.trailerUrl || "",
       screenshots: details?.screenshots || [],
       releaseDate: details?.releaseDate || "",
@@ -358,10 +468,17 @@ export const syncSteamLibraryToFirestore = async (
       updatedAt: new Date().toISOString(),
     };
 
-    batch.set(userGameDocRef(uid, id), clean(mapped), { merge: true });
+    return { ref: userGameDocRef(uid, id), data: clean(mapped) };
   });
 
-  await batch.commit();
+  const FIRESTORE_BATCH_SIZE = 400;
+  for (let i = 0; i < writes.length; i += FIRESTORE_BATCH_SIZE) {
+    const batch = writeBatch(db);
+    writes.slice(i, i + FIRESTORE_BATCH_SIZE).forEach(({ ref, data }) => {
+      batch.set(ref, data, { merge: true });
+    });
+    await batch.commit();
+  }
 
   try {
     const profileBatch = writeBatch(db);
@@ -369,6 +486,13 @@ export const syncSteamLibraryToFirestore = async (
       profileDocRef(uid),
       {
         lastSteamSyncAt: serverTimestamp(),
+        steamAchievementSync: {
+          requested: achievementSummaryResult.requested,
+          resolved: achievementSummaryResult.resolved,
+          failed: achievementSummaryResult.failedAppIds.length,
+          failedAppIds: achievementSummaryResult.failedAppIds.slice(0, 100),
+          updatedAt: new Date().toISOString(),
+        },
         updatedAt: serverTimestamp(),
       },
       { merge: true },

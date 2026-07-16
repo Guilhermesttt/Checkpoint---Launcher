@@ -3,7 +3,17 @@ export {};
 declare global {
   interface Window {
     electronAPI?: {
-      launchExecutable: (executablePath: string) => Promise<void>;
+      launchExecutable: (
+        executablePath: string,
+        launchProfile?: import("./domain").GameLaunchProfile,
+      ) => Promise<void>;
+      getDisplays: () => Promise<Array<{
+        id: number;
+        label: string;
+        primary: boolean;
+        width: number;
+        height: number;
+      }>>;
       isExecutableRunning: (executablePath: string) => Promise<boolean>;
       detectRunningGames: (executablePaths: string[]) => Promise<string[]>;
       startGoogleBrowserAuth: () => Promise<{ state: string }>;
@@ -11,6 +21,7 @@ declare global {
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
       testOverlayWelcome: () => Promise<void>;
       testOverlayAchievement: () => Promise<void>;
+      toggleOverlayPanel: () => Promise<{ open: boolean }>;
       showGameStartOverlay: (payload: { gameTitle: string }) => Promise<void>;
       showFriendPlayingOverlay: (payload: {
         playerName: string;
@@ -43,6 +54,20 @@ declare global {
       getLocalAchievementState: (
         appId: string
       ) => Promise<{ [id: string]: { earned: boolean; earnedTime: number } }>;
+      getLocalAchievementLibrarySummary: () => Promise<{
+        byGameId: Record<string, { total: number; unlocked: number }>;
+        bySteamAppId: Record<string, { total: number; unlocked: number }>;
+        updatedAt: string;
+      }>;
+      getAchievementDiagnostics: () => Promise<{
+        bridgePort: number;
+        watcherKeys: string[];
+        monitoredGameKeys: string[];
+        pendingRescanKeys: string[];
+        overlayReady: boolean;
+        overlayDisplayId: number | null;
+        overlayVisible: boolean;
+      }>;
       saveLocalAchievementDefinitions: (
         gameId: string,
         definitions: Array<{ id: string; name: string; description: string; icon?: string }>,
@@ -57,6 +82,51 @@ declare global {
         messageText: string;
         avatarUrl?: string;
       }) => Promise<void>;
+      updateOverlayPanel: (payload: {
+        friends: Array<{ id: string; name: string; status: string; playing?: string; avatar?: string; unread?: number; canChat?: boolean }>;
+        achievements: {
+          unlocked: number;
+          available: number;
+          loading?: boolean;
+          items?: Array<{ id: string; name: string; description?: string; icon?: string; achieved: boolean; unlockedAt?: string }>;
+        };
+        currentGame?: {
+          id: string;
+          title: string;
+          image?: string;
+          platform?: string;
+          category?: string;
+          developer?: string;
+          releaseDate?: string;
+          executableName?: string;
+          totalPlaytimeMinutes?: number;
+          sessionStartedAt?: string;
+          windowMode?: string;
+          resolution?: string;
+          monitoring?: "verified" | "unverified";
+        } | null;
+        chat?: {
+          friendId: string;
+          friendName: string;
+          friendAvatar?: string;
+          typing?: boolean;
+          sending?: boolean;
+          error?: string;
+          messages: Array<{ id: string; text: string; createdAt: string; mine: boolean; pending?: boolean }>;
+        } | null;
+        profile?: {
+          name: string;
+          avatar?: string;
+          discordConnected?: boolean;
+          discordUsername?: string;
+          achievements?: number;
+        };
+      }) => Promise<void>;
+      onOverlayPanelAction: (callback: (payload:
+        | { kind: "select-chat"; friendId: string }
+        | { kind: "close-chat" }
+        | { kind: "send-message"; text: string }
+      ) => void) => () => void;
 
       // ─ Real-time achievement push events (main → renderer) ─────────────────
       /**
@@ -85,6 +155,12 @@ declare global {
     earnedTime: number;
     /** ISO 8601 date string derived from earnedTime (or Date.now() as fallback). */
     unlockedAt: string;
+    achievement?: {
+      id?: string;
+      name?: string;
+      description?: string;
+      icon?: string;
+    };
   }
 
   /** Opaque handle returned by onRealtimeAchievementUnlock — used for cleanup. */

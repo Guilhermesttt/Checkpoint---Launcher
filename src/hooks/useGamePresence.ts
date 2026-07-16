@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useInterval } from "./useInterval";
 import type { Game, UserProfile } from "../types/domain";
 import { getMonitorableExecutablePath } from "../services/launcher";
-import { fetchSteamAchievementDetails } from "../services/steam";
+import { fetchSteamAchievementDetails, fetchSteamCurrentGame } from "../services/steam";
+import { publishSocialActivity } from "../services/socialActivity";
 
 interface UseGamePresenceProps {
   userUid?: string;
@@ -10,20 +11,58 @@ interface UseGamePresenceProps {
   games: Game[];
 }
 
+export const UNVERIFIED_URI_PRESENCE_TTL_MS = 12 * 60 * 60 * 1000;
+export type PresenceVerificationMode = "none" | "provisional" | "process" | "steam";
+
 export function useGamePresence({ userUid, userProfile, games }: UseGamePresenceProps) {
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [currentPresenceExecutablePath, setCurrentPresenceExecutablePath] = useState<string | null>(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
+  const [presenceVerification, setPresenceVerification] = useState<PresenceVerificationMode>("none");
+  const [provisionalPresenceExpiresAt, setProvisionalPresenceExpiresAt] = useState<string | null>(null);
+  const provisionalPresenceDeadlineRef = useRef<number | null>(null);
+  const presenceRevisionRef = useRef(0);
+  const steamPresenceMissesRef = useRef(0);
+  const steamPresenceLastConfirmedAtRef = useRef<number | null>(null);
   const steamId = userProfile?.steamId;
 
   const clearCurrentPresence = useCallback(() => {
+    presenceRevisionRef.current += 1;
+    provisionalPresenceDeadlineRef.current = null;
+    steamPresenceMissesRef.current = 0;
+    steamPresenceLastConfirmedAtRef.current = null;
     setCurrentPresenceGame(null);
     setCurrentPresenceExecutablePath(null);
+    setSessionStartedAt(null);
+    setPresenceVerification("none");
+    setProvisionalPresenceExpiresAt(null);
   }, []);
+
+  const markCurrentPresence = useCallback((title: string, executablePath: string | null) => {
+    const normalizedExecutablePath = executablePath?.trim() || null;
+    const provisionalDeadline = normalizedExecutablePath
+      ? null
+      : Date.now() + UNVERIFIED_URI_PRESENCE_TTL_MS;
+
+    presenceRevisionRef.current += 1;
+    provisionalPresenceDeadlineRef.current = provisionalDeadline;
+    steamPresenceMissesRef.current = 0;
+    steamPresenceLastConfirmedAtRef.current = null;
+    if (title !== currentPresenceGame) setSessionStartedAt(new Date().toISOString());
+    setCurrentPresenceGame(title);
+    setCurrentPresenceExecutablePath(normalizedExecutablePath);
+    setPresenceVerification(normalizedExecutablePath ? "process" : "provisional");
+    setProvisionalPresenceExpiresAt(
+      provisionalDeadline == null ? null : new Date(provisionalDeadline).toISOString(),
+    );
+  }, [currentPresenceGame]);
 
   const syncDetectedRunningGame = useCallback(async () => {
     if (!window.electronAPI?.detectRunningGames || games.length === 0) {
-      return;
+      return false;
     }
+
+    const requestRevision = presenceRevisionRef.current;
 
     const monitorableGames = games
       .map((game) => ({
@@ -32,12 +71,14 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
       }))
       .filter((entry): entry is { game: Game; executablePath: string } => Boolean(entry.executablePath));
 
-    if (monitorableGames.length === 0) return;
+    if (monitorableGames.length === 0) return false;
 
     try {
       const runningPaths = await window.electronAPI.detectRunningGames(
         monitorableGames.map((entry) => entry.executablePath),
       );
+      if (presenceRevisionRef.current !== requestRevision) return false;
+
       const normalizedRunning = new Set(runningPaths.map((value) => value.trim().toLowerCase()));
 
       const matchedCurrent = currentPresenceExecutablePath
@@ -56,35 +97,55 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
         if (currentPresenceExecutablePath) {
           clearCurrentPresence();
         }
-        return;
+        return false;
       }
 
       if (
         currentPresenceGame !== matchedGame.game.title ||
         currentPresenceExecutablePath !== matchedGame.executablePath
       ) {
-        setCurrentPresenceGame(matchedGame.game.title);
-        setCurrentPresenceExecutablePath(matchedGame.executablePath);
+        markCurrentPresence(matchedGame.game.title, matchedGame.executablePath);
       }
+      return true;
     } catch {
       // Presence auto-detection is best-effort.
+      return false;
     }
-  }, [clearCurrentPresence, currentPresenceExecutablePath, currentPresenceGame, games]);
+  }, [clearCurrentPresence, currentPresenceExecutablePath, currentPresenceGame, games, markCurrentPresence]);
 
   const verifyRunningState = useCallback(async () => {
-    if (!currentPresenceExecutablePath || !window.electronAPI?.isExecutableRunning) {
-      void syncDetectedRunningGame();
+    const requestRevision = presenceRevisionRef.current;
+    if (currentPresenceExecutablePath && window.electronAPI?.isExecutableRunning) {
+      try {
+        const isRunning = await window.electronAPI.isExecutableRunning(currentPresenceExecutablePath);
+        if (!isRunning && presenceRevisionRef.current === requestRevision) {
+          clearCurrentPresence();
+        }
+      } catch {
+        // best-effort
+      }
       return;
     }
-    try {
-      const isRunning = await window.electronAPI.isExecutableRunning(currentPresenceExecutablePath);
-      if (!isRunning) {
-        clearCurrentPresence();
-      }
-    } catch {
-      // best-effort
+
+    const matchedDetectedGame = await syncDetectedRunningGame();
+    if (matchedDetectedGame || presenceRevisionRef.current !== requestRevision) return;
+
+    const provisionalDeadline = provisionalPresenceDeadlineRef.current;
+    if (
+      currentPresenceGame
+      && presenceVerification === "provisional"
+      && provisionalDeadline != null
+      && Date.now() >= provisionalDeadline
+    ) {
+      clearCurrentPresence();
     }
-  }, [currentPresenceExecutablePath, clearCurrentPresence, syncDetectedRunningGame]);
+  }, [
+    clearCurrentPresence,
+    currentPresenceExecutablePath,
+    currentPresenceGame,
+    presenceVerification,
+    syncDetectedRunningGame,
+  ]);
 
   useInterval(
     () => {
@@ -93,7 +154,7 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
       }
     },
     userUid ? 10000 : null,
-    { pauseWhenHidden: true }
+    { pauseWhenHidden: false }
   );
 
   useEffect(() => {
@@ -104,6 +165,99 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [userUid, verifyRunningState]);
+
+  const verifySteamUriPresence = useCallback(async () => {
+    if (!currentPresenceGame || currentPresenceExecutablePath || !steamId) return;
+
+    const expectedGame = games.find((game) => (
+      game.launcherType === "steam"
+      && Boolean(game.steamAppId)
+      && (
+        game.title.toLowerCase().includes(currentPresenceGame.toLowerCase())
+        || currentPresenceGame.toLowerCase().includes(game.title.toLowerCase())
+      )
+    ));
+    if (!expectedGame?.steamAppId) return;
+
+    const requestRevision = presenceRevisionRef.current;
+    const startedAt = sessionStartedAt ? Date.parse(sessionStartedAt) : Date.now();
+
+    const markSteamVerified = () => {
+      steamPresenceMissesRef.current = 0;
+      steamPresenceLastConfirmedAtRef.current = Date.now();
+      provisionalPresenceDeadlineRef.current = null;
+      setPresenceVerification("steam");
+      setProvisionalPresenceExpiresAt(null);
+    };
+
+    const downgradeToProvisional = () => {
+      const deadline = Date.now() + UNVERIFIED_URI_PRESENCE_TTL_MS;
+      provisionalPresenceDeadlineRef.current = deadline;
+      setPresenceVerification("provisional");
+      setProvisionalPresenceExpiresAt(new Date(deadline).toISOString());
+    };
+
+    try {
+      const steamPresence = await fetchSteamCurrentGame();
+      if (presenceRevisionRef.current !== requestRevision) return;
+
+      if (!steamPresence.observable) {
+        steamPresenceMissesRef.current = 0;
+        if (presenceVerification === "steam") downgradeToProvisional();
+        return;
+      }
+
+      if (steamPresence.appId === String(expectedGame.steamAppId)) {
+        markSteamVerified();
+        return;
+      }
+
+      // Steam pode demorar alguns segundos para publicar o jogo logo após o URI.
+      if (Date.now() - startedAt < 90_000) return;
+      steamPresenceMissesRef.current += 1;
+      if (steamPresenceMissesRef.current < 2) return;
+
+      if (steamPresence.appId) {
+        const detectedGame = games.find((game) => (
+          game.launcherType === "steam"
+          && String(game.steamAppId || "") === steamPresence.appId
+        ));
+        if (detectedGame) {
+          markCurrentPresence(detectedGame.title, null);
+          markSteamVerified();
+          return;
+        }
+      }
+
+      clearCurrentPresence();
+    } catch {
+      const lastConfirmedAt = steamPresenceLastConfirmedAtRef.current;
+      if (
+        presenceVerification === "steam"
+        && lastConfirmedAt != null
+        && Date.now() - lastConfirmedAt >= 10 * 60 * 1000
+      ) {
+        downgradeToProvisional();
+      }
+    }
+  }, [
+    clearCurrentPresence,
+    currentPresenceExecutablePath,
+    currentPresenceGame,
+    games,
+    markCurrentPresence,
+    presenceVerification,
+    sessionStartedAt,
+    steamId,
+  ]);
+
+  useInterval(
+    () => void verifySteamUriPresence(),
+    userUid && currentPresenceGame && !currentPresenceExecutablePath && steamId
+      ? 15_000
+      : null,
+    { pauseWhenHidden: false },
+  );
 
   const pollAchievements = useCallback(async (unlockedSet: Set<string>, state: { firstLoadDone: boolean }) => {
     if (!currentPresenceGame || !steamId) return;
@@ -135,12 +289,23 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
           unlockedSet.add(ach.apiName);
 
           void window.electronAPI?.unlockAchievement(`steam_${appId}`, ach.apiName);
+          if (userUid && runningGame) {
+            void publishSocialActivity(userUid, userProfile, {
+              kind: "achievement",
+              gameId: runningGame.id,
+              gameTitle: runningGame.title,
+              gameImage: runningGame.cardImage || runningGame.image || "",
+              achievementId: ach.apiName,
+              achievementName: ach.name,
+              achievementIcon: ach.icon || "",
+            }).catch(() => undefined);
+          }
         }
       }
     } catch (error) {
       console.error("Erro no polling de conquistas Steam:", error);
     }
-  }, [currentPresenceGame, steamId, games]);
+  }, [currentPresenceGame, games, steamId, userProfile, userUid]);
 
   const achievementsState = useRef({
     unlockedSet: new Set<string>(),
@@ -161,14 +326,16 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
       );
     },
     currentPresenceGame && steamId ? 15000 : null,
-    { pauseWhenHidden: true }
+    { pauseWhenHidden: false }
   );
 
   return {
     currentPresenceGame,
-    setCurrentPresenceGame,
     currentPresenceExecutablePath,
-    setCurrentPresenceExecutablePath,
+    sessionStartedAt,
+    presenceVerification,
+    provisionalPresenceExpiresAt,
+    markCurrentPresence,
     clearCurrentPresence,
     syncDetectedRunningGame,
   };

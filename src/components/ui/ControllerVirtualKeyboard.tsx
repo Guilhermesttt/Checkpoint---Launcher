@@ -3,6 +3,7 @@ import { Check, Delete, Space, Trash2 } from "lucide-react";
 import ModalShell from "./ModalShell";
 import {
   CONTROLLER_KEYBOARD_EVENT,
+  CONTROLLER_KEYBOARD_VISIBILITY_EVENT,
   setControllerTextValue,
   type ControllerTextTarget,
 } from "../../utils/controllerTextInput";
@@ -28,6 +29,12 @@ const ControllerVirtualKeyboard: React.FC = () => {
     return () => window.removeEventListener(CONTROLLER_KEYBOARD_EVENT, handleOpen);
   }, []);
 
+  React.useEffect(() => {
+    window.dispatchEvent(new CustomEvent(CONTROLLER_KEYBOARD_VISIBILITY_EVENT, {
+      detail: { isOpen: Boolean(target) },
+    }));
+  }, [target]);
+
   const commit = React.useCallback((nextValue: string) => {
     if (!target) return;
     const limitedValue = target.maxLength > -1 ? nextValue.slice(0, target.maxLength) : nextValue;
@@ -39,7 +46,10 @@ const ControllerVirtualKeyboard: React.FC = () => {
     <ModalShell
       isOpen={Boolean(target)}
       onClose={() => setTarget(null)}
-      maxWidthClassName="max-w-4xl"
+      maxWidthClassName="max-w-[calc(100vw-1rem)] md:max-w-[58vw]"
+      zIndexClassName="z-[300]"
+      containerClassName="items-end justify-center p-2 md:items-center md:justify-end md:p-3"
+      backdropClassName="pointer-events-none bg-transparent backdrop-blur-none"
       className="rounded-[28px] border border-white/12 bg-[#08080b] p-6 shadow-2xl"
       ariaLabel="Teclado virtual do controle"
       gamepadPriority={200}

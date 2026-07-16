@@ -45,6 +45,7 @@ const runFrame = () => {
 
 beforeEach(() => {
   setLauncherInputLocked(false);
+  Reflect.deleteProperty(window, "electronAPI");
   gamepads = [];
   nextFrame = null;
   Object.defineProperty(navigator, "getGamepads", {
@@ -120,5 +121,20 @@ describe("navegacao por gamepad", () => {
     gamepads = [makeGamepad({ pressed: [0] })];
     runFrame();
     expect(action).not.toHaveBeenCalled();
+  });
+
+  it("abre o overlay uma vez ao pressionar o botao central", () => {
+    const toggleOverlayPanel = vi.fn().mockResolvedValue({ open: true });
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { toggleOverlayPanel },
+    });
+    render(<GamepadProvider><Status /></GamepadProvider>);
+
+    gamepads = [makeGamepad({ pressed: [16] })];
+    runFrame();
+    runFrame();
+
+    expect(toggleOverlayPanel).toHaveBeenCalledOnce();
   });
 });

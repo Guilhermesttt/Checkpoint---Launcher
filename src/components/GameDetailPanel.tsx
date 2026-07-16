@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, Clock, CalendarClock, Trophy, Camera, Trash2 } from "lucide-react";
 import { updateDoc, deleteDoc } from "firebase/firestore";
 import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
-import type { Game } from "../types/domain";
+import type { Game, GameLaunchProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
@@ -18,6 +18,7 @@ import GlassButton from "./ui/GlassButton";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { userGameDocRef } from "../services/firestorePaths";
+import { publishSocialActivity } from "../services/socialActivity";
 import { useNotification } from "./NotificationCenter";
 import { useGamepadButton } from "../context/GamepadContext";
 import InputHints from "./ui/InputHints";
@@ -66,6 +67,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const [isAddAchModalOpen, setIsAddAchModalOpen] = React.useState(false);
   const [newAchName, setNewAchName] = React.useState("");
   const [newAchDesc, setNewAchDesc] = React.useState("");
+  const [launchProfile, setLaunchProfile] = React.useState<GameLaunchProfile>({});
+  const [displayOptions, setDisplayOptions] = React.useState<Array<{
+    id: number;
+    label: string;
+    primary: boolean;
+    width: number;
+    height: number;
+  }>>([]);
+  const [isSavingLaunchProfile, setIsSavingLaunchProfile] = React.useState(false);
 
 
   const copy = {
@@ -377,7 +387,29 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setCurrentGalleryIndex(0);
     setDeleteModalOpen(false);
     setIsDeleting(false);
-  }, [game?.id]);
+    setLaunchProfile(game?.launchProfile || {});
+  }, [copy.tabPlay, game?.id, game?.launchProfile]);
+
+  React.useEffect(() => {
+    if (!isOpen || !window.electronAPI?.getDisplays) return;
+    void window.electronAPI.getDisplays().then(setDisplayOptions).catch(() => setDisplayOptions([]));
+  }, [isOpen]);
+
+  const saveLaunchProfile = async () => {
+    if (!user?.uid || !game?.id || isSavingLaunchProfile) return;
+    setIsSavingLaunchProfile(true);
+    try {
+      await updateDoc(userGameDocRef(user.uid, game.id), {
+        launchProfile,
+        updatedAt: new Date().toISOString(),
+      });
+      notify("Perfil de inicialização salvo.", "success");
+    } catch {
+      notify("Não foi possível salvar o perfil de inicialização.", "error");
+    } finally {
+      setIsSavingLaunchProfile(false);
+    }
+  };
 
   React.useEffect(() => {
     if (!galleryModalOpen || !game?.screenshots?.length) return;
@@ -518,6 +550,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         setAchievementSourceAppId(resolvedAppId);
         setAchievementItems(result.achievements);
 
+        if (user?.uid && (result.achievements.length > 0 || !game.totalAchievements)) {
+          const canResolveUnlockedProgress =
+            game.launcherType === "local" || Boolean(userProfile?.steamId);
+          void updateDoc(userGameDocRef(user.uid, game.id), {
+            totalAchievements: result.achievements.length,
+            completedAchievements: canResolveUnlockedProgress
+              ? result.achievements.filter((achievement) => achievement.achieved).length
+              : game.completedAchievements ?? 0,
+            updatedAt: new Date().toISOString(),
+          }).catch((error) => {
+            console.error("Erro ao salvar totais de conquistas:", error);
+          });
+        }
+
         if (result.achievements.length === 0) {
           setAchievementsError(
             !userProfile?.steamId && game.launcherType !== "local"
@@ -545,10 +591,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     copy.achievementsEmpty,
     copy.achievementsMissingAppId,
     copy.achievementsNeedSteam,
+    game?.completedAchievements,
     game?.id,
     game?.launcherType,
     game?.steamAppId,
     game?.title,
+    game?.totalAchievements,
+    user?.uid,
     userProfile?.steamId,
   ]);
 
@@ -563,26 +612,72 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
     const handler = window.electronAPI.onRealtimeAchievementUnlock((payload) => {
       const { achievementId, earnedTime, unlockedAt } = payload;
+      const payloadSteamAppId = payload.gameId.match(/^steam_(\d+)$/i)?.[1];
+      const belongsToCurrentGame = payloadSteamAppId
+        ? String(game.steamAppId || "") === payloadSteamAppId
+        : payload.gameId === game.id;
+      if (!belongsToCurrentGame) return;
 
-      setAchievementItems((prev) =>
-        prev.map((ach) => {
+      const unlockedAchievement = latestAchievementsRef.current.find(
+        (achievement) => achievement.apiName.toLowerCase() === achievementId.toLowerCase(),
+      );
+      if (unlockedAchievement && !unlockedAchievement.achieved && user?.uid) {
+        void publishSocialActivity(user.uid, userProfile, {
+          kind: "achievement",
+          gameId: game.id,
+          gameTitle: game.title,
+          gameImage: game.cardImage || game.image || game.backgroundImage,
+          achievementId,
+          achievementName: payload.achievement?.name || unlockedAchievement.name,
+          achievementIcon: payload.achievement?.icon || unlockedAchievement.icon,
+          dedupeKey: `achievement_${game.id}_${achievementId}`,
+        }).catch((error) => console.error("Erro ao publicar conquista no feed:", error));
+      }
+
+      setAchievementItems((prev) => {
+        let changed = false;
+        const next = prev.map((ach) => {
           const isMatch =
             ach.apiName.toLowerCase() === achievementId.toLowerCase();
           if (!isMatch || ach.achieved) return ach;
+
+          changed = true;
 
           const unixSecs = earnedTime > 0
             ? earnedTime
             : Math.floor(new Date(unlockedAt).getTime() / 1000);
 
           return { ...ach, achieved: true, unlockTime: unixSecs };
-        })
-      );
+        });
+
+        if (changed && user?.uid) {
+          void updateDoc(userGameDocRef(user.uid, game.id), {
+            totalAchievements: next.length,
+            completedAchievements: next.filter((achievement) => achievement.achieved).length,
+            updatedAt: new Date().toISOString(),
+          }).catch((error) => {
+            console.error("Erro ao atualizar totais de conquistas:", error);
+          });
+        }
+
+        return next;
+      });
     });
 
     return () => {
       window.electronAPI?.removeRealtimeAchievementUnlock?.(handler);
     };
-  }, [game?.id, game?.launcherType]);
+  }, [
+    game?.backgroundImage,
+    game?.cardImage,
+    game?.id,
+    game?.image,
+    game?.launcherType,
+    game?.steamAppId,
+    game?.title,
+    user?.uid,
+    userProfile,
+  ]);
 
   if (!game) return null;
 
@@ -668,16 +763,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         wait(MIN_LAUNCH_SCREEN_MS),
       ]);
 
+      if (result.status === "rejected") {
+        throw result.reason;
+      }
+
       if (user?.uid) {
         updateDoc(userGameDocRef(user.uid, game.id), {
           lastPlayedAt: new Date().toISOString(),
-        }).catch(() => {
-          return;
-        });
-      }
-
-      if (result.status === "rejected") {
-        throw result.reason;
+        }).catch(() => undefined);
+        publishSocialActivity(user.uid, userProfile, {
+          kind: "game-start",
+          gameId: game.id,
+          gameTitle: game.title,
+          gameImage: game.cardImage || game.image || game.backgroundImage,
+        }).catch((error) => console.error("Erro ao publicar atividade de jogo:", error));
       }
 
       window.dispatchEvent(
@@ -1180,6 +1279,120 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         >
                           {copy.verify}
                         </button>
+                      </div>
+                      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                        <div className="mb-4 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/70">
+                              Perfil de inicialização
+                            </p>
+                            <p className="mt-1 text-[11px] text-white/35">
+                              Aplicado a jogos locais iniciados pelo desktop.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isSavingLaunchProfile || !user?.uid}
+                            onClick={() => void saveLaunchProfile()}
+                            className="rounded-xl bg-white px-4 py-2 text-[9px] font-black uppercase tracking-widest text-black disabled:opacity-40"
+                          >
+                            {isSavingLaunchProfile ? "Salvando..." : "Salvar perfil"}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Monitor
+                            <select
+                              value={launchProfile.monitorId ?? ""}
+                              onChange={(event) => setLaunchProfile((current) => ({
+                                ...current,
+                                monitorId: event.target.value ? Number(event.target.value) : null,
+                              }))}
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
+                            >
+                              <option value="">Automático</option>
+                              {displayOptions.map((display) => (
+                                <option key={display.id} value={display.id}>
+                                  {display.label} · {display.width}×{display.height}{display.primary ? " (principal)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Modo de janela
+                            <select
+                              value={launchProfile.windowMode || "default"}
+                              onChange={(event) => setLaunchProfile((current) => ({
+                                ...current,
+                                windowMode: event.target.value as GameLaunchProfile["windowMode"],
+                              }))}
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
+                            >
+                              <option value="default">Padrão do jogo</option>
+                              <option value="borderless">Sem bordas</option>
+                              <option value="windowed">Janela</option>
+                            </select>
+                          </label>
+                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Resolução
+                            <div className="flex gap-2">
+                              <input
+                                inputMode="numeric"
+                                value={launchProfile.resolutionWidth ?? ""}
+                                onChange={(event) => setLaunchProfile((current) => ({
+                                  ...current,
+                                  resolutionWidth: event.target.value ? Number(event.target.value) : null,
+                                }))}
+                                placeholder="1920"
+                                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
+                              />
+                              <input
+                                inputMode="numeric"
+                                value={launchProfile.resolutionHeight ?? ""}
+                                onChange={(event) => setLaunchProfile((current) => ({
+                                  ...current,
+                                  resolutionHeight: event.target.value ? Number(event.target.value) : null,
+                                }))}
+                                placeholder="1080"
+                                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
+                              />
+                            </div>
+                          </label>
+                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Prioridade
+                            <select
+                              value={launchProfile.processPriority || "normal"}
+                              onChange={(event) => setLaunchProfile((current) => ({
+                                ...current,
+                                processPriority: event.target.value as GameLaunchProfile["processPriority"],
+                              }))}
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="above-normal">Acima do normal</option>
+                              <option value="high">Alta</option>
+                            </select>
+                          </label>
+                          <label className="col-span-2 space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Argumentos
+                            <input
+                              value={launchProfile.arguments || ""}
+                              onChange={(event) => setLaunchProfile((current) => ({ ...current, arguments: event.target.value }))}
+                              placeholder='Ex.: -windowed -novid --profile "TV"'
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
+                            />
+                          </label>
+                          <label className="col-span-2 space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
+                            Diretório de trabalho
+                            <input
+                              value={launchProfile.workingDirectory || ""}
+                              onChange={(event) => setLaunchProfile((current) => ({ ...current, workingDirectory: event.target.value }))}
+                              placeholder="Automático: pasta do executável"
+                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
+                            />
+                          </label>
+                        </div>
                       </div>
                       <div className="flex gap-4">
                         <button

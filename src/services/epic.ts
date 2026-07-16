@@ -3,6 +3,7 @@ import { apiUrl } from "./api";
 export interface EpicAppDetails {
   catalogId: string;
   namespace?: string;
+  appName?: string;
   title?: string;
   cardImage?: string;
   backgroundImage?: string;

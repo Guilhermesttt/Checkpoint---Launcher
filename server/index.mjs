@@ -6,7 +6,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { Timestamp, getFirestore } from "firebase-admin/firestore";
+import { AggregateField, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { getStorage as getAdminStorage } from "firebase-admin/storage";
 import { OAuth2Client } from "google-auth-library";
 import path from "path";
@@ -104,8 +104,20 @@ const pendingDesktopGoogleStates = new Map();
 
 const appDetailsCache = new Map();
 const achievementsCache = new Map();
+const achievementSummaryCache = new Map();
 const achievementSchemaCache = new Map();
+const steamPresenceCache = new Map();
+const steamOwnedGamesCache = new Map();
 const CACHE_TTL = 1000 * 60 * 60; // 1 hora
+const STEAM_PRESENCE_CACHE_TTL = 10 * 1000;
+const STEAM_OWNED_GAMES_CACHE_TTL = 10 * 60 * 1000;
+const STEAM_API_TIMEOUT_MS = 8 * 1000;
+const ACHIEVEMENT_SUMMARY_REQUEST_BUDGET_MS = 25 * 1000;
+const MAX_ACHIEVEMENT_CACHE_ENTRIES = 5000;
+const MAX_STEAM_OWNED_GAMES_CACHE_ENTRIES = 200;
+const MAX_ACHIEVEMENT_SUMMARY_APP_IDS = 250;
+const FRIEND_PROFILE_GAME_LIMIT = 500;
+const ACTIVITY_AUDIENCE_REVOKE_BATCH_SIZE = 400;
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DESKTOP_GOOGLE_AUTH_STATE_TTL = 1000 * 60 * 5; // 5 minutos
@@ -131,6 +143,98 @@ const steamPrivateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+const steamAchievementSummaryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => String(req.firebaseUser?.uid || "unauthenticated"),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const setBoundedCacheEntry = (cache, key, value, maxEntries = MAX_ACHIEVEMENT_CACHE_ENTRIES) => {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
+};
+
+const isSteamTimeoutError = (error) =>
+  error?.name === "AbortError" || error?.name === "TimeoutError";
+
+const fetchSteamWithTimeout = async (url, options = {}, timeoutMs = STEAM_API_TIMEOUT_MS) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    Math.max(1, Math.min(STEAM_API_TIMEOUT_MS, Number(timeoutMs) || STEAM_API_TIMEOUT_MS)),
+  );
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const normalizeSteamAppIds = (values) => Array.from(new Set(
+  (Array.isArray(values) ? values : [])
+    .map((value) => String(value?.appid ?? value).trim())
+    .filter((value) => /^\d+$/.test(value)),
+));
+
+const cacheOwnedSteamAppIds = (steamId, games) => {
+  const appIds = new Set(normalizeSteamAppIds(games));
+  setBoundedCacheEntry(
+    steamOwnedGamesCache,
+    steamId,
+    { appIds, timestamp: Date.now() },
+    MAX_STEAM_OWNED_GAMES_CACHE_ENTRIES,
+  );
+  return appIds;
+};
+
+const fetchOwnedSteamAppIds = async (steamId) => {
+  const cached = steamOwnedGamesCache.get(steamId);
+  if (cached && Date.now() - cached.timestamp < STEAM_OWNED_GAMES_CACHE_TTL) {
+    return cached.appIds;
+  }
+
+  const url = new URL("https://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/");
+  url.searchParams.set("key", steamApiKey);
+  url.searchParams.set("steamid", steamId);
+  url.searchParams.set("include_appinfo", "0");
+  url.searchParams.set("include_played_free_games", "1");
+  url.searchParams.set("format", "json");
+
+  const response = await fetchSteamWithTimeout(url.toString());
+  if (!response.ok) {
+    const error = new Error(`Falha ao validar biblioteca Steam (status ${response.status}).`);
+    error.statusCode = 502;
+    throw error;
+  }
+
+  const payload = await response.json();
+  if (!payload?.response || (
+    payload.response.games !== undefined && !Array.isArray(payload.response.games)
+  )) {
+    const error = new Error("A Steam retornou uma biblioteca inválida.");
+    error.statusCode = 502;
+    throw error;
+  }
+
+  return cacheOwnedSteamAppIds(steamId, payload.response.games || []);
+};
+
+export const partitionOwnedSteamAppIds = (requestedAppIds, ownedAppIds) => {
+  const owned = ownedAppIds instanceof Set ? ownedAppIds : new Set(normalizeSteamAppIds(ownedAppIds));
+  const requested = normalizeSteamAppIds(requestedAppIds);
+  return {
+    allowedAppIds: requested.filter((appId) => owned.has(appId)),
+    rejectedAppIds: requested.filter((appId) => !owned.has(appId)),
+  };
+};
 
 const buildSteamReturnTo = (token) =>
   `${backendPublicUrl}/auth/steam/callback?token=${encodeURIComponent(token)}`;
@@ -378,6 +482,7 @@ const EPIC_CATALOG_ITEM_QUERY = `
           path
         }
         releaseInfo {
+          appId
           platform
         }
         customAttributes {
@@ -503,9 +608,14 @@ const postEpicGraphql = async (query, variables) => {
   return { ok: false, status: response.status, payload: null };
 };
 
-const buildEpicDetails = (catalogId, namespace, catalogItem) => {
+export const buildEpicDetails = (catalogId, namespace, catalogItem) => {
   const customAttributes = extractEpicCustomAttributes(catalogItem?.customAttributes);
   const keyImages = Array.isArray(catalogItem?.keyImages) ? catalogItem.keyImages : [];
+  const releaseInfo = Array.isArray(catalogItem?.releaseInfo) ? catalogItem.releaseInfo : [];
+  const preferredRelease = releaseInfo.find(
+    (release) => /win/i.test(String(release?.platform || "")) && String(release?.appId || "").trim(),
+  ) || releaseInfo.find((release) => String(release?.appId || "").trim());
+  const appName = String(preferredRelease?.appId || "").trim();
   
   let screenshots = keyImages
     .filter(
@@ -538,6 +648,7 @@ const buildEpicDetails = (catalogId, namespace, catalogItem) => {
   return {
     catalogId,
     namespace,
+    appName,
     title:
       String(catalogItem?.title ?? "").trim() ||
       String(customAttributes?.productName ?? "").trim() ||
@@ -690,45 +801,22 @@ const requireFirebaseUser = async (req, res, next) => {
   }
 };
 
-const verifyUserToken = async (token) => {
-  if (!token) return null;
-  try {
-    return await getAuth().verifyIdToken(token);
-  } catch {
-    return null;
-  }
-};
-
 // ─── Chat Transiente via SSE (Custo Zero e Tempo Real) ──────────────────────
 const activeClients = new Map(); // Map<string, Response> (uid -> Express Response)
 const chatHistory = new Map(); // Map<string, ChatMessage[]> (chatId -> array de mensagens)
 
-app.get("/api/chat/stream", async (req, res) => {
-  const token = String(req.query.token || "").trim();
-  if (!token) {
-    res.status(401).json({ error: "Token ausente" });
-    return;
-  }
-
-  const firebaseUser = await verifyUserToken(token);
-  if (!firebaseUser) {
-    res.status(401).json({ error: "Token inválido ou expirado" });
-    return;
-  }
-
-  const userId = firebaseUser.uid;
+app.get("/api/chat/stream", requireFirebaseUser, (req, res) => {
+  const userId = req.firebaseUser.uid;
 
   // Define headers para Server-Sent Events (SSE)
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
-    "Access-Control-Allow-Origin": "*",
   });
 
   // Registra o cliente ativo
   activeClients.set(userId, res);
-  console.log(`[ChatServer] Cliente conectado via SSE: ${userId}. Ativos: ${activeClients.size}`);
 
   // Envia ping periódico para manter a conexão aberta (especialmente no Render/Heroku)
   const pingInterval = setInterval(() => {
@@ -737,8 +825,9 @@ app.get("/api/chat/stream", async (req, res) => {
 
   req.on("close", () => {
     clearInterval(pingInterval);
-    activeClients.delete(userId);
-    console.log(`[ChatServer] Cliente desconectado do SSE: ${userId}. Ativos: ${activeClients.size}`);
+    if (activeClients.get(userId) === res) {
+      activeClients.delete(userId);
+    }
   });
 });
 
@@ -778,7 +867,6 @@ app.post("/api/chat/send", requireFirebaseUser, (req, res) => {
   // Encaminha via SSE ao destinatário se estiver online
   const receiverClient = activeClients.get(receiverId);
   if (receiverClient) {
-    console.log(`[ChatServer] Encaminhando mensagem de ${senderId} para ${receiverId}`);
     receiverClient.write(`data: ${JSON.stringify({ type: "message", message })}\n\n`);
   }
 
@@ -817,9 +905,28 @@ app.get("/api/chat/history", requireFirebaseUser, (req, res) => {
 });
 
 
+export const resolveLinkedSteamId = (linkedValue, requestedValue) => {
+  const linkedSteamId = String(linkedValue ?? "").trim();
+  const requestedSteamId = String(requestedValue ?? "").trim();
+  if (requestedSteamId && !/^\d+$/.test(requestedSteamId)) {
+    return { ok: false, status: 400, error: "steamId inválido." };
+  }
+  if (!/^\d+$/.test(linkedSteamId)) {
+    return { ok: false, status: 409, error: "Nenhuma conta Steam está vinculada ao perfil." };
+  }
+  if (requestedSteamId && requestedSteamId !== linkedSteamId) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Steam ID não pertence ao usuário autenticado.",
+    };
+  }
+  return { ok: true, steamId: linkedSteamId };
+};
+
 const requireLinkedSteamId = async (req, res, next) => {
-  const steamId = String(req.query.steamId ?? "").trim();
-  if (!/^\d+$/.test(steamId)) {
+  const requestedSteamId = String(req.query.steamId ?? "").trim();
+  if (requestedSteamId && !/^\d+$/.test(requestedSteamId)) {
     res.status(400).json({ error: "steamId inválido." });
     return;
   }
@@ -827,12 +934,15 @@ const requireLinkedSteamId = async (req, res, next) => {
   try {
     const uid = req.firebaseUser.uid;
     const profileSnap = await getFirestore().doc(`profiles/${uid}`).get();
-    const linkedSteamId = String(profileSnap.data()?.steamId ?? "").trim();
-    if (linkedSteamId !== steamId) {
-      res.status(403).json({ error: "Steam ID não pertence ao usuário autenticado." });
+    const resolution = resolveLinkedSteamId(
+      profileSnap.data()?.steamId,
+      requestedSteamId,
+    );
+    if (!resolution.ok) {
+      res.status(resolution.status).json({ error: resolution.error });
       return;
     }
-    req.steamId = steamId;
+    req.steamId = resolution.steamId;
     next();
   } catch (error) {
     console.error("Erro interno no requireLinkedSteamId:", error);
@@ -863,6 +973,53 @@ const compactFriendProfile = (profile) => ({
   playing: profile.playing || null,
 });
 
+const nonNegativeFiniteNumber = (value) => {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+};
+
+export const projectFriendGame = (id, data = {}) => {
+  const steamAppId = /^\d+$/.test(String(data.steamAppId || ""))
+    ? String(data.steamAppId)
+    : "";
+  const steamCover = steamAppId
+    ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900_2x.jpg`
+    : "";
+  const steamBackground = steamAppId
+    ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_hero.jpg`
+    : "";
+  const unlocked = nonNegativeFiniteNumber(data.completedAchievements);
+  const available = Math.max(unlocked, nonNegativeFiniteNumber(data.totalAchievements));
+
+  return {
+    id: String(id || ""),
+    title: String(data.title || "Jogo").trim().slice(0, 160) || "Jogo",
+    image: steamCover,
+    backgroundImage: steamBackground,
+    cardImage: steamCover,
+    logoImage: "",
+    category: String(data.category || "").trim().slice(0, 80),
+    isFavorite: Boolean(data.isFavorite),
+    hoursPlayed: nonNegativeFiniteNumber(data.hoursPlayed),
+    launcherType: ["steam", "epic", "local"].includes(data.launcherType)
+      ? data.launcherType
+      : "local",
+    steamAppId,
+    totalAchievements: available,
+    completedAchievements: unlocked,
+  };
+};
+
+export const normalizeFriendAchievementAggregate = (aggregate = {}, gamesWithAchievements = 0) => {
+  const unlocked = nonNegativeFiniteNumber(aggregate.unlocked);
+  return {
+    unlocked,
+    available: Math.max(unlocked, nonNegativeFiniteNumber(aggregate.available)),
+    gamesWithAchievements: Math.floor(nonNegativeFiniteNumber(gamesWithAchievements)),
+    totalGames: Math.floor(nonNegativeFiniteNumber(aggregate.totalGames)),
+  };
+};
+
 const resolvePresence = (presence = {}) => {
   const updatedAtMs = Date.parse(String(presence.updatedAt || ""));
   const isFresh = Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < 2 * 60 * 1000;
@@ -882,6 +1039,170 @@ const withUniqueProfile = (items, profile, extra = {}) => [
 
 const withoutProfileUid = (items, uid) =>
   (Array.isArray(items) ? items : []).filter((item) => item?.uid !== uid);
+
+export const revokeActivityAudience = async (firestore, ownerUid, removedUid) => {
+  if (!firestore || !ownerUid || !removedUid || ownerUid === removedUid) return 0;
+
+  let revoked = 0;
+  while (true) {
+    const snapshot = await firestore
+      .collection("activities")
+      .where("userId", "==", ownerUid)
+      .where("audienceIds", "array-contains", removedUid)
+      .limit(ACTIVITY_AUDIENCE_REVOKE_BATCH_SIZE)
+      .get();
+    if (snapshot.empty) break;
+
+    const batch = firestore.batch();
+    snapshot.docs.forEach((activityDoc) => {
+      batch.update(activityDoc.ref, {
+        audienceIds: FieldValue.arrayRemove(removedUid),
+      });
+    });
+    await batch.commit();
+    revoked += snapshot.size;
+  }
+
+  return revoked;
+};
+
+const SOCIAL_ACTIVITY_KINDS = new Set(["game-start", "achievement"]);
+
+const socialText = (value, maxLength) =>
+  (typeof value === "string" ? value.trim() : "").slice(0, maxLength);
+
+const socialImageUrl = (value) => {
+  const raw = socialText(value, 2048);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+};
+
+export const normalizeSocialActivityInput = (value) => {
+  const input = value && typeof value === "object" ? value : {};
+  const kind = socialText(input.kind, 32);
+  if (!SOCIAL_ACTIVITY_KINDS.has(kind)) {
+    throw new Error("Tipo de atividade inválido.");
+  }
+
+  const normalized = {
+    kind,
+    gameId: socialText(input.gameId, 160),
+    gameTitle: socialText(input.gameTitle, 160),
+    gameImage: socialImageUrl(input.gameImage),
+    achievementId: socialText(input.achievementId, 160),
+    achievementName: socialText(input.achievementName, 160),
+    achievementIcon: socialImageUrl(input.achievementIcon),
+    caption: socialText(input.caption, 500),
+  };
+
+  if (kind === "game-start" && (!normalized.gameId || !normalized.gameTitle)) {
+    throw new Error("Jogo inválido para a atividade.");
+  }
+  if (
+    kind === "achievement"
+    && (!normalized.gameId || !normalized.gameTitle || !normalized.achievementId)
+  ) {
+    throw new Error("Conquista inválida para a atividade.");
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalized).filter(([, fieldValue]) => fieldValue !== ""),
+  );
+};
+
+const isAlreadyExistsError = (error) =>
+  error?.code === 6
+  || error?.code === "6"
+  || error?.code === "already-exists"
+  || /already exists/i.test(String(error?.message || ""));
+
+app.post("/api/social/activity", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  let activity;
+  try {
+    activity = normalizeSocialActivityInput(req.body);
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : "Atividade inválida.",
+    });
+    return;
+  }
+
+  try {
+    const uid = req.firebaseUser.uid;
+    const firestore = getFirestore();
+    const profileSnap = await firestore.doc(`profiles/${uid}`).get();
+    const profile = profileSnap.data() || {};
+    const friendIds = Array.from(new Set(
+      (Array.isArray(profile.checkpointFriends) ? profile.checkpointFriends : [])
+        .map((friend) => socialText(friend?.uid, 128))
+        .filter((friendUid) => friendUid && friendUid !== uid),
+    )).slice(0, 199);
+    const friendSnaps = friendIds.length > 0
+      ? await firestore.getAll(...friendIds.map((friendUid) => firestore.doc(`profiles/${friendUid}`)))
+      : [];
+    const confirmedFriendIds = friendSnaps
+      .filter((friendSnap) => {
+        const friendProfile = friendSnap.data() || {};
+        return Array.isArray(friendProfile.checkpointFriends)
+          && friendProfile.checkpointFriends.some((friend) => friend?.uid === uid);
+      })
+      .map((friendSnap) => friendSnap.id);
+    const audienceIds = Array.from(new Set([
+      uid,
+      ...confirmedFriendIds,
+    ].filter(Boolean))).slice(0, 200);
+    const userName = socialText(
+      profile.displayName
+        || profile.discordUsername
+        || req.firebaseUser.name
+        || req.firebaseUser.email?.split("@")[0]
+        || "Jogador",
+      80,
+    ) || "Jogador";
+    const userAvatar = socialImageUrl(
+      profile.discordAvatar
+        || profile.photoURL
+        || profile.steamAvatar
+        || req.firebaseUser.picture,
+    );
+    const payload = {
+      ...activity,
+      userId: uid,
+      userName,
+      userAvatar: userAvatar || null,
+      audienceIds,
+      createdAt: new Date().toISOString(),
+    };
+
+    let activityRef;
+    if (activity.kind === "achievement") {
+      const digest = crypto
+        .createHash("sha256")
+        .update(`${uid}\0${activity.gameId}\0${activity.achievementId}`)
+        .digest("hex");
+      activityRef = firestore.doc(`activities/achievement_${digest}`);
+      try {
+        await activityRef.create(payload);
+      } catch (error) {
+        if (!isAlreadyExistsError(error)) throw error;
+        res.json({ ok: true, id: activityRef.id, duplicate: true });
+        return;
+      }
+    } else {
+      activityRef = await firestore.collection("activities").add(payload);
+    }
+
+    res.status(201).json({ ok: true, id: activityRef.id, duplicate: false });
+  } catch (error) {
+    console.error("Erro ao publicar atividade social:", error);
+    res.status(500).json({ error: "Não foi possível publicar a atividade." });
+  }
+});
 
 app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const term = String(req.query.q ?? "").trim();
@@ -1011,24 +1332,33 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
     const profileData = profileSnap.data() || {};
     const presence = resolvePresence(profileData.presence);
-    const gamesSnap = await firestore.collection(`users/${friendUid}/games`).limit(80).get();
-    const games = gamesSnap.docs.map((doc) => {
-      const data = doc.data() || {};
-      return {
-        id: doc.id,
-        title: data.title || "Jogo",
-        image: data.image || "",
-        backgroundImage: data.backgroundImage || "",
-        cardImage: data.cardImage || "",
-        logoImage: data.logoImage || "",
-        category: data.category || "",
-        isFavorite: Boolean(data.isFavorite),
-        hoursPlayed: Number(data.hoursPlayed || 0),
-        launcherType: data.launcherType || "local",
-        totalAchievements: Number(data.totalAchievements || 0),
-        completedAchievements: Number(data.completedAchievements || 0),
-      };
-    });
+    const gamesCollection = firestore.collection(`users/${friendUid}/games`);
+    const [gamesSnap, aggregateSnap, gamesWithAchievementsSnap] = await Promise.all([
+      gamesCollection
+        .select(
+          "title",
+          "category",
+          "isFavorite",
+          "hoursPlayed",
+          "launcherType",
+          "steamAppId",
+          "totalAchievements",
+          "completedAchievements",
+        )
+        .limit(FRIEND_PROFILE_GAME_LIMIT)
+        .get(),
+      gamesCollection.aggregate({
+        totalGames: AggregateField.count(),
+        available: AggregateField.sum("totalAchievements"),
+        unlocked: AggregateField.sum("completedAchievements"),
+      }).get(),
+      gamesCollection.where("totalAchievements", ">", 0).count().get(),
+    ]);
+    const games = gamesSnap.docs.map((doc) => projectFriendGame(doc.id, doc.data()));
+    const achievementSummary = normalizeFriendAchievementAggregate(
+      aggregateSnap.data(),
+      gamesWithAchievementsSnap.data().count,
+    );
 
     res.json({
       profile: {
@@ -1043,8 +1373,13 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
         steamUsername: profileData.steamUsername || "",
         status: presence.status,
         playing: presence.playing,
+        achievementSummary: {
+          ...achievementSummary,
+          updatedAt: profileData.achievementSummary?.updatedAt || "",
+        },
       },
       games,
+      gamesTruncated: achievementSummary.totalGames > games.length,
     });
   } catch {
     res.status(500).json({ error: "Erro ao carregar perfil do amigo." });
@@ -1233,20 +1568,24 @@ app.post("/api/friends/reject", steamPrivateLimiter, requireFirebaseUser, async 
 
 app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const friendUid = String(req.body?.uid ?? "").trim();
-  if (!friendUid) {
+  const currentUid = req.firebaseUser.uid;
+  if (!friendUid || friendUid === currentUid) {
     res.status(400).json({ error: "Usuário inválido." });
     return;
   }
 
   try {
     const firestore = getFirestore();
-    const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
+    const profileRef = firestore.doc(`profiles/${currentUid}`);
     const friendRef = firestore.doc(`profiles/${friendUid}`);
     const [profileSnap, friendSnap] = await Promise.all([profileRef.get(), friendRef.get()]);
     const now = new Date().toISOString();
+    const profileBatch = firestore.batch();
+    let hasProfileWrites = false;
     if (profileSnap.exists) {
       const data = profileSnap.data() || {};
-      await profileRef.set(
+      profileBatch.set(
+        profileRef,
         {
           checkpointFriends: withoutProfileUid(data.checkpointFriends, friendUid),
           checkpointFriendRequestsIncoming: withoutProfileUid(data.checkpointFriendRequestsIncoming, friendUid),
@@ -1255,20 +1594,34 @@ app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, asyn
         },
         { merge: true },
       );
+      hasProfileWrites = true;
     }
     if (friendSnap.exists) {
       const data = friendSnap.data() || {};
-      await friendRef.set(
+      profileBatch.set(
+        friendRef,
         {
-          checkpointFriends: withoutProfileUid(data.checkpointFriends, req.firebaseUser.uid),
-          checkpointFriendRequestsIncoming: withoutProfileUid(data.checkpointFriendRequestsIncoming, req.firebaseUser.uid),
-          checkpointFriendRequestsOutgoing: withoutProfileUid(data.checkpointFriendRequestsOutgoing, req.firebaseUser.uid),
+          checkpointFriends: withoutProfileUid(data.checkpointFriends, currentUid),
+          checkpointFriendRequestsIncoming: withoutProfileUid(data.checkpointFriendRequestsIncoming, currentUid),
+          checkpointFriendRequestsOutgoing: withoutProfileUid(data.checkpointFriendRequestsOutgoing, currentUid),
           updatedAt: now,
         },
         { merge: true },
       );
+      hasProfileWrites = true;
     }
-    res.json({ ok: true });
+    if (hasProfileWrites) {
+      await profileBatch.commit();
+    }
+
+    const [revokedFromCurrent, revokedFromFriend] = await Promise.all([
+      revokeActivityAudience(firestore, currentUid, friendUid),
+      revokeActivityAudience(firestore, friendUid, currentUid),
+    ]);
+    res.json({
+      ok: true,
+      revokedActivities: revokedFromCurrent + revokedFromFriend,
+    });
   } catch {
     res.status(500).json({ error: "Erro ao remover amigo." });
   }
@@ -1791,7 +2144,7 @@ app.get("/api/steam/library", steamPrivateLimiter, requireFirebaseUser, requireL
     url.searchParams.set("include_played_free_games", "1");
     url.searchParams.set("format", "json");
 
-    const response = await fetch(url.toString());
+    const response = await fetchSteamWithTimeout(url.toString());
     if (!response.ok) {
       res.status(502).json({
         error: `Falha ao consultar Steam API (status ${response.status}).`,
@@ -1812,15 +2165,173 @@ app.get("/api/steam/library", steamPrivateLimiter, requireFirebaseUser, requireL
         .json({ error: "Biblioteca Steam retornou formato inesperado." });
       return;
     }
+    cacheOwnedSteamAppIds(steamId, games);
 
     res.json({
       steamId,
       gameCount: payload.response.game_count ?? games.length,
       games,
     });
-  } catch {
-    res.status(500).json({ error: "Erro interno ao consultar Steam." });
+  } catch (error) {
+    res.status(isSteamTimeoutError(error) ? 504 : 500).json({
+      error: isSteamTimeoutError(error)
+        ? "A Steam demorou demais para responder."
+        : "Erro interno ao consultar Steam.",
+    });
   }
+});
+
+app.get("/api/steam/current-game", steamPrivateLimiter, requireFirebaseUser, requireLinkedSteamId, async (req, res) => {
+  if (!steamApiKey) {
+    res.status(500).json({ error: "STEAM_API_KEY não configurada no backend." });
+    return;
+  }
+
+  try {
+    const cached = steamPresenceCache.get(req.steamId);
+    if (cached && Date.now() - cached.timestamp < STEAM_PRESENCE_CACHE_TTL) {
+      res.json(cached.data);
+      return;
+    }
+
+    const url = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/");
+    url.searchParams.set("key", steamApiKey);
+    url.searchParams.set("steamids", req.steamId);
+    const response = await fetchSteamWithTimeout(url.toString());
+    if (!response.ok) {
+      res.status(502).json({ error: `Falha ao consultar presença Steam (status ${response.status}).` });
+      return;
+    }
+
+    const payload = await response.json();
+    const player = Array.isArray(payload?.response?.players)
+      ? payload.response.players[0]
+      : null;
+    if (!player) {
+      res.status(502).json({ error: "A Steam não retornou o perfil conectado." });
+      return;
+    }
+
+    const appId = /^\d+$/.test(String(player.gameid || ""))
+      ? String(player.gameid)
+      : null;
+    const visibilityState = Number(player.communityvisibilitystate || 0);
+    const data = {
+      observable: visibilityState >= 3 || Boolean(appId),
+      appId,
+      title: appId ? String(player.gameextrainfo || "").slice(0, 160) : null,
+      visibilityState,
+    };
+    setBoundedCacheEntry(steamPresenceCache, req.steamId, { data, timestamp: Date.now() });
+    res.json(data);
+  } catch (error) {
+    res.status(isSteamTimeoutError(error) ? 504 : 500).json({
+      error: isSteamTimeoutError(error)
+        ? "A Steam demorou demais para informar o jogo atual."
+        : "Erro interno ao consultar presença Steam.",
+    });
+  }
+});
+
+app.post("/api/steam/achievement-summary", steamPrivateLimiter, requireFirebaseUser, steamAchievementSummaryLimiter, requireLinkedSteamId, async (req, res) => {
+  if (!steamApiKey) {
+    res.status(500).json({ error: "STEAM_API_KEY não configurada no backend." });
+    return;
+  }
+
+  const appIds = normalizeSteamAppIds(req.body?.appIds);
+
+  if (appIds.length === 0) {
+    res.status(400).json({ error: "Lista de appIds inválida." });
+    return;
+  }
+
+  if (appIds.length > MAX_ACHIEVEMENT_SUMMARY_APP_IDS) {
+    res.status(413).json({
+      error: `Envie no máximo ${MAX_ACHIEVEMENT_SUMMARY_APP_IDS} appIds por requisição.`,
+    });
+    return;
+  }
+
+  const steamId = req.steamId;
+  let allowedAppIds;
+  try {
+    const ownedAppIds = await fetchOwnedSteamAppIds(steamId);
+    ({ allowedAppIds } = partitionOwnedSteamAppIds(appIds, ownedAppIds));
+  } catch (error) {
+    res.status(isSteamTimeoutError(error) ? 504 : Number(error?.statusCode || 502)).json({
+      error: isSteamTimeoutError(error)
+        ? "A Steam demorou demais para validar a biblioteca."
+        : String(error?.message || "Não foi possível validar a biblioteca Steam."),
+    });
+    return;
+  }
+
+  const stats = {};
+  let cursor = 0;
+  const requestDeadline = Date.now() + ACHIEVEMENT_SUMMARY_REQUEST_BUDGET_MS;
+
+  const loadNext = async () => {
+    while (cursor < allowedAppIds.length && Date.now() < requestDeadline) {
+      const appId = allowedAppIds[cursor++];
+      const cacheKey = `${steamId}_${appId}`;
+      const detailedCached = achievementsCache.get(cacheKey);
+      if (detailedCached && Date.now() - detailedCached.timestamp < CACHE_TTL) {
+        const unlocked = nonNegativeFiniteNumber(detailedCached.data?.unlocked);
+        stats[appId] = {
+          total: Math.max(unlocked, nonNegativeFiniteNumber(detailedCached.data?.total)),
+          unlocked,
+        };
+        continue;
+      }
+
+      const cached = achievementSummaryCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+        stats[appId] = cached.data;
+        continue;
+      }
+
+      try {
+        const url = new URL("https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/");
+        url.searchParams.set("key", steamApiKey);
+        url.searchParams.set("steamid", steamId);
+        url.searchParams.set("appid", appId);
+        const remainingBudget = requestDeadline - Date.now();
+        if (remainingBudget <= 0) return;
+        const response = await fetchSteamWithTimeout(url.toString(), {}, remainingBudget);
+        if (!response.ok) {
+          if (response.status === 400 || response.status === 404) {
+            const data = { total: 0, unlocked: 0 };
+            setBoundedCacheEntry(achievementSummaryCache, cacheKey, { data, timestamp: Date.now() });
+            stats[appId] = data;
+          }
+          continue;
+        }
+        const payload = await response.json();
+        if (payload?.playerstats?.success === false) continue;
+        const achievements = Array.isArray(payload?.playerstats?.achievements)
+          ? payload.playerstats.achievements
+          : [];
+        const data = {
+          total: achievements.length,
+          unlocked: achievements.filter((achievement) => Number(achievement?.achieved || 0) === 1).length,
+        };
+        setBoundedCacheEntry(achievementSummaryCache, cacheKey, { data, timestamp: Date.now() });
+        stats[appId] = data;
+      } catch {
+        // Uma falha isolada não deve impedir os totais dos outros jogos.
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(4, allowedAppIds.length) }, () => loadNext()));
+  const failedAppIds = appIds.filter((appId) => !Object.hasOwn(stats, appId));
+  res.json({
+    stats,
+    requested: appIds.length,
+    resolved: Object.keys(stats).length,
+    failedAppIds,
+  });
 });
 
 const handleSteamSearch = async (req, res) => {
@@ -2033,7 +2544,7 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
     if (!response.ok) {
       if (response.status === 400 || response.status === 404) {
         const data = { achievements: [], total: 0, unlocked: 0 };
-        achievementsCache.set(cacheKey, { data, timestamp: Date.now() });
+        setBoundedCacheEntry(achievementsCache, cacheKey, { data, timestamp: Date.now() });
         res.json(data);
         return;
       }
@@ -2081,7 +2592,7 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
       unlocked,
     };
 
-    achievementsCache.set(cacheKey, { data, timestamp: Date.now() });
+    setBoundedCacheEntry(achievementsCache, cacheKey, { data, timestamp: Date.now() });
     res.json(data);
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar conquistas." });

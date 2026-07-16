@@ -27,6 +27,11 @@ service cloud.firestore {
       return isSignedInOwner(userId)
         && request.resource.data.uid == userId
         && request.resource.data.createdAt == resource.data.createdAt
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'checkpointFriends',
+          'checkpointFriendRequestsIncoming',
+          'checkpointFriendRequestsOutgoing'
+        ])
         && request.resource.data.keys().hasOnly([
           'uid',
           'email',
@@ -50,7 +55,9 @@ service cloud.firestore {
           'lastSteamSyncAt',
           'gamesMigratedAt',
           'migrationSkippedReason',
-          'onboardingCompletedAt'
+          'onboardingCompletedAt',
+          'achievementSummary',
+          'steamAchievementSync'
         ]);
     }
 
@@ -135,6 +142,15 @@ service cloud.firestore {
 
       allow delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
+    }
+
+    match /activities/{activityId} {
+      allow read: if isSignedIn()
+        && resource.data.audienceIds is list
+        && resource.data.audienceIds.hasAll([request.auth.uid]);
+      // Somente o backend autenticado (Firebase Admin) publica atividades.
+      // Clientes nunca escolhem identidade, audiencia ou timestamp.
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {

@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  launchExecutable: (executablePath) =>
-    ipcRenderer.invoke("launcher:open-executable", executablePath),
+  launchExecutable: (executablePath, launchProfile) =>
+    ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile),
+  getDisplays: () => ipcRenderer.invoke("launcher:get-displays"),
   isExecutableRunning: (executablePath) =>
     ipcRenderer.invoke("launcher:is-executable-running", executablePath),
   detectRunningGames: (executablePaths) =>
@@ -12,6 +13,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
+  toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
 
   showFriendPlayingOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-playing", payload),
@@ -22,8 +24,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveLocalAchievementDefinitions: (gameId, definitions, steamAppId) => ipcRenderer.invoke("achievement:save-definitions", gameId, definitions, steamAppId),
   getAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
   getLocalAchievementState: (appId) => ipcRenderer.invoke("achievement:get-local-state", appId),
+  getLocalAchievementLibrarySummary: () => ipcRenderer.invoke("achievement:get-library-summary"),
+  getAchievementDiagnostics: () => ipcRenderer.invoke("achievement:get-diagnostics"),
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
+  updateOverlayPanel: (payload) => ipcRenderer.invoke("overlay:update-panel", payload),
+  onOverlayPanelAction: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("overlay:panel-action", handler);
+    return () => ipcRenderer.removeListener("overlay:panel-action", handler);
+  },
   // ─ Auto-Updater APIs ────────────────────────────────────────────────────────
   getVersion: () => ipcRenderer.invoke("app:get-version"),
   checkForUpdates: () => ipcRenderer.invoke("update:check-for-updates"),
