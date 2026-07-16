@@ -5,13 +5,21 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
-const { detectEmulator, parseAchievementState, getGoldbergV1Paths, readGoldbergSettingsAchievements } = require("./emulator-detector.cjs");
+const {
+  detectEmulator,
+  parseAchievementState,
+  getGoldbergV1Paths,
+  getAchievementAliases,
+  resolveEmulatorAchievementId,
+  detectKnownEmulatorSave,
+} = require("./emulator-detector.cjs");
 
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
 const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
 const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
 const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
+const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_INJECTION === "1";
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
@@ -60,6 +68,8 @@ const HEALTH_CHECK_INTERVAL_MS = 500;
 
 let mainWindow;
 let overlayWindow;
+let overlayReady = false;
+const pendingOverlayEvents = [];
 let achievementBridge;
 let startupErrorShown = false;
 let isQuitting = false;
@@ -409,6 +419,7 @@ const createOverlayWindow = () => {
     return overlayWindow;
   }
 
+  overlayReady = false;
   overlayWindow = new BrowserWindow({
     x: 0,
     y: 0,
@@ -440,12 +451,23 @@ const createOverlayWindow = () => {
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   overlayWindow.setAlwaysOnTop(true, "screen-saver");
   syncOverlayBounds();
-  overlayWindow.loadFile(path.join(__dirname, "overlay.html"));
-  overlayWindow.once("ready-to-show", () => {
-    overlayWindow.showInactive();
+  const createdOverlayWindow = overlayWindow;
+  createdOverlayWindow.loadFile(path.join(__dirname, "overlay.html"));
+  createdOverlayWindow.webContents.once("did-finish-load", () => {
+    if (createdOverlayWindow.isDestroyed() || overlayWindow !== createdOverlayWindow) return;
+    overlayReady = true;
+    pendingOverlayEvents.splice(0).forEach(({ channel, payload }) => {
+      createdOverlayWindow.webContents.send(channel, payload);
+    });
   });
-  overlayWindow.on("closed", () => {
-    overlayWindow = null;
+  createdOverlayWindow.once("ready-to-show", () => {
+    if (!createdOverlayWindow.isDestroyed()) createdOverlayWindow.showInactive();
+  });
+  createdOverlayWindow.on("closed", () => {
+    if (overlayWindow === createdOverlayWindow) {
+      overlayWindow = null;
+      overlayReady = false;
+    }
   });
 
   return overlayWindow;
@@ -457,6 +479,12 @@ const sendOverlayEvent = (channel, payload) => {
     throw new Error("Overlay indisponivel.");
   }
 
+  if (!overlayReady || overlayWindow.webContents.isLoadingMainFrame()) {
+    pendingOverlayEvents.push({ channel, payload });
+    if (pendingOverlayEvents.length > 32) pendingOverlayEvents.shift();
+    return;
+  }
+
   overlayWindow.webContents.send(channel, payload);
 };
 
@@ -466,7 +494,13 @@ const playOverlaySound = (sound) => {
     throw new Error("Overlay indisponivel.");
   }
 
-  overlayWindow.webContents.send("overlay:play-sound", { sound });
+  sendOverlayEvent("overlay:play-sound", { sound });
+};
+
+const steamAppIdFromGameKey = (gameId) => {
+  const value = String(gameId || "").trim();
+  return value.match(/^steam_(\d+)$/i)?.[1] || value.match(/_steam_(\d+)$/i)?.[1] ||
+    (/^\d+$/.test(value) ? value : null);
 };
 
 const startAchievementBridge = async () => {
@@ -474,6 +508,12 @@ const startAchievementBridge = async () => {
     userDataPath: app.getPath("userData"),
     appUrl: APP_URL,
     logger: console,
+    normalizeAchievementId: async (gameId, rawAchievementId) => {
+      const appId = steamAppIdFromGameKey(gameId);
+      return appId
+        ? resolveEmulatorAchievementId(appId, rawAchievementId)
+        : rawAchievementId;
+    },
     onAchievementUnlocked: async (payload) => {
       // payload vem do emulador como { gameId, achievementId, unlockedAt, duplicate }
       if (payload.duplicate) return;
@@ -503,10 +543,46 @@ const startAchievementBridge = async () => {
 
       sendOverlayEvent("achievement:unlock", payload);
       playOverlaySound("achievement-unlock");
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("achievement:realtime-unlock", {
+          gameId: payload.gameId,
+          achievementId: payload.achievementId,
+          achievement: payload.achievement,
+          unlockedAt: payload.unlockedAt,
+        });
+      }
     },
   });
 
   return achievementBridge.start();
+};
+
+const migrateKnownAchievementProgress = async () => {
+  if (!achievementBridge) return;
+  const userDataPath = app.getPath("userData");
+  let files = [];
+  try {
+    files = await fs.promises.readdir(userDataPath);
+  } catch {
+    return;
+  }
+
+  for (const file of files) {
+    const appId = file.match(/^user_progress_steam_(\d+)\.json$/i)?.[1];
+    if (!appId) continue;
+    const detected = detectKnownEmulatorSave(appId);
+    if (!detected) continue;
+    const aliases = getAchievementAliases(detected);
+    if (Object.keys(aliases).length === 0) continue;
+    try {
+      const result = await achievementBridge.migrateAchievementAliases(`steam_${appId}`, aliases);
+      if (result.migrated > 0) {
+        console.info(`[achievement-migration] ${result.migrated} IDs migrados para steam_${appId}.`);
+      }
+    } catch (error) {
+      console.error(`[achievement-migration] Falha em steam_${appId}:`, error);
+    }
+  }
 };
 
 registerSecureIpcHandler("achievement:get-definitions", async (_event, gameId) => {
@@ -572,11 +648,6 @@ registerSecureIpcHandler("achievement:unlock", async (_event, gameId, achievemen
     console.error("Error unlocking achievement:", error);
     throw error;
   }
-});
-
-registerSecureIpcHandler("overlay:show-achievement", async (_event, payload) => {
-  sendOverlayEvent("achievement:unlock", payload);
-  playOverlaySound("achievement-unlock");
 });
 
 registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) => {
@@ -823,6 +894,8 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
     throw new Error("Executavel invalido.");
   }
 
+  if (ENABLE_EMULATOR_FILE_INJECTION) {
+
   // Autoconfiguração de ponte de conquistas para emuladores Steam locais (Goldberg)
   try {
     const gameDir = path.dirname(normalizedTarget);
@@ -923,6 +996,7 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   } catch (err) {
     console.error("Erro na autoconfiguração do receptor de conquistas:", err);
   }
+  }
 
   const gameDir = path.dirname(normalizedTarget);
 
@@ -987,83 +1061,10 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
 
       if (newlyUnlocked.length === 0) return;
 
-      // ── Resolve metadados das conquistas ─────────────────────────────────
-      // 1º) Schema remoto (cache da Steam API salvo pelo renderer)
-      // 2º) steam_settings/achievements.json do Goldberg no dir do jogo
-      const remoteSchema = await getSchemaByAppIdOrGameId(watcherKey).catch(() => null);
-      const localSchema = readGoldbergSettingsAchievements(gameDir);
-
-      for (const { id, earnedTime } of newlyUnlocked) {
-        // Busca no schema remoto (case-insensitive)
-        const remoteAch = remoteSchema?.find(
-          (a) => String(a.id || a.apiName || "").toLowerCase() === id.toLowerCase()
-        );
-        // Busca no schema local Goldberg (case-insensitive)
-        const localAchKey = localSchema
-          ? Object.keys(localSchema).find((k) => k.toLowerCase() === id.toLowerCase())
-          : undefined;
-        const localAch = localSchema?.[localAchKey ?? id];
-
-        // Ícone: prefere URL HTTPS do schema remoto (CDN Steam).
-        // Fallback: constrói file:// do ícone local do Goldberg.
-        const remoteIcon = String(remoteAch?.icon || "").trim();
-        let resolvedIcon = remoteIcon;
-        if (!resolvedIcon && localAch?.icon) {
-          const localIconName = localAch.icon;
-          const iconAbs = path.isAbsolute(localIconName)
-            ? localIconName
-            : path.join(gameDir, "steam_settings", localIconName);
-          resolvedIcon = `file:///${iconAbs.replace(/\\/g, "/")}`;
-        }
-
-        const achievement = {
-          id,
-          name: remoteAch?.name || localAch?.name || id,
-          description: remoteAch?.description || localAch?.description || "",
-          icon: resolvedIcon,
-        };
-
-        const unlockedAt =
-          earnedTime > 0 ? new Date(earnedTime * 1000).toISOString() : new Date().toISOString();
-
-        // Envia DIRETO ao overlay com metadados já resolvidos.
-        // Não passa pelo onAchievementUnlocked do bridge para evitar que a
-        // detecção de duplicata silencie conquistas novas (causa raiz do bug
-        // em que apenas a 1ª conquista aparecia no overlay).
-        try {
-          sendOverlayEvent("achievement:unlock", {
-            gameId: watcherKey,
-            achievementId: id,
-            achievement,
-            unlockedAt,
-            duplicate: false,
-          });
-          playOverlaySound("achievement-unlock");
-        } catch (overlayErr) {
-          console.error("[achievement-watcher] Erro ao enviar ao overlay:", overlayErr);
-        }
-
-        // Persiste o progresso via bridge (fire-and-forget).
-        if (achievementBridge) {
-          achievementBridge
-            .unlockAchievement(watcherKey, id)
-            .catch((err) => console.error("[achievement-watcher] unlockAchievement error:", err));
-        }
-
-        // Envia evento em tempo real para o renderer atualizar a UI.
-        try {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send("achievement:realtime-unlock", {
-              gameId: watcherKey,
-              achievementId: id,
-              achievement,
-              earnedTime,
-              unlockedAt,
-            });
-          }
-        } catch (e) {
-          console.error("[achievement-watcher] IPC send error:", e);
-        }
+      // Uma única entrada para persistência, metadados, dedupe, overlay e IPC.
+      for (const { id } of newlyUnlocked) {
+        if (!achievementBridge) continue;
+        await achievementBridge.unlockAchievement(watcherKey, id);
       }
     } catch (err) {
       console.error("[achievement-watcher] Erro em handleAchievementFileChange:", err);
@@ -1078,8 +1079,8 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   const startGameWatcher = (detectedEmulator, onExit) => {
     if (!detectedEmulator) return;
 
-    // Garante que o diretório de saves existe (Goldberg pode não tê-lo criado ainda).
-    try { fs.mkdirSync(detectedEmulator.watchDir, { recursive: true }); } catch { /* ignore */ }
+    // Somente leitura: nunca cria diretórios ou arquivos de save.
+    if (!fs.existsSync(detectedEmulator.watchDir) || !fs.existsSync(detectedEmulator.savePath)) return;
 
     // Lê o estado inicial ANTES de montar o watcher para poder comparar depois.
     const initialState = parseAchievementState(detectedEmulator);
@@ -1146,6 +1147,7 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   // Delega ao injector correto com base no tipo de emulador detectado,
   // evitando a dupla chamada a getSchemaByAppIdOrGameId que havia antes.
   const injectAchievementDefinitions = async (appId, emulator, settingsPath) => {
+    if (!ENABLE_EMULATOR_FILE_INJECTION) return;
     if (!appId) return;
     if (emulator?.emulatorType === "generic_ini") {
       await injectGenericIniDefinitions(appId, emulator.savePath);
@@ -1157,6 +1159,14 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
   let detectedEmulator = detectedGameAppId
     ? detectEmulator(gameDir, detectedGameAppId)
     : null;
+
+  if (detectedEmulator && achievementBridge) {
+    const aliases = getAchievementAliases(detectedEmulator);
+    const migration = await achievementBridge.migrateAchievementAliases(watcherKey, aliases);
+    if (migration.migrated > 0) {
+      console.info(`[achievement-migration] ${migration.migrated} IDs legados migrados em ${watcherKey}.`);
+    }
+  }
 
   // Resolve o settingsPath novamente (já foi calculado acima no bloco de autoconfig)
   const _settingsPathForInject = (() => {
@@ -1227,6 +1237,10 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
           console.info(`[achievement-watcher] Emulador encontrado após ${rescanAttempt * RESCAN_INTERVAL_MS / 1000}s: ${found.emulatorType}`);
           // Injeta definições agora que o arquivo de save foi criado
           injectAchievementDefinitions(detectedGameAppId, found, _settingsPathForInject).catch(() => {});
+          const aliases = getAchievementAliases(found);
+          achievementBridge?.migrateAchievementAliases(watcherKey, aliases).catch(
+            (error) => console.error("[achievement-migration] Falha:", error),
+          );
           startGameWatcher(found, registerExitHook);
         } else if (rescanAttempt >= RESCAN_MAX_ATTEMPTS) {
           clearInterval(rescanTimer);
@@ -1629,6 +1643,7 @@ app.whenReady().then(async () => {
     screen.on("display-added", syncOverlayBounds);
     screen.on("display-removed", syncOverlayBounds);
     await startAchievementBridge();
+    await migrateKnownAchievementProgress();
     await createWindow();
   } catch (error) {
     showFatalStartupError(error);

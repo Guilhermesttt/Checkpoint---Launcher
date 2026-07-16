@@ -8,6 +8,7 @@ import {
   useGamepad,
   useGamepadButton,
 } from "../src/context/GamepadContext";
+import { setLauncherInputLocked } from "../src/utils/launcherInputLock";
 
 let gamepads: Array<Gamepad | null> = [];
 let nextFrame: FrameRequestCallback | null = null;
@@ -43,6 +44,7 @@ const runFrame = () => {
 };
 
 beforeEach(() => {
+  setLauncherInputLocked(false);
   gamepads = [];
   nextFrame = null;
   Object.defineProperty(navigator, "getGamepads", {
@@ -105,5 +107,18 @@ describe("navegacao por gamepad", () => {
     gamepads = [makeGamepad({ axes: [0.8, 0, 0, 0] })];
     runFrame();
     expect(moveRight).toHaveBeenCalledOnce();
+  });
+
+  it("ignora comandos enquanto a intro bloqueia a interface", () => {
+    const action = vi.fn();
+    const Harness = () => {
+      useGamepadButton("X", action);
+      return null;
+    };
+    render(<GamepadProvider><Harness /></GamepadProvider>);
+    setLauncherInputLocked(true);
+    gamepads = [makeGamepad({ pressed: [0] })];
+    runFrame();
+    expect(action).not.toHaveBeenCalled();
   });
 });

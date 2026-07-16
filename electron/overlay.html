@@ -556,7 +556,17 @@
         </svg>
       `;
 
-    const createIconColumn = ({ ring, avatarSrc, avatarSvg, isPhoto, isLogo }) => {
+    const safeImageUrl = (value) => {
+      if (typeof value !== "string" || !value.trim()) return "";
+      try {
+        const url = new URL(value, window.location.href);
+        return ["https:", "file:", "data:"].includes(url.protocol) ? url.toString() : "";
+      } catch {
+        return "";
+      }
+    };
+
+    const createIconColumn = ({ ring, avatarSrc, avatarSvg, fallbackSvg, isPhoto, isLogo }) => {
       const icon = document.createElement("div");
       icon.className = "overlay-icon";
 
@@ -570,13 +580,18 @@
       const avatar = document.createElement("div");
       avatar.className = "icon-avatar" + (isPhoto ? " is-photo" : "") + (isLogo ? " is-logo" : "");
 
-      if (avatarSrc) {
+      const resolvedAvatarSrc = safeImageUrl(avatarSrc);
+      if (resolvedAvatarSrc) {
         const img = document.createElement("img");
-        img.src = avatarSrc;
+        img.src = resolvedAvatarSrc;
         img.alt = "";
+        img.addEventListener("error", () => {
+          avatar.classList.remove("is-photo", "is-logo");
+          avatar.innerHTML = fallbackSvg || avatarSvg || trophySvg();
+        }, { once: true });
         avatar.appendChild(img);
-      } else if (avatarSvg) {
-        avatar.innerHTML = avatarSvg;
+      } else if (avatarSvg || fallbackSvg) {
+        avatar.innerHTML = avatarSvg || fallbackSvg;
       }
 
       icon.appendChild(avatar);
@@ -611,7 +626,7 @@
       const _achIconUrl = payload.achievement?.icon || "";
       shell.appendChild(createIconColumn(
         _achIconUrl
-          ? { avatarSrc: _achIconUrl, isLogo: true }
+          ? { avatarSrc: _achIconUrl, fallbackSvg: trophySvg(), isLogo: true }
           : { avatarSvg: trophySvg() }
       ));
 

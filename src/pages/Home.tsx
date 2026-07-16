@@ -64,10 +64,6 @@ import {
 import { useGameLibraryView } from "../hooks/useGameLibraryView";
 
 import {
-  fetchSteamAchievementDetails,
-} from "../services/steam";
-
-import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
@@ -427,75 +423,6 @@ const Home: React.FC = () => {
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
   }, [games, isRichPresenceEnabled, setGameActivity, setCurrentPresenceGame, setCurrentPresenceExecutablePath]);
-
-
-  // Polling loop for Steam achievements while playing
-  useEffect(() => {
-    if (!currentPresenceGame || !userProfile?.steamId) {
-      return;
-    }
-
-    const runningGame = games.find(
-      (g) =>
-        g.title.toLowerCase().includes(currentPresenceGame.toLowerCase()) ||
-        currentPresenceGame.toLowerCase().includes(g.title.toLowerCase())
-    );
-
-    const appId = runningGame?.steamAppId;
-    if (!appId) return;
-
-    let isPolling = true;
-    const unlockedSet = new Set<string>();
-    let firstLoadDone = false;
-
-    const pollAchievements = async () => {
-      try {
-        const details = await fetchSteamAchievementDetails(userProfile.steamId!, appId);
-        if (!isPolling) return;
-
-        if (!firstLoadDone) {
-          details.achievements.forEach((ach) => {
-            if (ach.achieved) {
-              unlockedSet.add(ach.apiName);
-            }
-          });
-          firstLoadDone = true;
-          return;
-        }
-
-        for (const ach of details.achievements) {
-          if (ach.achieved && !unlockedSet.has(ach.apiName)) {
-            unlockedSet.add(ach.apiName);
-
-            void window.electronAPI?.showAchievementOverlay({
-              gameId: runningGame.id,
-              achievementId: ach.apiName,
-              achievement: {
-                id: ach.apiName,
-                name: ach.name,
-                description: ach.description,
-                icon: ach.icon || "",
-              },
-              unlockedAt: new Date().toISOString(),
-              duplicate: false,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Erro no polling de conquistas Steam:", error);
-      }
-    };
-
-    void pollAchievements();
-    const interval = window.setInterval(() => {
-      void pollAchievements();
-    }, 5000);
-
-    return () => {
-      isPolling = false;
-      window.clearInterval(interval);
-    };
-  }, [currentPresenceGame, userProfile?.steamId, games]);
 
   useEffect(() => {
     if (!user?.uid) return;

@@ -7,6 +7,13 @@ const MAX_PORT = 3010;
 const LOCAL_HOST = "127.0.0.1";
 const progressWriteQueues = new Map();
 
+const extractSteamAppId = (gameId) => {
+  const value = String(gameId || "").trim();
+  return value.match(/^steam_(\d+)$/i)?.[1] ||
+    value.match(/_steam_(\d+)$/i)?.[1] ||
+    (/^\d+$/.test(value) ? value : null);
+};
+
 const sanitizeId = (value, label) => {
   const id = String(value || "").trim();
   if (!id) {
@@ -77,21 +84,57 @@ const normalizeAchievementRecord = (achievementId, record) => {
 };
 
 const findAchievementDefinition = (definitionFile, achievementId) => {
+  const normalizedId = String(achievementId || "").trim().toLowerCase();
   if (Array.isArray(definitionFile?.achievements)) {
     const matched = definitionFile.achievements.find(
-      (achievement) => String(achievement?.id || "").trim() === achievementId,
+      (achievement) =>
+        String(achievement?.id || achievement?.apiName || "").trim().toLowerCase() === normalizedId,
     );
     return normalizeAchievementRecord(achievementId, matched);
   }
 
   if (definitionFile?.achievements && typeof definitionFile.achievements === "object") {
-    return normalizeAchievementRecord(achievementId, definitionFile.achievements[achievementId]);
+    const key = Object.keys(definitionFile.achievements).find(
+      (candidate) => candidate.toLowerCase() === normalizedId,
+    );
+    return normalizeAchievementRecord(achievementId, definitionFile.achievements[key || achievementId]);
   }
 
   if (definitionFile && typeof definitionFile === "object") {
-    return normalizeAchievementRecord(achievementId, definitionFile[achievementId]);
+    const key = Object.keys(definitionFile).find((candidate) => candidate.toLowerCase() === normalizedId);
+    return normalizeAchievementRecord(achievementId, definitionFile[key || achievementId]);
   }
 
+  return null;
+};
+
+const findDefinitionFile = async (achievementsDir, gameId) => {
+  const exactPath = path.join(achievementsDir, `${gameId}.json`);
+  try {
+    return await readJsonFile(exactPath);
+  } catch (error) {
+    if (!error || error.code !== "ENOENT") throw error;
+  }
+
+  const appId = extractSteamAppId(gameId);
+  if (!appId) return null;
+  let files = [];
+  try {
+    files = await fs.promises.readdir(achievementsDir);
+  } catch (error) {
+    if (error && error.code === "ENOENT") return null;
+    throw error;
+  }
+
+  for (const file of files) {
+    if (!file.endsWith(".json")) continue;
+    try {
+      const parsed = await readJsonFile(path.join(achievementsDir, file));
+      if (String(parsed?.steamAppId || "") === appId) return parsed;
+    } catch {
+      // Um cache corrompido não impede a busca nos demais arquivos.
+    }
+  }
   return null;
 };
 
@@ -100,6 +143,7 @@ const createAchievementBridge = ({
   appUrl,
   logger = console,
   onAchievementUnlocked,
+  normalizeAchievementId,
 }) => {
   const app = express();
   app.disable("x-powered-by");
@@ -111,25 +155,26 @@ const createAchievementBridge = ({
 
   const unlockAchievement = async (gameId, achievementId) => {
     const cleanedGameId = sanitizeId(gameId, "gameId");
-    const cleanedAchievementId = sanitizeId(achievementId, "achievementId");
+    const rawAchievementId = sanitizeId(achievementId, "achievementId");
+    const normalizedAchievementId = normalizeAchievementId
+      ? await normalizeAchievementId(cleanedGameId, rawAchievementId)
+      : rawAchievementId;
+    const cleanedAchievementId = sanitizeId(normalizedAchievementId, "achievementId");
     const achievementsDir = path.join(userDataPath, "achievements");
     const definitionsPath = path.join(achievementsDir, `${cleanedGameId}.json`);
     const progressPath = path.join(userDataPath, `user_progress_${cleanedGameId}.json`);
 
     let definitionFile = null;
     try {
-      definitionFile = await readJsonFile(definitionsPath);
+      definitionFile = await findDefinitionFile(achievementsDir, cleanedGameId);
+      if (!definitionFile) {
+        const missing = new Error("Schema local ausente.");
+        missing.code = "ENOENT";
+        throw missing;
+      }
     } catch (err) {
       if (err && err.code === "ENOENT" && appUrl) {
-        let appid = null;
-        if (/^\d+$/.test(cleanedGameId)) {
-          appid = cleanedGameId;
-        } else {
-          const parts = cleanedGameId.split("_steam_");
-          if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) {
-            appid = parts[parts.length - 1];
-          }
-        }
+        const appid = extractSteamAppId(cleanedGameId);
 
         if (appid) {
           try {
@@ -189,18 +234,26 @@ const createAchievementBridge = ({
         }
       }
 
-      const wasAlreadyUnlocked = Boolean(existingProgress.unlockedAchievements[cleanedAchievementId]);
+      const canonicalRecord = existingProgress.unlockedAchievements[cleanedAchievementId];
+      const legacyRecord = rawAchievementId !== cleanedAchievementId
+        ? existingProgress.unlockedAchievements[rawAchievementId]
+        : null;
+      const wasAlreadyUnlocked = Boolean(canonicalRecord || legacyRecord);
       existingProgress.unlockedAchievements[cleanedAchievementId] = {
+        ...(legacyRecord || {}),
         ...achievement,
         unlockedAt,
       };
+      if (rawAchievementId !== cleanedAchievementId) {
+        delete existingProgress.unlockedAchievements[rawAchievementId];
+      }
       existingProgress.updatedAt = unlockedAt;
 
       await writeJsonAtomic(progressPath, existingProgress);
       return { progress: existingProgress, duplicate: wasAlreadyUnlocked };
     });
 
-    onAchievementUnlocked({
+    await onAchievementUnlocked({
       gameId: cleanedGameId,
       achievementId: cleanedAchievementId,
       achievement,
@@ -208,7 +261,61 @@ const createAchievementBridge = ({
       duplicate: updatedProgress.duplicate,
     });
 
-    return { duplicate: updatedProgress.duplicate };
+    return {
+      duplicate: updatedProgress.duplicate,
+      achievementId: cleanedAchievementId,
+      achievement,
+      unlockedAt,
+    };
+  };
+
+  const migrateAchievementAliases = async (gameId, aliases) => {
+    const cleanedGameId = sanitizeId(gameId, "gameId");
+    if (!aliases || typeof aliases !== "object") return { migrated: 0 };
+    const achievementsDir = path.join(userDataPath, "achievements");
+    const progressPath = path.join(userDataPath, `user_progress_${cleanedGameId}.json`);
+    const definitionFile = await findDefinitionFile(achievementsDir, cleanedGameId).catch(() => null);
+
+    return withQueuedProgressWrite(progressPath, async () => {
+      let progress;
+      try {
+        progress = await readJsonFile(progressPath);
+      } catch (error) {
+        if (error && error.code === "ENOENT") return { migrated: 0 };
+        throw error;
+      }
+      if (!progress?.unlockedAchievements || typeof progress.unlockedAchievements !== "object") {
+        return { migrated: 0 };
+      }
+
+      let migrated = 0;
+      for (const [rawId, targetId] of Object.entries(aliases)) {
+        const legacy = progress.unlockedAchievements[rawId];
+        const canonicalId = sanitizeId(targetId, "achievementId");
+        if (!legacy || rawId === canonicalId) continue;
+        const definition = findAchievementDefinition(definitionFile, canonicalId) || {
+          id: canonicalId,
+          name: canonicalId,
+          description: "Conquista desbloqueada localmente.",
+          icon: "",
+        };
+        const existingCanonical = progress.unlockedAchievements[canonicalId];
+        progress.unlockedAchievements[canonicalId] = {
+          ...legacy,
+          ...(existingCanonical || {}),
+          ...definition,
+          unlockedAt: existingCanonical?.unlockedAt || legacy.unlockedAt || new Date().toISOString(),
+        };
+        delete progress.unlockedAchievements[rawId];
+        migrated += 1;
+      }
+
+      if (migrated > 0) {
+        progress.updatedAt = new Date().toISOString();
+        await writeJsonAtomic(progressPath, progress);
+      }
+      return { migrated };
+    });
   };
 
   app.post("/unlock", async (request, response) => {
@@ -238,28 +345,9 @@ const createAchievementBridge = ({
         return;
       }
 
-      const achievementsDir = path.join(userDataPath, "achievements");
-      let matchedGameId = null;
-      try {
-        const files = await fs.promises.readdir(achievementsDir);
-        for (const file of files) {
-          if (file.endsWith(".json")) {
-            const gameId = path.basename(file, ".json");
-            if (gameId.endsWith(`_steam_${appid}`) || gameId === String(appid)) {
-              matchedGameId = gameId;
-              break;
-            }
-          }
-        }
-      } catch (err) {
-        logger.error?.("[achievement-bridge] erro ao buscar appid local", err);
-      }
-
-      if (!matchedGameId) {
-        matchedGameId = `${appid}`;
-      }
-
-      const result = await unlockAchievement(matchedGameId, achievementId);
+      // Toda origem usa a mesma chave para que watcher, receiver e polling
+      // compartilhem progresso e deduplicação.
+      const result = await unlockAchievement(`steam_${appid}`, achievementId);
       response.json({ ok: true, duplicate: result.duplicate });
     } catch (error) {
       logger.error?.("[achievement-bridge] Goldberg emulator post failed", error);
@@ -323,6 +411,7 @@ const createAchievementBridge = ({
     start,
     stop,
     unlockAchievement,
+    migrateAchievementAliases,
     getAddress: () => bridge?.address || null,
   };
 };

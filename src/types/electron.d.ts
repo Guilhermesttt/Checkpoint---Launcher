@@ -48,17 +48,10 @@ declare global {
         definitions: Array<{ id: string; name: string; description: string; icon?: string }>,
         steamAppId?: string
       ) => Promise<boolean>;
-      unlockLocalAchievement: (
+      unlockAchievement: (
         gameId: string,
         achievementId: string
       ) => Promise<{ duplicate: boolean }>;
-      showAchievementOverlay: (payload: {
-        gameId: string;
-        achievementId: string;
-        achievement: { id: string; name: string; description: string; icon: string };
-        unlockedAt: string;
-        duplicate: boolean;
-      }) => Promise<void>;
       showFriendMessageOverlay: (payload: {
         senderName: string;
         messageText: string;

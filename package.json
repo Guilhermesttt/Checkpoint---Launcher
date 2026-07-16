@@ -1,7 +1,7 @@
 {
   "name": "checkpoint",
   "private": true,
-  "version": "1.0.8",
+  "version": "1.0.9",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
@@ -139,7 +139,7 @@
     "cross-env": "^10.1.0",
     "date-fns": "^4.1.0",
     "dompurify": "^3.4.11",
-    "electron": "^31.7.7",
+    "electron": "^39.8.10",
     "electron-builder": "^26.15.3",
     "embla-carousel": "^8.6.0",
     "embla-carousel-react": "^8.6.0",

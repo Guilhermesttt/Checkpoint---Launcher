@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useInterval } from "./useInterval";
 import type { Game, UserProfile } from "../types/domain";
 import { getMonitorableExecutablePath } from "../services/launcher";
@@ -13,6 +13,7 @@ interface UseGamePresenceProps {
 export function useGamePresence({ userUid, userProfile, games }: UseGamePresenceProps) {
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [currentPresenceExecutablePath, setCurrentPresenceExecutablePath] = useState<string | null>(null);
+  const steamId = userProfile?.steamId;
 
   const clearCurrentPresence = useCallback(() => {
     setCurrentPresenceGame(null);
@@ -105,7 +106,7 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
   }, [userUid, verifyRunningState]);
 
   const pollAchievements = useCallback(async (unlockedSet: Set<string>, state: { firstLoadDone: boolean }) => {
-    if (!currentPresenceGame || !userProfile?.steamId) return;
+    if (!currentPresenceGame || !steamId) return;
 
     const runningGame = games.find(
       (g) =>
@@ -117,7 +118,7 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
     if (!appId) return;
 
     try {
-      const details = await fetchSteamAchievementDetails(userProfile.steamId, appId);
+      const details = await fetchSteamAchievementDetails(steamId, appId);
 
       if (!state.firstLoadDone) {
         details.achievements.forEach((ach) => {
@@ -133,41 +134,33 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
         if (ach.achieved && !unlockedSet.has(ach.apiName)) {
           unlockedSet.add(ach.apiName);
 
-          void window.electronAPI?.showAchievementOverlay({
-            gameId: runningGame.id,
-            achievementId: ach.apiName,
-            achievement: {
-              id: ach.apiName,
-              name: ach.name,
-              description: ach.description,
-              icon: ach.icon || "",
-            },
-            unlockedAt: new Date().toISOString(),
-            duplicate: false,
-          });
+          void window.electronAPI?.unlockAchievement(`steam_${appId}`, ach.apiName);
         }
       }
     } catch (error) {
       console.error("Erro no polling de conquistas Steam:", error);
     }
-  }, [currentPresenceGame, userProfile?.steamId, games]);
+  }, [currentPresenceGame, steamId, games]);
 
-  const [achievementsState] = useState(() => ({
+  const achievementsState = useRef({
     unlockedSet: new Set<string>(),
     state: { firstLoadDone: false }
-  }));
+  });
 
 
   useEffect(() => {
-    achievementsState.unlockedSet.clear();
-    achievementsState.state.firstLoadDone = false;
-  }, [currentPresenceGame, achievementsState]);
+    achievementsState.current.unlockedSet.clear();
+    achievementsState.current.state.firstLoadDone = false;
+  }, [currentPresenceGame]);
 
   useInterval(
     () => {
-      void pollAchievements(achievementsState.unlockedSet, achievementsState.state);
+      void pollAchievements(
+        achievementsState.current.unlockedSet,
+        achievementsState.current.state,
+      );
     },
-    currentPresenceGame && userProfile?.steamId ? 15000 : null,
+    currentPresenceGame && steamId ? 15000 : null,
     { pauseWhenHidden: true }
   );
 

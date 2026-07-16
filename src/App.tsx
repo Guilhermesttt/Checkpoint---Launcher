@@ -250,10 +250,16 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
-      <MainVideoBackground />
-      <Home />
-      <GamepadStatusOverlay />
-      <ControllerVirtualKeyboard />
+      <div
+        className="absolute inset-0"
+        inert={isIntroVisible}
+        aria-hidden={isIntroVisible ? "true" : undefined}
+      >
+        <MainVideoBackground />
+        <Home />
+        <GamepadStatusOverlay />
+        <ControllerVirtualKeyboard />
+      </div>
       <AnimatePresence mode="wait">
         {isIntroVisible && (
           <GameBootIntro

@@ -11,6 +11,7 @@ const os = require("node:os");
 
 // ─── Emulator type identifiers ────────────────────────────────────────────────
 const EMULATOR_TYPES = {
+  RUNE: "rune",
   GOLDBERG_V1: "goldberg_v1",
   GOLDBERG_SOCIALCLUB: "goldberg_socialclub",
   TENOKE: "tenoke",
@@ -27,6 +28,29 @@ const tryReadJson = (filePath) => {
   } catch {
     return null;
   }
+};
+
+const parseJsonAchievementState = (data) => {
+  if (!data || typeof data !== "object") return {};
+  const source = data.achievements && typeof data.achievements === "object"
+    ? data.achievements
+    : data;
+  const result = {};
+  for (const [id, entry] of Object.entries(source)) {
+    if (!id || entry == null) continue;
+    if (typeof entry === "boolean" || typeof entry === "number") {
+      result[id] = { earned: Boolean(entry), earnedTime: 0 };
+      continue;
+    }
+    if (typeof entry !== "object" || Array.isArray(entry)) continue;
+    const earnedValue = entry.earned ?? entry.achieved ?? entry.unlocked ?? false;
+    const parsedEarned = parseBooleanLike(earnedValue);
+    result[id] = {
+      earned: parsedEarned ?? Boolean(earnedValue),
+      earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? entry.unlock_time ?? entry.unlockTime ?? 0),
+    };
+  }
+  return result;
 };
 
 // ─── Estrutura de Adaptadores ───────────────────────────────────────────────
@@ -143,7 +167,11 @@ const parseGenericIniAchievements = (content) => {
       const booleanValue = parseBooleanLike(value);
       if (booleanValue !== null) {
         const ts = timeMap.get(key.toLowerCase()) || (booleanValue ? Date.now() / 1000 : 0);
-        result[key] = { earned: booleanValue, earnedTime: ts };
+        const existing = result[key];
+        result[key] = {
+          earned: Boolean(existing?.earned || booleanValue),
+          earnedTime: Number(existing?.earnedTime || ts || 0),
+        };
         continue;
       }
 
@@ -157,6 +185,89 @@ const parseGenericIniAchievements = (content) => {
 
   return result;
 };
+
+const parseRuneAchievementAliases = (content) => {
+  const sections = parseIniSections(content);
+  const aliases = {};
+  const mapping = sections.get("SteamAchievements");
+  if (!mapping) return aliases;
+
+  for (const [rawKey, rawValue] of mapping.entries()) {
+    if (!rawKey || rawKey.toLowerCase() === "count") continue;
+    const canonicalId = String(rawValue || "").trim();
+    if (!canonicalId) continue;
+
+    const indexedKey = rawKey.match(/^Achievement(\d+)$/i)?.[1];
+    const alias = indexedKey == null
+      ? String(rawKey).trim()
+      : String(indexedKey).padStart(5, "0");
+    aliases[alias] = canonicalId;
+  }
+  return aliases;
+};
+
+const parseRuneAchievements = (content) => {
+  const parsed = parseGenericIniAchievements(content);
+  const aliases = parseRuneAchievementAliases(content);
+  const normalized = {};
+
+  for (const [rawId, state] of Object.entries(parsed)) {
+    // Em RUNE, as chaves zero-padded de [SteamAchievements] são aliases,
+    // não estados booleanos (mesmo quando o valor canônico é "1").
+    if (aliases[rawId]) continue;
+    const canonicalId = aliases[rawId] || rawId;
+    const previous = normalized[canonicalId];
+    normalized[canonicalId] = previous
+      ? {
+          earned: Boolean(previous.earned || state.earned),
+          earnedTime: Math.max(Number(previous.earnedTime || 0), Number(state.earnedTime || 0)),
+        }
+      : state;
+  }
+  return normalized;
+};
+
+class RuneAdapter {
+  constructor() {
+    this.emulatorType = EMULATOR_TYPES.RUNE;
+  }
+
+  _getPaths(appId) {
+    const publicDocs = path.join(process.env.PUBLIC || "C:\\Users\\Public", "Documents");
+    const watchDir = path.join(publicDocs, "Steam", "RUNE", String(appId));
+    return { watchDir, savePath: path.join(watchDir, "achievements.ini") };
+  }
+
+  detect(gamePath) {
+    if (!gamePath) return false;
+    return fs.existsSync(path.join(gamePath, "RUNE.ini")) ||
+      fs.existsSync(path.join(gamePath, "rune.ini"));
+  }
+
+  readAchievements(appId, _gamePath, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId).savePath;
+    if (!savePath || !fs.existsSync(savePath)) return {};
+    try {
+      return parseRuneAchievements(readTextFile(savePath));
+    } catch {
+      return {};
+    }
+  }
+
+  getAliases(appId, providedSavePath) {
+    const savePath = providedSavePath || this._getPaths(appId).savePath;
+    if (!savePath || !fs.existsSync(savePath)) return {};
+    try {
+      return parseRuneAchievementAliases(readTextFile(savePath));
+    } catch {
+      return {};
+    }
+  }
+
+  getWatchInfo(appId) {
+    return { emulatorType: this.emulatorType, ...this._getPaths(appId) };
+  }
+}
 
 class GoldbergAdapter {
   constructor() {
@@ -176,11 +287,15 @@ class GoldbergAdapter {
 
   detect(gamePath) {
     if (!gamePath) return false;
-    const hasSteamApi =
-      fs.existsSync(path.join(gamePath, "steam_api64.dll")) ||
-      fs.existsSync(path.join(gamePath, "steam_api.dll"));
     const hasSteamSettings = fs.existsSync(path.join(gamePath, "steam_settings"));
-    return hasSteamApi || hasSteamSettings;
+    if (!hasSteamSettings) return false;
+    const settingsMarkers = [
+      "steam_appid.txt",
+      "configs.app.ini",
+      "configs.user.ini",
+      "steam_interfaces.txt",
+    ];
+    return settingsMarkers.some((name) => fs.existsSync(path.join(gamePath, "steam_settings", name)));
   }
 
   readAchievements(appId, gamePath, providedSavePath) {
@@ -188,16 +303,7 @@ class GoldbergAdapter {
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
-    const result = {};
-    for (const [id, entry] of Object.entries(data)) {
-      if (entry && typeof entry === "object") {
-        result[id] = {
-          earned: Boolean(entry.earned),
-          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
-        };
-      }
-    }
-    return result;
+    return parseJsonAchievementState(data);
   }
 
   writeAchievements(appId, data, gamePath) {
@@ -246,16 +352,7 @@ class GoldbergSocialClubAdapter {
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
-    const result = {};
-    for (const [id, entry] of Object.entries(data)) {
-      if (entry && typeof entry === "object") {
-        result[id] = {
-          earned: Boolean(entry.earned),
-          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
-        };
-      }
-    }
-    return result;
+    return parseJsonAchievementState(data);
   }
 
   writeAchievements(appId, data, gamePath) {
@@ -300,16 +397,7 @@ class TenokeAdapter {
     const data = tryReadJson(savePath);
     if (!data || typeof data !== "object") return {};
 
-    const result = {};
-    for (const [id, entry] of Object.entries(data)) {
-      if (entry && typeof entry === "object") {
-        result[id] = {
-          earned: Boolean(entry.earned),
-          earnedTime: Number(entry.earned_time ?? entry.earnedTime ?? 0),
-        };
-      }
-    }
-    return result;
+    return parseJsonAchievementState(data);
   }
 
   writeAchievements(appId, data, gamePath) {
@@ -402,6 +490,7 @@ class GenericIniAdapter {
 // ─── Seletor Universal e Escaneamento de Caminhos (Baseado no Hydra) ──────────
 
 const adapters = [
+  new RuneAdapter(),
   new GoldbergSocialClubAdapter(), // Prioridade alta para testes de GTA
   new TenokeAdapter(),
   new GenericIniAdapter(),
@@ -443,12 +532,12 @@ const getScannedEmulator = (appId, gameDir) => {
     },
     // RUNE
     {
-      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      emulatorType: EMULATOR_TYPES.RUNE,
       savePath: path.join(publicDocs, "Steam", "RUNE", String(appId), "achievements.ini"),
       watchDir: path.join(publicDocs, "Steam", "RUNE", String(appId))
     },
     {
-      emulatorType: EMULATOR_TYPES.GENERIC_INI,
+      emulatorType: EMULATOR_TYPES.RUNE,
       savePath: path.join(publicDocs, "Steam", "RUNE", String(appId), "remote", "achievements.ini"),
       watchDir: path.join(publicDocs, "Steam", "RUNE", String(appId), "remote")
     },
@@ -600,16 +689,6 @@ const getScannedEmulator = (appId, gameDir) => {
   if (gameDir) {
     candidates.push(
       {
-        emulatorType: EMULATOR_TYPES.GOLDBERG_V1,
-        savePath: path.join(gameDir, "steam_settings", "achievements.json"),
-        watchDir: path.join(gameDir, "steam_settings")
-      },
-      {
-        emulatorType: EMULATOR_TYPES.GENERIC_INI,
-        savePath: path.join(gameDir, "steam_settings", "achievements.ini"),
-        watchDir: path.join(gameDir, "steam_settings")
-      },
-      {
         emulatorType: EMULATOR_TYPES.GENERIC_INI,
         savePath: path.join(gameDir, "SteamData", "user_stats.ini"),
         watchDir: path.join(gameDir, "SteamData")
@@ -626,28 +705,27 @@ const getScannedEmulator = (appId, gameDir) => {
   for (const cand of candidates) {
     if (fs.existsSync(cand.savePath)) {
       console.log(`[EmulatorDetector] Arquivo exato encontrado: ${cand.savePath} (Emulador: ${cand.emulatorType})`);
-      return cand;
+      return { ...cand, detectionSource: "known-path", confidence: "high" };
     }
   }
 
   // ── Passo 2: busca em profundidade (depth 2) nos diretórios raiz conhecidos ──
   // Cobre variações de layout que não estão na lista estática (ex: RUNE/<id>/remote/stats/)
   const rootDirs = [
-    path.join(appData, "Goldberg SteamEmu Saves", String(appId)),
-    path.join(appData, "GSE Saves", String(appId)),
-    path.join(appData, "Goldberg Socialclub Emu Saves", String(appId)),
-    path.join(localAppData, "TENOKE", String(appId)),
-    path.join(publicDocs, "Steam", "RUNE", String(appId)),
-    path.join(publicDocs, "Steam", "CODEX", String(appId)),
-    path.join(publicDocs, "Steam", "FLT", String(appId)),
-    path.join(publicDocs, "Steam", "CPY", String(appId)),
-    path.join(publicDocs, "OnlineFix", String(appId)),
-    path.join(programData, "RLD!", String(appId)),
-    path.join(appData, "SmartSteamEmu", String(appId)),
-    path.join(appData, "3DM", String(appId)),
-    path.join(appData, "Empress", String(appId)),
-    path.join(appData, "Ali213", String(appId)),
-    ...(gameDir ? [gameDir] : []),
+    { dir: path.join(appData, "Goldberg SteamEmu Saves", String(appId)), emulatorType: EMULATOR_TYPES.GOLDBERG_V1 },
+    { dir: path.join(appData, "GSE Saves", String(appId)), emulatorType: EMULATOR_TYPES.GOLDBERG_V1 },
+    { dir: path.join(appData, "Goldberg Socialclub Emu Saves", String(appId)), emulatorType: EMULATOR_TYPES.GOLDBERG_SOCIALCLUB },
+    { dir: path.join(localAppData, "TENOKE", String(appId)), emulatorType: EMULATOR_TYPES.TENOKE },
+    { dir: path.join(publicDocs, "Steam", "RUNE", String(appId)), emulatorType: EMULATOR_TYPES.RUNE },
+    { dir: path.join(publicDocs, "Steam", "CODEX", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(publicDocs, "Steam", "FLT", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(publicDocs, "Steam", "CPY", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(publicDocs, "OnlineFix", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(programData, "RLD!", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(appData, "SmartSteamEmu", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(appData, "3DM", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(appData, "Empress", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
+    { dir: path.join(appData, "Ali213", String(appId)), emulatorType: EMULATOR_TYPES.GENERIC_INI },
   ];
 
   const ACH_FILENAMES = [
@@ -655,7 +733,7 @@ const getScannedEmulator = (appId, gameDir) => {
     "achiev.ini", "CreamAPI.Achievements.cfg", "user_stats.ini",
   ];
 
-  const scanDepth = (dir, depth) => {
+  const scanDepth = (dir, depth, emulatorType) => {
     if (depth > 2) return null;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
@@ -667,26 +745,27 @@ const getScannedEmulator = (appId, gameDir) => {
       const lname = entry.name.toLowerCase();
       if (ACH_FILENAMES.some(n => n.toLowerCase() === lname)) {
         const fullPath = path.join(dir, entry.name);
-        const isJson = lname.endsWith(".json");
         return {
-          emulatorType: isJson ? EMULATOR_TYPES.GOLDBERG_V1 : EMULATOR_TYPES.GENERIC_INI,
+          emulatorType,
           savePath: fullPath,
           watchDir: dir,
+          detectionSource: "known-root-scan",
+          confidence: "medium",
         };
       }
     }
     // Depois desce nos subdiretórios
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const found = scanDepth(path.join(dir, entry.name), depth + 1);
+      const found = scanDepth(path.join(dir, entry.name), depth + 1, emulatorType);
       if (found) return found;
     }
     return null;
   };
 
-  for (const rootDir of rootDirs) {
-    if (!fs.existsSync(rootDir)) continue;
-    const found = scanDepth(rootDir, 0);
+  for (const root of rootDirs) {
+    if (!fs.existsSync(root.dir)) continue;
+    const found = scanDepth(root.dir, 0, root.emulatorType);
     if (found) {
       console.log(`[EmulatorDetector] Arquivo encontrado via busca profunda: ${found.savePath} (Emulador: ${found.emulatorType})`);
       return found;
@@ -726,8 +805,10 @@ function detectEmulator(gameDir, appId) {
   }
 
   // 2. Fallback: detecção de emulador baseada nas DLLs do jogo para novos saves
-  const adapter = getEmulatorForGame(gameDir) || new GoldbergAdapter();
+  const adapter = getEmulatorForGame(gameDir);
+  if (!adapter) return null;
   const watchInfo = adapter.getWatchInfo(appId, gameDir);
+  if (!watchInfo?.savePath || !fs.existsSync(watchInfo.savePath)) return null;
   
   console.log(`[EmulatorDetector] Fallback de detecção de emulador para appId: ${appId} | Emulador: ${adapter.emulatorType}`);
   console.log(`[EmulatorDetector] Pasta de saves (watchDir): ${watchInfo.watchDir}`);
@@ -736,7 +817,9 @@ function detectEmulator(gameDir, appId) {
   return {
     ...watchInfo,
     appId,
-    gameDir
+    gameDir,
+    detectionSource: "signature-and-existing-save",
+    confidence: "high",
   };
 }
 
@@ -760,8 +843,32 @@ function readLocalSavesRetroactive(appId, gameDir = null) {
     }
   }
 
-  const adapter = gameDir ? (getEmulatorForGame(gameDir) || new GoldbergAdapter()) : new GoldbergAdapter();
-  return adapter.readAchievements(appId, gameDir);
+  const adapter = gameDir ? getEmulatorForGame(gameDir) : null;
+  if (!adapter) return {};
+  const watchInfo = adapter.getWatchInfo(appId, gameDir);
+  if (!watchInfo?.savePath || !fs.existsSync(watchInfo.savePath)) return {};
+  return adapter.readAchievements(appId, gameDir, watchInfo.savePath);
+}
+
+function getAchievementAliases(detectedEmulator) {
+  if (!detectedEmulator || detectedEmulator.emulatorType !== EMULATOR_TYPES.RUNE) return {};
+  const adapter = adapters.find((candidate) => candidate.emulatorType === EMULATOR_TYPES.RUNE);
+  return adapter?.getAliases(detectedEmulator.appId, detectedEmulator.savePath) || {};
+}
+
+function resolveEmulatorAchievementId(appId, rawAchievementId) {
+  const rawId = String(rawAchievementId || "").trim();
+  if (!appId || !rawId) return rawId;
+  const scanned = getScannedEmulator(String(appId), null);
+  if (!scanned || scanned.emulatorType !== EMULATOR_TYPES.RUNE) return rawId;
+  const aliases = getAchievementAliases({ ...scanned, appId: String(appId) });
+  return aliases[rawId] || rawId;
+}
+
+function detectKnownEmulatorSave(appId) {
+  if (!appId) return null;
+  const scanned = getScannedEmulator(String(appId), null);
+  return scanned ? { ...scanned, appId: String(appId), gameDir: null } : null;
 }
 // Mantemos esse helper exportado solto para a autoconfiguração antiga no main.cjs
 function getGoldbergV1Paths(appId) {
@@ -845,7 +952,14 @@ module.exports = {
   getGoldbergV1Paths,
   detectEmulator,
   parseAchievementState,
+  parseGenericIniAchievements,
+  parseJsonAchievementState,
+  parseRuneAchievements,
+  parseRuneAchievementAliases,
   readLocalSavesRetroactive,
   readGoldbergSettingsAchievements,
+  getAchievementAliases,
+  resolveEmulatorAchievementId,
+  detectKnownEmulatorSave,
   getEmulatorForGame
 };

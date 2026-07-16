@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
 import { resetCachedLedDevice } from "../services/controllerLed";
+import { isLauncherInputLocked } from "../utils/launcherInputLock";
 
 export type InputType = "mouse" | "keyboard" | "gamepad";
 export type GamepadFamily = "playstation" | "xbox" | "generic";
@@ -104,6 +105,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [connectedGamepadId]);
 
   const dispatchButtonPress = useCallback((buttonName: GamepadButtonName) => {
+    if (isLauncherInputLocked()) return;
     const subscribers = Array.from(gamepadButtonSubscribers.get(buttonName) ?? []);
     if (subscribers.length === 0) return;
 
@@ -194,10 +196,10 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const rightX = gp.axes[2];
         const rightY = gp.axes[3];
         const RIGHT_DEADZONE = 0.2;
-        if (
+        const rightStickActive =
           (rightX !== undefined && Math.abs(rightX) > RIGHT_DEADZONE) ||
-          (rightY !== undefined && Math.abs(rightY) > RIGHT_DEADZONE)
-        ) {
+          (rightY !== undefined && Math.abs(rightY) > RIGHT_DEADZONE);
+        if (!isLauncherInputLocked() && rightStickActive) {
           inputDetected = true;
           window.dispatchEvent(
             new CustomEvent("gamepad:rightstick", {

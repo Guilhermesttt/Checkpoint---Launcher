@@ -23,7 +23,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
   getLocalAchievementState: (appId) => ipcRenderer.invoke("achievement:get-local-state", appId),
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
-  showAchievementOverlay: (payload) => ipcRenderer.invoke("overlay:show-achievement", payload),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
   // ─ Auto-Updater APIs ────────────────────────────────────────────────────────
   getVersion: () => ipcRenderer.invoke("app:get-version"),
