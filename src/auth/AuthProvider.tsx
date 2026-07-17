@@ -31,8 +31,6 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   displayName: data?.displayName ?? null,
   photoURL: data?.photoURL ?? null,
   bio: data?.bio,
-  location: data?.location,
-  pronouns: data?.pronouns,
   website: data?.website,
   favoriteGenres: data?.favoriteGenres,
   steamId: data?.steamId,
