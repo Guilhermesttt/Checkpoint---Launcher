@@ -1551,6 +1551,73 @@
     .capture-delete.is-confirming::after { content: "Excluir?"; font-size: 8px; font-weight: 800; }
     .capture-delete .ui-icon { width: 14px; height: 14px; }
     .capture-empty { grid-column: 1 / -1; padding: 38px 16px; border: 1px dashed rgba(255, 255, 255, .1); border-radius: 13px; color: var(--text-muted); text-align: center; font-size: 11px; }
+    .capture-card { cursor: zoom-in; }
+    .capture-card:focus-visible { outline: 2px solid rgba(255, 255, 255, .86); outline-offset: 2px; border-color: rgba(255, 255, 255, .54); }
+    .capture-viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 20000;
+      display: none;
+      place-items: center;
+      padding: 3vh 3vw;
+      pointer-events: auto;
+      background: rgba(0, 0, 0, .86);
+      backdrop-filter: blur(18px);
+    }
+    .capture-viewer.is-open { display: grid; animation: fade-in 170ms ease both; }
+    .capture-viewer-shell {
+      width: min(1500px, 94vw);
+      height: min(900px, 90vh);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .13);
+      border-radius: 18px;
+      background: #08080a;
+      box-shadow: 0 36px 110px rgba(0, 0, 0, .72);
+    }
+    .capture-viewer-header, .capture-viewer-footer {
+      min-height: 58px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(255, 255, 255, .025);
+    }
+    .capture-viewer-header { border-bottom: 1px solid rgba(255, 255, 255, .08); }
+    .capture-viewer-footer { justify-content: space-between; border-top: 1px solid rgba(255, 255, 255, .08); }
+    .capture-viewer-title { min-width: 0; flex: 1; }
+    .capture-viewer-title strong, .capture-viewer-title span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .capture-viewer-title strong { font-size: 13px; }
+    .capture-viewer-title span, .capture-viewer-footer { color: var(--text-muted); font-size: 10px; }
+    .capture-viewer-close, .capture-viewer-nav {
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, .12);
+      background: rgba(255, 255, 255, .055);
+      color: #fff;
+      cursor: pointer;
+    }
+    .capture-viewer-close { width: 36px; height: 36px; border-radius: 10px; }
+    .capture-viewer-stage { min-height: 0; position: relative; display: grid; place-items: center; padding: 18px 66px; overflow: hidden; background: #030304; }
+    .capture-viewer-image { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 20px 36px rgba(0, 0, 0, .45)); }
+    .capture-viewer-nav {
+      position: absolute;
+      top: 50%;
+      width: 42px;
+      height: 58px;
+      border-radius: 12px;
+      transform: translateY(-50%);
+      background: rgba(12, 12, 15, .82);
+      backdrop-filter: blur(12px);
+    }
+    .capture-viewer-nav:hover, .capture-viewer-close:hover { background: rgba(255, 255, 255, .12); }
+    .capture-viewer-nav:disabled { opacity: .25; cursor: default; }
+    .capture-viewer-nav.previous { left: 14px; }
+    .capture-viewer-nav.next { right: 14px; }
+    .capture-viewer-nav.next .ui-icon { transform: rotate(180deg); }
+    .capture-viewer-shortcuts { display: flex; gap: 12px; }
+    .capture-viewer-shortcuts kbd { font: inherit; color: rgba(255, 255, 255, .7); }
 
     .top-profile { color: #fff; font: inherit; }
     .top-profile:hover { background: var(--panel-surface-hover); border-color: rgba(255, 255, 255, 0.16); }
@@ -1675,7 +1742,7 @@
   <section id="command-panel" aria-hidden="true">
     <div class="panel-game-backdrop" id="panel-game-backdrop"></div>
     <aside class="panel-sidebar">
-      <div class="panel-logo" aria-label="Checkpoint"><img src="../public/Checkpoint_Logo.png" alt="" /></div>
+      <div class="panel-logo" aria-label="Checkpoint"><img src="../assets/icon.png" alt="" /></div>
       <nav class="panel-navigation" aria-label="Navegação do overlay">
         <button class="panel-tab is-active" data-panel-tab="friends"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-home" /></svg></span><span>Início</span></button>
         <button class="panel-tab" data-panel-tab="chats"><span class="nav-icon"><svg class="ui-icon"><use href="#icon-chat" /></svg></span><span>Chat</span><b class="nav-notification" id="nav-unread" hidden></b></button>
@@ -1804,7 +1871,7 @@
                   <h3>Experiência</h3>
                   <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-sparkles" /></svg></span><span class="setting-copy"><b>Animações</b><small>Transições e movimentos da interface</small></span><input class="setting-switch" id="setting-animations" type="checkbox" checked /></label>
                   <label class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-settings" /></svg></span><span class="setting-copy"><b>Abrir overlay</b><small>Atalho global durante o jogo</small></span><kbd class="shortcut-key">Ctrl + Shift + O</kbd></label>
-                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span><span class="setting-copy"><b>Atalho no controle</b><small>Xbox Guide, PS ou Home</small></span><kbd class="shortcut-key">Botão central</kbd></div>
+                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span><span class="setting-copy"><b>Atalho no controle</b><small>Xbox Guide, PS/Home ou o fallback View + Menu</small></span><kbd class="shortcut-key">Botão central</kbd></div>
                 </section>
                 <section class="settings-card settings-card-wide">
                   <h3>Captura de tela</h3>
@@ -1861,7 +1928,33 @@
     </aside>
   </section>
 
-  <!-- JS LOGIC REMAINS 100% UNCHANGED -->
+  <div class="capture-viewer" id="capture-viewer" aria-hidden="true">
+    <section class="capture-viewer-shell" role="dialog" aria-modal="true" aria-labelledby="capture-viewer-name">
+      <header class="capture-viewer-header">
+        <div class="capture-viewer-title">
+          <strong id="capture-viewer-name">Captura de tela</strong>
+          <span id="capture-viewer-date"></span>
+        </div>
+        <button class="capture-viewer-close" id="capture-viewer-close" type="button" aria-label="Fechar visualização">
+          <svg class="ui-icon"><use href="#icon-close" /></svg>
+        </button>
+      </header>
+      <div class="capture-viewer-stage">
+        <button class="capture-viewer-nav previous" id="capture-viewer-previous" type="button" aria-label="Captura anterior">
+          <svg class="ui-icon"><use href="#icon-back" /></svg>
+        </button>
+        <img class="capture-viewer-image" id="capture-viewer-image" alt="" />
+        <button class="capture-viewer-nav next" id="capture-viewer-next" type="button" aria-label="Próxima captura">
+          <svg class="ui-icon"><use href="#icon-back" /></svg>
+        </button>
+      </div>
+      <footer class="capture-viewer-footer">
+        <span id="capture-viewer-counter">1 de 1</span>
+        <span class="capture-viewer-shortcuts"><kbd>← →</kbd> navegar <kbd>Esc</kbd> fechar</span>
+      </footer>
+    </section>
+  </div>
+
   <script>
     const achievementStack = document.getElementById("achievement-stack");
     const socialStack = document.getElementById("social-stack");
@@ -2177,6 +2270,57 @@
     let latestPanelState = {};
     let showAllOnlineFriends = false;
     let captureShortcutRecording = false;
+    let captureViewerIndex = -1;
+
+    const captureViewer = document.getElementById("capture-viewer");
+    const closeCaptureViewer = () => {
+      captureViewerIndex = -1;
+      captureViewer?.classList.remove("is-open");
+      captureViewer?.setAttribute("aria-hidden", "true");
+    };
+    const renderCaptureViewer = () => {
+      const captures = Array.isArray(latestPanelState.captures) ? latestPanelState.captures : [];
+      if (captureViewerIndex < 0 || captures.length === 0) {
+        closeCaptureViewer();
+        return;
+      }
+      captureViewerIndex = Math.min(captureViewerIndex, captures.length - 1);
+      const capture = captures[captureViewerIndex];
+      const image = document.getElementById("capture-viewer-image");
+      if (image) {
+        image.src = safeImageUrl(capture.url);
+        image.alt = capture.name || "Captura de tela";
+      }
+      const name = document.getElementById("capture-viewer-name");
+      if (name) name.textContent = capture.name || "Captura de tela";
+      const createdAt = Date.parse(capture.createdAt || "");
+      const date = document.getElementById("capture-viewer-date");
+      if (date) {
+        date.textContent = Number.isFinite(createdAt)
+          ? new Date(createdAt).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" })
+          : "";
+      }
+      const counter = document.getElementById("capture-viewer-counter");
+      if (counter) counter.textContent = `${captureViewerIndex + 1} de ${captures.length}`;
+      const previous = document.getElementById("capture-viewer-previous");
+      const next = document.getElementById("capture-viewer-next");
+      if (previous) previous.disabled = captureViewerIndex === 0;
+      if (next) next.disabled = captureViewerIndex === captures.length - 1;
+    };
+    const openCaptureViewer = (index) => {
+      captureViewerIndex = index;
+      renderCaptureViewer();
+      captureViewer?.classList.add("is-open");
+      captureViewer?.setAttribute("aria-hidden", "false");
+      document.getElementById("capture-viewer-close")?.focus();
+    };
+    const moveCaptureViewer = (direction) => {
+      if (captureViewerIndex < 0) return;
+      const captures = Array.isArray(latestPanelState.captures) ? latestPanelState.captures : [];
+      captureViewerIndex = Math.max(0, Math.min(captures.length - 1, captureViewerIndex + direction));
+      renderCaptureViewer();
+    };
+
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
       const onlineRoot = document.getElementById("panel-friends-online");
@@ -2422,6 +2566,9 @@
       captures.forEach((capture) => {
         const card = document.createElement("article");
         card.className = "capture-card";
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `Abrir ${capture.name || "captura"}`);
         const image = document.createElement("img");
         image.src = safeImageUrl(capture.url);
         image.alt = capture.name || "Captura de tela";
@@ -2463,9 +2610,18 @@
           deleteButton.classList.remove("is-confirming");
           setCaptureFeedback(result?.error || "Não foi possível excluir a captura.");
         });
+        const captureIndex = captures.indexOf(capture);
+        card.addEventListener("click", () => openCaptureViewer(captureIndex));
+        card.addEventListener("keydown", (event) => {
+          if (event.target !== card) return;
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          openCaptureViewer(captureIndex);
+        });
         card.append(image, date, deleteButton);
         captureRoot.appendChild(card);
       });
+      if (captureViewerIndex >= 0) renderCaptureViewer();
 
       const chat = state.chat || null;
       document.getElementById("panel-chat-list").hidden = Boolean(chat);
@@ -2551,6 +2707,12 @@
     document.getElementById("open-captures-folder")?.addEventListener("click", () => {
       window.achievementOverlay.panelAction({ kind: "open-captures-folder" });
     });
+    document.getElementById("capture-viewer-close")?.addEventListener("click", closeCaptureViewer);
+    document.getElementById("capture-viewer-previous")?.addEventListener("click", () => moveCaptureViewer(-1));
+    document.getElementById("capture-viewer-next")?.addEventListener("click", () => moveCaptureViewer(1));
+    captureViewer?.addEventListener("click", (event) => {
+      if (event.target === captureViewer) closeCaptureViewer();
+    });
     const captureShortcutRecorder = document.getElementById("record-capture-shortcut");
     const stopCaptureShortcutRecording = () => {
       captureShortcutRecording = false;
@@ -2621,6 +2783,19 @@
         setCaptureFeedback(`Atalho alterado para ${formatShortcut(savedShortcut)}.`);
         return;
       }
+      if (captureViewerIndex >= 0) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeCaptureViewer();
+        } else if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          moveCaptureViewer(-1);
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault();
+          moveCaptureViewer(1);
+        }
+        return;
+      }
       if (event.key !== "Escape" || !commandPanel?.classList.contains("is-open")) return;
       if (latestPanelState.chat) window.achievementOverlay.panelAction({ kind: "close-chat" });
       else window.achievementOverlay.panelAction({ kind: "close" });
@@ -2637,6 +2812,7 @@
         commandPanel?.setAttribute("aria-hidden", open ? "false" : "true");
         document.body.classList.toggle("panel-open", Boolean(open));
         if (!open && captureShortcutRecording) stopCaptureShortcutRecording();
+        if (!open) closeCaptureViewer();
         if (state) renderPanelState(state);
       });
       window.achievementOverlay.onPanelState(renderPanelState);

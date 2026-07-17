@@ -16,10 +16,9 @@ const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
 }));
 
-vi.mock("firebase/firestore", () => ({
-  addDoc: mocks.addDoc,
-  updateDoc: mocks.updateDoc,
-  deleteField: mocks.deleteField,
+vi.mock("../src/services/localLibrary", () => ({
+  createLibraryGame: mocks.addDoc,
+  updateLibraryGame: mocks.updateDoc,
 }));
 
 vi.mock("../src/auth/AuthProvider", () => ({
@@ -49,11 +48,6 @@ vi.mock("../src/components/ui/ModalShell", () => ({
         {children}
       </div>
     ) : null,
-}));
-
-vi.mock("../src/services/firestorePaths", () => ({
-  userGamesCollectionRef: (uid: string) => `games:${uid}`,
-  userGameDocRef: (uid: string, gameId: string) => `games:${uid}:${gameId}`,
 }));
 
 vi.mock("../src/services/steam", () => ({
@@ -126,7 +120,7 @@ describe("AddGameModal", () => {
 
     await waitFor(() => expect(mocks.addDoc).toHaveBeenCalledTimes(1));
     expect(mocks.addDoc).toHaveBeenCalledWith(
-      "games:user-1",
+      "user-1",
       expect.objectContaining({
         title: "Control",
         launcherType: "local",
@@ -155,7 +149,8 @@ describe("AddGameModal", () => {
 
     await waitFor(() => expect(mocks.updateDoc).toHaveBeenCalledTimes(1));
     expect(mocks.updateDoc).toHaveBeenCalledWith(
-      "games:user-1:game-7",
+      "user-1",
+      "game-7",
       expect.objectContaining({
         title: "Hades",
         launcherType: "steam",

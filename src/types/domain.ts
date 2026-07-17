@@ -30,6 +30,7 @@ export interface Game {
   epicLaunchId?: string;
   epicStoreUrl?: string;
   steamPlaytimeMinutes?: number;
+  locallyTrackedMinutes?: number;
   steamLastPlayedAt?: string;
   source?: "manual" | "steam" | "epic";
   lastSyncedAt?: string;
@@ -44,6 +45,7 @@ export interface Game {
   tags?: string[];
   totalAchievements?: number;
   completedAchievements?: number;
+  achievementsUpdatedAt?: string;
   launchProfile?: GameLaunchProfile;
 }
 
@@ -69,6 +71,9 @@ export interface UserProfile {
   email?: string | null;
   displayName?: string | null;
   photoURL?: string | null;
+  bio?: string;
+  website?: string;
+  favoriteGenres?: string[];
   steamId?: string;
   discordId?: string;
   discordUsername?: string;
@@ -114,6 +119,22 @@ export interface UserProfile {
     totalGames?: number;
     updatedAt?: string;
   };
+  librarySummary?: {
+    games: number;
+    minutesPlayed: number;
+    favorites: number;
+    steamGames: number;
+    epicGames: number;
+    localGames: number;
+  };
+}
+
+export interface EditableProfile {
+  displayName: string;
+  photoURL?: string;
+  bio: string;
+  website: string;
+  favoriteGenres: string[];
 }
 
 export interface SteamOwnedGame {

@@ -1,18 +1,17 @@
 import {
   serverTimestamp,
-  writeBatch,
-  getDocs,
-  query,
-  where,
+  setDoc,
 } from "firebase/firestore";
-import { auth, db } from "../../Firebase";
+import { auth } from "../../Firebase";
 import { apiUrl } from "./api";
 import type { Game, SteamOwnedGame } from "../types/domain";
 import {
   profileDocRef,
-  userGameDocRef,
-  userGamesCollectionRef,
 } from "./firestorePaths";
+import {
+  bulkUpsertLibraryGames,
+  listLibraryGames,
+} from "./localLibrary";
 
 const clean = <T extends Record<string, unknown>>(obj: T) => {
   const newObj = { ...obj };
@@ -376,22 +375,20 @@ export const fetchSteamAchievementSummary = async (
   };
 };
 
-export const syncSteamLibraryToFirestore = async (
+export const syncSteamLibraryToLocal = async (
   uid: string,
   steamId: string,
 ) => {
   const payload = await fetchSteamLibrary(steamId);
 
-  const existingGamesSnap = await getDocs(
-    query(userGamesCollectionRef(uid), where("steamAppId", "!=", "")),
-  );
+  const existingGames = (await listLibraryGames(uid))
+    .filter((game) => Boolean(game.steamAppId));
 
   const appIdToDocId = new Map<string, string>();
   const existingByAppId = new Map<string, Game>();
-  existingGamesSnap.docs.forEach((doc) => {
-    const data = doc.data() as Game;
+  existingGames.forEach((data) => {
     if (data.steamAppId) {
-      appIdToDocId.set(String(data.steamAppId), doc.id);
+      appIdToDocId.set(String(data.steamAppId), data.id);
       existingByAppId.set(String(data.steamAppId), data);
     }
   });
@@ -428,7 +425,11 @@ export const syncSteamLibraryToFirestore = async (
     const details = detailsCache.get(appIdStr);
     const coverImage = details?.cardImage || assets.cardImage;
     const backgroundImage = details?.backgroundImage || assets.image;
-    const normalizedHours = Math.round((owned.playtime_forever ?? 0) / 60);
+    const locallyTrackedMinutes = Math.max(
+      Number(existingByAppId.get(appIdStr)?.locallyTrackedMinutes) || 0,
+      owned.playtime_forever ?? 0,
+    );
+    const normalizedHours = Math.round((locallyTrackedMinutes / 60) * 10) / 10;
     const steamLastPlayedAt =
       owned.rtime_last_played && owned.rtime_last_played > 0
         ? new Date(owned.rtime_last_played * 1000).toISOString()
@@ -452,6 +453,7 @@ export const syncSteamLibraryToFirestore = async (
       launcherType: "steam",
       steamAppId: appIdStr,
       steamPlaytimeMinutes: owned.playtime_forever ?? 0,
+      locallyTrackedMinutes,
       steamLastPlayedAt,
       hoursPlayed: normalizedHours,
       sizeGB: Math.max(0, Math.round(details?.sizeGB ?? 0)),
@@ -468,21 +470,13 @@ export const syncSteamLibraryToFirestore = async (
       updatedAt: new Date().toISOString(),
     };
 
-    return { ref: userGameDocRef(uid, id), data: clean(mapped) };
+    return clean({ id, ...mapped }) as Game;
   });
 
-  const FIRESTORE_BATCH_SIZE = 400;
-  for (let i = 0; i < writes.length; i += FIRESTORE_BATCH_SIZE) {
-    const batch = writeBatch(db);
-    writes.slice(i, i + FIRESTORE_BATCH_SIZE).forEach(({ ref, data }) => {
-      batch.set(ref, data, { merge: true });
-    });
-    await batch.commit();
-  }
+  await bulkUpsertLibraryGames(uid, writes);
 
   try {
-    const profileBatch = writeBatch(db);
-    profileBatch.set(
+    await setDoc(
       profileDocRef(uid),
       {
         lastSteamSyncAt: serverTimestamp(),
@@ -497,10 +491,12 @@ export const syncSteamLibraryToFirestore = async (
       },
       { merge: true },
     );
-    await profileBatch.commit();
   } catch (err) {
     console.error("Erro ao atualizar perfil:", err);
   }
 
   return payload.games.length;
 };
+
+/** @deprecated Use syncSteamLibraryToLocal. */
+export const syncSteamLibraryToFirestore = syncSteamLibraryToLocal;

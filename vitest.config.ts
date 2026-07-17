@@ -11,7 +11,10 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
-    exclude: ["tests/firestore.rules.test.ts"],
+    exclude: [
+      "tests/firestore.rules.test.ts",
+      "tests/database.rules.test.ts",
+    ],
     restoreMocks: true,
     clearMocks: true,
     coverage: {

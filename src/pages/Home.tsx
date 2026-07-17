@@ -18,12 +18,9 @@ import {
 
 import {
   collection,
-  deleteDoc,
   getDocs,
-  onSnapshot,
   query,
   setDoc,
-  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -85,8 +82,14 @@ import {
   profileDocRef,
   userDocRef,
   userGameDocRef,
-  userGamesCollectionRef,
 } from "../services/firestorePaths";
+import {
+  deleteLibraryGame,
+  importFirestoreLibraryIntoLocal,
+  listLibraryGames,
+  syncPublicLibrarySummary,
+  updateLibraryGame,
+} from "../services/localLibrary";
 import { useGamepadButton, useGamepad } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
@@ -95,7 +98,7 @@ import InputHints from "../components/ui/InputHints";
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
 const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
-const SocialFeedPage = React.lazy(() => import("../components/SocialFeedPage"));
+const GamingRadarPage = React.lazy(() => import("../components/GamingRadarPage"));
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
@@ -152,6 +155,7 @@ const Home: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [isLoading, setIsLoading] = useState(true);
+  const [localLibraryReady, setLocalLibraryReady] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -216,7 +220,27 @@ const Home: React.FC = () => {
     [userProfile?.discordId],
   );
 
-  useAchievementLibrarySync(user?.uid, resolvedSteamId, games, !isLoading);
+  const refreshLibrary = useCallback(async () => {
+    if (!user?.uid) {
+      setGames([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      setGames(await listLibraryGames(user.uid));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.uid]);
+
+  useAchievementLibrarySync(
+    user?.uid,
+    resolvedSteamId,
+    games,
+    !isLoading,
+    refreshLibrary,
+  );
 
   // Correção 2: Desestruturando as funções faltantes
   const {
@@ -229,6 +253,7 @@ const Home: React.FC = () => {
     userUid: user?.uid,
     userProfile,
     games,
+    onLibraryChanged: refreshLibrary,
   });
 
   const {
@@ -250,6 +275,7 @@ const Home: React.FC = () => {
     refreshProfile,
     setIsLoading,
     setSelectedIndex,
+    onLibraryChanged: refreshLibrary,
   });
 
   const {
@@ -346,23 +372,43 @@ const Home: React.FC = () => {
       setGames([]);
 
       setIsLoading(false);
+      setLocalLibraryReady(false);
       return;
     }
 
-    setIsLoading(true);
-    const unsub = onSnapshot(
-      query(userGamesCollectionRef(user.uid)),
-      (snap) => {
-        setGames(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }) as Game)
-            .sort((a, b) => a.title.localeCompare(b.title)),
-        );
-        setIsLoading(false);
-      },
-    );
-    return () => unsub();
-  }, [user?.uid]);
+    if (!window.electronAPI?.importLegacyGames) {
+      setLocalLibraryReady(true);
+    }
+    void refreshLibrary();
+  }, [refreshLibrary, user?.uid]);
+
+  useEffect(() => {
+    if (
+      !user?.uid
+      || !userProfile?.gamesMigratedAt
+      || !window.electronAPI?.importLegacyGames
+    ) return;
+    const migrateLocalLibrary = async () => {
+      try {
+        const result = await importFirestoreLibraryIntoLocal(user.uid);
+        if (result.imported > 0) await refreshLibrary();
+        setLocalLibraryReady(true);
+      } catch (error) {
+        console.error("Falha ao importar a biblioteca do Firestore para SQLite:", error);
+      }
+    };
+    void migrateLocalLibrary();
+  }, [refreshLibrary, user?.uid, userProfile?.gamesMigratedAt]);
+
+  useEffect(() => {
+    if (!user?.uid || isLoading || !localLibraryReady) return;
+    const timer = window.setTimeout(() => {
+      void syncPublicLibrarySummary(user.uid, userProfile).catch((error) => {
+        console.error("Falha ao sincronizar resumo publico da biblioteca:", error);
+      });
+    }, 1_000);
+    return () => window.clearTimeout(timer);
+  }, [games, isLoading, localLibraryReady, user?.uid, userProfile]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -746,9 +792,10 @@ const Home: React.FC = () => {
     if (game && user?.uid) {
       playSound(game.isFavorite ? "favoriteOff" : "favoriteOn");
       try {
-        await updateDoc(userGameDocRef(user.uid, game.id), {
+        await updateLibraryGame(user.uid, game.id, {
           isFavorite: !game.isFavorite,
         });
+        await refreshLibrary();
       } catch (err) {
         console.error("Error toggling favorite via gamepad", err);
       }
@@ -1187,9 +1234,10 @@ const Home: React.FC = () => {
       closeCtx(true);
       return;
     } else if (action === "favorite" && user?.uid) {
-      await updateDoc(userGameDocRef(user.uid, game.id), {
+      await updateLibraryGame(user.uid, game.id, {
         isFavorite: !game.isFavorite,
       });
+      await refreshLibrary();
     } else if (action === "edit") {
       openAddGameModal(game);
       closeCtx(true);
@@ -1559,14 +1607,9 @@ const Home: React.FC = () => {
             />
           ) : activeCategory === "FEED" ? (
             <React.Suspense fallback={
-              <div className="flex flex-1 items-center justify-center text-white/40">Carregando feed...</div>
+              <div className="flex flex-1 items-center justify-center text-white/40">Carregando Radar Gamer...</div>
             }>
-              <SocialFeedPage
-                userIds={[
-                  user?.uid || "",
-                  ...(userProfile?.checkpointFriends || []).map((friend) => friend.uid),
-                ].filter(Boolean)}
-              />
+              <GamingRadarPage />
             </React.Suspense>
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
@@ -1579,6 +1622,7 @@ const Home: React.FC = () => {
                 user={user}
                 games={games}
                 onOpenGame={openDetails}
+                onProfileUpdated={refreshProfile}
               />
             </React.Suspense>
           ) : isLoading ? (
@@ -1792,6 +1836,7 @@ const Home: React.FC = () => {
             setIsDetailOpen(false);
           }}
           playSound={playSound}
+          onLibraryChanged={refreshLibrary}
         />
       </React.Suspense>
 
@@ -1799,7 +1844,7 @@ const Home: React.FC = () => {
         <AddGameModal
           isOpen={isAddModalOpen}
           onClose={closeAddModal}
-          onSaved={() => { }}
+          onSaved={() => void refreshLibrary()}
           playSound={playSound}
           gameToEdit={editingGame}
         />
@@ -1843,6 +1888,7 @@ const Home: React.FC = () => {
               userProfile={friendProfileModal.profile}
               user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
               games={friendProfileModal.games}
+              editable={false}
             />
           </React.Suspense>
         )}
@@ -1864,7 +1910,8 @@ const Home: React.FC = () => {
             return;
           }
           try {
-            await deleteDoc(userGameDocRef(user.uid, pendingDeleteGame.id));
+            await deleteLibraryGame(user.uid, pendingDeleteGame.id);
+            await refreshLibrary();
             notify("Jogo removido da biblioteca.", "success");
           } catch (e) {
             notify(e instanceof Error ? e.message : "Erro ao remover jogo.", "error");

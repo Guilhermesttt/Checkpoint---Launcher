@@ -77,6 +77,13 @@ function readTriggerValue(gp: Gamepad, side: "L2" | "R2"): number {
   return Math.max(buttonValue, axisValue > 0 ? axisValue : 0);
 }
 
+const isPressed = (button: GamepadButton | undefined) =>
+  Boolean(button?.pressed || (button?.value ?? 0) > 0.5);
+
+const isGamepadOverlayTogglePressed = (gamepad: Gamepad) =>
+  isPressed(gamepad.buttons[16])
+  || (isPressed(gamepad.buttons[8]) && isPressed(gamepad.buttons[9]));
+
 export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [activeInputType, setActiveInputType] = useState<InputType>("mouse");
   const [isGamepadConnected, setIsGamepadConnected] = useState(false);
@@ -130,16 +137,15 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const guidePollTime = performance.now();
     connectedGamepads.forEach((gamepad) => {
-      const guideButton = gamepad.buttons[16];
-      const isGuidePressed = Boolean(guideButton?.pressed || (guideButton?.value ?? 0) > 0.5);
-      const stateKey = `${gamepad.index}:guide-toggle`;
-      const wasGuidePressed = lastButtonState.current[stateKey];
+      const isOverlayTogglePressed = isGamepadOverlayTogglePressed(gamepad);
+      const stateKey = `${gamepad.index}:overlay-toggle`;
+      const wasOverlayTogglePressed = lastButtonState.current[stateKey];
       const outsideCooldown = lastGuideToggle.current === 0 || guidePollTime - lastGuideToggle.current > 650;
-      if (isGuidePressed && !wasGuidePressed && outsideCooldown) {
+      if (isOverlayTogglePressed && !wasOverlayTogglePressed && outsideCooldown) {
         lastGuideToggle.current = guidePollTime;
         void window.electronAPI?.toggleOverlayPanel().catch(() => undefined);
       }
-      lastButtonState.current[stateKey] = isGuidePressed;
+      lastButtonState.current[stateKey] = isOverlayTogglePressed;
     });
 
     if (activeGamepad) {

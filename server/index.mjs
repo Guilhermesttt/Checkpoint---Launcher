@@ -6,11 +6,12 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { AggregateField, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
-import { getStorage as getAdminStorage } from "firebase-admin/storage";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getDatabase as getAdminDatabase } from "firebase-admin/database";
 import { OAuth2Client } from "google-auth-library";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getGamingNews } from "./gaming-news.mjs";
 
 export const app = express();
 const port = Number(process.env.PORT ?? 8787);
@@ -48,6 +49,12 @@ const firebaseStorageBucket = (
   || process.env.VITE_FIREBASE_STORAGE_BUCKET?.trim()
   || ""
 );
+const firebaseDatabaseUrl = (
+  process.env.FIREBASE_DATABASE_URL?.trim()
+  || process.env.VITE_FIREBASE_DATABASE_URL?.trim()
+  || ""
+);
+const CHAT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const parseFirebaseServiceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
@@ -65,6 +72,7 @@ if (firebaseServiceAccount && getApps().length === 0) {
   initializeApp({
     credential: cert(firebaseServiceAccount),
     ...(firebaseStorageBucket ? { storageBucket: firebaseStorageBucket } : {}),
+    ...(firebaseDatabaseUrl ? { databaseURL: firebaseDatabaseUrl } : {}),
   });
 }
 
@@ -121,7 +129,6 @@ const ACTIVITY_AUDIENCE_REVOKE_BATCH_SIZE = 400;
 const STEAM_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DISCORD_AUTH_STATE_TTL = 1000 * 60 * 10; // 10 minutos
 const DESKTOP_GOOGLE_AUTH_STATE_TTL = 1000 * 60 * 5; // 5 minutos
-const CHAT_RETENTION_MS = 24 * 60 * 60 * 1000; // 24 horas
 
 const steamAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -801,109 +808,55 @@ const requireFirebaseUser = async (req, res, next) => {
   }
 };
 
-// ─── Chat Transiente via SSE (Custo Zero e Tempo Real) ──────────────────────
-const activeClients = new Map(); // Map<string, Response> (uid -> Express Response)
-const chatHistory = new Map(); // Map<string, ChatMessage[]> (chatId -> array de mensagens)
-
-app.get("/api/chat/stream", requireFirebaseUser, (req, res) => {
-  const userId = req.firebaseUser.uid;
-
-  // Define headers para Server-Sent Events (SSE)
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
-  });
-
-  // Registra o cliente ativo
-  activeClients.set(userId, res);
-
-  // Envia ping periódico para manter a conexão aberta (especialmente no Render/Heroku)
-  const pingInterval = setInterval(() => {
-    res.write(":\n\n");
-  }, 20000);
-
-  req.on("close", () => {
-    clearInterval(pingInterval);
-    if (activeClients.get(userId) === res) {
-      activeClients.delete(userId);
-    }
-  });
-});
-
-app.post("/api/chat/send", requireFirebaseUser, (req, res) => {
-  const senderId = req.firebaseUser.uid;
-  const { receiverId, text } = req.body;
-
-  if (!receiverId || !text || !String(text).trim()) {
-    res.status(400).json({ error: "Destinatário ou mensagem vazia" });
-    return;
-  }
-
-  const msgId = crypto.randomUUID();
-  const normalizedText = String(text).trim();
-  const chatId = [senderId, receiverId].sort().join("_");
-
-  const message = {
-    id: msgId,
-    chatId,
-    senderId,
-    receiverId,
-    text: normalizedText,
-    createdAt: new Date().toISOString(),
-    read: false,
-  };
-
-  // Mantém histórico das últimas 30 mensagens em memória
-  if (!chatHistory.has(chatId)) {
-    chatHistory.set(chatId, []);
-  }
-  const history = chatHistory.get(chatId);
-  history.push(message);
-  if (history.length > 30) {
-    history.shift();
-  }
-
-  // Encaminha via SSE ao destinatário se estiver online
-  const receiverClient = activeClients.get(receiverId);
-  if (receiverClient) {
-    receiverClient.write(`data: ${JSON.stringify({ type: "message", message })}\n\n`);
-  }
-
-  res.json({ success: true, message });
-});
-
-app.post("/api/chat/typing", requireFirebaseUser, (req, res) => {
-  const senderId = req.firebaseUser.uid;
-  const { receiverId, typing } = req.body;
-
-  if (!receiverId) {
-    res.status(400).json({ error: "Destinatário ausente" });
-    return;
-  }
-
-  const receiverClient = activeClients.get(receiverId);
-  if (receiverClient) {
-    receiverClient.write(`data: ${JSON.stringify({ type: "typing", senderId, typing: Boolean(typing) })}\n\n`);
-  }
-
-  res.json({ success: true });
-});
-
-app.get("/api/chat/history", requireFirebaseUser, (req, res) => {
+app.post("/api/chat/open", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const currentUid = req.firebaseUser.uid;
-  const { friendUid } = req.query;
-
-  if (!friendUid) {
-    res.status(400).json({ error: "friendUid ausente" });
+  const friendUid = String(req.body?.friendUid || "").trim();
+  if (!friendUid || friendUid === currentUid) {
+    res.status(400).json({ error: "Usuario invalido." });
+    return;
+  }
+  if (!firebaseDatabaseUrl) {
+    res.status(503).json({ error: "Realtime Database nao configurado." });
     return;
   }
 
-  const chatId = [currentUid, friendUid].sort().join("_");
-  const history = chatHistory.get(chatId) || [];
-  res.json(history);
-});
+  try {
+    const profileSnap = await getFirestore().doc(`profiles/${currentUid}`).get();
+    const isFriend = (Array.isArray(profileSnap.data()?.checkpointFriends)
+      ? profileSnap.data().checkpointFriends
+      : [])
+      .some((friend) => String(friend?.uid || "") === friendUid);
+    if (!isFriend) {
+      res.status(403).json({ error: "Chat disponivel apenas para amigos." });
+      return;
+    }
 
+    const chatId = [currentUid, friendUid].sort().join("_");
+    await getAdminDatabase().ref(`chats/${chatId}/participants`).set({
+      [currentUid]: true,
+      [friendUid]: true,
+    });
+    const expiredMessages = await getAdminDatabase()
+      .ref(`chats/${chatId}/messages`)
+      .orderByChild("createdAt")
+      .endAt(Date.now() - CHAT_RETENTION_MS)
+      .limitToFirst(200)
+      .get();
+    if (expiredMessages.exists()) {
+      const removals = {};
+      expiredMessages.forEach((message) => {
+        removals[message.key] = null;
+      });
+      await getAdminDatabase()
+        .ref(`chats/${chatId}/messages`)
+        .update(removals);
+    }
+    res.json({ chatId });
+  } catch (error) {
+    console.error("Erro ao abrir chat:", error);
+    res.status(500).json({ error: "Erro ao abrir conversa." });
+  }
+});
 
 export const resolveLinkedSteamId = (linkedValue, requestedValue) => {
   const linkedSteamId = String(linkedValue ?? "").trim();
@@ -954,11 +907,26 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get("/api/gaming/news", steamPublicLimiter, async (_req, res) => {
+  try {
+    const result = await getGamingNews();
+    res.set("Cache-Control", "public, max-age=300, stale-while-revalidate=900");
+    res.json({
+      items: result.items,
+      sources: result.sources,
+      cached: result.cached,
+      stale: Boolean(result.stale),
+    });
+  } catch {
+    res.status(502).json({ error: "As fontes de notícias estão indisponíveis agora." });
+  }
+});
+
 const publicProfile = (id, data = {}) => ({
   uid: String(id || data.uid || ""),
   email: data.email || "",
   displayName: data.displayName || data.email?.split("@")[0] || "User",
-  photoURL: data.discordAvatar || data.photoURL || "",
+  photoURL: data.photoURL || data.discordAvatar || data.steamAvatar || "",
   discordAvatar: data.discordAvatar || "",
   discordUsername: data.discordUsername || "",
   status: resolvePresence(data.presence).status,
@@ -1058,12 +1026,33 @@ export const revokeActivityAudience = async (firestore, ownerUid, removedUid) =>
       batch.update(activityDoc.ref, {
         audienceIds: FieldValue.arrayRemove(removedUid),
       });
+      batch.delete(firestore.doc(`feeds/${removedUid}/activities/${activityDoc.id}`));
     });
     await batch.commit();
     revoked += snapshot.size;
   }
 
   return revoked;
+};
+
+export const writeActivityToFeeds = async (firestore, activityId, audienceIds, payload) => {
+  const normalizedActivityId = socialText(activityId, 256);
+  const normalizedAudienceIds = Array.from(new Set(
+    (Array.isArray(audienceIds) ? audienceIds : [])
+      .map((uid) => socialText(uid, 128))
+      .filter(Boolean),
+  )).slice(0, 200);
+  if (!firestore || !normalizedActivityId || normalizedAudienceIds.length === 0) return 0;
+
+  const batch = firestore.batch();
+  normalizedAudienceIds.forEach((viewerUid) => {
+    batch.set(
+      firestore.doc(`feeds/${viewerUid}/activities/${normalizedActivityId}`),
+      payload,
+    );
+  });
+  await batch.commit();
+  return normalizedAudienceIds.length;
 };
 
 const SOCIAL_ACTIVITY_KINDS = new Set(["game-start", "achievement"]);
@@ -1180,6 +1169,7 @@ app.post("/api/social/activity", steamPrivateLimiter, requireFirebaseUser, async
     };
 
     let activityRef;
+    let duplicate = false;
     if (activity.kind === "achievement") {
       const digest = crypto
         .createHash("sha256")
@@ -1190,14 +1180,14 @@ app.post("/api/social/activity", steamPrivateLimiter, requireFirebaseUser, async
         await activityRef.create(payload);
       } catch (error) {
         if (!isAlreadyExistsError(error)) throw error;
-        res.json({ ok: true, id: activityRef.id, duplicate: true });
-        return;
+        duplicate = true;
       }
     } else {
       activityRef = await firestore.collection("activities").add(payload);
     }
 
-    res.status(201).json({ ok: true, id: activityRef.id, duplicate: false });
+    await writeActivityToFeeds(firestore, activityRef.id, audienceIds, payload);
+    res.status(duplicate ? 200 : 201).json({ ok: true, id: activityRef.id, duplicate });
   } catch (error) {
     console.error("Erro ao publicar atividade social:", error);
     res.status(500).json({ error: "Não foi possível publicar a atividade." });
@@ -1313,73 +1303,69 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
   try {
     const firestore = getFirestore();
-    const currentSnap = await firestore.doc(`profiles/${req.firebaseUser.uid}`).get();
-    const isFriend = (Array.isArray(currentSnap.data()?.checkpointFriends)
-      ? currentSnap.data().checkpointFriends
-      : [])
-      .some((friend) => String(friend?.uid || "") === friendUid);
-
-    if (!isFriend) {
-      res.status(403).json({ error: "Perfil disponível apenas para amigos." });
-      return;
-    }
-
-    const profileSnap = await firestore.doc(`profiles/${friendUid}`).get();
+    const profileSnap = await firestore.doc(`publicProfiles/${friendUid}`).get();
     if (!profileSnap.exists) {
       res.status(404).json({ error: "Perfil não encontrado." });
       return;
     }
 
     const profileData = profileSnap.data() || {};
-    const presence = resolvePresence(profileData.presence);
-    const gamesCollection = firestore.collection(`users/${friendUid}/games`);
-    const [gamesSnap, aggregateSnap, gamesWithAchievementsSnap] = await Promise.all([
-      gamesCollection
-        .select(
-          "title",
-          "category",
-          "isFavorite",
-          "hoursPlayed",
-          "launcherType",
-          "steamAppId",
-          "totalAchievements",
-          "completedAchievements",
-        )
-        .limit(FRIEND_PROFILE_GAME_LIMIT)
-        .get(),
-      gamesCollection.aggregate({
-        totalGames: AggregateField.count(),
-        available: AggregateField.sum("totalAchievements"),
-        unlocked: AggregateField.sum("completedAchievements"),
-      }).get(),
-      gamesCollection.where("totalAchievements", ">", 0).count().get(),
-    ]);
-    const games = gamesSnap.docs.map((doc) => projectFriendGame(doc.id, doc.data()));
-    const achievementSummary = normalizeFriendAchievementAggregate(
-      aggregateSnap.data(),
-      gamesWithAchievementsSnap.data().count,
-    );
+    const stats = profileData.stats || {};
+    const achievements = profileData.achievements || {};
+    const platforms = profileData.platforms || {};
+    const favoriteGames = Array.isArray(profileData.favoriteGames)
+      ? profileData.favoriteGames
+      : [];
+    const favoriteIds = new Set(favoriteGames.map((game) => String(game?.id || "")));
+    const compactGames = [
+      ...(Array.isArray(profileData.topGames) ? profileData.topGames : []),
+      ...favoriteGames,
+    ];
+    const games = compactGames
+      .filter((game, index, items) => game?.id
+        && items.findIndex((candidate) => candidate?.id === game.id) === index)
+      .slice(0, FRIEND_PROFILE_GAME_LIMIT)
+      .map((game) => ({
+        id: String(game.id),
+        title: String(game.title || "Jogo"),
+        image: String(game.imageUrl || ""),
+        cardImage: String(game.imageUrl || ""),
+        hoursPlayed: Math.round((Number(game.minutesPlayed) || 0) / 60),
+        isFavorite: favoriteIds.has(String(game.id)),
+        source: "manual",
+      }));
 
     res.json({
       profile: {
         uid: friendUid,
-        displayName: profileData.displayName || profileData.discordUsername || "Usuário",
-        photoURL: profileData.discordAvatar || profileData.photoURL || "",
-        steamId: profileData.steamId ? "connected" : "",
-        discordId: profileData.discordId ? "connected" : "",
-        discordUsername: profileData.discordUsername || "",
-        discordAvatar: profileData.discordAvatar || "",
-        steamAvatar: profileData.steamAvatar || "",
-        steamUsername: profileData.steamUsername || "",
-        status: presence.status,
-        playing: presence.playing,
+        displayName: profileData.displayName || "Usuário",
+        photoURL: profileData.photoURL || "",
+        bio: profileData.bio || "",
+        location: profileData.location || "",
+        pronouns: profileData.pronouns || "",
+        website: profileData.website || "",
+        favoriteGenres: Array.isArray(profileData.favoriteGenres)
+          ? profileData.favoriteGenres.slice(0, 6)
+          : [],
+        steamId: platforms.steamConnected ? "connected" : "",
+        discordId: platforms.discordConnected ? "connected" : "",
         achievementSummary: {
-          ...achievementSummary,
-          updatedAt: profileData.achievementSummary?.updatedAt || "",
+          unlocked: Math.max(0, Number(achievements.unlocked) || 0),
+          available: Math.max(0, Number(achievements.total) || 0),
+          totalGames: Math.max(0, Number(stats.games) || 0),
+          updatedAt: profileData.updatedAt || "",
+        },
+        librarySummary: {
+          games: Math.max(0, Number(stats.games) || 0),
+          minutesPlayed: Math.max(0, Number(stats.minutesPlayed) || 0),
+          favorites: Math.max(0, Number(stats.favorites) || 0),
+          steamGames: Math.max(0, Number(platforms.steamGameCount) || 0),
+          epicGames: Math.max(0, Number(platforms.epicGameCount) || 0),
+          localGames: Math.max(0, Number(platforms.localGameCount) || 0),
         },
       },
       games,
-      gamesTruncated: achievementSummary.totalGames > games.length,
+      gamesTruncated: Number(stats.games) > games.length,
     });
   } catch {
     res.status(500).json({ error: "Erro ao carregar perfil do amigo." });
@@ -1624,74 +1610,6 @@ app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, asyn
     });
   } catch {
     res.status(500).json({ error: "Erro ao remover amigo." });
-  }
-});
-
-app.post("/api/chat/cleanup", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
-  const friendUid = String(req.body?.uid ?? "").trim();
-  if (!friendUid || friendUid === req.firebaseUser.uid) {
-    res.status(400).json({ error: "Usuário inválido." });
-    return;
-  }
-
-  try {
-    const firestore = getFirestore();
-    const chatId = [req.firebaseUser.uid, friendUid].sort().join("_");
-    const cutoff = Timestamp.fromMillis(Date.now() - CHAT_RETENTION_MS);
-    const expiredMessagesSnap = await firestore
-      .collection("messages")
-      .where("chatId", "==", chatId)
-      .where("createdAt", "<", cutoff)
-      .limit(400)
-      .get();
-
-    let deletedMessages = 0;
-    if (!expiredMessagesSnap.empty) {
-      const batch = firestore.batch();
-      const attachmentPaths = [];
-      expiredMessagesSnap.forEach((doc) => {
-        const attachmentPath = String(doc.data()?.attachmentPath || "").trim();
-        if (attachmentPath) {
-          attachmentPaths.push(attachmentPath);
-        }
-        batch.delete(doc.ref);
-        deletedMessages += 1;
-      });
-      await batch.commit();
-
-      if (attachmentPaths.length > 0 && firebaseStorageBucket) {
-        const bucket = getAdminStorage().bucket(firebaseStorageBucket);
-        await Promise.all(
-          attachmentPaths.map((attachmentPath) =>
-            bucket.file(attachmentPath).delete().catch(() => undefined),
-          ),
-        );
-      }
-    }
-
-    let deletedTyping = 0;
-    const typingDocs = await Promise.all([
-      firestore.doc(`chatTyping/${chatId}_${req.firebaseUser.uid}`).get(),
-      firestore.doc(`chatTyping/${chatId}_${friendUid}`).get(),
-    ]);
-    const expiredTypingDocs = typingDocs.filter((doc) => {
-      const updatedAt = doc.data()?.updatedAt;
-      return doc.exists && updatedAt?.toMillis && updatedAt.toMillis() < cutoff.toMillis();
-    });
-
-    if (expiredTypingDocs.length > 0) {
-      const batch = firestore.batch();
-      expiredTypingDocs.forEach((doc) => {
-        batch.delete(doc.ref);
-        deletedTyping += 1;
-      });
-      await batch.commit();
-    }
-
-    res.json({ ok: true, deletedMessages, deletedTyping });
-  } catch (error) {
-    console.error("Erro ao limpar conversa expirada:", error);
-    res.status(500).json({ error: "Erro ao limpar conversa expirada." });
   }
 });
 

@@ -18,16 +18,15 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { addDoc, updateDoc, deleteField } from "firebase/firestore";
 import ModalShell from "./ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import { useNotification } from "./NotificationCenter";
 import {
-  userGamesCollectionRef,
-  userGameDocRef,
-} from "../services/firestorePaths";
+  createLibraryGame,
+  updateLibraryGame,
+} from "../services/localLibrary";
 import { fetchSteamAppDetailsResult } from "../services/steam";
 import {
   fetchEpicAppDetailsResult,
@@ -970,23 +969,23 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         return;
       }
       if (gameToEdit) {
-        await updateDoc(userGameDocRef(user.uid, gameToEdit.id), {
+        await updateLibraryGame(user.uid, gameToEdit.id, {
           ...data,
           ...(!formData.steamAppId
             ? {
-              steamPlaytimeMinutes: deleteField(),
-              steamLastPlayedAt: deleteField(),
-              totalAchievements: deleteField(),
-              completedAchievements: deleteField(),
+              steamPlaytimeMinutes: 0,
+              steamLastPlayedAt: "",
+              totalAchievements: 0,
+              completedAchievements: 0,
             }
             : {}),
-        });
+        } as Partial<import("../types/domain").Game>);
         notify("Jogo atualizado!", "success");
       } else {
-        await addDoc(userGamesCollectionRef(user.uid), {
+        await createLibraryGame(user.uid, {
           ...data,
           createdAt: new Date().toISOString(),
-        });
+        } as Omit<import("../types/domain").Game, "id">);
         notify("Jogo adicionado!", "success");
       }
       handleClose(true);
@@ -1067,8 +1066,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
               <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
                 {([
-                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: (selected: boolean) => <HardDrive size={17} /> },
-                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: (selected: boolean) => <Globe size={17} /> },
+                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: () => <HardDrive size={17} /> },
+                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: () => <Globe size={17} /> },
                   { id: "epic" as const, label: copy.epic, description: copy.epicDescription, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
                 ]).map((option) => {
                   const selected = formData.launcherType === option.id;

@@ -2,7 +2,6 @@ import React from "react";
 import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Play, Clock, CalendarClock, Trophy, Camera, Trash2 } from "lucide-react";
-import { updateDoc, deleteDoc } from "firebase/firestore";
 import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
 import type { Game, GameLaunchProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
@@ -17,8 +16,10 @@ import ModalShell from "./ui/ModalShell";
 import GlassButton from "./ui/GlassButton";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
-import { userGameDocRef } from "../services/firestorePaths";
-import { publishSocialActivity } from "../services/socialActivity";
+import {
+  deleteLibraryGame,
+  updateLibraryGame,
+} from "../services/localLibrary";
 import { useNotification } from "./NotificationCenter";
 import { useGamepadButton } from "../context/GamepadContext";
 import InputHints from "./ui/InputHints";
@@ -29,6 +30,7 @@ interface GameDetailPanelProps {
   onClose: () => void;
   playSound: (type: SoundEffectType) => void;
   onEditGame?: (game: Game) => void;
+  onLibraryChanged?: () => Promise<void> | void;
 }
 
 const MIN_LAUNCH_SCREEN_MS = 1200;
@@ -48,6 +50,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   onClose,
   playSound,
   onEditGame,
+  onLibraryChanged,
 }) => {
   const { user, userProfile } = useAuth();
   const { t, language } = usePreferences();
@@ -399,10 +402,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     if (!user?.uid || !game?.id || isSavingLaunchProfile) return;
     setIsSavingLaunchProfile(true);
     try {
-      await updateDoc(userGameDocRef(user.uid, game.id), {
+      await updateLibraryGame(user.uid, game.id, {
         launchProfile,
         updatedAt: new Date().toISOString(),
       });
+      await onLibraryChanged?.();
       notify("Perfil de inicialização salvo.", "success");
     } catch {
       notify("Não foi possível salvar o perfil de inicialização.", "error");
@@ -553,7 +557,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         if (user?.uid && (result.achievements.length > 0 || !game.totalAchievements)) {
           const canResolveUnlockedProgress =
             game.launcherType === "local" || Boolean(userProfile?.steamId);
-          void updateDoc(userGameDocRef(user.uid, game.id), {
+          void updateLibraryGame(user.uid, game.id, {
             totalAchievements: result.achievements.length,
             completedAchievements: canResolveUnlockedProgress
               ? result.achievements.filter((achievement) => achievement.achieved).length
@@ -561,7 +565,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             updatedAt: new Date().toISOString(),
           }).catch((error) => {
             console.error("Erro ao salvar totais de conquistas:", error);
-          });
+          }).then(() => onLibraryChanged?.());
         }
 
         if (result.achievements.length === 0) {
@@ -597,14 +601,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     game?.steamAppId,
     game?.title,
     game?.totalAchievements,
+    onLibraryChanged,
     user?.uid,
     userProfile?.steamId,
   ]);
-
-  const latestAchievementsRef = React.useRef(achievementItems);
-  React.useEffect(() => {
-    latestAchievementsRef.current = achievementItems;
-  }, [achievementItems]);
 
   React.useEffect(() => {
     if (!game?.id || game.launcherType !== "local") return;
@@ -617,22 +617,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         ? String(game.steamAppId || "") === payloadSteamAppId
         : payload.gameId === game.id;
       if (!belongsToCurrentGame) return;
-
-      const unlockedAchievement = latestAchievementsRef.current.find(
-        (achievement) => achievement.apiName.toLowerCase() === achievementId.toLowerCase(),
-      );
-      if (unlockedAchievement && !unlockedAchievement.achieved && user?.uid) {
-        void publishSocialActivity(user.uid, userProfile, {
-          kind: "achievement",
-          gameId: game.id,
-          gameTitle: game.title,
-          gameImage: game.cardImage || game.image || game.backgroundImage,
-          achievementId,
-          achievementName: payload.achievement?.name || unlockedAchievement.name,
-          achievementIcon: payload.achievement?.icon || unlockedAchievement.icon,
-          dedupeKey: `achievement_${game.id}_${achievementId}`,
-        }).catch((error) => console.error("Erro ao publicar conquista no feed:", error));
-      }
 
       setAchievementItems((prev) => {
         let changed = false;
@@ -651,11 +635,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         });
 
         if (changed && user?.uid) {
-          void updateDoc(userGameDocRef(user.uid, game.id), {
+          void updateLibraryGame(user.uid, game.id, {
             totalAchievements: next.length,
             completedAchievements: next.filter((achievement) => achievement.achieved).length,
             updatedAt: new Date().toISOString(),
-          }).catch((error) => {
+          }).then(() => onLibraryChanged?.()).catch((error) => {
             console.error("Erro ao atualizar totais de conquistas:", error);
           });
         }
@@ -675,6 +659,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     game?.launcherType,
     game?.steamAppId,
     game?.title,
+    onLibraryChanged,
     user?.uid,
     userProfile,
   ]);
@@ -768,15 +753,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       }
 
       if (user?.uid) {
-        updateDoc(userGameDocRef(user.uid, game.id), {
+        updateLibraryGame(user.uid, game.id, {
           lastPlayedAt: new Date().toISOString(),
-        }).catch(() => undefined);
-        publishSocialActivity(user.uid, userProfile, {
-          kind: "game-start",
-          gameId: game.id,
-          gameTitle: game.title,
-          gameImage: game.cardImage || game.image || game.backgroundImage,
-        }).catch((error) => console.error("Erro ao publicar atividade de jogo:", error));
+        }).then(() => onLibraryChanged?.()).catch(() => undefined);
       }
 
       window.dispatchEvent(
@@ -805,7 +784,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     if (isDeleting) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(userGameDocRef(user.uid, game.id));
+      await deleteLibraryGame(user.uid, game.id);
+      await onLibraryChanged?.();
       notify(copy.removedSuccess, "success");
       setDeleteModalOpen(false);
       onClose();

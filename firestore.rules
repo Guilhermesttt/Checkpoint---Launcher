@@ -10,14 +10,37 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function validEditableProfileFields() {
+      let data = request.resource.data;
+      return (!('displayName' in data)
+          || (data.displayName is string
+            && data.displayName.size() >= 2
+            && data.displayName.size() <= 50))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 280))
+        && (!('location' in data) || (data.location is string && data.location.size() <= 80))
+        && (!('pronouns' in data) || (data.pronouns is string && data.pronouns.size() <= 40))
+        && (!('website' in data)
+          || (data.website is string
+            && data.website.size() <= 300
+            && (data.website == '' || data.website.matches('^https://.*$'))))
+        && (!('favoriteGenres' in data)
+          || (data.favoriteGenres is list && data.favoriteGenres.size() <= 6));
+    }
+
     function validProfileCreate(userId) {
       return isSignedInOwner(userId)
         && request.resource.data.uid == userId
+        && validEditableProfileFields()
         && request.resource.data.keys().hasOnly([
           'uid',
           'email',
           'displayName',
           'photoURL',
+          'bio',
+          'location',
+          'pronouns',
+          'website',
+          'favoriteGenres',
           'createdAt',
           'updatedAt'
         ]);
@@ -26,6 +49,7 @@ service cloud.firestore {
     function validProfileUpdate(userId) {
       return isSignedInOwner(userId)
         && request.resource.data.uid == userId
+        && validEditableProfileFields()
         && request.resource.data.createdAt == resource.data.createdAt
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
           'checkpointFriends',
@@ -37,6 +61,11 @@ service cloud.firestore {
           'email',
           'displayName',
           'photoURL',
+          'bio',
+          'location',
+          'pronouns',
+          'website',
+          'favoriteGenres',
           'createdAt',
           'updatedAt',
           'steamId',
@@ -68,6 +97,32 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /publicProfiles/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedInOwner(userId)
+        && request.resource.data.uid == userId
+        && validEditableProfileFields()
+        && request.resource.data.keys().hasOnly([
+          'schemaVersion',
+          'uid',
+          'displayName',
+          'photoURL',
+          'bio',
+          'location',
+          'pronouns',
+          'website',
+          'favoriteGenres',
+          'stats',
+          'platforms',
+          'achievements',
+          'topGames',
+          'favoriteGames',
+          'revision',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
     match /users/{userId} {
       allow create, read, update: if isSignedInOwner(userId);
       allow delete: if false;
@@ -77,79 +132,15 @@ service cloud.firestore {
       }
     }
 
-    match /messages/{messageId} {
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
-          'chatId',
-          'senderId',
-          'receiverId',
-          'text',
-          'createdAt',
-          'read',
-          'attachmentName',
-          'attachmentUrl',
-          'attachmentType',
-          'attachmentSize',
-          'attachmentPath'
-        ])
-        && request.resource.data.senderId == request.auth.uid
-        && request.resource.data.receiverId is string
-        && request.resource.data.chatId is string
-        && request.resource.data.text is string
-        && (
-          request.resource.data.text.size() > 0
-          || request.resource.data.attachmentUrl.size() > 0
-        )
-        && request.resource.data.text.size() <= 2000
-        && request.resource.data.attachmentName is string
-        && request.resource.data.attachmentUrl is string
-        && request.resource.data.attachmentType is string
-        && request.resource.data.attachmentPath is string
-        && request.resource.data.attachmentSize is number
-        && request.resource.data.read == false;
-
-      allow read: if isSignedIn()
-        && (resource.data.senderId == request.auth.uid
-          || resource.data.receiverId == request.auth.uid);
-
-      allow update: if isSignedIn()
-        && resource.data.receiverId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
-        && request.resource.data.read is bool;
-
-      allow delete: if false;
-    }
-
-    match /chatTyping/{typingId} {
-      allow create, update: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
-          'chatId',
-          'userId',
-          'participants',
-          'typing',
-          'updatedAt'
-        ])
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.chatId is string
-        && request.resource.data.typing is bool
-        && request.resource.data.participants is list
-        && request.resource.data.participants.size() == 2
-        && request.resource.data.participants.hasAll([request.auth.uid]);
-
-      allow read: if isSignedIn()
-        && resource.data.participants is list
-        && resource.data.participants.hasAll([request.auth.uid]);
-
-      allow delete: if isSignedIn()
-        && resource.data.userId == request.auth.uid;
-    }
-
     match /activities/{activityId} {
-      allow read: if isSignedIn()
-        && resource.data.audienceIds is list
-        && resource.data.audienceIds.hasAll([request.auth.uid]);
-      // Somente o backend autenticado (Firebase Admin) publica atividades.
-      // Clientes nunca escolhem identidade, audiencia ou timestamp.
+      // Colecao canonica usada apenas pelo backend para deduplicacao e auditoria.
+      allow read, write: if false;
+    }
+
+    match /feeds/{userId}/activities/{activityId} {
+      // Cada consulta fica presa ao UID do caminho, algo que o Firestore
+      // consegue validar antes de executar a query.
+      allow read: if isSignedInOwner(userId);
       allow create, update, delete: if false;
     }
 

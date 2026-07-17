@@ -11,6 +11,24 @@ contextBridge.exposeInMainWorld("electronAPI", {
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
+  listLocalGames: (uid) => ipcRenderer.invoke("library:list", uid),
+  createLocalGame: (uid, game) => ipcRenderer.invoke("library:create", uid, game),
+  updateLocalGame: (uid, gameId, patch) =>
+    ipcRenderer.invoke("library:update", uid, gameId, patch),
+  deleteLocalGame: (uid, gameId) => ipcRenderer.invoke("library:delete", uid, gameId),
+  deleteLocalGamesByLauncher: (uid, launcherType) =>
+    ipcRenderer.invoke("library:delete-by-launcher", uid, launcherType),
+  recordLocalGameSession: (uid, gameId, session) =>
+    ipcRenderer.invoke("library:record-session", uid, gameId, session),
+  bulkUpsertLocalGames: (uid, games) =>
+    ipcRenderer.invoke("library:bulk-upsert", uid, games),
+  importLegacyGames: (uid, games) =>
+    ipcRenderer.invoke("library:import-legacy", uid, games),
+  needsLegacyGameImport: (uid) =>
+    ipcRenderer.invoke("library:needs-legacy-import", uid),
+  getLocalLibrarySummary: (uid) => ipcRenderer.invoke("library:get-summary", uid),
+  markLocalLibrarySummarySynced: (uid, revision) =>
+    ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),

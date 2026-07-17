@@ -6,7 +6,18 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { afterAll, afterEach, beforeAll, describe, it } from "vitest";
 
 let environment: RulesTestEnvironment;
@@ -78,29 +89,34 @@ describe("regras Firestore", () => {
     await assertFails(deleteDoc(doc(alice, "profiles/alice")));
   });
 
-  it("mensagens so podem ser criadas pelo remetente e lidas pelos participantes", async () => {
+  it("mantem o resumo publico em um documento seguro e tira o chat do Firestore", async () => {
     const alice = environment.authenticatedContext("alice").firestore();
     const bob = environment.authenticatedContext("bob").firestore();
-    const mallory = environment.authenticatedContext("mallory").firestore();
-    const message = {
-      chatId: "alice_bob",
+    const summary = {
+      schemaVersion: 1,
+      uid: "alice",
+      displayName: "Alice",
+      photoURL: "",
+      stats: { games: 54, minutesPlayed: 1200, favorites: 3 },
+      platforms: { steamGameCount: 50, epicGameCount: 2, localGameCount: 2 },
+      achievements: { unlocked: 10, total: 20 },
+      topGames: [],
+      favoriteGames: [],
+      revision: 1,
+      updatedAt: "2026-07-16T12:00:00.000Z",
+    };
+    await assertSucceeds(setDoc(doc(alice, "publicProfiles/alice"), summary));
+    await assertSucceeds(getDoc(doc(bob, "publicProfiles/alice")));
+    await assertFails(setDoc(doc(bob, "publicProfiles/alice"), summary));
+    await assertFails(setDoc(doc(alice, "publicProfiles/alice"), {
+      ...summary,
+      email: "private@example.com",
+    }));
+    await assertFails(setDoc(doc(alice, "messages/message-1"), {
       senderId: "alice",
       receiverId: "bob",
       text: "ola",
-      createdAt: 1,
-      read: false,
-      attachmentName: "",
-      attachmentUrl: "",
-      attachmentType: "",
-      attachmentSize: 0,
-      attachmentPath: "",
-    };
-    await assertSucceeds(setDoc(doc(alice, "messages/message-1"), message));
-    await assertFails(setDoc(doc(mallory, "messages/message-2"), message));
-    await assertFails(getDoc(doc(mallory, "messages/message-1")));
-    await assertSucceeds(getDoc(doc(bob, "messages/message-1")));
-    await assertSucceeds(updateDoc(doc(bob, "messages/message-1"), { read: true }));
-    await assertFails(updateDoc(doc(bob, "messages/message-1"), { text: "alterado" }));
+    }));
   });
 
   it("permite ler atividades da audiencia, mas bloqueia toda escrita direta do cliente", async () => {
@@ -120,11 +136,23 @@ describe("regras Firestore", () => {
     };
     await environment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), "activities/activity-1"), activity);
+      await setDoc(doc(context.firestore(), "feeds/bob/activities/activity-1"), activity);
     });
     await assertFails(setDoc(doc(alice, "activities/activity-2"), activity));
-    await assertSucceeds(getDoc(doc(bob, "activities/activity-1")));
+    await assertFails(getDoc(doc(bob, "activities/activity-1")));
+    await assertSucceeds(getDoc(doc(bob, "feeds/bob/activities/activity-1")));
     const mallory = environment.authenticatedContext("mallory").firestore();
-    await assertFails(getDoc(doc(mallory, "activities/activity-1")));
+    await assertFails(getDoc(doc(mallory, "feeds/bob/activities/activity-1")));
+    await assertSucceeds(getDocs(query(
+      collection(bob, "feeds", "bob", "activities"),
+      orderBy("createdAt", "desc"),
+      limit(60),
+    )));
+    await assertFails(getDocs(query(
+      collection(mallory, "feeds", "bob", "activities"),
+      orderBy("createdAt", "desc"),
+      limit(60),
+    )));
     await assertFails(setDoc(doc(bob, "activities/activity-2"), activity));
     await assertFails(updateDoc(doc(alice, "activities/activity-1"), { caption: "alterado" }));
     await assertFails(deleteDoc(doc(alice, "activities/activity-1")));

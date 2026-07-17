@@ -1,279 +1,310 @@
-import { auth } from "../../Firebase";
-import { apiUrl } from "./api";
+import {
+  limitToLast,
+  off,
+  onChildAdded,
+  onValue,
+  push,
+  query,
+  ref,
+  remove,
+  serverTimestamp,
+  set,
+  update,
+} from "firebase/database";
+import { auth, realtimeDb } from "../../Firebase";
 import type { ChatMessage } from "../types/domain";
+import { apiUrl } from "./api";
 
-// Conexão SSE global autenticada por header. O token nunca entra na URL.
-let streamAbortController: AbortController | null = null;
-let reconnectTimer: number | null = null;
-let connectedUserUid: string | null = null;
-const messageListeners = new Set<(msg: ChatMessage) => void>();
+const HISTORY_LIMIT = 50;
+const messageListeners = new Set<(message: ChatMessage) => void>();
 const typingListeners = new Set<(data: { senderId: string; typing: boolean }) => void>();
-
-// Gerenciamento de Não Lidas em Memória (Tempo Real)
-let activeChatFriendUid: string | null = null;
-const unreadMessages: ChatMessage[] = [];
 const unreadListeners = new Set<(messages: ChatMessage[]) => void>();
+const unreadMessages: ChatMessage[] = [];
 
-const getAuthHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error("Sessao expirada. Entre novamente.");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+let activeChatFriendUid: string | null = null;
+let connectedUserUid: string | null = null;
+let userChatsRef: ReturnType<typeof ref> | null = null;
+let seenInboxMessageIds = new Set<string>();
+let inboxInitialized = false;
+const openedChatIds = new Set<string>();
+const openingChats = new Map<string, Promise<string>>();
+
+export const getChatId = (uid1: string, uid2: string) =>
+  [uid1, uid2].sort().join("_");
+
+const emitUnread = () => {
+  unreadListeners.forEach((listener) => listener([...unreadMessages]));
 };
 
-const dispatchChatStreamData = (rawData: string) => {
-  if (!rawData) return;
-  try {
-    const data = JSON.parse(rawData) as {
-      type?: string;
-      message?: ChatMessage;
-      senderId?: string;
-      typing?: boolean;
+const normalizeMessage = (
+  id: string,
+  value: Record<string, unknown>,
+): ChatMessage => ({
+  id,
+  chatId: String(value.chatId || ""),
+  senderId: String(value.senderId || ""),
+  receiverId: String(value.receiverId || ""),
+  text: String(value.text || ""),
+  createdAt: typeof value.createdAt === "number"
+    ? new Date(value.createdAt).toISOString()
+    : String(value.createdAt || new Date().toISOString()),
+  read: false,
+});
+
+const ensureChat = async (uid: string, friendUid: string) => {
+  const expectedChatId = getChatId(uid, friendUid);
+  if (openedChatIds.has(expectedChatId)) return expectedChatId;
+  const pending = openingChats.get(expectedChatId);
+  if (pending) return pending;
+  const request = (async () => {
+    const token = await auth.currentUser?.getIdToken();
+    if (!token || auth.currentUser?.uid !== uid) {
+      throw new Error("Sessao expirada. Entre novamente.");
+    }
+    const response = await fetch(apiUrl("/api/chat/open"), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ friendUid }),
+    });
+    const payload = await response.json().catch(() => ({})) as {
+      chatId?: string;
+      error?: string;
     };
-    if (data.type === "message" && data.message) {
-      const msg = data.message;
-      if (
-        activeChatFriendUid !== msg.senderId
-        && !unreadMessages.some((message) => message.id === msg.id)
-      ) {
-        unreadMessages.push(msg);
-        unreadListeners.forEach((listener) => listener([...unreadMessages]));
-      }
-      messageListeners.forEach((listener) => listener(msg));
+    if (!response.ok || !payload.chatId) {
+      throw new Error(payload.error || "Nao foi possivel abrir a conversa.");
+    }
+    openedChatIds.add(payload.chatId);
+    return payload.chatId;
+  })();
+  openingChats.set(expectedChatId, request);
+  try {
+    return await request;
+  } finally {
+    openingChats.delete(expectedChatId);
+  }
+};
+
+export const establishChatConnection = async () => {
+  const uid = auth.currentUser?.uid;
+  if (!uid || connectedUserUid === uid) return;
+  closeChatConnection();
+  connectedUserUid = uid;
+  seenInboxMessageIds = new Set();
+  inboxInitialized = false;
+  userChatsRef = ref(realtimeDb, `userChats/${uid}`);
+
+  onValue(userChatsRef, (snapshot) => {
+    const chats = snapshot.val() as Record<string, {
+      lastMessageId?: string;
+      senderId?: string;
+      receiverId?: string;
+      text?: string;
+      updatedAt?: number;
+    }> | null;
+    if (!chats) {
+      inboxInitialized = true;
       return;
     }
-    if (data.type === "typing" && data.senderId) {
-      typingListeners.forEach((listener) => listener({
-        senderId: String(data.senderId),
-        typing: Boolean(data.typing),
-      }));
+    if (!inboxInitialized) {
+      Object.values(chats).forEach((item) => {
+        const messageId = String(item.lastMessageId || "");
+        if (messageId) seenInboxMessageIds.add(messageId);
+      });
+      inboxInitialized = true;
+      return;
     }
-  } catch {
-    console.error("[ChatClient] Evento SSE inválido recebido.");
-  }
-};
-
-const consumeChatStream = async (response: Response, signal: AbortSignal) => {
-  if (!response.body) throw new Error("Stream de chat indisponível.");
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (!signal.aborted) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
-      const data = block
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => line.slice(5).trimStart())
-        .join("\n");
-      dispatchChatStreamData(data);
-      boundary = buffer.indexOf("\n\n");
-    }
-  }
-};
-
-/** Garante que a conexão SSE autenticada esteja ativa. */
-export const establishChatConnection = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-  if (streamAbortController && connectedUserUid === user.uid) return;
-
-  if (streamAbortController) streamAbortController.abort();
-  if (reconnectTimer != null) {
-    window.clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  const controller = new AbortController();
-  streamAbortController = controller;
-  connectedUserUid = user.uid;
-
-  try {
-    const response = await fetch(apiUrl("/api/chat/stream"), {
-      headers: await getAuthHeaders(),
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`Chat SSE respondeu ${response.status}.`);
-    await consumeChatStream(response, controller.signal);
-    if (!controller.signal.aborted) throw new Error("Stream de chat encerrado.");
-  } catch {
-    if (!controller.signal.aborted) {
-      console.error("[ChatClient] Conexão em tempo real interrompida; nova tentativa agendada.");
-    }
-  } finally {
-    if (streamAbortController === controller) {
-      streamAbortController = null;
-      connectedUserUid = null;
-      if (!controller.signal.aborted && auth.currentUser) {
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = null;
-          void establishChatConnection();
-        }, 5000);
+    Object.entries(chats).forEach(([chatId, item]) => {
+      const messageId = String(item.lastMessageId || "");
+      if (!messageId || seenInboxMessageIds.has(messageId)) return;
+      seenInboxMessageIds.add(messageId);
+      if (item.senderId !== uid) {
+        const message = normalizeMessage(messageId, { ...item, chatId });
+        if (
+          activeChatFriendUid !== message.senderId
+          && !unreadMessages.some((candidate) => candidate.id === message.id)
+        ) {
+          unreadMessages.push(message);
+          emitUnread();
+        }
+        messageListeners.forEach((listener) => listener(message));
       }
-    }
-  }
-};
-
-/**
- * Fecha a conexão SSE
- */
-export const closeChatConnection = () => {
-  if (reconnectTimer != null) {
-    window.clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-  streamAbortController?.abort();
-  streamAbortController = null;
-  connectedUserUid = null;
-  activeChatFriendUid = null;
-  if (unreadMessages.length > 0) {
-    unreadMessages.splice(0, unreadMessages.length);
-    unreadListeners.forEach((listener) => listener([]));
-  }
-};
-
-export const getChatId = (uid1: string, uid2: string) => {
-  return [uid1, uid2].sort().join("_");
-};
-
-export const sendChatMessage = async (receiverUid: string, text: string) => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(apiUrl("/api/chat/send"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ receiverId: receiverUid, text }),
+    });
   });
+};
 
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || "Erro ao enviar mensagem.");
-  }
-  return payload.message as ChatMessage;
+export const closeChatConnection = () => {
+  if (userChatsRef) off(userChatsRef);
+  userChatsRef = null;
+  connectedUserUid = null;
+  inboxInitialized = false;
+  activeChatFriendUid = null;
+  unreadMessages.splice(0, unreadMessages.length);
+  openedChatIds.clear();
+  openingChats.clear();
+  emitUnread();
+};
+
+export const sendChatMessage = async (
+  receiverUid: string,
+  rawText: string,
+): Promise<ChatMessage> => {
+  const senderId = auth.currentUser?.uid;
+  const receiverId = String(receiverUid || "").trim();
+  const text = String(rawText || "").trim();
+  if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
+  if (!receiverId || receiverId === senderId) throw new Error("Destinatario invalido.");
+  if (!text || text.length > 2_000) throw new Error("Mensagem invalida.");
+
+  const chatId = await ensureChat(senderId, receiverId);
+  const messageRef = push(ref(realtimeDb, `chats/${chatId}/messages`));
+  const messageId = messageRef.key;
+  if (!messageId) throw new Error("Nao foi possivel gerar a mensagem.");
+  const createdAt = Date.now();
+  const messageData = {
+    chatId,
+    senderId,
+    receiverId,
+    text,
+    createdAt: serverTimestamp(),
+  };
+  await set(messageRef, messageData);
+  await update(ref(realtimeDb), {
+    [`userChats/${senderId}/${chatId}`]: {
+      friendUid: receiverId,
+      lastMessageId: messageId,
+      senderId,
+      receiverId,
+      text,
+      updatedAt: createdAt,
+    },
+    [`userChats/${receiverId}/${chatId}`]: {
+      friendUid: senderId,
+      lastMessageId: messageId,
+      senderId,
+      receiverId,
+      text,
+      updatedAt: createdAt,
+    },
+  });
+  return normalizeMessage(messageId, { ...messageData, createdAt });
 };
 
 export const setChatTyping = async (friendUid: string, typing: boolean) => {
-  const headers = await getAuthHeaders();
-  await fetch(apiUrl("/api/chat/typing"), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ receiverId: friendUid, typing }),
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const chatId = await ensureChat(uid, friendUid);
+  const typingRef = ref(realtimeDb, `chats/${chatId}/typing/${uid}`);
+  if (!typing) {
+    await remove(typingRef).catch(() => undefined);
+    return;
+  }
+  await set(typingRef, {
+    active: true,
+    updatedAt: serverTimestamp(),
   }).catch(() => undefined);
 };
 
 export const cleanupExpiredChatMessages = async (friendUid: string) => {
   void friendUid;
-  return Promise.resolve();
 };
 
 export const markMessagesAsRead = async (friendUid: string) => {
-  const initialLength = unreadMessages.length;
-  // Remove mensagens não lidas do amigo específico
-  for (let i = unreadMessages.length - 1; i >= 0; i--) {
-    if (unreadMessages[i].senderId === friendUid) {
-      unreadMessages.splice(i, 1);
-    }
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const chatId = getChatId(uid, friendUid);
+  await set(ref(realtimeDb, `chats/${chatId}/reads/${uid}`), serverTimestamp())
+    .catch(() => undefined);
+  for (let index = unreadMessages.length - 1; index >= 0; index -= 1) {
+    if (unreadMessages[index].senderId === friendUid) unreadMessages.splice(index, 1);
   }
-  if (unreadMessages.length !== initialLength) {
-    unreadListeners.forEach((listener) => listener([...unreadMessages]));
-  }
-  return Promise.resolve();
+  emitUnread();
 };
 
-/**
- * Inscreve-se nas mensagens de um amigo específico.
- * Carrega o histórico da memória do backend no início.
- */
 export const subscribeToChatMessages = (
   friendUid: string,
   callback: (messages: ChatMessage[]) => void,
 ) => {
-  let messagesList: ChatMessage[] = [];
+  const uid = auth.currentUser?.uid;
+  if (!uid) return () => undefined;
+  const chatId = getChatId(uid, friendUid);
+  const messagesQuery = query(
+    ref(realtimeDb, `chats/${chatId}/messages`),
+    limitToLast(HISTORY_LIMIT),
+  );
+  const messages = new Map<string, ChatMessage>();
   activeChatFriendUid = friendUid;
-
-  // Ao abrir o chat de um amigo, limpa as mensagens não lidas dele
-  void markMessagesAsRead(friendUid);
-
-  // 1. Carrega o histórico em memória inicial
-  const loadHistory = async () => {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch(apiUrl(`/api/chat/history?friendUid=${friendUid}`), { headers });
-      if (res.ok) {
-        messagesList = await res.json();
-        callback([...messagesList]);
-      }
-    } catch (err) {
-      console.error("[ChatClient] Erro ao carregar histórico inicial:", err);
-    }
-  };
-
-  void loadHistory();
   void establishChatConnection();
 
-  // 2. Escuta novas mensagens em tempo real
-  const handleNewMessage = (msg: ChatMessage) => {
-    const currentUid = auth.currentUser?.uid;
-    if (!currentUid) return;
-    const currentChatId = getChatId(currentUid, friendUid);
+  let cancelled = false;
+  let unsubscribe: () => void = () => {};
+  void ensureChat(uid, friendUid).then(() => {
+    if (cancelled) return;
+    void markMessagesAsRead(friendUid);
+    unsubscribe = onChildAdded(messagesQuery, (snapshot) => {
+      const message = normalizeMessage(
+        snapshot.key || "",
+        snapshot.val() as Record<string, unknown>,
+      );
+      if (!message.id || messages.has(message.id)) return;
+      messages.set(message.id, message);
+      callback(
+        [...messages.values()]
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+      );
+    });
+  }).catch((error) => console.error("Erro ao abrir conversa:", error));
 
-    if (msg.chatId === currentChatId) {
-      // Evita duplicados
-      if (!messagesList.some((m) => m.id === msg.id)) {
-        messagesList.push(msg);
-        callback([...messagesList]);
-      }
-    }
+  const forwardMessage = (message: ChatMessage) => {
+    if (message.chatId !== chatId || !message.id || messages.has(message.id)) return;
+    messages.set(message.id, message);
+    callback([...messages.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
   };
-
-  messageListeners.add(handleNewMessage);
+  messageListeners.add(forwardMessage);
 
   return () => {
-    messageListeners.delete(handleNewMessage);
-    if (activeChatFriendUid === friendUid) {
-      activeChatFriendUid = null;
-    }
+    cancelled = true;
+    unsubscribe();
+    messageListeners.delete(forwardMessage);
+    if (activeChatFriendUid === friendUid) activeChatFriendUid = null;
   };
 };
 
-/**
- * Inscreve-se na digitação do amigo
- */
 export const subscribeToFriendTyping = (
   friendUid: string,
   callback: (typing: boolean) => void,
 ) => {
-  void establishChatConnection();
-
-  const handleTypingEvent = (data: { senderId: string; typing: boolean }) => {
-    if (data.senderId === friendUid) {
-      callback(data.typing);
-    }
-  };
-
-  typingListeners.add(handleTypingEvent);
-
+  const uid = auth.currentUser?.uid;
+  if (!uid) return () => undefined;
+  const chatId = getChatId(uid, friendUid);
+  const typingRef = ref(realtimeDb, `chats/${chatId}/typing/${friendUid}`);
+  let cancelled = false;
+  let unsubscribe: () => void = () => {};
+  void ensureChat(uid, friendUid).then(() => {
+    if (cancelled) return;
+    unsubscribe = onValue(typingRef, (snapshot) => {
+      const value = snapshot.val() as { active?: boolean; updatedAt?: number } | null;
+      const fresh = value?.updatedAt
+        ? Date.now() - Number(value.updatedAt) < 10_000
+        : false;
+      callback(Boolean(value?.active && fresh));
+      typingListeners.forEach((listener) =>
+        listener({ senderId: friendUid, typing: Boolean(value?.active && fresh) }));
+    });
+  }).catch(() => callback(false));
   return () => {
-    typingListeners.delete(handleTypingEvent);
+    cancelled = true;
+    unsubscribe();
   };
 };
 
-/**
- * Escuta não lidas em tempo real (em memória do cliente)
- */
 export const subscribeToUnreadMessages = (
   callback: (messages: ChatMessage[]) => void,
 ) => {
   unreadListeners.add(callback);
   callback([...unreadMessages]);
-  
   return () => {
     unreadListeners.delete(callback);
   };

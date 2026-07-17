@@ -1,0 +1,45 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "chats": {
+      "$chatId": {
+        ".read": "auth != null && data.child('participants').child(auth.uid).val() === true",
+        "participants": {
+          ".write": false,
+          "$uid": {
+            ".validate": "newData.val() === true"
+          }
+        },
+        "messages": {
+          ".indexOn": ["createdAt"],
+          "$messageId": {
+            ".write": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true && !data.exists() && newData.child('senderId').val() === auth.uid",
+            ".validate": "newData.hasChildren(['senderId', 'receiverId', 'text', 'createdAt']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('receiverId').isString() && newData.child('receiverId').val() !== auth.uid && root.child('chats').child($chatId).child('participants').child(newData.child('receiverId').val()).val() === true"
+          }
+        },
+        "reads": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true",
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "typing": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true",
+            ".validate": "!newData.exists() || (newData.hasChildren(['active', 'updatedAt']) && newData.child('active').isBoolean() && newData.child('updatedAt').isNumber())"
+          }
+        }
+      }
+    },
+    "userChats": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$chatId": {
+          ".write": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true && root.child('chats').child($chatId).child('participants').child($uid).val() === true",
+          ".validate": "newData.hasChildren(['friendUid', 'lastMessageId', 'senderId', 'receiverId', 'text', 'updatedAt']) && newData.child('senderId').val() === auth.uid && root.child('chats').child($chatId).child('messages').child(newData.child('lastMessageId').val()).child('senderId').val() === auth.uid && ((auth.uid === $uid && newData.child('friendUid').val() === newData.child('receiverId').val()) || (auth.uid !== $uid && newData.child('friendUid').val() === auth.uid && newData.child('receiverId').val() === $uid))"
+        }
+      }
+    }
+  }
+}

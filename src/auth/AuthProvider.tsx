@@ -30,6 +30,11 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   email: data?.email ?? null,
   displayName: data?.displayName ?? null,
   photoURL: data?.photoURL ?? null,
+  bio: data?.bio,
+  location: data?.location,
+  pronouns: data?.pronouns,
+  website: data?.website,
+  favoriteGenres: data?.favoriteGenres,
   steamId: data?.steamId,
   steamAvatar: data?.steamAvatar,
   steamUsername: data?.steamUsername,
@@ -48,6 +53,7 @@ const toProfile = (uid: string, data?: Partial<UserProfile>): UserProfile => ({
   gamesMigratedAt: data?.gamesMigratedAt,
   onboardingCompletedAt: data?.onboardingCompletedAt,
   achievementSummary: data?.achievementSummary,
+  librarySummary: data?.librarySummary,
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {

@@ -38,11 +38,12 @@ const SocialFeedPage: React.FC<SocialFeedPageProps> = ({ userIds }) => {
       },
       (feedError) => {
         const code = String((feedError as Error & { code?: string }).code || "");
+        console.error("[feed] Falha ao carregar atividades:", feedError);
         setError(
           code.includes("failed-precondition")
             ? "O índice do feed ainda não foi publicado no Firebase."
             : code.includes("permission-denied")
-              ? "As regras do feed ainda não foram publicadas no Firebase."
+              ? "O Firestore recusou a consulta do feed. Atualize sua sessão e tente novamente."
               : "Não foi possível carregar o feed.",
         );
         setLoading(false);

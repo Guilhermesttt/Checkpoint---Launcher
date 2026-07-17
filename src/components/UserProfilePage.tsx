@@ -1,18 +1,21 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, Gamepad2, Star, Trophy, TrendingUp, User } from "lucide-react";
+import { Clock, ExternalLink, Gamepad2, MapPin, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
+import ProfileEditorModal from "./ProfileEditorModal";
 
 interface UserProfilePageProps {
   userProfile: UserProfile | null;
   user: { email?: string | null; photoURL?: string | null } | null;
   games: Game[];
   onOpenGame?: (game: Game) => void;
+  onProfileUpdated?: () => Promise<void> | void;
+  editable?: boolean;
 }
 
 const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -27,7 +30,7 @@ const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const avatarUrl = (profile: UserProfile | null, firebasePhotoURL?: string | null) =>
-  profile?.discordAvatar || profile?.steamAvatar || profile?.photoURL || firebasePhotoURL || "";
+  profile?.photoURL || firebasePhotoURL || profile?.discordAvatar || profile?.steamAvatar || "";
 
 const initialsFor = (name: string) =>
   name
@@ -46,7 +49,7 @@ const ProfileAvatar: React.FC<{
   return (
     <div className="relative h-[74px] w-[74px] shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06]">
       {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover grayscale" />
+        <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xl font-black text-white/70">
           {initialsFor(displayName)}
@@ -64,12 +67,11 @@ const PlatformCard: React.FC<{
   icon: React.ReactNode;
 }> = ({ name, connected, username, avatar, icon }) => (
   <div
-    className={`flex items-center gap-3 rounded-2xl border p-3 ${
-      connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
-    }`}
+    className={`flex items-center gap-3 rounded-2xl border p-3 ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
+      }`}
   >
     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75">
-      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover grayscale" /> : icon}
+      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : icon}
     </div>
     <div className="min-w-0 flex-1">
       <p className="truncate text-xs font-black text-white">{name}</p>
@@ -108,8 +110,16 @@ const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React
   </section>
 );
 
-const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, games, onOpenGame }) => {
+const UserProfilePage: React.FC<UserProfilePageProps> = ({
+  userProfile,
+  user,
+  games,
+  onOpenGame,
+  onProfileUpdated,
+  editable = true,
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
   useGamepadNavigation({
     scrollRef: scrollRef as React.RefObject<HTMLElement>,
     scrollSpeed: 25,
@@ -120,7 +130,9 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
   const email = userProfile?.email || user?.email || "";
 
   const stats = useMemo(() => {
-    const totalHours = games.reduce((acc, game) => acc + (game.hoursPlayed || 0), 0);
+    const totalHours = userProfile?.librarySummary
+      ? Math.round(userProfile.librarySummary.minutesPlayed / 60)
+      : games.reduce((acc, game) => acc + (game.hoursPlayed || 0), 0);
     const achievementTotals = calculateAchievementTotals(games);
     const storedAchievementSummary = userProfile?.achievementSummary;
     const hasCanonicalSummary = Boolean(storedAchievementSummary?.updatedAt);
@@ -130,12 +142,17 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
     const totalPossible = hasCanonicalSummary
       ? Math.max(Number(storedAchievementSummary?.available || 0), totalAchievements)
       : achievementTotals.available;
-    const favorites = games.filter((game) => game.isFavorite).length;
-    const steamGames = games.filter((game) => game.launcherType === "steam").length;
-    const epicGames = games.filter((game) => game.launcherType === "epic").length;
-    const localGames = games.filter((game) => !game.launcherType || game.launcherType === "local").length;
-    return { totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
-  }, [games, userProfile?.achievementSummary]);
+    const favorites = userProfile?.librarySummary?.favorites
+      ?? games.filter((game) => game.isFavorite).length;
+    const steamGames = userProfile?.librarySummary?.steamGames
+      ?? games.filter((game) => game.launcherType === "steam").length;
+    const epicGames = userProfile?.librarySummary?.epicGames
+      ?? games.filter((game) => game.launcherType === "epic").length;
+    const localGames = userProfile?.librarySummary?.localGames
+      ?? games.filter((game) => !game.launcherType || game.launcherType === "local").length;
+    const totalGames = userProfile?.librarySummary?.games ?? games.length;
+    return { totalGames, totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
+  }, [games, userProfile]);
 
   const topGames = useMemo(
     () =>
@@ -182,18 +199,18 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                 <h1 className="truncate text-3xl font-black tracking-tight text-white">{displayName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {userProfile?.steamId && (
-                    <button 
+                    <button
                       type="button"
                       disabled={!/^\d{10,20}$/.test(userProfile.steamId)}
                       onClick={() => window.electronAPI?.openExternalUrl(`https://steamcommunity.com/profiles/${userProfile.steamId}`)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-default"
                     >
-                      <FontAwesomeIcon icon={faSteam} className="h-3 w-3" /> 
+                      <FontAwesomeIcon icon={faSteam} className="h-3 w-3" />
                       {userProfile.steamUsername || "Steam"}
                     </button>
                   )}
                   {userProfile?.discordId && (
-                    <button 
+                    <button
                       type="button"
                       disabled={!/^\d{10,24}$/.test(userProfile.discordId)}
                       onClick={() => window.electronAPI?.openExternalUrl(`https://discordapp.com/users/${userProfile.discordId}`)}
@@ -204,14 +221,46 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                     </button>
                   )}
                 </div>
-                {email && <p className="mt-3 text-xs font-semibold text-white/28">{email}</p>}
+                {userProfile?.bio && <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/55">{userProfile.bio}</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-white/28">
+                  {email && <span>{email}</span>}
+                  {userProfile?.website && /^https:\/\//i.test(userProfile.website) && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 hover:text-white/65"
+                      onClick={() => window.electronAPI?.openExternalUrl(userProfile.website as string)}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Site
+                    </button>
+                  )}
+                </div>
+                {Boolean(userProfile?.favoriteGenres?.length) && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {userProfile?.favoriteGenres?.map((genre) => (
+                      <span key={genre} className="rounded-lg border border-white/10 bg-white/[0.05] px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white/40">
+                        {genre}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <StatCard icon={<Gamepad2 className="h-4 w-4" />} label="Jogos" value={games.length} />
-              <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${stats.totalHours}h`} />
-              <StatCard icon={<Star className="h-4 w-4" />} label="Favoritos" value={stats.favorites} />
+            <div className="flex flex-col items-end gap-3">
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/12 hover:text-white"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Editar perfil
+                </button>
+              )}
+              <div className="grid grid-cols-3 gap-3">
+                <StatCard icon={<Gamepad2 className="h-4 w-4" />} label="Jogos" value={stats.totalGames} />
+                <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${stats.totalHours}h`} />
+                <StatCard icon={<Star className="h-4 w-4" />} label="Favoritos" value={stats.favorites} />
+              </div>
             </div>
           </div>
         </section>
@@ -275,7 +324,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
                     <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: games.length > 0 ? `${(row.value / games.length) * 100}%` : "0%" }}
+                        animate={{ width: stats.totalGames > 0 ? `${(row.value / stats.totalGames) * 100}%` : "0%" }}
                         transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
                         className="h-full rounded-full bg-white"
                       />
@@ -356,6 +405,15 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({ userProfile, user, ga
           </div>
         </div>
       </div>
+      {isEditing && (
+        <ProfileEditorModal
+          profile={userProfile}
+          fallbackName={displayName}
+          fallbackPhotoURL={user?.photoURL}
+          onClose={() => setIsEditing(false)}
+          onSaved={onProfileUpdated}
+        />
+      )}
     </motion.div>
   );
 };

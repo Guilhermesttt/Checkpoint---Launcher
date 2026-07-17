@@ -45,6 +45,13 @@ describe("overlay de conquistas", () => {
         <button id="record-capture-shortcut"><span id="record-shortcut-label"></span><kbd id="capture-shortcut-value"></kbd></button><span id="capture-shortcut-label"></span><span id="capture-setting-feedback"></span>
         <button id="capture-now"></button><button id="open-captures-folder"></button><div id="capture-gallery"></div>
       </section>
+      <div id="capture-viewer" aria-hidden="true">
+        <button id="capture-viewer-close"></button>
+        <button id="capture-viewer-previous"></button>
+        <img id="capture-viewer-image" />
+        <button id="capture-viewer-next"></button>
+        <span id="capture-viewer-name"></span><span id="capture-viewer-date"></span><span id="capture-viewer-counter"></span>
+      </div>
     `;
     Object.defineProperty(window, "achievementOverlay", {
       configurable: true,
@@ -80,6 +87,13 @@ describe("overlay de conquistas", () => {
     expect(html).toContain("--overlay-width: min(392px, calc(100vw - 32px))");
     expect(cardRule).toContain("container-type: inline-size");
     expect(cardRule).toContain("aspect-ratio: 447 / 157");
+  });
+
+  it("usa no overlay um logo incluido no pacote do Electron", () => {
+    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+    const parsed = new DOMParser().parseFromString(html, "text/html");
+
+    expect(parsed.querySelector(".panel-logo img")?.getAttribute("src")).toBe("../assets/icon.png");
   });
 
   it("renderiza nome, descricao e imagem recebidos do schema", () => {
@@ -211,5 +225,30 @@ describe("overlay de conquistas", () => {
     await Promise.resolve();
 
     expect(panelAction).toHaveBeenCalledWith({ kind: "delete-capture", captureId: "capture-1" });
+  });
+
+  it("abre, navega e fecha as capturas dentro do overlay", () => {
+    panelVisibility({
+      open: true,
+      state: {
+        settings: { captureShortcut: "F8" },
+        captures: [
+          { id: "capture-1", name: "Portal 2.png", url: "data:image/png;base64,AA==", createdAt: "2026-07-16T12:30:00.000Z" },
+          { id: "capture-2", name: "Half-Life 2.png", url: "data:image/png;base64,BB==", createdAt: "2026-07-16T12:31:00.000Z" },
+        ],
+      },
+    });
+
+    document.querySelector<HTMLElement>(".capture-card")?.click();
+    expect(document.getElementById("capture-viewer")?.classList.contains("is-open")).toBe(true);
+    expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Portal 2.png");
+    expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("1 de 2");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Half-Life 2.png");
+    expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("2 de 2");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.getElementById("capture-viewer")?.classList.contains("is-open")).toBe(false);
   });
 });

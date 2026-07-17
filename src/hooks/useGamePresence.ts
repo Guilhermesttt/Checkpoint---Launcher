@@ -3,18 +3,27 @@ import { useInterval } from "./useInterval";
 import type { Game, UserProfile } from "../types/domain";
 import { getMonitorableExecutablePath } from "../services/launcher";
 import { fetchSteamAchievementDetails, fetchSteamCurrentGame } from "../services/steam";
-import { publishSocialActivity } from "../services/socialActivity";
+import {
+  recordLibrarySession,
+  updateLibraryGame,
+} from "../services/localLibrary";
 
 interface UseGamePresenceProps {
   userUid?: string;
   userProfile?: UserProfile | null;
   games: Game[];
+  onLibraryChanged?: () => Promise<void> | void;
 }
 
 export const UNVERIFIED_URI_PRESENCE_TTL_MS = 12 * 60 * 60 * 1000;
 export type PresenceVerificationMode = "none" | "provisional" | "process" | "steam";
 
-export function useGamePresence({ userUid, userProfile, games }: UseGamePresenceProps) {
+export function useGamePresence({
+  userUid,
+  userProfile,
+  games,
+  onLibraryChanged,
+}: UseGamePresenceProps) {
   const [currentPresenceGame, setCurrentPresenceGame] = useState<string | null>(null);
   const [currentPresenceExecutablePath, setCurrentPresenceExecutablePath] = useState<string | null>(null);
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
@@ -24,9 +33,48 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
   const presenceRevisionRef = useRef(0);
   const steamPresenceMissesRef = useRef(0);
   const steamPresenceLastConfirmedAtRef = useRef<number | null>(null);
+  const activeSessionRef = useRef<{
+    title: string;
+    startedAt: number;
+  } | null>(null);
   const steamId = userProfile?.steamId;
 
+  const finalizeActiveSession = useCallback(async () => {
+    const session = activeSessionRef.current;
+    activeSessionRef.current = null;
+    if (!session || !userUid) return;
+    const durationMinutes = Math.max(
+      0,
+      Math.round((Date.now() - session.startedAt) / 60_000),
+    );
+    if (durationMinutes < 1) return;
+    const game = games.find((candidate) =>
+      candidate.title.trim().toLowerCase() === session.title.trim().toLowerCase());
+    if (!game) return;
+    const knownMinutes = Math.max(
+      Number(game.locallyTrackedMinutes) || 0,
+      Number(game.steamPlaytimeMinutes) || 0,
+      Math.round((Number(game.hoursPlayed) || 0) * 60),
+    );
+    const locallyTrackedMinutes = knownMinutes + durationMinutes;
+    const endedAt = new Date().toISOString();
+    await recordLibrarySession(userUid, game.id, {
+      startedAt: new Date(session.startedAt).toISOString(),
+      endedAt,
+      durationMinutes,
+    });
+    await updateLibraryGame(userUid, game.id, {
+      locallyTrackedMinutes,
+      hoursPlayed: Math.round((locallyTrackedMinutes / 60) * 10) / 10,
+      lastPlayedAt: endedAt,
+    });
+    await onLibraryChanged?.();
+  }, [games, onLibraryChanged, userUid]);
+
   const clearCurrentPresence = useCallback(() => {
+    void finalizeActiveSession().catch((error) => {
+      console.error("Erro ao registrar sessao local:", error);
+    });
     presenceRevisionRef.current += 1;
     provisionalPresenceDeadlineRef.current = null;
     steamPresenceMissesRef.current = 0;
@@ -36,7 +84,7 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
     setSessionStartedAt(null);
     setPresenceVerification("none");
     setProvisionalPresenceExpiresAt(null);
-  }, []);
+  }, [finalizeActiveSession]);
 
   const markCurrentPresence = useCallback((title: string, executablePath: string | null) => {
     const normalizedExecutablePath = executablePath?.trim() || null;
@@ -48,14 +96,19 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
     provisionalPresenceDeadlineRef.current = provisionalDeadline;
     steamPresenceMissesRef.current = 0;
     steamPresenceLastConfirmedAtRef.current = null;
-    if (title !== currentPresenceGame) setSessionStartedAt(new Date().toISOString());
+    if (title !== currentPresenceGame) {
+      void finalizeActiveSession().catch(() => undefined);
+      const startedAt = Date.now();
+      activeSessionRef.current = { title, startedAt };
+      setSessionStartedAt(new Date(startedAt).toISOString());
+    }
     setCurrentPresenceGame(title);
     setCurrentPresenceExecutablePath(normalizedExecutablePath);
     setPresenceVerification(normalizedExecutablePath ? "process" : "provisional");
     setProvisionalPresenceExpiresAt(
       provisionalDeadline == null ? null : new Date(provisionalDeadline).toISOString(),
     );
-  }, [currentPresenceGame]);
+  }, [currentPresenceGame, finalizeActiveSession]);
 
   const syncDetectedRunningGame = useCallback(async () => {
     if (!window.electronAPI?.detectRunningGames || games.length === 0) {
@@ -289,23 +342,12 @@ export function useGamePresence({ userUid, userProfile, games }: UseGamePresence
           unlockedSet.add(ach.apiName);
 
           void window.electronAPI?.unlockAchievement(`steam_${appId}`, ach.apiName);
-          if (userUid && runningGame) {
-            void publishSocialActivity(userUid, userProfile, {
-              kind: "achievement",
-              gameId: runningGame.id,
-              gameTitle: runningGame.title,
-              gameImage: runningGame.cardImage || runningGame.image || "",
-              achievementId: ach.apiName,
-              achievementName: ach.name,
-              achievementIcon: ach.icon || "",
-            }).catch(() => undefined);
-          }
         }
       }
     } catch (error) {
       console.error("Erro no polling de conquistas Steam:", error);
     }
-  }, [currentPresenceGame, games, steamId, userProfile, userUid]);
+  }, [currentPresenceGame, games, steamId]);
 
   const achievementsState = useRef({
     unlockedSet: new Set<string>(),

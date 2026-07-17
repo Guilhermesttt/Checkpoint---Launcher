@@ -13,15 +13,16 @@ Use este documento para todo release público. O responsável pelo release deve 
 - [ ] `npm run release:smoke` validou instalação, `--smoke-test` e desinstalação.
 - [ ] Assinatura Authenticode válida no artefato público (`REQUIRE_SIGNED_RELEASE=1`).
 - [ ] O bundle de produção aponta para o backend público, sem depender do `.env` local.
-- [ ] Backend, regras e índices do Firestore compatíveis com a versão foram publicados e verificados.
+- [ ] Backend e regras do Firestore e Realtime Database compatíveis com a versão foram publicados e verificados.
 
 ## Privacidade e dados
 
 - [ ] Nenhum `.env`, service account, token Firebase/Discord/Steam ou certificado está no commit/artefato.
 - [ ] Apenas variáveis `VITE_*` deliberadamente públicas entram no renderer.
 - [ ] Logs não contêm token, e-mail completo, conteúdo de chat, caminho pessoal ou credencial.
-- [ ] Mensagens continuam limitadas, acessíveis apenas aos participantes e sem exclusão pelo cliente.
-- [ ] Biblioteca permanece isolada em `users/{uid}/games` pelas regras.
+- [ ] Mensagens continuam limitadas e acessíveis apenas aos participantes validados pelo backend.
+- [ ] O resumo em `publicProfiles/{uid}` não contém e-mail, caminhos locais nem imagens base64.
+- [ ] A biblioteca SQLite fica em `app.getPath("userData")` e só é acessada por IPC validado.
 - [ ] Perfil não aceita campos arbitrários nem alteração de `uid`/`createdAt`.
 - [ ] Uploads e anexos têm tipo, tamanho e retenção revisados.
 - [ ] URLs externas e chamadas IPC permanecem restritas a protocolos/origens permitidos.

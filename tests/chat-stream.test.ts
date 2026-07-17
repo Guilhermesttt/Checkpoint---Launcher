@@ -1,17 +1,30 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const authMocks = vi.hoisted(() => ({
-  getIdToken: vi.fn(async () => "firebase-chat-token"),
-  user: { uid: "user-1" },
+const databaseMocks = vi.hoisted(() => ({
+  onValue: vi.fn(),
+  off: vi.fn(),
+  ref: vi.fn((_db: unknown, path = "") => ({ path })),
+}));
+
+vi.mock("firebase/database", () => ({
+  get: vi.fn(),
+  limitToLast: vi.fn((value) => value),
+  off: databaseMocks.off,
+  onChildAdded: vi.fn(),
+  onValue: databaseMocks.onValue,
+  push: vi.fn(),
+  query: vi.fn((value) => value),
+  ref: databaseMocks.ref,
+  remove: vi.fn(),
+  serverTimestamp: vi.fn(() => 123),
+  set: vi.fn(),
+  update: vi.fn(),
 }));
 
 vi.mock("../Firebase", () => ({
-  auth: {
-    get currentUser() {
-      return { ...authMocks.user, getIdToken: authMocks.getIdToken };
-    },
-  },
+  auth: { currentUser: { uid: "user-1" } },
+  realtimeDb: {},
 }));
 
 import {
@@ -22,57 +35,50 @@ import {
 
 afterEach(() => {
   closeChatConnection();
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
-describe("chat SSE", () => {
-  it("autentica pelo header sem expor o token na URL", async () => {
-    const message = {
-      id: "message-1",
-      chatId: "friend-1_user-1",
-      senderId: "friend-1",
-      receiverId: "user-1",
-      text: "Olá",
-      createdAt: "2026-07-16T12:00:00.000Z",
-      read: false,
-    };
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode(
-          `data: ${JSON.stringify({ type: "message", message })}\n\n`,
-        ));
-        controller.close();
-      },
+describe("chat no Realtime Database", () => {
+  it("escuta somente a caixa do usuario e deduplica mensagens recebidas", async () => {
+    let inboxCallback: ((snapshot: { val: () => unknown }) => void) | undefined;
+    databaseMocks.onValue.mockImplementation((_reference, callback) => {
+      inboxCallback = callback;
+      return vi.fn();
     });
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      void input;
-      void init;
-      return new Response(stream, {
-        status: 200,
-        headers: { "Content-Type": "text/event-stream" },
-      });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
     const unreadSnapshots: string[][] = [];
     const unsubscribe = subscribeToUnreadMessages((messages) => {
-      unreadSnapshots.push(
-        messages.map((item) => item.id).filter((id): id is string => Boolean(id)),
-      );
+      unreadSnapshots.push(messages.flatMap((message) => message.id ? [message.id] : []));
     });
 
     await establishChatConnection();
+    expect(databaseMocks.ref).toHaveBeenCalledWith({}, "userChats/user-1");
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(String(url)).toMatch(/\/api\/chat\/stream$/);
-    expect(String(url)).not.toContain("firebase-chat-token");
-    expect((init?.headers as Record<string, string>).Authorization).toBe(
-      "Bearer firebase-chat-token",
-    );
+    inboxCallback?.({ val: () => null });
+    inboxCallback?.({
+      val: () => ({
+        "friend-1_user-1": {
+          lastMessageId: "message-1",
+          senderId: "friend-1",
+          receiverId: "user-1",
+          text: "Ola",
+          updatedAt: Date.parse("2026-07-16T12:00:00.000Z"),
+        },
+      }),
+    });
+    inboxCallback?.({
+      val: () => ({
+        "friend-1_user-1": {
+          lastMessageId: "message-1",
+          senderId: "friend-1",
+          receiverId: "user-1",
+          text: "Ola",
+          updatedAt: Date.parse("2026-07-16T12:00:00.000Z"),
+        },
+      }),
+    });
+
     expect(unreadSnapshots).toContainEqual(["message-1"]);
-
+    expect(unreadSnapshots.filter((items) => items.includes("message-1"))).toHaveLength(1);
     unsubscribe();
   });
 });

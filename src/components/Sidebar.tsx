@@ -79,7 +79,7 @@ export const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2 },
   { id: "FAVORITES", label: "Favoritos", Icon: Star },
   { id: "FRIENDS", label: "Amigos", Icon: Users },
-  { id: "FEED", label: "Feed", Icon: Newspaper },
+  { id: "FEED", label: "Radar", Icon: Newspaper },
   { id: "PROFILE", label: "Perfil", Icon: User },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },

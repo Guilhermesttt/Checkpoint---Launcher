@@ -526,7 +526,7 @@ export const SettingsPageV2: React.FC<{
           <SettingsHeader
             icon={<Sparkles className="h-5 w-5 text-white/70" />}
             title="Overlay Lab"
-            description="Dispare os dois overlays manualmente para validar o visual antes de estilizar."
+            description="Prévia de como os overlays ficarão quando você estiver jogando."
           />
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <button
@@ -954,9 +954,8 @@ export const FriendsPage: React.FC<{
                       <Users className="h-4 w-4 text-white/70" />
                     )}
                     <span
-                      className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-[#0A0A0C] ${
-                        friend.status === "offline" ? "bg-red-500" : "bg-green-500"
-                      }`}
+                      className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-[#0A0A0C] ${friend.status === "offline" ? "bg-red-500" : "bg-green-500"
+                        }`}
                     />
                   </div>
                   <div className="min-w-0">
@@ -1845,13 +1844,12 @@ export const ChatModal: React.FC<{
                 className="h-10 w-10 rounded-full object-cover ring-2 ring-white/10"
               />
               <span
-                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${
-                  friend.status === "playing"
+                className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${friend.status === "playing"
                     ? "bg-green-500 animate-pulse"
                     : friend.status === "online"
                       ? "bg-green-400"
                       : "bg-white/20"
-                }`}
+                  }`}
               />
             </div>
             <div>
@@ -1887,11 +1885,10 @@ export const ChatModal: React.FC<{
               return (
                 <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${
-                      isMe
+                    className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${isMe
                         ? "bg-white/10 text-white rounded-tr-none"
                         : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
-                    }`}
+                      }`}
                   >
                     {inlineImageLinks.length > 0 ? (
                       <div className="mb-2 space-y-2">
@@ -1901,17 +1898,16 @@ export const ChatModal: React.FC<{
                             href={imageUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className={`block rounded-2xl border px-3 py-3 transition-all ${
-                              isMe
+                            className={`block rounded-2xl border px-3 py-3 transition-all ${isMe
                                 ? "border-white/10 bg-black/25 hover:bg-black/35"
                                 : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
-                            }`}
+                              }`}
                           >
-                          <img
-                            src={imageUrl}
-                            alt="Imagem compartilhada"
-                            className="max-h-48 w-full rounded-xl object-cover"
-                          />
+                            <img
+                              src={imageUrl}
+                              alt="Imagem compartilhada"
+                              className="max-h-48 w-full rounded-xl object-cover"
+                            />
                           </a>
                         ))}
                       </div>

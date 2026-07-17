@@ -13,6 +13,7 @@ const {
   parseProcessSnapshot,
 } = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
+const { createLocalGameLibrary } = require("./local-game-library.cjs");
 const {
   detectEmulator,
   parseAchievementState,
@@ -93,6 +94,7 @@ let overlayPanelState = {
 let captureShortcut = "F8";
 let recentCaptures = [];
 let captureInProgress = false;
+const CAPTURE_HISTORY_LIMIT = 60;
 
 const normalizeCaptureShortcut = (value) => {
   const raw = String(value || "").trim();
@@ -120,6 +122,7 @@ let achievementBridge;
 let startupErrorShown = false;
 let isQuitting = false;
 let tray = null;
+let localGameLibrary = null;
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -629,7 +632,7 @@ const loadRecentCaptures = () => {
         };
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, 12);
+      .slice(0, CAPTURE_HISTORY_LIMIT);
   } catch (error) {
     console.warn("[overlay] Nao foi possivel carregar as capturas:", error);
     recentCaptures = [];
@@ -641,24 +644,42 @@ const captureCurrentDisplay = async () => {
     ? screen.getAllDisplays().find((candidate) => candidate.id === overlayDisplayId)
     : screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const targetDisplay = display || screen.getPrimaryDisplay();
-  const restoreOverlay = Boolean(overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible());
+  const shouldTemporarilyHideOverlay = process.platform !== "win32"
+    && Boolean(overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible());
   const restorePanel = overlayPanelOpen;
 
   try {
-    if (restoreOverlay) {
+    if (shouldTemporarilyHideOverlay) {
       overlayWindow.hide();
       await sleep(120);
     }
     const scaleFactor = Math.max(1, Number(targetDisplay.scaleFactor) || 1);
-    const sources = await desktopCapturer.getSources({
-      types: ["screen"],
-      thumbnailSize: {
-        width: Math.max(1, Math.round(targetDisplay.size.width * scaleFactor)),
-        height: Math.max(1, Math.round(targetDisplay.size.height * scaleFactor)),
-      },
-    });
-    const source = sources.find((candidate) => String(candidate.display_id) === String(targetDisplay.id)) || sources[0];
-    if (!source || source.thumbnail.isEmpty()) throw new Error("Nenhuma imagem de tela foi retornada.");
+    const captureSize = {
+      width: Math.max(1, Math.round(targetDisplay.size.width * scaleFactor)),
+      height: Math.max(1, Math.round(targetDisplay.size.height * scaleFactor)),
+    };
+    let source = null;
+    let lastCaptureError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ["screen"],
+          thumbnailSize: captureSize,
+        });
+        source = sources.find((candidate) => String(candidate.display_id) === String(targetDisplay.id))
+          || sources[0]
+          || null;
+        if (source && !source.thumbnail.isEmpty()) break;
+        source = null;
+        lastCaptureError = new Error("Nenhuma imagem de tela foi retornada.");
+      } catch (error) {
+        lastCaptureError = error;
+      }
+      await sleep(100 + attempt * 80);
+    }
+    if (!source) {
+      throw lastCaptureError || new Error("Nenhuma imagem de tela foi retornada.");
+    }
 
     const directory = captureDirectory();
     fs.mkdirSync(directory, { recursive: true });
@@ -679,11 +700,12 @@ const captureCurrentDisplay = async () => {
       gameId: String(overlayPanelState.currentGame?.id || ""),
       gameTitle: String(overlayPanelState.currentGame?.title || ""),
     };
-    recentCaptures = [capture, ...recentCaptures.filter((item) => item.url !== capture.url)].slice(0, 12);
+    recentCaptures = [capture, ...recentCaptures.filter((item) => item.url !== capture.url)]
+      .slice(0, CAPTURE_HISTORY_LIMIT);
     overlayPanelState = { ...overlayPanelState, captures: recentCaptures };
     return capture;
   } finally {
-    if (restoreOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
+    if (shouldTemporarilyHideOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.showInactive();
       overlayWindow.setAlwaysOnTop(true, "screen-saver");
       if (restorePanel) {
@@ -843,6 +865,36 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
   };
   if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
 });
+
+const getLocalGameLibrary = () => {
+  if (!localGameLibrary) {
+    localGameLibrary = createLocalGameLibrary(app.getPath("userData"));
+  }
+  return localGameLibrary;
+};
+
+registerSecureIpcHandler("library:list", async (_event, uid) =>
+  getLocalGameLibrary().list(uid));
+registerSecureIpcHandler("library:create", async (_event, uid, game) =>
+  getLocalGameLibrary().create(uid, game));
+registerSecureIpcHandler("library:update", async (_event, uid, gameId, patch) =>
+  getLocalGameLibrary().update(uid, gameId, patch));
+registerSecureIpcHandler("library:delete", async (_event, uid, gameId) =>
+  getLocalGameLibrary().remove(uid, gameId));
+registerSecureIpcHandler("library:delete-by-launcher", async (_event, uid, launcherType) =>
+  getLocalGameLibrary().removeByLauncher(uid, launcherType));
+registerSecureIpcHandler("library:record-session", async (_event, uid, gameId, session) =>
+  getLocalGameLibrary().recordSession(uid, gameId, session));
+registerSecureIpcHandler("library:bulk-upsert", async (_event, uid, games) =>
+  getLocalGameLibrary().bulkUpsert(uid, games));
+registerSecureIpcHandler("library:import-legacy", async (_event, uid, games) =>
+  getLocalGameLibrary().importLegacy(uid, games));
+registerSecureIpcHandler("library:needs-legacy-import", async (_event, uid) =>
+  getLocalGameLibrary().needsLegacyImport(uid));
+registerSecureIpcHandler("library:get-summary", async (_event, uid) =>
+  getLocalGameLibrary().getSummary(uid));
+registerSecureIpcHandler("library:mark-summary-synced", async (_event, uid, revision) =>
+  getLocalGameLibrary().markSummarySynced(uid, revision));
 
 ipcMain.handle("overlay:panel-action", async (event, action) => {
   if (!overlayWindow || event.sender !== overlayWindow.webContents) {
@@ -2319,6 +2371,14 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  if (localGameLibrary) {
+    try {
+      localGameLibrary.close();
+    } catch (error) {
+      appendStartupLog("Failed to close local game library.", error);
+    }
+    localGameLibrary = null;
+  }
   for (const watcherKey of Array.from(activeGameMonitors.keys())) {
     stopGameProcessMonitor(watcherKey);
   }

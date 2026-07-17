@@ -49,11 +49,12 @@ export function useGamepadNavigation({
 
     const handleRightStick = (e: Event) => {
       const customEvent = e as CustomEvent<{ x: number; y: number }>;
-      const { y } = customEvent.detail;
+      const { x, y } = customEvent.detail;
 
-      if (Math.abs(y) > 0) {
+      if (Math.abs(y) > 0 || Math.abs(x) > 0) {
         scrollRef.current!.scrollBy({
           top: y * scrollSpeed,
+          left: x * scrollSpeed,
           behavior: "auto",
         });
       }

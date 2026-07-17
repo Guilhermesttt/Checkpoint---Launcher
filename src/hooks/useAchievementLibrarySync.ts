@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { writeBatch } from "firebase/firestore";
 import type { Game } from "../types/domain";
-import { db } from "../../Firebase";
-import { profileDocRef, userGameDocRef } from "../services/firestorePaths";
-import { calculateAchievementTotals } from "../utils/achievementTotals";
+import { updateLibraryGame } from "../services/localLibrary";
 import { fetchSteamAchievementSummary } from "../services/steam";
 
 interface LocalAchievementSummary {
@@ -23,10 +20,10 @@ export function useAchievementLibrarySync(
   steamId: string | undefined,
   games: Game[],
   gamesLoaded: boolean,
+  onLibraryChanged?: () => Promise<void> | void,
 ) {
   const syncingRef = useRef(false);
   const rerunRef = useRef(false);
-  const lastProfileFingerprintRef = useRef("");
   const steamSyncAttemptedRef = useRef(false);
   const steamRetryTimerRef = useRef<number | null>(null);
   const steamRetryAttemptRef = useRef(0);
@@ -102,48 +99,16 @@ export function useAchievementLibrarySync(
           || game.completedAchievements !== current.completedAchievements;
       });
 
-      for (let index = 0; index < changedGames.length; index += 400) {
-        const batch = writeBatch(db);
-        changedGames.slice(index, index + 400).forEach((game) => {
-          batch.update(userGameDocRef(userUid, game.id), {
+      if (changedGames.length > 0) {
+        await Promise.all(changedGames.map((game) =>
+          updateLibraryGame(userUid, game.id, {
             totalAchievements: game.totalAchievements || 0,
             completedAchievements: game.completedAchievements || 0,
             achievementsUpdatedAt: summary.updatedAt,
-          });
-        });
-        await batch.commit();
+          })));
+        await onLibraryChanged?.();
       }
 
-      const totals = calculateAchievementTotals(projectedGames);
-      const profileFingerprint = [
-        totals.unlocked,
-        totals.available,
-        totals.gamesWithAchievements,
-        projectedGames.length,
-        steamSummary?.requested ?? "",
-        steamSummary?.resolved ?? "",
-      ].join(":");
-      if (profileFingerprint !== lastProfileFingerprintRef.current) {
-        const profileBatch = writeBatch(db);
-        profileBatch.set(profileDocRef(userUid), {
-          achievementSummary: {
-            ...totals,
-            totalGames: projectedGames.length,
-            updatedAt: new Date().toISOString(),
-          },
-          ...(steamSummary ? {
-            steamAchievementSync: {
-              requested: steamSummary.requested,
-              resolved: steamSummary.resolved,
-              failed: steamSummary.failedAppIds.length,
-              failedAppIds: steamSummary.failedAppIds.slice(0, 100),
-              updatedAt: new Date().toISOString(),
-            },
-          } : {}),
-        }, { merge: true });
-        await profileBatch.commit();
-        lastProfileFingerprintRef.current = profileFingerprint;
-      }
     } catch (error) {
       console.error("Erro ao reconciliar biblioteca de conquistas:", error);
     } finally {
@@ -153,7 +118,7 @@ export function useAchievementLibrarySync(
         void runSync();
       }
     }
-  }, [games, gamesLoaded, steamId, userUid]);
+  }, [games, gamesLoaded, onLibraryChanged, steamId, userUid]);
 
   useEffect(() => {
     if (steamRetryTimerRef.current != null) {

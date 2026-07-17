@@ -3,15 +3,13 @@ import { isBackendHealthy } from "../services/api";
 import {
   disconnectSteamAccount,
   getSteamLinkUrl,
-  syncSteamLibraryToFirestore,
+  syncSteamLibraryToLocal,
 } from "../services/steam";
 import {
   disconnectDiscordAccount,
   getDiscordLinkUrl,
 } from "../services/discord";
-import { userGamesCollectionRef } from "../services/firestorePaths";
-import { getDocs, query, where, writeBatch } from "firebase/firestore";
-import { db } from "../../Firebase";
+import { deleteLibraryGamesByLauncher } from "../services/localLibrary";
 import type { SoundEffectType } from "./useSoundEffects";
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
@@ -25,6 +23,7 @@ interface UseAccountConnectionsProps {
   refreshProfile: () => Promise<void>;
   setIsLoading: (val: boolean) => void;
   setSelectedIndex: (val: number) => void;
+  onLibraryChanged?: () => Promise<void> | void;
 }
 
 export function useAccountConnections({
@@ -35,6 +34,7 @@ export function useAccountConnections({
   refreshProfile,
   setIsLoading,
   setSelectedIndex,
+  onLibraryChanged,
 }: UseAccountConnectionsProps) {
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -53,7 +53,7 @@ export function useAccountConnections({
     setIsLoading(true);
     setSteamSyncing(true);
     try {
-      const count = await syncSteamLibraryToFirestore(userUid, resolvedSteamId);
+      const count = await syncSteamLibraryToLocal(userUid, resolvedSteamId);
       notify(
         count === 0
           ? "Nenhum jogo retornado. Verifique se o perfil é público."
@@ -61,6 +61,7 @@ export function useAccountConnections({
         count === 0 ? "info" : "success",
       );
       await refreshProfile();
+      await onLibraryChanged?.();
     } catch (e) {
       notify(e instanceof Error ? e.message : "Falha na sincronização Steam.", "error");
     } finally {
@@ -134,18 +135,12 @@ export function useAccountConnections({
     setIsLoading(true);
     try {
       await disconnectSteamAccount();
-      const snap = await getDocs(
-        query(userGamesCollectionRef(userUid), where("launcherType", "==", "steam")),
-      );
-      if (snap.docs.length > 0) {
-        const b = writeBatch(db);
-        snap.docs.forEach((d) => b.delete(d.ref));
-        await b.commit();
-      }
+      await deleteLibraryGamesByLauncher(userUid, "steam");
       localStorage.removeItem(steamDiscKey(userUid));
       localStorage.removeItem(steamIdKey(userUid));
       await refreshProfile();
       setSelectedIndex(0);
+      await onLibraryChanged?.();
       notify("Steam desconectada e biblioteca atualizada.", "success");
     } catch {
       notify("Erro ao desconectar conta Steam.", "error");

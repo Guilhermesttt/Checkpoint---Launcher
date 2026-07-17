@@ -19,6 +19,65 @@ declare global {
       startGoogleBrowserAuth: () => Promise<{ state: string }>;
       openExternalUrl: (url: string) => Promise<void>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
+      listLocalGames: (uid: string) => Promise<import("./domain").Game[]>;
+      createLocalGame: (
+        uid: string,
+        game: Omit<import("./domain").Game, "id"> & { id?: string },
+      ) => Promise<import("./domain").Game>;
+      updateLocalGame: (
+        uid: string,
+        gameId: string,
+        patch: Partial<import("./domain").Game>,
+      ) => Promise<import("./domain").Game>;
+      deleteLocalGame: (uid: string, gameId: string) => Promise<boolean>;
+      deleteLocalGamesByLauncher: (
+        uid: string,
+        launcherType: import("./domain").LauncherType,
+      ) => Promise<number>;
+      recordLocalGameSession: (
+        uid: string,
+        gameId: string,
+        session: {
+          startedAt: string;
+          endedAt: string;
+          durationMinutes: number;
+        },
+      ) => Promise<string>;
+      bulkUpsertLocalGames: (
+        uid: string,
+        games: import("./domain").Game[],
+      ) => Promise<import("./domain").Game[]>;
+      importLegacyGames: (
+        uid: string,
+        games: import("./domain").Game[],
+      ) => Promise<{ imported: number; alreadyImported: boolean }>;
+      needsLegacyGameImport: (uid: string) => Promise<boolean>;
+      getLocalLibrarySummary: (uid: string) => Promise<{
+        schemaVersion: number;
+        stats: { games: number; minutesPlayed: number; favorites: number };
+        platforms: {
+          steamGameCount: number;
+          epicGameCount: number;
+          localGameCount: number;
+        };
+        achievements: { unlocked: number; total: number };
+        topGames: Array<{
+          id: string;
+          title: string;
+          minutesPlayed: number;
+          imageUrl: string;
+        }>;
+        favoriteGames: Array<{
+          id: string;
+          title: string;
+          minutesPlayed: number;
+          imageUrl: string;
+        }>;
+        revision: number;
+        deviceId: string;
+        dirty: boolean;
+      }>;
+      markLocalLibrarySummarySynced: (uid: string, revision: number) => Promise<void>;
       testOverlayWelcome: () => Promise<void>;
       testOverlayAchievement: () => Promise<void>;
       toggleOverlayPanel: () => Promise<{ open: boolean }>;

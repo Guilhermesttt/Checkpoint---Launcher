@@ -6,6 +6,9 @@ export const profilesCollection = () => collection(db, "profiles");
 export const profileDocRef = (uid: string): DocumentReference =>
   doc(db, "profiles", uid);
 
+export const publicProfileDocRef = (uid: string): DocumentReference =>
+  doc(db, "publicProfiles", uid);
+
 export const userDocRef = (uid: string): DocumentReference => doc(db, "users", uid);
 
 export const userGamesCollectionRef = (uid: string): CollectionReference =>

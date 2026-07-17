@@ -4,7 +4,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  where,
   type Unsubscribe,
 } from "firebase/firestore";
 import { auth, db } from "../../Firebase";
@@ -15,7 +14,8 @@ type ActivityInput = Omit<SocialActivity, "id" | "userId" | "userName" | "userAv
   dedupeKey?: string;
 };
 
-const activityCollection = () => collection(db, "activities");
+const activityCollection = (viewerId: string) =>
+  collection(db, "feeds", viewerId, "activities");
 
 export const publishSocialActivity = async (
   uid: string,
@@ -62,7 +62,7 @@ export const subscribeSocialFeed = (
   }
 
   return onSnapshot(
-    query(activityCollection(), where("audienceIds", "array-contains", viewerId), orderBy("createdAt", "desc"), limit(60)),
+    query(activityCollection(viewerId), orderBy("createdAt", "desc"), limit(60)),
     (snapshot) => {
       onChange(snapshot.docs.map((item) => ({
         id: item.id,

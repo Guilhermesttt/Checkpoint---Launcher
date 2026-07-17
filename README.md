@@ -61,8 +61,10 @@ O atalho de captura pode ser alterado nas configurações do overlay. São aceit
 | Steam | Biblioteca, perfil, metadados, horas, inicialização e conquistas |
 | Epic Games | Busca/importação assistida; inicialização por executável local ou, quando o identificador completo estiver disponível, pelo launcher Epic |
 | Discord | Conta conectada e avatar |
-| Firebase | Autenticação, biblioteca, perfis, amizades e feed social |
-| Backend Checkpoint | Chat em tempo real, integrações protegidas e publicação do feed |
+| Firestore | Perfis, amizades, feed social e um resumo público compacto da biblioteca |
+| Realtime Database | Mensagens, digitação, recibos de leitura e índice de conversas |
+| SQLite | Biblioteca completa, caminhos locais, preferências e horas observadas no computador |
+| Backend Checkpoint | Validação de amizades do chat, integrações protegidas e publicação do feed |
 | Jogos locais | Executável, perfil de inicialização, presença e conquistas compatíveis |
 
 ## Instalação
@@ -80,7 +82,7 @@ Pré-requisitos:
 
 - Node.js 22 ou superior.
 - npm com o lockfile do projeto.
-- Java 21 para os testes das regras do Firestore.
+- Java 21 para os testes das regras do Firestore e Realtime Database.
 - Projeto Firebase e credenciais opcionais das integrações que você deseja testar.
 
 Configuração:
@@ -116,20 +118,21 @@ npm run audit:ci
 - `src/`: interface React, estado, serviços e páginas do launcher.
 - `electron/`: runtime desktop, IPC, overlay, capturas, watchers e inicialização de jogos.
 - `server/`: API Express para Steam, Epic, OAuth e integrações do backend.
-- `tests/`: testes unitários, de DOM, IPC e regras do Firestore.
+- `tests/`: testes unitários, de DOM, IPC, SQLite e regras Firebase.
 - `docs/`: documentação técnica e checklist de release.
 
 ## Privacidade e segurança
 
-O Checkpoint usa Firebase para dados de conta, biblioteca e recursos sociais. Steam e Discord são opcionais. Segredos de backend não devem ser expostos ao renderer nem armazenados no repositório. Antes de publicar uma versão, siga o [checklist de release e privacidade](docs/RELEASE_CHECKLIST.md).
+O Checkpoint mantém a biblioteca completa em SQLite dentro de `app.getPath("userData")`. O Firestore recebe somente o resumo público sem caminhos de executáveis ou imagens base64; mensagens ficam no Realtime Database. Steam e Discord são opcionais. Segredos de backend não devem ser expostos ao renderer nem armazenados no repositório. Antes de publicar uma versão, siga o [checklist de release e privacidade](docs/RELEASE_CHECKLIST.md).
 
 ## Limitações conhecidas
 
 - O botão central do controle pode ser reservado pela Xbox Game Bar, Steam ou pelo próprio driver.
 - Fullscreen exclusivo não garante a sobreposição do overlay; borderless é o modo recomendado.
 - Jogos Steam abertos por URI são verificados quando a presença do perfil está visível. Sessões Epic por URI e perfis Steam privados permanecem provisórios e expiram após 12 horas se não houver um processo local verificável.
-- Recursos sociais e os novos resumos de conquistas dependem do backend, das regras e dos índices correspondentes estarem publicados.
-- Chat, histórico recente e contadores de não lidas são transitórios nesta versão; o backend mantém no máximo 30 mensagens por conversa em memória e um reinício limpa esse histórico.
+- Recursos sociais e resumos públicos dependem do backend e das regras dos dois bancos estarem publicados.
+- O chat carrega as 50 mensagens mais recentes e o backend remove mensagens com mais de 30 dias quando uma conversa é aberta.
+- A biblioteca SQLite é específica do computador. Steam pode reconstruir seus jogos em outra máquina, mas jogos manuais exigem nova adição ou uma futura função de exportação/importação.
 - Capturas ainda são locais; backup e versionamento de saves na nuvem não fazem parte da 2.0.0.
 
 O projeto está em desenvolvimento ativo. Relatos reproduzíveis e sugestões podem ser enviados pela página de [issues](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues).

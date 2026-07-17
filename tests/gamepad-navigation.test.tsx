@@ -137,4 +137,19 @@ describe("navegacao por gamepad", () => {
 
     expect(toggleOverlayPanel).toHaveBeenCalledOnce();
   });
+
+  it("oferece View e Menu juntos quando o sistema captura o botao central", () => {
+    const toggleOverlayPanel = vi.fn().mockResolvedValue({ open: true });
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { toggleOverlayPanel },
+    });
+    render(<GamepadProvider><Status /></GamepadProvider>);
+
+    gamepads = [makeGamepad({ id: "Xbox Wireless Controller", pressed: [8, 9] })];
+    runFrame();
+    runFrame();
+
+    expect(toggleOverlayPanel).toHaveBeenCalledOnce();
+  });
 });
