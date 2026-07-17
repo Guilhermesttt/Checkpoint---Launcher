@@ -118,6 +118,7 @@ interface SidebarProps {
   onCategory: (id: string) => void;
   settingsLabel: string;
   playSound: (t: SoundEffectType) => void;
+  notificationCount?: number;
 }
 
 interface SidebarButtonProps {
@@ -126,6 +127,8 @@ interface SidebarButtonProps {
   Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   active: boolean;
   onClick: () => void;
+  notificationCount?: number;
+  reducedMotion?: boolean;
   /** Ícone com leve rotação no hover (usado no Settings) */
   rotateOnHover?: boolean;
 }
@@ -134,17 +137,30 @@ interface SidebarButtonProps {
 // Isso elimina a duplicação entre o .map() e o botão de Settings de fora dele,
 // então qualquer ajuste de estilo/animação passa a valer para os dois automaticamente.
 const SidebarButton: React.FC<SidebarButtonProps> = ({
+  id,
   label,
   Icon,
   active,
   onClick,
+  notificationCount = 0,
+  reducedMotion = false,
   rotateOnHover = false,
 }) => {
+  const hasNotifications = notificationCount > 0;
   return (
-    <button
+    <motion.button
       onClick={onClick}
-      aria-label={label}
+      aria-label={hasNotifications ? `${label}, ${notificationCount} notificacoes` : label}
       aria-current={active ? "page" : undefined}
+      data-sidebar-item={id}
+      data-notification-count={notificationCount}
+      animate={hasNotifications && !reducedMotion ? {
+        y: [0, -7, 0, -3, 0],
+        rotate: [0, -1.5, 1.5, 0],
+      } : { y: 0, rotate: 0 }}
+      transition={hasNotifications && !reducedMotion
+        ? { duration: 0.68, ease: [0.16, 1, 0.3, 1] }
+        : { duration: 0.01 }}
       className={`relative group flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-xl
         transition-all duration-300 ease-out
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--launcher-accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-black
@@ -156,6 +172,38 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
           : "none",
       }}
     >
+      {hasNotifications && (
+        <>
+          <motion.span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 rounded-xl border"
+            style={{ borderColor: "rgb(var(--launcher-accent) / 0.5)" }}
+            animate={reducedMotion ? { opacity: 0.55 } : {
+              opacity: [0.25, 0.7, 0.25],
+              boxShadow: [
+                "0 0 0 0 rgb(var(--launcher-accent) / 0)",
+                "0 0 18px 2px rgb(var(--launcher-accent) / 0.32)",
+                "0 0 0 0 rgb(var(--launcher-accent) / 0)",
+              ],
+            }}
+            transition={reducedMotion ? { duration: 0 } : {
+              duration: 1.8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.span
+            key={`sidebar-notification-${notificationCount}`}
+            className="absolute right-1 top-1 z-20 flex min-h-4 min-w-4 items-center justify-center rounded-full border border-black/50 bg-white px-1 text-[8px] font-black leading-none text-black shadow-[0_0_12px_rgba(255,255,255,0.55)]"
+            initial={reducedMotion ? false : { scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 480, damping: 22 }}
+          >
+            {notificationCount > 99 ? "99+" : notificationCount}
+          </motion.span>
+        </>
+      )}
+
       {/* Indicador de item ativo */}
       {active && (
         <motion.div
@@ -224,7 +272,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
           {label}
         </span>
       </div>
-    </button>
+    </motion.button>
   );
 };
 
@@ -238,7 +286,13 @@ const GroupDivider: React.FC = () => (
   />
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategory, settingsLabel, playSound }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  activeCategory,
+  onCategory,
+  settingsLabel,
+  playSound,
+  notificationCount = 0,
+}) => {
   const prefersReducedMotion = useReducedMotion();
 
   const handleSelect = (id: string) => {
@@ -307,12 +361,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategory, settingsL
                   if (!category) return null;
                   return (
                     <SidebarButton
-                      key={category.id}
+                      key={category.id === "FRIENDS"
+                        ? `${category.id}-${notificationCount}`
+                        : category.id}
                       id={category.id}
                       label={category.label}
                       Icon={category.Icon}
                       active={activeCategory === category.id}
                       onClick={() => handleSelect(category.id)}
+                      notificationCount={category.id === "FRIENDS" ? notificationCount : 0}
+                      reducedMotion={Boolean(prefersReducedMotion)}
                     />
                   );
                 })}
@@ -331,6 +389,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategory, settingsL
             Icon={Settings}
             active={activeCategory === "SETTINGS"}
             onClick={() => handleSelect("SETTINGS")}
+            reducedMotion={Boolean(prefersReducedMotion)}
             rotateOnHover
           />
         </div>

@@ -527,9 +527,12 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .panel-topbar {
+      flex: 0 0 auto;
       padding: 32px 40px 16px;
       display: grid;
       grid-template-columns: 1fr auto auto auto;
@@ -643,6 +646,7 @@
 
     .panel-content {
       flex: 1;
+      min-height: 0;
       padding: 24px 40px;
       overflow-y: auto;
     }
@@ -1267,18 +1271,19 @@
 
     .panel-view[data-panel-view="chats"].is-active {
       height: 100%;
-      min-height: clamp(480px, calc(90vh - 160px), 780px);
+      min-height: 0;
+      overflow: hidden;
     }
 
     .panel-view[data-panel-view="chats"] #panel-chat-view:not([hidden]) {
       height: 100%;
-      min-height: inherit;
+      min-height: 0;
     }
 
     .chat-layout {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      min-height: inherit;
+      min-height: 0;
       overflow: hidden;
       border: 1px solid var(--panel-border);
       border-radius: 18px;
@@ -1370,12 +1375,43 @@
       opacity: 0.56;
     }
 
+    .chat-message-image {
+      display: block;
+      width: min(360px, 100%);
+      max-height: 280px;
+      margin-bottom: 7px;
+      border-radius: 11px;
+      object-fit: cover;
+      cursor: pointer;
+    }
+
     .chat-time {
       display: block;
       margin-top: 5px;
       font-size: 9px;
       text-align: right;
       opacity: 0.48;
+    }
+
+    .chat-day-separator {
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0;
+      color: rgba(255, 255, 255, 0.34);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .chat-day-separator::before,
+    .chat-day-separator::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .chat-empty {
@@ -1411,7 +1447,7 @@
 
     .chat-form {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 42px;
+      grid-template-columns: 42px minmax(0, 1fr) 42px;
       gap: 8px;
       padding: 5px;
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1451,6 +1487,22 @@
 
     .chat-send:hover { transform: translateY(-1px); }
     .chat-send:disabled { opacity: 0.42; cursor: wait; }
+
+    .chat-attach {
+      width: 42px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.07);
+      color: rgba(255, 255, 255, 0.72);
+      cursor: pointer;
+    }
+
+    .chat-attach:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+    .chat-attach:disabled { opacity: 0.42; cursor: wait; }
+    #chat-image-input { display: none; }
 
     .achievement-list {
       display: grid;
@@ -1703,7 +1755,7 @@
 
     @media (max-height: 700px) {
       .panel-view[data-panel-view="chats"].is-active {
-        min-height: calc(90vh - 130px);
+        min-height: 0;
       }
     }
   </style>
@@ -1816,7 +1868,8 @@
                 <div class="chat-composer">
                   <div class="chat-typing" id="chat-typing"></div>
                   <div class="chat-error" id="chat-error" role="status" aria-live="polite"></div>
-                  <form class="chat-form" id="chat-form"><input class="chat-input" id="chat-input"
+                  <input id="chat-image-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+                  <form class="chat-form" id="chat-form"><button class="chat-attach" id="chat-attach" type="button" aria-label="Enviar imagem"><svg class="ui-icon"><use href="#icon-image" /></svg></button><input class="chat-input" id="chat-input"
                       autocomplete="off" placeholder="Escreva uma mensagem..." aria-label="Mensagem" /><button class="chat-send" id="chat-send" type="submit" aria-label="Enviar mensagem"><svg class="ui-icon"><use href="#icon-send" /></svg></button></form>
               </div>
             </div>
@@ -2036,6 +2089,29 @@
       } catch {
         return "";
       }
+    };
+
+    const avatarFallbackUrl = (name = "Jogador") => {
+      const initials = String(name || "J")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => Array.from(part)[0] || "")
+        .join("")
+        .toUpperCase() || "J";
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#17171c"/><text x="64" y="69" text-anchor="middle" dominant-baseline="middle" fill="#f5f5f5" font-family="Segoe UI,Arial,sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    };
+
+    const setAvatarSource = (image, source, name) => {
+      if (!image) return;
+      const fallback = avatarFallbackUrl(name);
+      image.referrerPolicy = "no-referrer";
+      image.onerror = () => {
+        image.onerror = null;
+        image.src = fallback;
+      };
+      image.src = safeImageUrl(source) || fallback;
     };
 
     const createIconColumn = ({ ring, avatarSrc, avatarSvg, fallbackSvg, isPhoto, isLogo }) => {
@@ -2342,9 +2418,9 @@
       const profileAvatar = safeImageUrl(profile.avatar) || checkpointIconUrl;
       document.getElementById("panel-profile-name").textContent = profileName.split(" ")[0];
       document.getElementById("sidebar-profile-name").textContent = profileName.split(" ")[0];
-      document.getElementById("sidebar-profile-avatar").src = profileAvatar;
-      document.getElementById("panel-profile-avatar").src = profileAvatar;
-      document.getElementById("profile-page-avatar").src = profileAvatar;
+      setAvatarSource(document.getElementById("sidebar-profile-avatar"), profileAvatar, profileName);
+      setAvatarSource(document.getElementById("panel-profile-avatar"), profileAvatar, profileName);
+      setAvatarSource(document.getElementById("profile-page-avatar"), profileAvatar, profileName);
       document.getElementById("profile-page-name").textContent = profileName;
       const discordPill = document.getElementById("profile-discord");
       discordPill.hidden = !profile.discordConnected;
@@ -2373,7 +2449,7 @@
         card.className = `panel-card friend-card status-${friend.status || "offline"}`;
         const avatar = document.createElement("img");
         avatar.className = "friend-avatar";
-        avatar.src = safeImageUrl(friend.avatar) || checkpointIconUrl;
+        setAvatarSource(avatar, friend.avatar, friend.name);
         avatar.alt = "";
         const copy = document.createElement("div");
         copy.className = "friend-copy";
@@ -2438,7 +2514,7 @@
         row.type = "button";
         row.className = "conversation-row";
         const avatar = document.createElement("img");
-        avatar.src = safeImageUrl(friend.avatar) || checkpointIconUrl;
+        setAvatarSource(avatar, friend.avatar, friend.name);
         avatar.alt = "";
         const copy = document.createElement("span");
         copy.className = "conversation-copy";
@@ -2628,11 +2704,16 @@
       document.getElementById("panel-chat-view").hidden = !chat;
       if (chat) {
         document.getElementById("chat-name").textContent = chat.friendName || "Amigo";
-        document.getElementById("chat-avatar").src = safeImageUrl(chat.friendAvatar) || checkpointIconUrl;
+        setAvatarSource(
+          document.getElementById("chat-avatar"),
+          chat.friendAvatar,
+          chat.friendName,
+        );
         document.getElementById("chat-status").textContent = chat.typing ? "digitando..." : "Conversa pelo Checkpoint";
         document.getElementById("chat-typing").textContent = chat.typing ? `${chat.friendName} está digitando...` : "";
         document.getElementById("chat-error").textContent = chat.error || "";
         document.getElementById("chat-send").disabled = Boolean(chat.sending);
+        document.getElementById("chat-attach").disabled = Boolean(chat.sending);
         const messagesRoot = document.getElementById("chat-messages");
         messagesRoot.replaceChildren();
         if (!chat.messages?.length) {
@@ -2641,10 +2722,47 @@
           empty.textContent = "Comece a conversa por aqui.";
           messagesRoot.appendChild(empty);
         } else {
+          let previousDayKey = null;
           chat.messages.forEach((message) => {
+            const messageDate = new Date(message.createdAt);
+            const validDate = Number.isFinite(messageDate.getTime());
+            const dayKey = validDate
+              ? `${messageDate.getFullYear()}-${messageDate.getMonth()}-${messageDate.getDate()}`
+              : "";
+            if (dayKey !== previousDayKey) {
+              const today = new Date();
+              const yesterday = new Date(today);
+              yesterday.setDate(today.getDate() - 1);
+              const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+              const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+              const separator = document.createElement("div");
+              separator.className = "chat-day-separator";
+              separator.textContent = dayKey === todayKey
+                ? "Hoje"
+                : dayKey === yesterdayKey
+                  ? "Ontem"
+                  : validDate
+                    ? messageDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+                    : "Data desconhecida";
+              messagesRoot.appendChild(separator);
+              previousDayKey = dayKey;
+            }
             const bubble = document.createElement("div");
             bubble.className = `chat-message${message.mine ? " is-mine" : ""}${message.pending ? " is-pending" : ""}`;
-            bubble.textContent = message.text;
+            const attachmentUrl = safeImageUrl(message.attachmentUrl);
+            if (attachmentUrl) {
+              const image = document.createElement("img");
+              image.className = "chat-message-image";
+              image.src = attachmentUrl;
+              image.alt = message.attachmentName || "Imagem compartilhada";
+              image.addEventListener("click", () => window.open(attachmentUrl, "_blank", "noopener"));
+              bubble.appendChild(image);
+            }
+            if (message.text) {
+              const text = document.createElement("span");
+              text.textContent = message.text;
+              bubble.appendChild(text);
+            }
             const time = document.createElement("span");
             time.className = "chat-time";
             time.textContent = message.pending
@@ -2738,6 +2856,26 @@
       setCaptureFeedback("Pressione F1–F24, Print Screen ou uma combinação com Ctrl, Alt ou Shift. Esc cancela.");
       captureShortcutRecorder.focus();
     });
+    let chatTypingIdleTimer = 0;
+    let chatTypingLastRefresh = 0;
+    document.getElementById("chat-input")?.addEventListener("input", (event) => {
+      const typing = Boolean(event.currentTarget.value.trim());
+      const now = Date.now();
+      window.clearTimeout(chatTypingIdleTimer);
+      if (!typing) {
+        chatTypingLastRefresh = 0;
+        window.achievementOverlay.panelAction({ kind: "set-typing", typing: false });
+        return;
+      }
+      if (!chatTypingLastRefresh || now - chatTypingLastRefresh >= 1500) {
+        chatTypingLastRefresh = now;
+        window.achievementOverlay.panelAction({ kind: "set-typing", typing: true });
+      }
+      chatTypingIdleTimer = window.setTimeout(() => {
+        chatTypingLastRefresh = 0;
+        window.achievementOverlay.panelAction({ kind: "set-typing", typing: false });
+      }, 2500);
+    });
     document.getElementById("chat-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const input = document.getElementById("chat-input");
@@ -2745,6 +2883,30 @@
       if (!text) return;
       window.achievementOverlay.panelAction({ kind: "send-message", text });
       input.value = "";
+      window.clearTimeout(chatTypingIdleTimer);
+      chatTypingLastRefresh = 0;
+      window.achievementOverlay.panelAction({ kind: "set-typing", typing: false });
+    });
+    document.getElementById("chat-attach")?.addEventListener("click", () => {
+      document.getElementById("chat-image-input")?.click();
+    });
+    document.getElementById("chat-image-input")?.addEventListener("change", async (event) => {
+      const file = event.currentTarget.files?.[0];
+      event.currentTarget.value = "";
+      if (!file) return;
+      if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+        document.getElementById("chat-error").textContent = "Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.";
+        return;
+      }
+      const result = await window.achievementOverlay.panelAction({
+        kind: "send-image",
+        name: file.name,
+        type: file.type,
+        data: new Uint8Array(await file.arrayBuffer()),
+      });
+      if (result?.ok === false) {
+        document.getElementById("chat-error").textContent = result.error || "Nao foi possivel enviar a imagem.";
+      }
     });
     document.querySelectorAll("[data-media]").forEach((button) => button.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: button.dataset.media })));
     window.setInterval(updateSessionDuration, 1000);

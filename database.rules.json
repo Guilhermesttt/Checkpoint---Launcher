@@ -15,7 +15,22 @@
           ".indexOn": ["createdAt"],
           "$messageId": {
             ".write": "auth != null && root.child('chats').child($chatId).child('participants').child(auth.uid).val() === true && !data.exists() && newData.child('senderId').val() === auth.uid",
-            ".validate": "newData.hasChildren(['senderId', 'receiverId', 'text', 'createdAt']) && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && newData.child('receiverId').isString() && newData.child('receiverId').val() !== auth.uid && root.child('chats').child($chatId).child('participants').child(newData.child('receiverId').val()).val() === true"
+            ".validate": "newData.hasChildren(['senderId', 'receiverId', 'text', 'createdAt']) && newData.child('text').isString() && newData.child('text').val().length <= 2000 && (newData.child('text').val().length > 0 || newData.hasChildren(['attachmentName', 'attachmentUrl', 'attachmentType', 'attachmentSize', 'attachmentPath'])) && newData.child('receiverId').isString() && newData.child('receiverId').val() !== auth.uid && root.child('chats').child($chatId).child('participants').child(newData.child('receiverId').val()).val() === true",
+            "attachmentName": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 160)"
+            },
+            "attachmentUrl": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 4096)"
+            },
+            "attachmentType": {
+              ".validate": "!newData.exists() || (newData.isString() && (newData.val() === 'image/jpeg' || newData.val() === 'image/png' || newData.val() === 'image/webp' || newData.val() === 'image/gif'))"
+            },
+            "attachmentSize": {
+              ".validate": "!newData.exists() || (newData.isNumber() && newData.val() > 0 && newData.val() <= 8388608)"
+            },
+            "attachmentPath": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length > 0 && newData.val().length <= 500)"
+            }
           }
         },
         "reads": {

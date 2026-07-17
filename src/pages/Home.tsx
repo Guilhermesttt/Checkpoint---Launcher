@@ -64,7 +64,9 @@ import {
   closeChatConnection,
   establishChatConnection,
   markMessagesAsRead,
+  sendChatImage,
   sendChatMessage,
+  setChatTyping,
   subscribeToChatMessages,
   subscribeToFriendTyping,
 } from "../services/chat";
@@ -93,6 +95,7 @@ import {
 import { useGamepadButton, useGamepad } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
+import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
 import InputHints from "../components/ui/InputHints";
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
@@ -1119,6 +1122,8 @@ const Home: React.FC = () => {
         messages: overlayChatMessages.map((message) => ({
           id: message.id || `${message.senderId}:${message.createdAt}`,
           text: message.text,
+          attachmentUrl: message.attachmentUrl,
+          attachmentName: message.attachmentName,
           createdAt: message.createdAt,
           mine: message.senderId === user?.uid || message.senderId === "me",
           pending: String(message.id || "").startsWith("overlay-pending-"),
@@ -1172,10 +1177,36 @@ const Home: React.FC = () => {
         return;
       }
       if (action.kind === "close-chat") {
+        if (overlayChatFriendUid) void setChatTyping(overlayChatFriendUid, false);
         setOverlayChatMessages([]);
         setOverlayChatTyping(false);
         setOverlayChatError(null);
         setOverlayChatFriendId(null);
+        return;
+      }
+      if (action.kind === "set-typing") {
+        if (overlayChatFriendUid) void setChatTyping(overlayChatFriendUid, action.typing);
+        return;
+      }
+      if (action.kind === "send-image") {
+        if (!overlayChatFriendUid || overlayChatSending) return;
+        const bytes = action.data instanceof Uint8Array
+          ? action.data
+          : new Uint8Array(action.data);
+        const imageBuffer = new ArrayBuffer(bytes.byteLength);
+        new Uint8Array(imageBuffer).set(bytes);
+        const file = new File([imageBuffer], action.name, { type: action.type });
+        setOverlayChatSending(true);
+        setOverlayChatError(null);
+        void sendChatImage(overlayChatFriendUid, file).then((message) => {
+          setOverlayChatMessages((current) => current.some((item) => item.id === message.id)
+            ? current
+            : [...current, message].sort(
+              (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+            ));
+        }).catch((error) => {
+          setOverlayChatError(error instanceof Error ? error.message : "Nao foi possivel enviar a imagem.");
+        }).finally(() => setOverlayChatSending(false));
         return;
       }
       if (action.kind !== "send-message" || !overlayChatFriendUid || overlayChatSending) return;
@@ -1184,6 +1215,7 @@ const Home: React.FC = () => {
       const pendingId = `overlay-pending-${Date.now()}`;
       setOverlayChatSending(true);
       setOverlayChatError(null);
+      void setChatTyping(overlayChatFriendUid, false);
       setOverlayChatMessages((current) => [...current, {
         id: pendingId,
         chatId: overlayChatFriendUid,
@@ -1333,6 +1365,13 @@ const Home: React.FC = () => {
         onCategory={setActiveCategory}
         settingsLabel={t("settings")}
         playSound={playSound}
+        notificationCount={
+          incomingFriendRequests.length
+          + Object.values(unreadMessagesByFriend).reduce(
+            (total, count) => total + Math.max(0, Number(count) || 0),
+            0,
+          )
+        }
       />
 
       <div
@@ -1711,7 +1750,7 @@ const Home: React.FC = () => {
                             className="text-[11px] font-semibold"
                             style={{ color: "rgba(255,255,255,0.3)" }}
                           >
-                            {currentGame.hoursPlayed}h jogadas
+                            {formatPlayedHours(getGamePlayedHours(currentGame))}h jogadas
                           </span>
                         )}
                         {currentGame?.isFavorite && (
@@ -1837,6 +1876,7 @@ const Home: React.FC = () => {
           }}
           playSound={playSound}
           onLibraryChanged={refreshLibrary}
+          onGameHydrated={setSelectedGame}
         />
       </React.Suspense>
 

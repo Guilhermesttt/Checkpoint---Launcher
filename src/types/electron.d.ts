@@ -7,6 +7,52 @@ declare global {
         executablePath: string,
         launchProfile?: import("./domain").GameLaunchProfile,
       ) => Promise<void>;
+      selectExecutable: () => Promise<string | null>;
+      searchEpicStore: (query: string) => Promise<Array<{
+        id: string;
+        catalogId: string;
+        namespace: string;
+        name: string;
+        title: string;
+        appName: string;
+        epicLaunchId: string;
+        executablePath: string;
+        image: string;
+        tiny_image: string;
+        cardImage: string;
+        backgroundImage: string;
+        productSlug: string;
+        productUrl: string;
+        source: "epic-store";
+        installed: boolean;
+      }>>;
+      fetchEpicStoreDetails: (request: {
+        catalogId: string;
+        namespace: string;
+        productSlug: string;
+      }) => Promise<{
+        catalogId: string;
+        namespace: string;
+        appName: string;
+        title: string;
+        image: string;
+        cardImage: string;
+        backgroundImage: string;
+        logoImage: string;
+        description: string;
+        aboutTheGame: string;
+        screenshots: string[];
+        releaseDate: string;
+        developer: string;
+        publisher: string;
+        tags: string[];
+        trailerUrl: string;
+        productSlug: string;
+        productUrl: string;
+        epicLaunchId: string;
+        executablePath: string;
+        source: "epic-store";
+      }>;
       getDisplays: () => Promise<Array<{
         id: number;
         label: string;
@@ -113,6 +159,33 @@ declare global {
       getLocalAchievementState: (
         appId: string
       ) => Promise<{ [id: string]: { earned: boolean; earnedTime: number } }>;
+      getEpicLocalAchievements: (request: {
+        gameId: string;
+        title: string;
+        epicCatalogId?: string;
+        epicLaunchId?: string;
+        executablePath?: string;
+      }) => Promise<{
+        source: "epic-local";
+        status: "ok" | "not-installed" | "binary-save" | "no-readable-files";
+        installed: boolean;
+        installLocation: string;
+        achievements: Array<{
+          apiName: string;
+          achieved: boolean;
+          unlockTime: number;
+          name: string;
+          description: string;
+          icon: string;
+          iconGray: string;
+          hidden: boolean;
+        }>;
+        total: number;
+        unlocked: number;
+        readableFileCount: number;
+        binarySaveDetected: boolean;
+        scanTruncated: boolean;
+      }>;
       getLocalAchievementLibrarySummary: () => Promise<{
         byGameId: Record<string, { total: number; unlocked: number }>;
         bySteamAppId: Record<string, { total: number; unlocked: number }>;
@@ -171,7 +244,15 @@ declare global {
           typing?: boolean;
           sending?: boolean;
           error?: string;
-          messages: Array<{ id: string; text: string; createdAt: string; mine: boolean; pending?: boolean }>;
+          messages: Array<{
+            id: string;
+            text: string;
+            attachmentUrl?: string;
+            attachmentName?: string;
+            createdAt: string;
+            mine: boolean;
+            pending?: boolean;
+          }>;
         } | null;
         profile?: {
           name: string;
@@ -185,6 +266,8 @@ declare global {
         | { kind: "select-chat"; friendId: string }
         | { kind: "close-chat" }
         | { kind: "send-message"; text: string }
+        | { kind: "send-image"; name: string; type: string; data: Uint8Array }
+        | { kind: "set-typing"; typing: boolean }
       ) => void) => () => void;
 
       // ─ Real-time achievement push events (main → renderer) ─────────────────

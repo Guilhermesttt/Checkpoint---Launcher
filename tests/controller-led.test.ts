@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildDs4BluetoothLightbarReport,
   buildDs4UsbLightbarReport,
+  buildDualSenseBluetoothLightbarReport,
+  buildDualSenseUsbLightbarReport,
   THEME_ACCENT_COLORS,
   THEME_LED_COLORS,
 } from "../src/services/controllerLed";
@@ -27,6 +29,25 @@ describe("pacotes de LED do DualShock 4", () => {
     expect(Array.from(report.slice(-4))).not.toEqual([0, 0, 0, 0]);
   });
 
+});
+
+describe("pacotes de LED do DualSense", () => {
+  it("usa o tamanho exato do report USB 0x02 e habilita a lightbar", () => {
+    const report = buildDualSenseUsbLightbarReport(300, -1, 127.6);
+
+    expect(report).toHaveLength(47);
+    expect(Array.from(report.slice(0, 2))).toEqual([0x02, 0x04]);
+    expect(Array.from(report.slice(44, 47))).toEqual([255, 0, 128]);
+  });
+
+  it("monta o report Bluetooth 0x31 com sequencia, RGB e CRC", () => {
+    const report = buildDualSenseBluetoothLightbarReport(10, 20, 30, 3);
+
+    expect(report).toHaveLength(77);
+    expect(Array.from(report.slice(0, 4))).toEqual([0x30, 0x10, 0x02, 0x04]);
+    expect(Array.from(report.slice(46, 49))).toEqual([10, 20, 30]);
+    expect(Array.from(report.slice(-4))).not.toEqual([0, 0, 0, 0]);
+  });
 });
 
 describe("cores dos temas na lightbar", () => {

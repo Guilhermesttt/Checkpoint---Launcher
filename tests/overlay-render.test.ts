@@ -38,7 +38,7 @@ describe("overlay de conquistas", () => {
         <span id="game-platform"></span><span id="game-executable"></span><span id="game-developer"></span><span id="game-release-date"></span><span id="game-window-mode"></span><span id="game-resolution"></span>
         <span id="panel-unlocked"></span><span id="panel-available"></span>
         <div id="panel-achievement-progress"></div><div id="panel-achievements"></div>
-        <button id="panel-close"></button><button id="panel-close-top"></button><button id="chat-back"></button><form id="chat-form"><input id="chat-input" /></form>
+        <button id="panel-close"></button><button id="panel-close-top"></button><button id="chat-back"></button><form id="chat-form"><button id="chat-attach" type="button"></button><input id="chat-input" /></form><input id="chat-image-input" type="file" />
         <span id="chat-name"></span><img id="chat-avatar" /><span id="chat-status"></span>
         <span id="chat-typing"></span><span id="chat-error"></span><button id="chat-send"></button><div id="chat-messages"></div>
         <input id="setting-social" type="checkbox" /><input id="setting-achievements" type="checkbox" /><input id="setting-animations" type="checkbox" />
@@ -157,6 +157,30 @@ describe("overlay de conquistas", () => {
     expect(document.querySelectorAll(".capture-card")).toHaveLength(1);
   });
 
+  it("mantem avatar base64 completo e usa iniciais quando a imagem falha", () => {
+    const avatarData = `data:image/webp;base64,${"A".repeat(8_000)}`;
+    panelVisibility({
+      open: true,
+      state: {
+        friends: [{
+          id: "friend-avatar",
+          name: "Gui Rosa",
+          status: "online",
+          avatar: avatarData,
+        }],
+      },
+    });
+
+    const avatar = document.querySelector<HTMLImageElement>(
+      "#panel-friends-online .friend-avatar",
+    );
+    expect(avatar?.src).toBe(avatarData);
+
+    avatar?.dispatchEvent(new Event("error"));
+    expect(avatar?.src).toMatch(/^data:image\/svg\+xml/);
+    expect(avatar?.src).toContain("GR");
+  });
+
   it("mostra conquistas do jogo e permite conversar sem fechar o overlay", () => {
     panelVisibility({
       open: true,
@@ -187,6 +211,46 @@ describe("overlay de conquistas", () => {
     input.value = "Vamos";
     document.getElementById("chat-form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     expect(panelAction).toHaveBeenCalledWith({ kind: "send-message", text: "Vamos" });
+  });
+
+  it("mantem o compositor visivel, renderiza imagens e envia o estado de digitacao", () => {
+    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+    const chatViewRule = html.match(
+      /\.panel-view\[data-panel-view="chats"\]\.is-active\s*\{([\s\S]*?)\}/,
+    )?.[1] || "";
+
+    expect(chatViewRule).toContain("height: 100%");
+    expect(chatViewRule).toContain("min-height: 0");
+    expect(chatViewRule).toContain("overflow: hidden");
+
+    panelVisibility({
+      open: true,
+      state: {
+        chat: {
+          friendId: "cp-friend:friend-1",
+          friendName: "Mileide",
+          messages: [{
+            id: "image-1",
+            text: "",
+            attachmentUrl: "https://cdn.example.com/image.png",
+            attachmentName: "image.png",
+            createdAt: "2026-07-16T12:00:00.000Z",
+            mine: false,
+          }],
+        },
+      },
+    });
+
+    expect(document.querySelector(".chat-message-image")?.getAttribute("src"))
+      .toContain("cdn.example.com/image.png");
+
+    const input = document.getElementById("chat-input") as HTMLInputElement;
+    input.value = "Ola";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(panelAction).toHaveBeenCalledWith({ kind: "set-typing", typing: true });
+
+    vi.advanceTimersByTime(2_500);
+    expect(panelAction).toHaveBeenCalledWith({ kind: "set-typing", typing: false });
   });
 
   it("grava uma combinação personalizada para captura", async () => {

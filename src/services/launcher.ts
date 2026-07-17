@@ -102,6 +102,12 @@ export const launchGame = async (game: Game): Promise<void> => {
       return;
     }
 
+    if (window.electronAPI?.launchExecutable && game.executablePath) {
+      throw new Error(
+        "O caminho salvo para este jogo e invalido. Edite o jogo e selecione novamente o arquivo .exe.",
+      );
+    }
+
     throw new Error(
       "Execucao local requer runtime desktop. No modo web, Steam e Epic sao suportados via URLs do launcher.",
     );

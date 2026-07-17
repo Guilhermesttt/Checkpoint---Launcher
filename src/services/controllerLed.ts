@@ -283,6 +283,43 @@ async function sendDs4Lightbar(
   return sendCompatibleReports(attempts, "Nenhum output report DS4 compativel encontrado.");
 }
 
+export function buildDualSenseUsbLightbarReport(
+  r: number,
+  g: number,
+  b: number,
+): Uint8Array<ArrayBuffer> {
+  const report = new Uint8Array(47);
+  report[0] = 0x02;
+  report[1] = 0x04;
+  report[44] = clampRgb(r);
+  report[45] = clampRgb(g);
+  report[46] = clampRgb(b);
+  return report;
+}
+
+export function buildDualSenseBluetoothLightbarReport(
+  r: number,
+  g: number,
+  b: number,
+  sequence = 0,
+): Uint8Array<ArrayBuffer> {
+  const reportId = 0x31;
+  const report = new Uint8Array(77);
+  report[0] = (sequence & 0x0f) << 4;
+  report[1] = 0x10;
+  report[2] = 0x02;
+  report[3] = 0x04;
+  report[46] = clampRgb(r);
+  report[47] = clampRgb(g);
+  report[48] = clampRgb(b);
+  const crcInput = new Uint8Array(1 + report.length - 4);
+  crcInput[0] = reportId;
+  crcInput.set(report.subarray(0, report.length - 4), 1);
+  const seedCrc = crc32Le(0xffffffff, new Uint8Array([0xa2]));
+  writeLe32(report, report.length - 4, (~crc32Le(seedCrc, crcInput)) >>> 0);
+  return report;
+}
+
 async function sendDualSenseLightbar(device: HIDDevice, r: number, g: number, b: number): Promise<string[]> {
   // USB output report 0x02 (48 bytes) — lightbar + player LED
   const reportIds = getOutputReportIds(device);
@@ -290,33 +327,16 @@ async function sendDualSenseLightbar(device: HIDDevice, r: number, g: number, b:
 
   if (reportIds.size === 0 || reportIds.has(0x02)) {
     attempts.push({ label: "USB 0x02", send: async () => {
-      const report = new Uint8Array(62);
-      report[0] = 0x00;
-      report[1] = 0x04;
-      report[44] = r;
-      report[45] = g;
-      report[46] = b;
-      await device.sendReport(0x02, report);
+      await device.sendReport(0x02, buildDualSenseUsbLightbarReport(r, g, b));
     } });
   }
 
   if (reportIds.size === 0 || reportIds.has(0x31)) {
     attempts.push({ label: "Bluetooth 0x31", send: async () => {
-      const reportId = 0x31;
-      const report = new Uint8Array(77);
-      report[0] = (dualsenseOutputSequence++ & 0x0f) << 4;
-      report[1] = 0x10;
-      report[2] = 0x00;
-      report[3] = 0x04;
-      report[46] = r;
-      report[47] = g;
-      report[48] = b;
-      const crcInput = new Uint8Array(1 + report.length - 4);
-      crcInput[0] = reportId;
-      crcInput.set(report.subarray(0, report.length - 4), 1);
-      const seedCrc = crc32Le(0xffffffff, new Uint8Array([0xa2]));
-      writeLe32(report, report.length - 4, (~crc32Le(seedCrc, crcInput)) >>> 0);
-      await device.sendReport(reportId, report);
+      await device.sendReport(
+        0x31,
+        buildDualSenseBluetoothLightbarReport(r, g, b, dualsenseOutputSequence++),
+      );
     } });
   }
 

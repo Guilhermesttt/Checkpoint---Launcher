@@ -13,6 +13,7 @@ vi.mock("firebase/database", () => ({
   off: databaseMocks.off,
   onChildAdded: vi.fn(),
   onValue: databaseMocks.onValue,
+  orderByChild: vi.fn((value) => value),
   push: vi.fn(),
   query: vi.fn((value) => value),
   ref: databaseMocks.ref,
@@ -28,6 +29,7 @@ vi.mock("../Firebase", () => ({
 }));
 
 import {
+  compareChatMessages,
   closeChatConnection,
   establishChatConnection,
   subscribeToUnreadMessages,
@@ -39,6 +41,24 @@ afterEach(() => {
 });
 
 describe("chat no Realtime Database", () => {
+  it("ordena por horario e usa o id como desempate deterministico", () => {
+    const base = {
+      chatId: "chat",
+      senderId: "user-1",
+      receiverId: "friend-1",
+      text: "Mensagem",
+      read: false,
+      createdAt: "2026-07-17T12:00:00.000Z",
+    };
+    const messages = [
+      { ...base, id: "b" },
+      { ...base, id: "c", createdAt: "2026-07-17T12:01:00.000Z" },
+      { ...base, id: "a" },
+    ].sort(compareChatMessages);
+
+    expect(messages.map((message) => message.id)).toEqual(["a", "b", "c"]);
+  });
+
   it("escuta somente a caixa do usuario e deduplica mensagens recebidas", async () => {
     let inboxCallback: ((snapshot: { val: () => unknown }) => void) | undefined;
     databaseMocks.onValue.mockImplementation((_reference, callback) => {

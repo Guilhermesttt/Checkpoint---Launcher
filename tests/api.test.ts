@@ -30,6 +30,22 @@ describe("API publica", () => {
     await request(app).get("/api/epic/app-details").expect(400);
   });
 
+  it("nao mistura resultados de outra loja quando o GraphQL da Epic e bloqueado", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("", { status: 403 }));
+    try {
+      const response = await request(app)
+        .get("/api/epic/search?query=portal")
+        .expect(502);
+
+      expect(response.body.items).toBeUndefined();
+      expect(response.body.error).toMatch(/Epic Games Store/i);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it("nao permite origem CORS desconhecida", async () => {
     const response = await request(app)
       .get("/health")

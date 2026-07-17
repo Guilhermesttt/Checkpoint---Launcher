@@ -94,6 +94,10 @@ describe("AddGameModal", () => {
 
   afterEach(() => {
     cleanup();
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: undefined,
+    });
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -129,6 +133,33 @@ describe("AddGameModal", () => {
     );
     expect(onClose).toHaveBeenCalledWith(true);
     expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it("salva o caminho absoluto retornado pelo seletor nativo de executavel", async () => {
+    const selectExecutable = vi.fn().mockResolvedValue(
+      "C:\\Games\\Control\\Control.exe",
+    );
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { selectExecutable },
+    });
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.type(screen.getByLabelText("Título"), "Control");
+    await user.click(screen.getByRole("button", { name: /Selecionar \.exe/i }));
+
+    expect(selectExecutable).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("C:\\Games\\Control\\Control.exe")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Confirmar Adição/i }));
+    await waitFor(() => expect(mocks.addDoc).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({
+        launcherType: "local",
+        executablePath: "C:\\Games\\Control\\Control.exe",
+      }),
+    ));
   });
 
   it("edita um jogo legado da Steam e usa a ação correta de salvar", async () => {

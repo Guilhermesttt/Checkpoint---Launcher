@@ -2252,6 +2252,19 @@ app.post("/api/steam/achievement-summary", steamPrivateLimiter, requireFirebaseU
   });
 });
 
+const fetchSteamSearchItems = async (query) => {
+  const url = new URL("https://store.steampowered.com/api/storesearch/");
+  url.searchParams.set("term", query);
+  url.searchParams.set("l", "brazilian");
+  url.searchParams.set("cc", "BR");
+  const response = await fetch(url.toString(), { headers: steamStoreFetchHeaders });
+  if (!response.ok) {
+    throw new Error(`Falha na busca Steam Store (status ${response.status}).`);
+  }
+  const payload = await response.json();
+  return Array.isArray(payload?.items) ? payload.items : [];
+};
+
 const handleSteamSearch = async (req, res) => {
   const query = String(req.query.query ?? "").trim();
   if (query.length < 2) {
@@ -2260,26 +2273,7 @@ const handleSteamSearch = async (req, res) => {
   }
 
   try {
-    const url = new URL("https://store.steampowered.com/api/storesearch/");
-    url.searchParams.set("term", query);
-    url.searchParams.set("l", "brazilian");
-    url.searchParams.set("cc", "BR");
-
-    const response = await fetch(url.toString(), {
-      headers: steamStoreFetchHeaders,
-    });
-
-    if (!response.ok) {
-      res.status(502).json({
-        error: `Falha na busca Steam Store (status ${response.status}).`,
-      });
-      return;
-    }
-
-    const payload = await response.json();
-    res.json({
-      items: payload?.items ?? [],
-    });
+    res.json({ items: await fetchSteamSearchItems(query) });
   } catch {
     res
       .status(500)
@@ -2304,18 +2298,13 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
       country: "BR",
       count: 12,
       start: 0,
-    });
-
-    if (!result.ok) {
-      res.status(502).json({
-        error: `Falha na busca Epic Games Store (status ${result.status}).`,
-      });
-      return;
-    }
+    }).catch(() => ({ ok: false, status: 0, payload: null }));
 
     const payload = result.payload ?? {};
-    if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-      res.status(502).json({ error: "GraphQL da Epic retornou erro na busca." });
+    if (!result.ok || (Array.isArray(payload?.errors) && payload.errors.length > 0)) {
+      res.status(502).json({
+        error: `Falha na busca da Epic Games Store (status ${result.status}).`,
+      });
       return;
     }
 
@@ -2338,6 +2327,7 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
 
         return {
           id: catalogId,
+          catalogId,
           namespace,
           name: String(item.title).trim(),
           title: String(item.title).trim(),

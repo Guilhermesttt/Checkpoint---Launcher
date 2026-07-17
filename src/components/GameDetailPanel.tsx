@@ -23,6 +23,7 @@ import {
 import { useNotification } from "./NotificationCenter";
 import { useGamepadButton } from "../context/GamepadContext";
 import InputHints from "./ui/InputHints";
+import { fetchEpicAppDetailsResult } from "../services/epic";
 
 interface GameDetailPanelProps {
   game: Game | null;
@@ -31,6 +32,7 @@ interface GameDetailPanelProps {
   playSound: (type: SoundEffectType) => void;
   onEditGame?: (game: Game) => void;
   onLibraryChanged?: () => Promise<void> | void;
+  onGameHydrated?: (game: Game) => void;
 }
 
 const MIN_LAUNCH_SCREEN_MS = 1200;
@@ -51,6 +53,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   playSound,
   onEditGame,
   onLibraryChanged,
+  onGameHydrated,
 }) => {
   const { user, userProfile } = useAuth();
   const { t, language } = usePreferences();
@@ -79,6 +82,67 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     height: number;
   }>>([]);
   const [isSavingLaunchProfile, setIsSavingLaunchProfile] = React.useState(false);
+  const hydratedEpicGamesRef = React.useRef(new Set<string>());
+
+  React.useEffect(() => {
+    if (
+      !isOpen
+      || !user?.uid
+      || !game?.id
+      || game.launcherType !== "epic"
+      || !game.epicStoreUrl
+      || hydratedEpicGamesRef.current.has(game.id)
+    ) return;
+    let productSlug = "";
+    try {
+      productSlug = new URL(game.epicStoreUrl).pathname
+        .match(/\/p\/([^/?#]+)/i)?.[1] || "";
+    } catch {
+      return;
+    }
+    if (!productSlug) return;
+    hydratedEpicGamesRef.current.add(game.id);
+    const launchParts = String(game.epicLaunchId || "").split(":");
+    const namespace = launchParts.length >= 2 ? launchParts[0] : "";
+    let cancelled = false;
+    void fetchEpicAppDetailsResult(
+      String(game.epicCatalogId || ""),
+      namespace,
+      productSlug,
+    ).then(async (result) => {
+      if (cancelled || !result.ok) return;
+      const details = result.data;
+      const patch: Partial<Game> = {
+        title: details.title || game.title,
+        image: details.cardImage || details.image || game.image,
+        cardImage: details.cardImage || game.cardImage || game.image,
+        backgroundImage: details.backgroundImage || game.backgroundImage || game.image,
+        logoImage: details.logoImage || game.logoImage,
+        description: details.description || game.description,
+        aboutTheGame: details.aboutTheGame || game.aboutTheGame || game.description,
+        screenshots: details.screenshots || game.screenshots || [],
+        releaseDate: details.releaseDate || game.releaseDate,
+        developer: details.developer || game.developer,
+        publisher: details.publisher || game.publisher,
+        tags: details.tags || game.tags || [],
+        trailerUrl: details.trailerUrl || game.trailerUrl,
+        epicCatalogId: details.catalogId || game.epicCatalogId,
+        epicLaunchId: details.epicLaunchId || game.epicLaunchId,
+        executablePath: details.executablePath || game.executablePath,
+        epicStoreUrl: details.productUrl || game.epicStoreUrl,
+        steamAppId: "",
+        source: "epic",
+      };
+      const updated = { ...game, ...patch };
+      await updateLibraryGame(user.uid, game.id, patch);
+      if (cancelled) return;
+      onGameHydrated?.(updated);
+      await onLibraryChanged?.();
+    }).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [game, isOpen, onGameHydrated, onLibraryChanged, user?.uid]);
 
 
   const copy = {
@@ -142,10 +206,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       launchGenericError: "Falha ao iniciar o jogo.",
       achievementsLoading: "Buscando conquistas da Steam...",
       achievementsLoadingLocal: "Carregando conquistas locais...",
+      achievementsLoadingEpicLocal: "Lendo conquistas nos arquivos locais da Epic...",
       achievementsEmpty: "Nenhuma conquista encontrada para este jogo.",
       achievementsLocalEmpty: "Nenhuma conquista local registrada.",
+      achievementsEpicLocalEmpty:
+        "Nenhum arquivo local de conquistas legível foi encontrado para este jogo.",
+      achievementsEpicBinarySave:
+        "O jogo usa um save local binário ou protegido. Ainda não é possível extrair as conquistas desse formato.",
+      achievementsEpicNotInstalled:
+        "A instalação local deste jogo não foi encontrada nos manifestos da Epic.",
       achievementsSource: "Suas conquistas",
       achievementsLocalSource: "Conquistas locais",
+      achievementsEpicLocalSource: "Arquivos locais da Epic",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Jogo Epic usando conquistas da versão Steam vinculada.",
@@ -222,10 +294,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       launchGenericError: "Failed to launch the game.",
       achievementsLoading: "Loading Steam achievements...",
       achievementsLoadingLocal: "Loading local achievements...",
+      achievementsLoadingEpicLocal: "Reading achievements from local Epic files...",
       achievementsEmpty: "No achievements were found for this game.",
       achievementsLocalEmpty: "No local achievements recorded.",
+      achievementsEpicLocalEmpty:
+        "No readable local achievement file was found for this game.",
+      achievementsEpicBinarySave:
+        "This game uses a binary or protected local save. Achievements cannot be extracted from this format yet.",
+      achievementsEpicNotInstalled:
+        "This game's local installation was not found in the Epic manifests.",
       achievementsSource: "Your achievements",
       achievementsLocalSource: "Local achievements",
+      achievementsEpicLocalSource: "Epic local files",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Epic game using achievements from the linked Steam version.",
@@ -302,10 +382,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       launchGenericError: "No se pudo iniciar el juego.",
       achievementsLoading: "Cargando logros de Steam...",
       achievementsLoadingLocal: "Cargando logros locales...",
+      achievementsLoadingEpicLocal: "Leyendo logros de los archivos locales de Epic...",
       achievementsEmpty: "No se encontraron logros para este juego.",
       achievementsLocalEmpty: "No hay logros locales registrados.",
+      achievementsEpicLocalEmpty:
+        "No se encontró ningún archivo local de logros legible para este juego.",
+      achievementsEpicBinarySave:
+        "El juego usa un guardado local binario o protegido. Aún no se pueden extraer sus logros.",
+      achievementsEpicNotInstalled:
+        "La instalación local de este juego no aparece en los manifiestos de Epic.",
       achievementsSource: "Tus logros",
       achievementsLocalSource: "Logros locales",
+      achievementsEpicLocalSource: "Archivos locales de Epic",
       achievementsSteamFallback: "Steam",
       achievementsSteamFallbackHint:
         "Juego de Epic usando logros de la versión vinculada de Steam.",
@@ -450,6 +538,47 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       setIsAchievementsLoading(true);
 
       try {
+        if (game.launcherType === "epic") {
+          if (!window.electronAPI?.getEpicLocalAchievements) {
+            setAchievementsError(copy.achievementsEpicLocalEmpty);
+            return;
+          }
+
+          const localResult = await window.electronAPI.getEpicLocalAchievements({
+            gameId: game.id,
+            title: game.title,
+            epicCatalogId: game.epicCatalogId,
+            epicLaunchId: game.epicLaunchId,
+            executablePath: game.executablePath,
+          });
+          if (cancelled) return;
+
+          setAchievementSourceAppId("epic-local");
+          setAchievementItems(localResult.achievements);
+
+          if (user?.uid) {
+            void updateLibraryGame(user.uid, game.id, {
+              totalAchievements: localResult.total,
+              completedAchievements: localResult.unlocked,
+              achievementsUpdatedAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }).catch((error) => {
+              console.error("Erro ao salvar totais de conquistas da Epic:", error);
+            }).then(() => onLibraryChanged?.());
+          }
+
+          if (localResult.achievements.length === 0) {
+            setAchievementsError(
+              localResult.status === "not-installed"
+                ? copy.achievementsEpicNotInstalled
+                : localResult.status === "binary-save"
+                  ? copy.achievementsEpicBinarySave
+                  : copy.achievementsEpicLocalEmpty,
+            );
+          }
+          return;
+        }
+
         let resolvedAppId = String(game.steamAppId || "").trim();
 
         if (!resolvedAppId) {
@@ -593,6 +722,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     };
   }, [
     copy.achievementsEmpty,
+    copy.achievementsEpicBinarySave,
+    copy.achievementsEpicLocalEmpty,
+    copy.achievementsEpicNotInstalled,
     copy.achievementsMissingAppId,
     copy.achievementsNeedSteam,
     game?.completedAchievements,
@@ -711,10 +843,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     .replace(/\s+/g, " ")
     .trim();
   const achievementSourceLabel =
-    game.launcherType === "epic" && achievementSourceAppId
-      ? game.steamAppId
-        ? copy.achievementsSteamLinked
-        : copy.achievementsSteamMatched
+    achievementSourceAppId === "epic-local"
+      ? copy.achievementsEpicLocalSource
       : achievementSourceAppId
         ? copy.steamLabel
         : copy.achievementsSteamFallback;
@@ -1180,11 +1310,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               <p className="text-sm font-semibold text-white/85">
                                 {achievementSourceLabel}
                               </p>
-                              {game.launcherType === "epic" && achievementSourceAppId && (
-                                <p className="mt-2 text-xs text-white/45">
-                                  {copy.achievementsSteamFallbackHint}
-                                </p>
-                              )}
                             </div>
                             <div className="flex flex-col gap-2 items-end">
                               <div className="min-w-[120px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-right">
@@ -1203,7 +1328,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
                         {isAchievementsLoading && (
                           <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-white/10 bg-white/0.03 text-sm text-white/55">
-                            {copy.achievementsLoading}
+                            {game.launcherType === "epic"
+                              ? copy.achievementsLoadingEpicLocal
+                              : game.launcherType === "local"
+                                ? copy.achievementsLoadingLocal
+                                : copy.achievementsLoading}
                           </div>
                         )}
 

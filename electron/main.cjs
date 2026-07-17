@@ -7,6 +7,16 @@ const { pathToFileURL, fileURLToPath } = require("node:url");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
 const { readAchievementLibrarySummary } = require("./achievement-summary.cjs");
 const { normalizeLaunchProfile } = require("./launch-profile.cjs");
+const { sanitizeOverlayImageSource } = require("./overlay-image.cjs");
+const { readInstalledEpicGames } = require("./epic-manifests.cjs");
+const { readEpicLocalAchievements } = require("./epic-local-achievements.cjs");
+const {
+  EPIC_STORE_CARD_EXTRACTOR,
+  EPIC_STORE_GRAPHQL_QUERY,
+  normalizeEpicGraphqlElements,
+  normalizeEpicStoreDetails,
+  normalizeEpicStoreCards,
+} = require("./epic-store-search.cjs");
 const {
   createGameProcessTracker,
   normalizeWindowsPath,
@@ -798,7 +808,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     name: String(friend?.name || "Jogador").slice(0, 80),
     status: ["online", "playing", "offline"].includes(friend?.status) ? friend.status : "offline",
     playing: String(friend?.playing || "").slice(0, 120),
-    avatar: String(friend?.avatar || "").slice(0, 2048),
+    avatar: sanitizeOverlayImageSource(friend?.avatar),
     unread: Math.max(0, Number(friend?.unread) || 0),
     canChat: Boolean(friend?.canChat),
   })).filter((friend) => friend.id) : [];
@@ -816,10 +826,12 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     ? payload.chat.messages.slice(-80).map((message) => ({
       id: String(message?.id || "").slice(0, 180),
       text: String(message?.text || "").slice(0, 2000),
+      attachmentUrl: String(message?.attachmentUrl || "").slice(0, 4096),
+      attachmentName: String(message?.attachmentName || "").slice(0, 160),
       createdAt: String(message?.createdAt || "").slice(0, 64),
       mine: Boolean(message?.mine),
       pending: Boolean(message?.pending),
-    })).filter((message) => message.id && message.text)
+    })).filter((message) => message.id && (message.text || message.attachmentUrl))
     : [];
   overlayPanelState = {
     friends,
@@ -832,7 +844,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     currentGame: payload?.currentGame ? {
       id: String(payload.currentGame.id || "").slice(0, 160),
       title: String(payload.currentGame.title || "").slice(0, 160),
-      image: String(payload.currentGame.image || "").slice(0, 2048),
+      image: sanitizeOverlayImageSource(payload.currentGame.image),
       platform: String(payload.currentGame.platform || "").slice(0, 40),
       category: String(payload.currentGame.category || "").slice(0, 80),
       developer: String(payload.currentGame.developer || "").slice(0, 120),
@@ -849,7 +861,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     chat: payload?.chat ? {
       friendId: String(payload.chat.friendId || "").slice(0, 128),
       friendName: String(payload.chat.friendName || "Amigo").slice(0, 80),
-      friendAvatar: String(payload.chat.friendAvatar || "").slice(0, 2048),
+      friendAvatar: sanitizeOverlayImageSource(payload.chat.friendAvatar),
       typing: Boolean(payload.chat.typing),
       sending: Boolean(payload.chat.sending),
       error: String(payload.chat.error || "").slice(0, 300),
@@ -857,7 +869,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     } : null,
     profile: {
       name: String(payload?.profile?.name || "Jogador").slice(0, 80),
-      avatar: String(payload?.profile?.avatar || "").slice(0, 2048),
+      avatar: sanitizeOverlayImageSource(payload?.profile?.avatar),
       discordConnected: Boolean(payload?.profile?.discordConnected),
       discordUsername: String(payload?.profile?.discordUsername || "").slice(0, 80),
       achievements: Math.max(0, Number(payload?.profile?.achievements) || 0),
@@ -934,11 +946,23 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
     ], { windowsHide: true }, () => undefined);
     return;
   }
-  if (["select-chat", "close-chat", "send-message"].includes(kind)) {
+  if (["select-chat", "close-chat", "send-message", "send-image", "set-typing"].includes(kind)) {
     const payload = { kind };
     if (kind === "select-chat") payload.friendId = String(action?.friendId || "").slice(0, 128);
     if (kind === "send-message") payload.text = String(action?.text || "").trim().slice(0, 2000);
+    if (kind === "set-typing") payload.typing = Boolean(action?.typing);
+    if (kind === "send-image") {
+      const type = String(action?.type || "").toLowerCase();
+      const data = Buffer.from(action?.data || []);
+      if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type) || data.length === 0 || data.length > 8 * 1024 * 1024) {
+        return { ok: false, error: "Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB." };
+      }
+      payload.name = String(action?.name || "imagem").slice(0, 160);
+      payload.type = type;
+      payload.data = data;
+    }
     mainWindow?.webContents.send("overlay:panel-action", payload);
+    return { ok: true };
   }
 });
 
@@ -1078,6 +1102,67 @@ registerSecureIpcHandler("achievement:get-local-state", async (_event, appId) =>
   }
 });
 
+registerSecureIpcHandler("achievement:get-epic-local", async (_event, request) => {
+  try {
+    const result = readEpicLocalAchievements({
+      title: String(request?.title || "").slice(0, 180),
+      epicCatalogId: String(request?.epicCatalogId || "").slice(0, 300),
+      epicLaunchId: String(request?.epicLaunchId || "").slice(0, 800),
+      executablePath: String(request?.executablePath || "").slice(0, 2_000),
+    });
+    const gameId = String(request?.gameId || "").trim();
+    if (/^[a-zA-Z0-9_-]{1,220}$/.test(gameId) && result.achievements.length > 0) {
+      const achievementsDir = path.join(app.getPath("userData"), "achievements");
+      const definitionsPath = path.join(achievementsDir, `${gameId}.json`);
+      const progressPath = path.join(app.getPath("userData"), `user_progress_${gameId}.json`);
+      await fs.promises.mkdir(achievementsDir, { recursive: true });
+      await Promise.all([
+        fs.promises.writeFile(definitionsPath, JSON.stringify({
+          source: "epic-local",
+          achievements: result.achievements.map((achievement) => ({
+            id: achievement.apiName,
+            name: achievement.name,
+            description: achievement.description,
+            icon: achievement.icon,
+          })),
+        }, null, 2), "utf8"),
+        fs.promises.writeFile(progressPath, JSON.stringify({
+          gameId,
+          unlockedAchievements: Object.fromEntries(
+            result.achievements
+              .filter((achievement) => achievement.achieved)
+              .map((achievement) => [achievement.apiName, {
+                id: achievement.apiName,
+                name: achievement.name,
+                description: achievement.description,
+                icon: achievement.icon,
+                unlockedAt: achievement.unlockTime > 0
+                  ? new Date(achievement.unlockTime * 1_000).toISOString()
+                  : new Date().toISOString(),
+              }]),
+          ),
+          updatedAt: new Date().toISOString(),
+        }, null, 2), "utf8"),
+      ]);
+    }
+    return result;
+  } catch (error) {
+    console.error("Error reading Epic local achievements:", error);
+    return {
+      source: "epic-local",
+      status: "no-readable-files",
+      installed: false,
+      installLocation: "",
+      achievements: [],
+      total: 0,
+      unlocked: 0,
+      readableFileCount: 0,
+      binarySaveDetected: false,
+      scanTruncated: false,
+    };
+  }
+});
+
 registerSecureIpcHandler("achievement:get-library-summary", async () => {
   try {
     return await readAchievementLibrarySummary(app.getPath("userData"));
@@ -1127,7 +1212,7 @@ registerSecureIpcHandler("achievement:unlock", async (_event, gameId, achievemen
 registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) => {
   const senderName = String(payload?.senderName || "").trim() || "Amigo";
   const messageText = String(payload?.messageText || "").trim() || "Nova mensagem";
-  const avatarUrl = String(payload?.avatarUrl || "").trim();
+  const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-message",
@@ -1350,6 +1435,179 @@ registerSecureIpcHandler("launcher:get-displays", async () => screen.getAllDispl
   height: display.bounds.height,
 })));
 
+registerSecureIpcHandler("launcher:select-executable", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Selecione o executavel do jogo",
+    properties: ["openFile"],
+    buttonLabel: "Selecionar jogo",
+    filters: [{ name: "Executaveis do Windows", extensions: ["exe"] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  const selectedPath = path.normalize(result.filePaths[0]);
+  if (
+    !path.isAbsolute(selectedPath)
+    || path.extname(selectedPath).toLowerCase() !== ".exe"
+  ) {
+    throw new Error("Selecione um arquivo executavel .exe valido.");
+  }
+  return selectedPath;
+});
+
+const epicStoreSearchCache = new Map();
+const epicStoreDetailsCache = new Map();
+let epicStoreSearchWindow = null;
+let epicStoreReadyPromise = null;
+
+const ensureEpicStoreSearchWindow = async () => {
+  if (
+    epicStoreSearchWindow
+    && !epicStoreSearchWindow.isDestroyed()
+    && epicStoreReadyPromise
+  ) {
+    await epicStoreReadyPromise;
+    return epicStoreSearchWindow;
+  }
+
+  const searchWindow = new BrowserWindow({
+    show: false,
+    width: 1100,
+    height: 800,
+    webPreferences: {
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+      partition: "persist:epic-store-search",
+    },
+  });
+  epicStoreSearchWindow = searchWindow;
+  searchWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  searchWindow.on("closed", () => {
+    if (epicStoreSearchWindow === searchWindow) {
+      epicStoreSearchWindow = null;
+      epicStoreReadyPromise = null;
+    }
+  });
+  epicStoreReadyPromise = searchWindow.loadURL(
+    "https://store.epicgames.com/pt-BR/browse?sortBy=relevancy&sortDir=DESC&count=12",
+  ).catch((error) => {
+    if (!searchWindow.isDestroyed()) searchWindow.destroy();
+    throw error;
+  });
+  await epicStoreReadyPromise;
+  return searchWindow;
+};
+
+const searchEpicGamesStore = async (rawQuery) => {
+  const searchQuery = String(rawQuery || "").trim().slice(0, 100);
+  if (searchQuery.length < 2) return [];
+  const cacheKey = searchQuery.toLocaleLowerCase("pt-BR");
+  const cached = epicStoreSearchCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < 5 * 60 * 1_000) return cached.items;
+
+  const searchWindow = await ensureEpicStoreSearchWindow();
+  const graphqlBody = JSON.stringify({
+    query: EPIC_STORE_GRAPHQL_QUERY,
+    variables: {
+      keywords: searchQuery,
+      locale: "pt-BR",
+      country: "BR",
+      count: 12,
+      start: 0,
+    },
+  });
+  const graphqlResult = await searchWindow.webContents.executeJavaScript(`(async () => {
+    const response = await fetch("/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8" },
+      body: ${JSON.stringify(graphqlBody)}
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload: await response.json().catch(() => ({}))
+    };
+  })()`, true).catch(() => ({ ok: false, status: 0, payload: null }));
+
+  const graphqlElements =
+    graphqlResult?.payload?.data?.Catalog?.searchStore?.elements;
+  const graphqlAvailable = graphqlResult?.ok && Array.isArray(graphqlElements);
+  let items = graphqlAvailable
+    ? normalizeEpicGraphqlElements(graphqlElements, readInstalledEpicGames())
+    : [];
+
+  if (!graphqlAvailable) {
+    const targetUrl = new URL("https://store.epicgames.com/pt-BR/browse");
+    targetUrl.searchParams.set("q", searchQuery);
+    targetUrl.searchParams.set("sortBy", "relevancy");
+    targetUrl.searchParams.set("sortDir", "DESC");
+    targetUrl.searchParams.set("count", "12");
+    await searchWindow.loadURL(targetUrl.toString());
+    const deadline = Date.now() + 15_000;
+    let cards = [];
+    while (Date.now() < deadline && cards.length === 0 && !searchWindow.isDestroyed()) {
+      cards = await searchWindow.webContents
+        .executeJavaScript(EPIC_STORE_CARD_EXTRACTOR, true)
+        .catch(() => []);
+      if (cards.length === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+    }
+    items = normalizeEpicStoreCards(cards, readInstalledEpicGames());
+  }
+
+  items = items.slice(0, 12);
+  epicStoreSearchCache.set(cacheKey, { createdAt: Date.now(), items });
+  if (epicStoreSearchCache.size > 50) {
+    epicStoreSearchCache.delete(epicStoreSearchCache.keys().next().value);
+  }
+  return items;
+};
+
+registerSecureIpcHandler("launcher:search-epic-store", async (_event, query) =>
+  searchEpicGamesStore(query));
+
+const fetchEpicGamesStoreDetails = async (rawRequest) => {
+  const productSlug = String(rawRequest?.productSlug || "")
+    .trim()
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\/home$/i, "");
+  if (!/^[a-z0-9][a-z0-9-]{0,199}$/i.test(productSlug)) {
+    throw new Error("Produto Epic invalido.");
+  }
+  const cacheKey = productSlug.toLocaleLowerCase("en-US");
+  const cached = epicStoreDetailsCache.get(cacheKey);
+  if (cached && Date.now() - cached.createdAt < 15 * 60 * 1_000) return cached.details;
+
+  const url = `https://store-content-ipv4.ak.epicgames.com/api/pt-BR/content/products/${encodeURIComponent(productSlug)}`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+      Referer: `https://store.epicgames.com/pt-BR/p/${productSlug}`,
+    },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`A Epic nao retornou os detalhes do jogo (status ${response.status}).`);
+  }
+  const payload = await response.json();
+  const details = normalizeEpicStoreDetails(payload, {
+    productSlug,
+    catalogId: String(rawRequest?.catalogId || "").trim(),
+    namespace: String(rawRequest?.namespace || "").trim(),
+  }, readInstalledEpicGames());
+  if (!details) throw new Error("Detalhes nao encontrados na Epic Games Store.");
+  epicStoreDetailsCache.set(cacheKey, { createdAt: Date.now(), details });
+  if (epicStoreDetailsCache.size > 50) {
+    epicStoreDetailsCache.delete(epicStoreDetailsCache.keys().next().value);
+  }
+  return details;
+};
+
+registerSecureIpcHandler("launcher:fetch-epic-store-details", async (_event, request) =>
+  fetchEpicGamesStoreDetails(request));
+
 registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath, rawLaunchProfile) => {
   const target = String(executablePath || "").trim();
   if (!target) {
@@ -1376,9 +1634,10 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
     throw new Error("Executavel invalido.");
   }
 
-  const launchProfile = normalizeLaunchProfile(rawLaunchProfile, path.dirname(normalizedTarget));
+  const defaultWorkingDirectory = path.dirname(normalizedTarget);
+  const launchProfile = normalizeLaunchProfile(rawLaunchProfile, defaultWorkingDirectory);
   if (!fs.existsSync(launchProfile.workingDirectory) || !fs.statSync(launchProfile.workingDirectory).isDirectory()) {
-    throw new Error("Diretorio de trabalho nao encontrado.");
+    launchProfile.workingDirectory = defaultWorkingDirectory;
   }
   if (launchProfile.monitorId != null && screen.getAllDisplays().some((display) => display.id === launchProfile.monitorId)) {
     overlayDisplayId = launchProfile.monitorId;
@@ -2061,7 +2320,7 @@ registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
 registerSecureIpcHandler("overlay:show-friend-playing", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
   const gameTitle = String(payload?.gameTitle || "").trim() || "agora";
-  const avatarUrl = String(payload?.avatarUrl || "").trim();
+  const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-playing",
@@ -2073,7 +2332,7 @@ registerSecureIpcHandler("overlay:show-friend-playing", async (_event, payload) 
 
 registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
-  const avatarUrl = String(payload?.avatarUrl || "").trim();
+  const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-request",
@@ -2085,7 +2344,7 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
 
 registerSecureIpcHandler("overlay:show-friend-accepted", async (_event, payload) => {
   const playerName = String(payload?.playerName || "").trim() || "Jogador";
-  const avatarUrl = String(payload?.avatarUrl || "").trim();
+  const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-accepted",
@@ -2337,6 +2596,9 @@ app.whenReady().then(async () => {
     await startAchievementBridge();
     await migrateKnownAchievementProgress();
     await createWindow();
+    void ensureEpicStoreSearchWindow().catch((error) => {
+      console.warn("[epic-store] Nao foi possivel preaquecer a busca:", error?.message || error);
+    });
   } catch (error) {
     showFatalStartupError(error);
     app.quit();

@@ -677,45 +677,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const requestId = ++detailsRequestRef.current;
     setLoading(true);
     try {
-      const catalogId = String(game.id || game.catalogId || "").trim();
+      const catalogId = String(
+        game.catalogId || (game.namespace ? game.id : ""),
+      ).trim();
       const namespace = String(game.namespace || "").trim();
-      let launchId = namespace && catalogId ? `${namespace}:${catalogId}` : catalogId;
+      const productSlug = String(game.productSlug || "").trim();
       const details =
-        catalogId && namespace
-          ? await fetchEpicAppDetailsResult(catalogId, namespace).catch(() => null)
+        productSlug
+          ? await fetchEpicAppDetailsResult(catalogId, namespace, productSlug).catch(() => null)
           : null;
       const d = details?.ok ? details.data : null;
       if (requestId !== detailsRequestRef.current) return;
 
+      const resolvedCatalogId = String(d?.catalogId || catalogId).trim();
+      const resolvedNamespace = String(d?.namespace || namespace).trim();
       const appName = String(d?.appName || game.appName || "").trim();
-      if (namespace && catalogId && appName) {
-        launchId = `${namespace}:${catalogId}:${appName}`;
-      }
-
+      const launchId = String(
+        d?.epicLaunchId
+        || game.epicLaunchId
+        || (
+          resolvedNamespace && resolvedCatalogId
+            ? `${resolvedNamespace}:${resolvedCatalogId}${appName ? `:${appName}` : ""}`
+            : resolvedCatalogId
+        ),
+      ).trim();
       const gameTitle = d?.title || game.title || game.name || "";
-      let resolvedSteamAppId = "";
-
-      // Buscar equivalência na Steam em segundo plano para obter as conquistas
-      if (gameTitle) {
-        try {
-          const resp = await fetch(
-            apiUrl(`/api/steam/search?query=${encodeURIComponent(gameTitle)}`),
-          );
-          if (resp.ok) {
-            const data = await resp.json();
-            const items = data.items || [];
-            const match = items.find(
-              (item: any) =>
-                String(item.name || "").toLowerCase() === gameTitle.toLowerCase(),
-            ) || items[0];
-            if (match) {
-              resolvedSteamAppId = String(match.id);
-            }
-          }
-        } catch (err) {
-          console.error("Erro ao buscar conquistas equivalentes na Steam:", err);
-        }
-      }
 
       if (requestId !== detailsRequestRef.current) return;
       setFormData((prev) => ({
@@ -728,11 +714,14 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         description: d?.description || game.description || "",
         aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
         launcherType: "epic",
-        executablePath: isWindowsExecutablePath(prev.executablePath) ? prev.executablePath : "",
-        steamAppId: resolvedSteamAppId || prev.steamAppId || "",
-        epicCatalogId: catalogId,
+        executablePath:
+          (isWindowsExecutablePath(d?.executablePath || "") && d?.executablePath)
+          || (isWindowsExecutablePath(game.executablePath) && game.executablePath)
+          || (isWindowsExecutablePath(prev.executablePath) ? prev.executablePath : ""),
+        steamAppId: "",
+        epicCatalogId: resolvedCatalogId,
         epicLaunchId: launchId,
-        epicStoreUrl: game.productUrl || "",
+        epicStoreUrl: d?.productUrl || game.productUrl || "",
         sizeGB: d?.sizeGB ?? prev.sizeGB,
         releaseDate: d?.releaseDate || game.releaseDate || "",
         developer: d?.developer || game.developer || "",
@@ -755,43 +744,57 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
-  const handleExecutableSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const browserPath =
-      (file as File & { path?: string }).path ||
-      file.webkitRelativePath ||
-      file.name;
-
+  const applyExecutableSelection = (
+    executablePath: string,
+    launcherType: "local" | "epic",
+  ) => {
     setFormData((prev) => ({
       ...prev,
-      launcherType: "local",
-      executablePath: browserPath,
-      epicCatalogId: "",
-      epicLaunchId: "",
-      epicStoreUrl: "",
-      source: "manual",
+      launcherType,
+      executablePath,
+      ...(launcherType === "local" ? {
+        epicCatalogId: "",
+        epicLaunchId: "",
+        epicStoreUrl: "",
+        source: "manual" as const,
+      } : {
+        source: prev.epicCatalogId ? "epic" as const : "manual" as const,
+      }),
     }));
     playSound("select");
   };
 
-  const handleEpicExecutableSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExecutableFileFallback = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    launcherType: "local" | "epic",
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const browserPath =
       (file as File & { path?: string }).path ||
-      file.webkitRelativePath ||
-      file.name;
+      file.webkitRelativePath;
+    e.target.value = "";
+    if (!isWindowsExecutablePath(browserPath)) {
+      notify("Nao foi possivel obter o caminho completo. Selecione o executavel pelo aplicativo desktop.", "error");
+      return;
+    }
+    applyExecutableSelection(browserPath, launcherType);
+  };
 
-    setFormData((prev) => ({
-      ...prev,
-      launcherType: "epic",
-      executablePath: browserPath,
-      source: prev.epicCatalogId ? "epic" : "manual",
-    }));
-    playSound("select");
+  const handleChooseExecutable = async (launcherType: "local" | "epic") => {
+    if (!window.electronAPI?.selectExecutable) {
+      executableInputRef.current?.click();
+      return;
+    }
+    try {
+      const executablePath = await window.electronAPI.selectExecutable();
+      if (executablePath) applyExecutableSelection(executablePath, launcherType);
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Nao foi possivel selecionar o executavel.",
+        "error",
+      );
+    }
   };
 
   const handleCoverSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1173,9 +1176,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
               {formData.launcherType === "epic" && (
                 <div className="mt-4 border-t border-white/[0.06] pt-4">
-                  <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={handleEpicExecutableSelect} />
+                  <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={(event) => handleExecutableFileFallback(event, "epic")} />
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <button type="button" onClick={() => executableInputRef.current?.click()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white">
+                    <button type="button" onClick={() => void handleChooseExecutable("epic")} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white">
                       <FolderOpen size={14} /> {copy.chooseExe}
                     </button>
                     <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
@@ -1368,12 +1371,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       type="file"
                       accept=".exe,application/x-msdownload"
                       className="hidden"
-                      onChange={handleExecutableSelect}
+                      onChange={(event) => handleExecutableFileFallback(event, "local")}
                     />
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <button
                         type="button"
-                        onClick={() => executableInputRef.current?.click()}
+                        onClick={() => void handleChooseExecutable("local")}
                         className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white"
                       >
                         <FolderOpen size={14} /> {copy.chooseExe}

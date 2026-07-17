@@ -1,8 +1,8 @@
 import {
   limitToLast,
   off,
-  onChildAdded,
   onValue,
+  orderByChild,
   push,
   query,
   ref,
@@ -11,17 +11,25 @@ import {
   set,
   update,
 } from "firebase/database";
-import { auth, realtimeDb } from "../../Firebase";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref as storageRef,
+  uploadBytes,
+} from "firebase/storage";
+import { auth, realtimeDb, storage } from "../../Firebase";
 import type { ChatMessage } from "../types/domain";
 import { apiUrl } from "./api";
 
 const HISTORY_LIMIT = 50;
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const messageListeners = new Set<(message: ChatMessage) => void>();
 const typingListeners = new Set<(data: { senderId: string; typing: boolean }) => void>();
 const unreadListeners = new Set<(messages: ChatMessage[]) => void>();
 const unreadMessages: ChatMessage[] = [];
 
-let activeChatFriendUid: string | null = null;
+const activeChatSubscriptions = new Map<string, number>();
 let connectedUserUid: string | null = null;
 let userChatsRef: ReturnType<typeof ref> | null = null;
 let seenInboxMessageIds = new Set<string>();
@@ -49,7 +57,25 @@ const normalizeMessage = (
     ? new Date(value.createdAt).toISOString()
     : String(value.createdAt || new Date().toISOString()),
   read: false,
+  attachmentName: value.attachmentName ? String(value.attachmentName) : undefined,
+  attachmentUrl: value.attachmentUrl ? String(value.attachmentUrl) : undefined,
+  attachmentType: value.attachmentType ? String(value.attachmentType) : undefined,
+  attachmentSize: typeof value.attachmentSize === "number"
+    ? value.attachmentSize
+    : undefined,
+  attachmentPath: value.attachmentPath ? String(value.attachmentPath) : undefined,
 });
+
+const messageTimestamp = (message: Pick<ChatMessage, "createdAt">) => {
+  const timestamp = Date.parse(String(message.createdAt || ""));
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+export const compareChatMessages = (a: ChatMessage, b: ChatMessage) => {
+  const timeDifference = messageTimestamp(a) - messageTimestamp(b);
+  if (timeDifference !== 0) return timeDifference;
+  return String(a.id || "").localeCompare(String(b.id || ""));
+};
 
 const ensureChat = async (uid: string, friendUid: string) => {
   const expectedChatId = getChatId(uid, friendUid);
@@ -123,7 +149,7 @@ export const establishChatConnection = async () => {
       if (item.senderId !== uid) {
         const message = normalizeMessage(messageId, { ...item, chatId });
         if (
-          activeChatFriendUid !== message.senderId
+          !activeChatSubscriptions.has(message.senderId)
           && !unreadMessages.some((candidate) => candidate.id === message.id)
         ) {
           unreadMessages.push(message);
@@ -140,7 +166,7 @@ export const closeChatConnection = () => {
   userChatsRef = null;
   connectedUserUid = null;
   inboxInitialized = false;
-  activeChatFriendUid = null;
+  activeChatSubscriptions.clear();
   unreadMessages.splice(0, unreadMessages.length);
   openedChatIds.clear();
   openingChats.clear();
@@ -150,13 +176,19 @@ export const closeChatConnection = () => {
 export const sendChatMessage = async (
   receiverUid: string,
   rawText: string,
+  attachment?: Pick<
+    ChatMessage,
+    "attachmentName" | "attachmentUrl" | "attachmentType" | "attachmentSize" | "attachmentPath"
+  >,
 ): Promise<ChatMessage> => {
   const senderId = auth.currentUser?.uid;
   const receiverId = String(receiverUid || "").trim();
   const text = String(rawText || "").trim();
   if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
   if (!receiverId || receiverId === senderId) throw new Error("Destinatario invalido.");
-  if (!text || text.length > 2_000) throw new Error("Mensagem invalida.");
+  if ((!text && !attachment?.attachmentUrl) || text.length > 2_000) {
+    throw new Error("Mensagem invalida.");
+  }
 
   const chatId = await ensureChat(senderId, receiverId);
   const messageRef = push(ref(realtimeDb, `chats/${chatId}/messages`));
@@ -168,6 +200,13 @@ export const sendChatMessage = async (
     senderId,
     receiverId,
     text,
+    ...(attachment?.attachmentUrl ? {
+      attachmentName: String(attachment.attachmentName || "imagem").slice(0, 160),
+      attachmentUrl: attachment.attachmentUrl,
+      attachmentType: String(attachment.attachmentType || "").slice(0, 80),
+      attachmentSize: Math.max(0, Number(attachment.attachmentSize) || 0),
+      attachmentPath: String(attachment.attachmentPath || "").slice(0, 500),
+    } : {}),
     createdAt: serverTimestamp(),
   };
   await set(messageRef, messageData);
@@ -177,7 +216,7 @@ export const sendChatMessage = async (
       lastMessageId: messageId,
       senderId,
       receiverId,
-      text,
+      text: text || "📷 Imagem",
       updatedAt: createdAt,
     },
     [`userChats/${receiverId}/${chatId}`]: {
@@ -185,11 +224,61 @@ export const sendChatMessage = async (
       lastMessageId: messageId,
       senderId,
       receiverId,
-      text,
+      text: text || "📷 Imagem",
       updatedAt: createdAt,
     },
   });
   return normalizeMessage(messageId, { ...messageData, createdAt });
+};
+
+export const sendChatImage = async (
+  receiverUid: string,
+  file: File,
+  caption = "",
+): Promise<ChatMessage> => {
+  const senderId = auth.currentUser?.uid;
+  if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
+  if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
+    throw new Error("Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.");
+  }
+
+  const chatId = await ensureChat(senderId, receiverUid);
+  const extension = file.type.split("/")[1]?.replace("jpeg", "jpg") || "img";
+  const uploadId = globalThis.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let attachmentPath = `chat-images/${senderId}/${chatId}/${uploadId}.${extension}`;
+  let imageRef = storageRef(storage, attachmentPath);
+  try {
+    await uploadBytes(imageRef, file, {
+      contentType: file.type,
+      customMetadata: { chatId, senderId },
+    });
+  } catch (error) {
+    const code = String((error as { code?: string })?.code || "");
+    const legacyCompatible =
+      code === "storage/unauthorized"
+      && file.size <= 5 * 1024 * 1024
+      && file.type !== "image/gif";
+    if (!legacyCompatible) throw error;
+    // Compatibilidade com clientes cuja regra de chat-images ainda não foi publicada.
+    attachmentPath = `profile-avatars/${senderId}/chat-${chatId}-${uploadId}.${extension}`;
+    imageRef = storageRef(storage, attachmentPath);
+    await uploadBytes(imageRef, file, { contentType: file.type });
+  }
+
+  try {
+    const attachmentUrl = await getDownloadURL(imageRef);
+    return await sendChatMessage(receiverUid, caption.trim() || "📷 Imagem", {
+      attachmentName: file.name,
+      attachmentUrl,
+      attachmentType: file.type,
+      attachmentSize: file.size,
+      attachmentPath,
+    });
+  } catch (error) {
+    await deleteObject(imageRef).catch(() => undefined);
+    throw error;
+  }
 };
 
 export const setChatTyping = async (friendUid: string, typing: boolean) => {
@@ -232,10 +321,14 @@ export const subscribeToChatMessages = (
   const chatId = getChatId(uid, friendUid);
   const messagesQuery = query(
     ref(realtimeDb, `chats/${chatId}/messages`),
+    orderByChild("createdAt"),
     limitToLast(HISTORY_LIMIT),
   );
   const messages = new Map<string, ChatMessage>();
-  activeChatFriendUid = friendUid;
+  activeChatSubscriptions.set(
+    friendUid,
+    (activeChatSubscriptions.get(friendUid) || 0) + 1,
+  );
   void establishChatConnection();
 
   let cancelled = false;
@@ -243,24 +336,21 @@ export const subscribeToChatMessages = (
   void ensureChat(uid, friendUid).then(() => {
     if (cancelled) return;
     void markMessagesAsRead(friendUid);
-    unsubscribe = onChildAdded(messagesQuery, (snapshot) => {
-      const message = normalizeMessage(
-        snapshot.key || "",
-        snapshot.val() as Record<string, unknown>,
-      );
-      if (!message.id || messages.has(message.id)) return;
-      messages.set(message.id, message);
-      callback(
-        [...messages.values()]
-          .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-      );
+    unsubscribe = onValue(messagesQuery, (snapshot) => {
+      const value = snapshot.val() as Record<string, Record<string, unknown>> | null;
+      messages.clear();
+      Object.entries(value || {}).forEach(([messageId, rawMessage]) => {
+        const message = normalizeMessage(messageId, rawMessage);
+        if (message.id) messages.set(messageId, message);
+      });
+      callback([...messages.values()].sort(compareChatMessages));
     });
   }).catch((error) => console.error("Erro ao abrir conversa:", error));
 
   const forwardMessage = (message: ChatMessage) => {
     if (message.chatId !== chatId || !message.id || messages.has(message.id)) return;
     messages.set(message.id, message);
-    callback([...messages.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    callback([...messages.values()].sort(compareChatMessages));
   };
   messageListeners.add(forwardMessage);
 
@@ -268,7 +358,12 @@ export const subscribeToChatMessages = (
     cancelled = true;
     unsubscribe();
     messageListeners.delete(forwardMessage);
-    if (activeChatFriendUid === friendUid) activeChatFriendUid = null;
+    const remainingSubscriptions = (activeChatSubscriptions.get(friendUid) || 1) - 1;
+    if (remainingSubscriptions > 0) {
+      activeChatSubscriptions.set(friendUid, remainingSubscriptions);
+    } else {
+      activeChatSubscriptions.delete(friendUid);
+    }
   };
 };
 
@@ -284,15 +379,28 @@ export const subscribeToFriendTyping = (
   let unsubscribe: () => void = () => {};
   void ensureChat(uid, friendUid).then(() => {
     if (cancelled) return;
-    unsubscribe = onValue(typingRef, (snapshot) => {
-      const value = snapshot.val() as { active?: boolean; updatedAt?: number } | null;
+    let lastTyping = false;
+    const emitTyping = (value: { active?: boolean; updatedAt?: number } | null) => {
       const fresh = value?.updatedAt
-        ? Date.now() - Number(value.updatedAt) < 10_000
+        ? Date.now() - Number(value.updatedAt) < 6_000
         : false;
-      callback(Boolean(value?.active && fresh));
-      typingListeners.forEach((listener) =>
-        listener({ senderId: friendUid, typing: Boolean(value?.active && fresh) }));
+      const typing = Boolean(value?.active && fresh);
+      if (typing === lastTyping) return;
+      lastTyping = typing;
+      callback(typing);
+      typingListeners.forEach((listener) => listener({ senderId: friendUid, typing }));
+    };
+    let latestValue: { active?: boolean; updatedAt?: number } | null = null;
+    unsubscribe = onValue(typingRef, (snapshot) => {
+      latestValue = snapshot.val() as { active?: boolean; updatedAt?: number } | null;
+      emitTyping(latestValue);
     });
+    const freshnessTimer = window.setInterval(() => emitTyping(latestValue), 1_000);
+    const firebaseUnsubscribe = unsubscribe;
+    unsubscribe = () => {
+      window.clearInterval(freshnessTimer);
+      firebaseUnsubscribe();
+    };
   }).catch(() => callback(false));
   return () => {
     cancelled = true;

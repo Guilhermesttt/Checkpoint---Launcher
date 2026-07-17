@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Game, SocialFriend } from "../types/domain";
 import { CATEGORIES } from "../components/Sidebar";
 import type { usePreferences } from "../context/PreferencesContext";
+import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
 
 export const normalizeCategory = (v?: string) =>
   v?.toUpperCase().replace(/[^A-Z0-9]/g, "") ?? "";
@@ -66,7 +67,7 @@ export function useGameLibraryView({
           const aPlayed = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
           const bPlayed = new Date(b.lastPlayedAt || b.steamLastPlayedAt || 0).getTime();
           if (aPlayed !== bPlayed) return bPlayed - aPlayed;
-          return (b.hoursPlayed || 0) - (a.hoursPlayed || 0);
+          return getGamePlayedHours(b) - getGamePlayedHours(a);
         })
         .slice(0, 3),
     [games],
@@ -76,7 +77,7 @@ export function useGameLibraryView({
     () =>
       [...games]
         .filter((game) => game.isFavorite)
-        .sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0))
+        .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a))
         .slice(0, 4),
     [games],
   );
@@ -104,7 +105,7 @@ export function useGameLibraryView({
       items.push({
         id: `game-${game.id}`,
         title: `${t("activityReturnedTo")} ${game.title}`,
-        detail: `${game.hoursPlayed || 0}${t("activityLibraryHours")}`,
+        detail: `${formatPlayedHours(getGamePlayedHours(game))}${t("activityLibraryHours")}`,
         tone: "accent",
       });
     });

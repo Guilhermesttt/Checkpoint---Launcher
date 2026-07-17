@@ -3,6 +3,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   launchExecutable: (executablePath, launchProfile) =>
     ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile),
+  selectExecutable: () => ipcRenderer.invoke("launcher:select-executable"),
+  searchEpicStore: (query) =>
+    ipcRenderer.invoke("launcher:search-epic-store", query),
+  fetchEpicStoreDetails: (request) =>
+    ipcRenderer.invoke("launcher:fetch-epic-store-details", request),
   getDisplays: () => ipcRenderer.invoke("launcher:get-displays"),
   isExecutableRunning: (executablePath) =>
     ipcRenderer.invoke("launcher:is-executable-running", executablePath),
@@ -42,6 +47,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveLocalAchievementDefinitions: (gameId, definitions, steamAppId) => ipcRenderer.invoke("achievement:save-definitions", gameId, definitions, steamAppId),
   getAchievementProgress: (gameId) => ipcRenderer.invoke("achievement:get-progress", gameId),
   getLocalAchievementState: (appId) => ipcRenderer.invoke("achievement:get-local-state", appId),
+  getEpicLocalAchievements: (request) => ipcRenderer.invoke("achievement:get-epic-local", request),
   getLocalAchievementLibrarySummary: () => ipcRenderer.invoke("achievement:get-library-summary"),
   getAchievementDiagnostics: () => ipcRenderer.invoke("achievement:get-diagnostics"),
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),

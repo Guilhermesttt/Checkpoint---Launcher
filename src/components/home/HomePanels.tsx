@@ -18,6 +18,7 @@ import {
   Volume2,
   X,
   Send,
+  ImagePlus,
   MessageSquare,
 } from "lucide-react";
 import Stepper, { Step } from "../ReactBits/Stepper";
@@ -27,7 +28,9 @@ import { useNotification } from "../NotificationCenter";
 import { searchCheckpointFriends } from "../../services/checkpointFriends";
 import {
   cleanupExpiredChatMessages,
+  compareChatMessages,
   markMessagesAsRead,
+  sendChatImage,
   sendChatMessage,
   setChatTyping,
   subscribeToChatMessages,
@@ -1615,11 +1618,14 @@ export const ChatModal: React.FC<{
   const optimisticRef = useRef<Map<string, ChatMessage>>(new Map());
   const [inputText, setInputText] = useState("");
   const [friendTyping, setFriendTyping] = useState(false);
+  const [isSendingImage, setIsSendingImage] = useState(false);
   const [spamLockedUntil, setSpamLockedUntil] = useState<number | null>(null);
   const [controllerKeyboardOpen, setControllerKeyboardOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
   const recentSendTimestampsRef = useRef<number[]>([]);
   const lastTypingSentRef = useRef(false);
+  const lastTypingRefreshRef = useRef(0);
   // Ref para o friendUid — evita que o useEffect re-execute quando apenas o
   // objeto friend (status/avatar) muda, mas o UID permanece o mesmo.
   const friendUidRef = useRef<string | null>(null);
@@ -1644,6 +1650,7 @@ export const ChatModal: React.FC<{
       optimisticRef.current.clear();
       setInputText("");
       setFriendTyping(false);
+      setIsSendingImage(false);
       setSpamLockedUntil(null);
       recentSendTimestampsRef.current = [];
       lastTypingSentRef.current = false;
@@ -1659,7 +1666,8 @@ export const ChatModal: React.FC<{
     // markMessagesAsRead é chamado uma vez ao abrir, não dentro do callback do snapshot
     void markMessagesAsRead(friendUid);
 
-    const lastMsgCountRef = { current: 0 };
+    let messagesInitialized = false;
+    let knownServerMessageIds = new Set<string>();
 
     const unsubscribeMessages = subscribeToChatMessages(friendUid, (serverMsgs) => {
       // Remove mensagens otimistas que o servidor já confirmou
@@ -1669,18 +1677,20 @@ export const ChatModal: React.FC<{
       });
 
       const pending = Array.from(optimisticRef.current.values());
-      const merged = [...serverMsgs, ...pending].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
+      const merged = [...serverMsgs, ...pending].sort(compareChatMessages);
 
-      // Se o número de mensagens aumentou e a última foi enviada pelo amigo, reproduz o som
-      if (merged.length > lastMsgCountRef.current && lastMsgCountRef.current > 0) {
-        const lastMsg = merged[merged.length - 1];
-        if (lastMsg && lastMsg.senderId === friendUid) {
-          playSound("friendRequest");
-        }
+      // Toca somente para uma mensagem nova, nunca ao carregar o historico.
+      const nextServerMessageIds = new Set(
+        serverMsgs.flatMap((message) => message.id ? [message.id] : []),
+      );
+      if (messagesInitialized && serverMsgs.some((message) =>
+        message.senderId === friendUid
+        && Boolean(message.id)
+        && !knownServerMessageIds.has(message.id!))) {
+        playSound("friendRequest");
       }
-      lastMsgCountRef.current = merged.length;
+      knownServerMessageIds = nextServerMessageIds;
+      messagesInitialized = true;
       setDisplayMessages(merged);
     });
 
@@ -1694,7 +1704,7 @@ export const ChatModal: React.FC<{
       unsubscribeTyping();
       friendUidRef.current = null;
     };
-  }, [isOpen, friendUid]);
+  }, [isOpen, friendUid, playSound]);
 
   // ── Scroll automático ────────────────────────────────────────────────────
   useEffect(() => {
@@ -1717,12 +1727,25 @@ export const ChatModal: React.FC<{
   useEffect(() => {
     if (!isOpen || !friendUid) return;
     const shouldSendTyping = inputText.trim().length > 0;
-    if (lastTypingSentRef.current === shouldSendTyping) return;
-    lastTypingSentRef.current = shouldSendTyping;
-    const timer = window.setTimeout(() => {
-      void setChatTyping(friendUid, shouldSendTyping);
-    }, shouldSendTyping ? 150 : 0);
-    return () => window.clearTimeout(timer);
+    if (!shouldSendTyping) {
+      lastTypingSentRef.current = false;
+      lastTypingRefreshRef.current = 0;
+      void setChatTyping(friendUid, false);
+      return;
+    }
+
+    const now = Date.now();
+    if (!lastTypingSentRef.current || now - lastTypingRefreshRef.current >= 1_500) {
+      lastTypingSentRef.current = true;
+      lastTypingRefreshRef.current = now;
+      void setChatTyping(friendUid, true);
+    }
+    const idleTimer = window.setTimeout(() => {
+      lastTypingSentRef.current = false;
+      lastTypingRefreshRef.current = 0;
+      void setChatTyping(friendUid, false);
+    }, 2_500);
+    return () => window.clearTimeout(idleTimer);
   }, [friendUid, inputText, isOpen]);
 
   if (!isOpen || !friend) return null;
@@ -1807,7 +1830,13 @@ export const ChatModal: React.FC<{
       setInputText("");
       lastTypingSentRef.current = false;
       void setChatTyping(friendUid, false);
-      await sendChatMessage(friendUid, text);
+      const confirmedMessage = await sendChatMessage(friendUid, text);
+      optimisticRef.current.delete(optimisticId);
+      setDisplayMessages((current) => [
+        ...current.filter((message) =>
+          message.id !== optimisticId && message.id !== confirmedMessage.id),
+        confirmedMessage,
+      ].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)));
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
       const localId = `local-${now}`;
@@ -1816,6 +1845,29 @@ export const ChatModal: React.FC<{
         current.filter((message) => message.id !== localId),
       );
       notify("Nao foi possivel enviar a mensagem.", "error");
+    }
+  };
+
+  const handleImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !friendUid || isSendingImage) return;
+    setIsSendingImage(true);
+    try {
+      playSound("select");
+      const message = await sendChatImage(friendUid, file);
+      setDisplayMessages((current) => current.some((item) => item.id === message.id)
+        ? current
+        : [...current, message].sort(
+          (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
+        ));
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Nao foi possivel enviar a imagem.",
+        "error",
+      );
+    } finally {
+      setIsSendingImage(false);
     }
   };
 
@@ -1833,7 +1885,7 @@ export const ChatModal: React.FC<{
         : undefined}
       className="p-0 border-0 overflow-hidden rounded-[24px]"
     >
-      <div className="flex h-[550px] w-full flex-col bg-[#050507]">
+      <div className="flex h-[calc(100dvh-2rem)] max-h-[550px] w-full flex-col bg-[#050507] md:h-[calc(100dvh-4rem)]">
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-white/5 bg-white/[0.02] px-6 py-4">
           <div className="flex items-center gap-3">
@@ -1881,45 +1933,85 @@ export const ChatModal: React.FC<{
           ) : (
             displayMessages.map((msg, index) => {
               const isMe = msg.senderId !== friendUid;
+              const messageDate = new Date(msg.createdAt);
+              const previousDate = index > 0
+                ? new Date(displayMessages[index - 1].createdAt)
+                : null;
+              const dayKey = Number.isFinite(messageDate.getTime())
+                ? `${messageDate.getFullYear()}-${messageDate.getMonth()}-${messageDate.getDate()}`
+                : "";
+              const previousDayKey = previousDate && Number.isFinite(previousDate.getTime())
+                ? `${previousDate.getFullYear()}-${previousDate.getMonth()}-${previousDate.getDate()}`
+                : "";
+              const showDaySeparator = index === 0 || dayKey !== previousDayKey;
+              const today = new Date();
+              const yesterday = new Date(today);
+              yesterday.setDate(today.getDate() - 1);
+              const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+              const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+              const dayLabel = dayKey === todayKey
+                ? "Hoje"
+                : dayKey === yesterdayKey
+                  ? "Ontem"
+                  : messageDate.toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "long",
+                    year: "numeric",
+                  });
               const inlineImageLinks = extractImageLinks(msg.text);
+              const visibleImages = Array.from(new Set([
+                ...(msg.attachmentUrl ? [msg.attachmentUrl] : []),
+                ...inlineImageLinks,
+              ]));
               return (
-                <div key={msg.id || index} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${isMe
-                        ? "bg-white/10 text-white rounded-tr-none"
-                        : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
-                      }`}
-                  >
-                    {inlineImageLinks.length > 0 ? (
-                      <div className="mb-2 space-y-2">
-                        {inlineImageLinks.map((imageUrl) => (
-                          <a
-                            key={imageUrl}
-                            href={imageUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`block rounded-2xl border px-3 py-3 transition-all ${isMe
-                                ? "border-white/10 bg-black/25 hover:bg-black/35"
-                                : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
-                              }`}
-                          >
-                            <img
-                              src={imageUrl}
-                              alt="Imagem compartilhada"
-                              className="max-h-48 w-full rounded-xl object-cover"
-                            />
-                          </a>
-                        ))}
-                      </div>
-                    ) : null}
-                    {msg.text ? (
-                      <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
-                    ) : null}
-                    <span className="mt-1 block text-[8px] text-white/30 text-right uppercase tracking-wider">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
+                <React.Fragment key={msg.id || index}>
+                  {showDaySeparator ? (
+                    <div className="flex items-center gap-3 py-2" role="separator" aria-label={dayLabel}>
+                      <span className="h-px flex-1 bg-white/[0.06]" />
+                      <span className="text-[9px] font-semibold uppercase tracking-[0.24em] text-white/30">
+                        {dayLabel}
+                      </span>
+                      <span className="h-px flex-1 bg-white/[0.06]" />
+                    </div>
+                  ) : null}
+                  <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${isMe
+                          ? "bg-white/10 text-white rounded-tr-none"
+                          : "bg-white/5 text-white/80 rounded-tl-none border border-white/5"
+                        }`}
+                    >
+                      {visibleImages.length > 0 ? (
+                        <div className="mb-2 space-y-2">
+                          {visibleImages.map((imageUrl) => (
+                            <a
+                              key={imageUrl}
+                              href={imageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`block rounded-2xl border px-3 py-3 transition-all ${isMe
+                                  ? "border-white/10 bg-black/25 hover:bg-black/35"
+                                  : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
+                                }`}
+                            >
+                              <img
+                                src={imageUrl}
+                                alt="Imagem compartilhada"
+                                className="max-h-48 w-full rounded-xl object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                      {msg.text ? (
+                        <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
+                      ) : null}
+                      <span className="mt-1 block text-[8px] text-white/30 text-right uppercase tracking-wider">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })
           )}
@@ -1966,6 +2058,23 @@ export const ChatModal: React.FC<{
           </div>
           <div className="flex gap-2">
             <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleImageSelected}
+            />
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={isSendingImage}
+              aria-label="Enviar imagem"
+              title="Enviar imagem"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-40"
+            >
+              <ImagePlus className="h-4 w-4" />
+            </button>
+            <input
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
@@ -1974,7 +2083,7 @@ export const ChatModal: React.FC<{
             />
             <button
               type="submit"
-              disabled={Boolean(spamLockedUntil && spamLockedUntil > Date.now())}
+              disabled={isSendingImage || Boolean(spamLockedUntil && spamLockedUntil > Date.now())}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black transition-transform hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-black/50"
             >
               <Send className="h-4 w-4" />

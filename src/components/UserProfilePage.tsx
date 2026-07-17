@@ -7,6 +7,11 @@ import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
+import {
+  calculateTotalPlayedMinutes,
+  formatPlayedHours,
+  getGamePlayedHours,
+} from "../utils/playtime";
 import ProfileEditorModal from "./ProfileEditorModal";
 
 interface UserProfilePageProps {
@@ -130,9 +135,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const email = userProfile?.email || user?.email || "";
 
   const stats = useMemo(() => {
-    const totalHours = userProfile?.librarySummary
-      ? Math.round(userProfile.librarySummary.minutesPlayed / 60)
-      : games.reduce((acc, game) => acc + (game.hoursPlayed || 0), 0);
+    const totalMinutes = userProfile?.librarySummary
+      ? Math.max(0, Math.round(Number(userProfile.librarySummary.minutesPlayed) || 0))
+      : calculateTotalPlayedMinutes(games);
+    const totalHours = totalMinutes / 60;
     const achievementTotals = calculateAchievementTotals(games);
     const storedAchievementSummary = userProfile?.achievementSummary;
     const hasCanonicalSummary = Boolean(storedAchievementSummary?.updatedAt);
@@ -157,8 +163,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const topGames = useMemo(
     () =>
       [...games]
-        .filter((game) => (game.hoursPlayed || 0) > 0)
-        .sort((a, b) => (b.hoursPlayed || 0) - (a.hoursPlayed || 0))
+        .filter((game) => getGamePlayedHours(game) > 0)
+        .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a))
         .slice(0, 5),
     [games],
   );
@@ -166,7 +172,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const favoriteGames = useMemo(() => games.filter((game) => game.isFavorite).slice(0, 6), [games]);
   const achievementPercent =
     stats.totalPossible > 0 ? Math.round((stats.totalAchievements / stats.totalPossible) * 100) : 0;
-  const maxHours = Math.max(topGames[0]?.hoursPlayed || 1, 1);
+  const maxHours = Math.max(topGames[0] ? getGamePlayedHours(topGames[0]) : 1, 1);
   const libraryRows = [
     { label: "Steam", value: stats.steamGames },
     { label: "Epic Games", value: stats.epicGames },
@@ -258,7 +264,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
               )}
               <div className="grid grid-cols-3 gap-3">
                 <StatCard icon={<Gamepad2 className="h-4 w-4" />} label="Jogos" value={stats.totalGames} />
-                <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${stats.totalHours}h`} />
+                <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${formatPlayedHours(stats.totalHours)}h`} />
                 <StatCard icon={<Star className="h-4 w-4" />} label="Favoritos" value={stats.favorites} />
               </div>
             </div>
@@ -340,7 +346,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
               {topGames.length > 0 ? (
                 <div className="space-y-4">
                   {topGames.map((game, index) => {
-                    const pct = ((game.hoursPlayed || 0) / maxHours) * 100;
+                    const playedHours = getGamePlayedHours(game);
+                    const pct = (playedHours / maxHours) * 100;
                     return (
                       <button
                         key={game.id}
@@ -367,7 +374,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                           </div>
                         </div>
                         <span className="flex items-center gap-1 text-[10px] font-semibold text-white/35">
-                          <Clock className="h-3 w-3" /> {game.hoursPlayed || 0}h
+                          <Clock className="h-3 w-3" /> {formatPlayedHours(playedHours)}h
                         </span>
                       </button>
                     );
