@@ -1,5 +1,5 @@
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   User,
   Star,
@@ -101,6 +101,18 @@ export const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
   ["ALL", "FAVORITES", "FRIENDS", "FEED", "STEAM", "EPIC", "LOCAL", "PROFILE"].includes(id),
 );
 
+// A navegação da sidebar não é uma lista plana — são três grupos com naturezas
+// diferentes (filtros de biblioteca, plataformas de origem, conta). Antes isso
+// não aparecia visualmente: os 8 itens ficavam soltos em sequência. Agora cada
+// grupo tem seu próprio cluster + divisor curto entre eles, e um rótulo lido só
+// por leitor de tela (a régua tem 96px, não cabe texto visível sem apertar os
+// ícones).
+const NAV_GROUPS: { key: string; ariaLabel: string; ids: string[] }[] = [
+  { key: "library", ariaLabel: "Biblioteca", ids: ["ALL", "FAVORITES", "FRIENDS", "FEED"] },
+  { key: "platforms", ariaLabel: "Plataformas", ids: ["STEAM", "EPIC", "LOCAL"] },
+  { key: "account", ariaLabel: "Conta", ids: ["PROFILE"] },
+];
+
 interface SidebarProps {
   activeCategory: string;
   onCategory: (id: string) => void;
@@ -133,7 +145,6 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       onClick={onClick}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      title={label}
       className={`relative group flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-xl
         transition-all duration-300 ease-out
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--launcher-accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-black
@@ -180,28 +191,56 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
         {label}
       </span>
 
-      {/* Tooltip flutuante — aparece no hover E no foco (teclado) */}
+      {/* Tooltip flutuante — aparece no hover E no foco (teclado).
+          Ganhou identidade própria: borda de destaque na cor do tema ativo
+          e uma seta apontando pro botão, em vez do balão genérico cinza. */}
       <div
         role="tooltip"
-        className="absolute left-full ml-4 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap
-          opacity-0 pointer-events-none transition-all duration-300 ease-out z-50 translate-x-2 scale-95 origin-left
+        className="absolute left-full ml-4 top-1/2 -translate-y-1/2 flex items-center opacity-0 pointer-events-none
+          transition-all duration-300 ease-out z-50 translate-x-2 scale-95 origin-left
           group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100
           group-focus-visible:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:scale-100"
-        style={{
-          background: "rgba(14,14,22,0.95)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          color: "rgba(255,255,255,0.9)",
-          backdropFilter: "blur(12px)",
-          boxShadow: "0 10px 40px -10px rgba(0,0,0,0.8)",
-        }}
       >
-        {label}
+        <span
+          className="w-2 h-2 rotate-45 -mr-1 shrink-0"
+          style={{
+            background: "rgba(14,14,22,0.95)",
+            borderLeft: "1px solid rgb(var(--launcher-accent) / 0.35)",
+            borderBottom: "1px solid rgb(var(--launcher-accent) / 0.35)",
+          }}
+        />
+        <span
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap"
+          style={{
+            background: "rgba(14,14,22,0.95)",
+            borderTop: "1px solid rgb(var(--launcher-accent) / 0.35)",
+            borderRight: "1px solid rgb(var(--launcher-accent) / 0.35)",
+            borderBottom: "1px solid rgb(var(--launcher-accent) / 0.35)",
+            color: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 10px 40px -10px rgba(0,0,0,0.8)",
+          }}
+        >
+          {label}
+        </span>
       </div>
     </button>
   );
 };
 
+// Divisor curto entre clusters de navegação — mais discreto que os traços
+// estruturais (logo↔nav, nav↔settings), então os grupos se distinguem sem
+// competir com a hierarquia principal da régua.
+const GroupDivider: React.FC = () => (
+  <div
+    aria-hidden="true"
+    className="w-6 h-px my-1.5 self-center shrink-0 bg-white/[0.06]"
+  />
+);
+
 const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategory, settingsLabel, playSound }) => {
+  const prefersReducedMotion = useReducedMotion();
+
   const handleSelect = (id: string) => {
     onCategory(id);
     playSound("navigate");
@@ -225,29 +264,60 @@ const Sidebar: React.FC<SidebarProps> = ({ activeCategory, onCategory, settingsL
           borderRight: "1px solid rgba(255,255,255,0.04)",
         }}
       >
-        {/* Logo */}
-        <div className="mb-4 flex flex-col items-center shrink-0 group cursor-pointer">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105 shadow-lg">
-            <img src="/Checkpoint_Logo.png" alt="Checkpoint" className="h-6 w-6 object-contain" />
+        {/* Logo — assinatura visual da régua. Um halo cônico na cor de
+            destaque gira devagar atrás da marca, amarrando o ícone ao
+            sistema de tema dinâmico do launcher (a mesma --launcher-accent
+            que colore os itens ativos). Ambiente, não chamativo, e some
+            se o usuário pedir menos movimento no sistema. */}
+        <div className="relative mb-4 flex flex-col items-center shrink-0 group cursor-pointer">
+          <div className="relative w-10 h-10 flex items-center justify-center">
+            {!prefersReducedMotion && (
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-[-6px] rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-500"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, rgb(var(--launcher-accent) / 0.5), transparent 30%, transparent 70%, rgb(var(--launcher-accent) / 0.5))",
+                  filter: "blur(6px)",
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 16, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+            <div className="relative w-10 h-10 rounded-2xl flex items-center justify-center bg-white/5 ring-1 ring-white/10 group-hover:ring-white/20 transition-all duration-300 group-hover:scale-105 shadow-lg">
+              <img src="/Checkpoint_Logo.png" alt="Checkpoint" className="h-6 w-6 object-contain" />
+            </div>
           </div>
         </div>
 
         <div className="w-10 h-px mb-2 shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        {/* Navegação */}
+        {/* Navegação — agora em 3 clusters (biblioteca / plataformas / conta)
+            em vez de uma lista única de 8 itens sem hierarquia. */}
         <nav
           aria-label="Navegação principal"
-          className="flex min-h-0 w-full flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain px-3 no-scrollbar"
+          className="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto overscroll-contain px-3 no-scrollbar"
         >
-          {SIDEBAR_CATEGORIES.map(({ id, label, Icon }) => (
-            <SidebarButton
-              key={id}
-              id={id}
-              label={label}
-              Icon={Icon}
-              active={activeCategory === id}
-              onClick={() => handleSelect(id)}
-            />
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <React.Fragment key={group.key}>
+              {groupIndex > 0 && <GroupDivider />}
+              <div role="group" aria-label={group.ariaLabel} className="flex w-full flex-col gap-1.5">
+                {group.ids.map((id) => {
+                  const category = SIDEBAR_CATEGORIES.find((item) => item.id === id);
+                  if (!category) return null;
+                  return (
+                    <SidebarButton
+                      key={category.id}
+                      id={category.id}
+                      label={category.label}
+                      Icon={category.Icon}
+                      active={activeCategory === category.id}
+                      onClick={() => handleSelect(category.id)}
+                    />
+                  );
+                })}
+              </div>
+            </React.Fragment>
           ))}
         </nav>
 

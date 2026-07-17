@@ -554,32 +554,7 @@ export const SettingsPageV2: React.FC<{
               </span>
             </button>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 text-xs md:grid-cols-4">
-            <div>
-              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Ponte local</span>
-              <span className="mt-1 block font-bold text-white/70">
-                {achievementDiagnostics?.bridgePort ? `Porta ${achievementDiagnostics.bridgePort}` : "Indisponivel"}
-              </span>
-            </div>
-            <div>
-              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Watchers</span>
-              <span className="mt-1 block font-bold text-white/70">{achievementDiagnostics?.watcherKeys.length ?? 0} ativos</span>
-            </div>
-            <div>
-              <span className="block text-[9px] font-black uppercase tracking-widest text-white/30">Processos</span>
-              <span className="mt-1 block font-bold text-white/70">{achievementDiagnostics?.monitoredGameKeys.length ?? 0} monitorados</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => void refreshAchievementDiagnostics()}
-              className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-white/65 hover:bg-white/10"
-            >
-              Atualizar status
-            </button>
-          </div>
-          <p className="mt-3 text-[11px] leading-relaxed text-white/35">
-            O overlay nativo funciona em janela e tela cheia sem bordas. Tela cheia exclusiva pode ficar acima das janelas do Windows; para compatibilidade, use o modo sem bordas enquanto o companion da Game Bar nao estiver instalado.
-          </p>
+
         </section>
 
         <AppUpdateSection />

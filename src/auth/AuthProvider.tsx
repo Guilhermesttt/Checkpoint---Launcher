@@ -121,8 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (payload.status === "complete" && payload.customToken) {
-          const result = await signInWithCustomToken(auth, payload.customToken);
-          await syncProfile(result.user);
+          await signInWithCustomToken(auth, payload.customToken);
           return;
         }
       }
@@ -132,39 +131,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-    const result = await (await import("firebase/auth")).signInWithPopup(auth, provider);
-    try {
-      await syncProfile(result.user);
-    } catch (error) {
-      console.error("Falha ao sincronizar perfil após login Google:", error);
-      setUserProfile(
-        toProfile(result.user.uid, {
-          email: result.user.email,
-          displayName: result.user.displayName,
-          photoURL: result.user.photoURL,
-        }),
-      );
-    }
-  }, [syncProfile]);
+    await (await import("firebase/auth")).signInWithPopup(auth, provider);
+  }, []);
 
   const signUpWithEmail = useCallback(async (email: string, pass: string) => {
     const { createUserWithEmailAndPassword } = await import("firebase/auth");
-    const result = await createUserWithEmailAndPassword(auth, email, pass);
-    await syncProfile(result.user);
-  }, [syncProfile]);
+    await createUserWithEmailAndPassword(auth, email, pass);
+  }, []);
 
   const signInWithEmail = useCallback(async (email: string, pass: string) => {
     const { signInWithEmailAndPassword } = await import("firebase/auth");
-    const result = await signInWithEmailAndPassword(auth, email, pass);
-    await syncProfile(result.user);
-  }, [syncProfile]);
+    await signInWithEmailAndPassword(auth, email, pass);
+  }, []);
 
   const signOutUser = useCallback(async () => {
     await signOut(auth);
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       if (!nextUser) {
         setUserProfile(null);
@@ -172,19 +157,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      try {
-        await syncProfile(nextUser);
-      } catch (error) {
-        console.error("Falha ao sincronizar perfil no onAuthStateChanged:", error);
-        setUserProfile(
-          toProfile(nextUser.uid, {
-            email: nextUser.email,
-            displayName: nextUser.displayName,
-            photoURL: nextUser.photoURL,
-          }),
-        );
-      }
+      setUserProfile(
+        toProfile(nextUser.uid, {
+          email: nextUser.email,
+          displayName: nextUser.displayName,
+          photoURL: nextUser.photoURL,
+        }),
+      );
       setLoading(false);
+
+      void syncProfile(nextUser).catch((error) => {
+        console.error("Falha ao sincronizar perfil no onAuthStateChanged:", error);
+      });
     });
 
     return unsubscribe;

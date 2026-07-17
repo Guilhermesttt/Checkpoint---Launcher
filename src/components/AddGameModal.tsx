@@ -44,14 +44,14 @@ interface AddGameModalProps {
   onSaved?: () => void;
 }
 
-const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
+const EpicIcon: React.FC<{ className?: string; invert?: boolean }> = ({ className, invert = true }) => (
   <img
     width={96}
     height={96}
     src={EPIC_GAMES_ICON_PATH}
     alt="Epic Games"
     className={className}
-    style={{ filter: "invert(1)" }}
+    style={{ filter: invert ? "invert(1)" : "none" }}
   />
 );
 
@@ -222,8 +222,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       localDescription: "Jogos instalados no PC e executáveis personalizados.",
       steamDescription: "Metadados, biblioteca e inicialização pela Steam.",
       epicDescription: "Catálogo da Epic com inicialização local opcional.",
+      platformSubtitle: "Escolha onde o jogo está instalado ou de onde ele vem.",
       automaticFill: "Preenchimento automático",
       automaticFillHint: "Busque o jogo para importar capa, descrição e metadados.",
+      launchTitle: "Lançamento",
+      launchHint: "Configure o tamanho estimado e o executável do jogo.",
       gameDetails: "Identidade do jogo",
       gameDetailsHint: "Revise como o jogo será exibido na sua biblioteca.",
       visualAssets: "Artes da biblioteca",
@@ -282,8 +285,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       localDescription: "Installed PC games and custom executables.",
       steamDescription: "Steam metadata, library ownership and launch support.",
       epicDescription: "Epic catalog metadata with optional local launching.",
+      platformSubtitle: "Choose where the game is installed or comes from.",
       automaticFill: "Automatic details",
       automaticFillHint: "Search for a game to import artwork, description and metadata.",
+      launchTitle: "Launch",
+      launchHint: "Set the estimated size and the game's executable.",
       gameDetails: "Game identity",
       gameDetailsHint: "Review how the game will appear in your library.",
       visualAssets: "Library artwork",
@@ -342,8 +348,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       localDescription: "Juegos instalados en PC y ejecutables personalizados.",
       steamDescription: "Metadatos, biblioteca e inicio mediante Steam.",
       epicDescription: "Catálogo de Epic con inicio local opcional.",
+      platformSubtitle: "Elige dónde está instalado el juego o de dónde viene.",
       automaticFill: "Relleno automático",
       automaticFillHint: "Busca el juego para importar imágenes, descripción y metadatos.",
+      launchTitle: "Lanzamiento",
+      launchHint: "Configura el tamaño estimado y el ejecutable del juego.",
       gameDetails: "Identidad del juego",
       gameDetailsHint: "Revisa cómo aparecerá el juego en tu biblioteca.",
       visualAssets: "Imágenes de la biblioteca",
@@ -1053,14 +1062,14 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">01</span>
                 <div>
                   <h3 className="text-sm font-extrabold text-white">{copy.platform}</h3>
-                  <p className="mt-0.5 text-[10px] text-white/34">{copy.addSubtitle}</p>
+                  <p className="mt-0.5 text-[10px] text-white/34">{copy.platformSubtitle}</p>
                 </div>
               </div>
               <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
                 {([
-                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: <HardDrive size={17} /> },
-                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: <Globe size={17} /> },
-                  { id: "epic" as const, label: copy.epic, description: copy.epicDescription, icon: <EpicIcon className="h-[17px] w-[17px] opacity-80" /> },
+                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: (selected: boolean) => <HardDrive size={17} /> },
+                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: (selected: boolean) => <Globe size={17} /> },
+                  { id: "epic" as const, label: copy.epic, description: copy.epicDescription, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
                 ]).map((option) => {
                   const selected = formData.launcherType === option.id;
                   return (
@@ -1076,7 +1085,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                     >
                       <div className="flex items-start justify-between gap-3">
                         <span className={"grid h-8 w-8 place-items-center rounded-xl border " + (selected ? "border-black/10 bg-black/[0.06]" : "border-white/[0.08] bg-white/[0.04] text-white/58")}>
-                          {option.icon}
+                          {option.icon(selected)}
                         </span>
                         {selected && <CheckCircle2 size={17} className="text-black/70" />}
                       </div>
@@ -1139,6 +1148,30 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 </a>
               )}
 
+              {formData.launcherType !== "local" &&
+                (formData.epicCatalogId || formData.steamAppId) && (
+                  <button
+                    type="button"
+                    aria-pressed={Boolean(formData.hasGame)}
+                    onClick={() => {
+                      playSound("select");
+                      setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }));
+                    }}
+                    className={`mt-4 flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${formData.hasGame
+                      ? "border-white/40 bg-white text-black shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
+                      : "border-white/[0.08] bg-white/[0.025] text-white/48 hover:border-white/16 hover:bg-white/[0.055]"
+                      }`}
+                  >
+                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${formData.hasGame ? "border-black/10 bg-black/[0.06]" : "border-white/10 bg-white/[0.04]"}`}>
+                      <Check size={15} strokeWidth={3} />
+                    </span>
+                    <span>
+                      <strong className="block text-[10px] font-black uppercase tracking-[0.12em]">{formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}</strong>
+                      <small className={`mt-1 block text-[9px] ${formData.hasGame ? "text-black/50" : "text-white/28"}`}>{platformLabel}</small>
+                    </span>
+                  </button>
+                )}
+
               {formData.launcherType === "epic" && (
                 <div className="mt-4 border-t border-white/[0.06] pt-4">
                   <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={handleEpicExecutableSelect} />
@@ -1155,32 +1188,6 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               )}
             </section>
 
-            {formData.launcherType !== "local" &&
-              (formData.epicCatalogId || formData.steamAppId) && (
-              <div>
-                <button
-                  type="button"
-                  aria-pressed={Boolean(formData.hasGame)}
-                  onClick={() => {
-                    playSound("select");
-                    setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }));
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${formData.hasGame
-                    ? "border-white/40 bg-white text-black shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
-                    : "border-white/[0.08] bg-white/[0.025] text-white/48 hover:border-white/16 hover:bg-white/[0.055]"
-                    }`}
-                >
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${formData.hasGame ? "border-black/10 bg-black/[0.06]" : "border-white/10 bg-white/[0.04]"}`}>
-                    <Check size={15} strokeWidth={3} />
-                  </span>
-                  <span>
-                    <strong className="block text-[10px] font-black uppercase tracking-[0.12em]">{formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}</strong>
-                    <small className={`mt-1 block text-[9px] ${formData.hasGame ? "text-black/50" : "text-white/28"}`}>{platformLabel}</small>
-                  </span>
-                </button>
-              </div>
-            )}
-
             <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
               <div className="mb-5 flex items-center gap-3">
                 <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">03</span>
@@ -1190,58 +1197,63 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="game-title" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                  <Type size={14} className="text-white/20" /> {copy.title}
-                </label>
-                <input
-                  id="game-title"
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  placeholder={copy.titlePlaceholder}
-                  className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
-                />
-              </div>
+                <div className="space-y-2">
+                  <label htmlFor="game-title" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
+                    <Type size={14} className="text-white/20" /> {copy.title}
+                  </label>
+                  <input
+                    id="game-title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    placeholder={copy.titlePlaceholder}
+                    className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <label htmlFor="game-category" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                  <Tags size={14} className="text-white/20" /> {copy.category}
-                </label>
-                <div className="relative">
-                  <select
-                    id="game-category"
-                    value={formData.category}
-                    onChange={(event) => {
-                      playSound("navigate");
-                      setFormData({ ...formData, category: event.target.value });
-                    }}
-                    className="w-full appearance-none rounded-xl border border-white/[0.09] bg-[#0d0d11] px-4 py-3.5 pr-10 text-[12px] text-white/78 outline-none transition-all focus:border-white/24"
-                  >
-                    {CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
-                  </select>
-                  <ChevronDown size={15} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/30" />
+                <div className="space-y-2">
+                  <label htmlFor="game-category" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
+                    <Tags size={14} className="text-white/20" /> {copy.category}
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="game-category"
+                      value={formData.category}
+                      onChange={(event) => {
+                        playSound("navigate");
+                        setFormData({ ...formData, category: event.target.value });
+                      }}
+                      className="w-full appearance-none rounded-xl border border-white/[0.09] bg-[#0d0d11] px-4 py-3.5 pr-10 text-[12px] text-white/78 outline-none transition-all focus:border-white/24"
+                    >
+                      {CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
+                    </select>
+                    <ChevronDown size={15} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/30" />
+                  </div>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label htmlFor="game-description" className="text-[9px] font-black uppercase tracking-[0.16em] text-white/40">{copy.description}</label>
+                  <textarea
+                    id="game-description"
+                    rows={3}
+                    value={formData.description}
+                    onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                    placeholder={copy.descriptionPlaceholder}
+                    className="w-full resize-none rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] leading-relaxed text-white/72 outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
+                  />
                 </div>
               </div>
+            </section>
 
-              <div className="space-y-2 md:col-span-2">
-                <label htmlFor="game-description" className="text-[9px] font-black uppercase tracking-[0.16em] text-white/40">{copy.description}</label>
-                <textarea
-                  id="game-description"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-                  placeholder={copy.descriptionPlaceholder}
-                  className="w-full resize-none rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] leading-relaxed text-white/72 outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
-                />
-              </div>
-
-              <div className="mt-1 border-t border-white/[0.06] pt-5 md:col-span-2">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-xl border border-white/[0.08] bg-white/[0.04]"><Sparkles size={14} className="text-white/44" /></span>
-                  <div><h4 className="text-[11px] font-extrabold text-white/82">{copy.visualAssets}</h4><p className="mt-0.5 text-[9px] text-white/28">{copy.visualAssetsHint}</p></div>
+            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">04</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">{copy.visualAssets}</h3>
+                  <p className="mt-0.5 text-[10px] text-white/34">{copy.visualAssetsHint}</p>
                 </div>
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
                   <label htmlFor="game-cover-url" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
@@ -1319,57 +1331,66 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   )}
                 </div>
               </div>
-              </div>
+            </section>
 
-              <div className="space-y-2">
-                <label htmlFor="game-size" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                  <HardDrive size={14} className="text-white/20" /> {copy.sizeGB}
-                  ({copy.optional})
-                </label>
-                <input
-                  id="game-size"
-                  type="number"
-                  min={0}
-                  value={formData.sizeGB ?? ""}
-                  onChange={handleSizeChange}
-                  placeholder={copy.sizePlaceholder}
-                  className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] text-white/70 outline-none transition-all placeholder:text-white/22 focus:border-white/24"
-                />
+            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">05</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">{copy.launchTitle}</h3>
+                  <p className="mt-0.5 text-[10px] text-white/34">{copy.launchHint}</p>
+                </div>
               </div>
-
-              {formData.launcherType === "local" && (
-                <div className="space-y-3 md:col-span-2">
-                  <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                    <FolderOpen size={14} className="text-white/20" />{" "}
-                    {copy.executable}
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label htmlFor="game-size" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
+                    <HardDrive size={14} className="text-white/20" /> {copy.sizeGB}
+                    ({copy.optional})
                   </label>
                   <input
-                    ref={executableInputRef}
-                    type="file"
-                    accept=".exe,application/x-msdownload"
-                    className="hidden"
-                    onChange={handleExecutableSelect}
+                    id="game-size"
+                    type="number"
+                    min={0}
+                    value={formData.sizeGB ?? ""}
+                    onChange={handleSizeChange}
+                    placeholder={copy.sizePlaceholder}
+                    className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] text-white/70 outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                   />
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <button
-                      type="button"
-                      onClick={() => executableInputRef.current?.click()}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white"
-                    >
-                      <FolderOpen size={14} /> {copy.chooseExe}
-                    </button>
-                    <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
-                      <p className="truncate text-[10px] text-white/52">
-                        {formData.executablePath || copy.noExecutable}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-[9px] leading-relaxed text-white/26">
-                    {copy.executableHint}
-                  </p>
                 </div>
-              )}
-            </div>
+
+                {formData.launcherType === "local" && (
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
+                      <FolderOpen size={14} className="text-white/20" />{" "}
+                      {copy.executable}
+                    </label>
+                    <input
+                      ref={executableInputRef}
+                      type="file"
+                      accept=".exe,application/x-msdownload"
+                      className="hidden"
+                      onChange={handleExecutableSelect}
+                    />
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => executableInputRef.current?.click()}
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white"
+                      >
+                        <FolderOpen size={14} /> {copy.chooseExe}
+                      </button>
+                      <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
+                        <p className="truncate text-[10px] text-white/52">
+                          {formData.executablePath || copy.noExecutable}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[9px] leading-relaxed text-white/26">
+                      {copy.executableHint}
+                    </p>
+                  </div>
+                )}
+              </div>
             </section>
 
             <footer className="sticky bottom-0 z-20 -mx-5 -mb-5 border-t border-white/[0.08] bg-[#08080b]/92 px-5 pb-5 pt-4 shadow-[0_-20px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl lg:-mx-7 lg:-mb-7 lg:px-7 lg:pb-7">
