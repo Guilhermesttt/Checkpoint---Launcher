@@ -1,7 +1,5 @@
 # Checkpoint Launcher
 
-![Checkpoint Launcher](public/Checkpoint_Logo.png)
-
 O Checkpoint é um launcher de jogos para Windows que reúne biblioteca, conquistas, amigos e ferramentas in-game em uma interface pensada para teclado, mouse e controle.
 
 Ele sincroniza jogos da Steam, aceita jogos locais e importações assistidas da Epic Games, inicia executáveis pelo desktop e mantém o monitoramento de sessões e conquistas enquanto a janela principal está em segundo plano.
