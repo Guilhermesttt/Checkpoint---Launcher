@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, ExternalLink, Gamepad2, MapPin, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
+import { Clock, ExternalLink, Gamepad2, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -21,6 +21,7 @@ interface UserProfilePageProps {
   onOpenGame?: (game: Game) => void;
   onProfileUpdated?: () => Promise<void> | void;
   editable?: boolean;
+  playSound?: (sound: string) => void;
 }
 
 const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -122,6 +123,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   onOpenGame,
   onProfileUpdated,
   editable = true,
+  playSound,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -256,7 +258,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
               {editable && (
                 <button
                   type="button"
-                  onClick={() => setIsEditing(true)}
+                  onClick={() => {
+                    setIsEditing(true);
+                    playSound?.("showModal");
+                  }}
                   className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/12 hover:text-white"
                 >
                   <Pencil className="h-3.5 w-3.5" /> Editar perfil
@@ -412,15 +417,17 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
           </div>
         </div>
       </div>
-      {isEditing && (
-        <ProfileEditorModal
-          profile={userProfile}
-          fallbackName={displayName}
-          fallbackPhotoURL={user?.photoURL}
-          onClose={() => setIsEditing(false)}
-          onSaved={onProfileUpdated}
-        />
-      )}
+      <ProfileEditorModal
+        isOpen={isEditing}
+        profile={userProfile}
+        fallbackName={displayName}
+        fallbackPhotoURL={user?.photoURL}
+        onClose={() => {
+          setIsEditing(false);
+          playSound?.("back");
+        }}
+        onSaved={onProfileUpdated}
+      />
     </motion.div>
   );
 };

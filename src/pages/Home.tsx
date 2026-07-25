@@ -13,7 +13,6 @@ import {
   Star,
   Gamepad2,
   X,
-  LogOut,
 } from "lucide-react";
 
 import {
@@ -40,6 +39,7 @@ import {
 } from "../components/home/HomePanels";
 import { useNotification } from "../components/NotificationCenter";
 import ModalShell from "../components/ui/ModalShell";
+import { ProfileDropdown } from "../components/ui/ProfileDropdown";
 import { useAuth } from "../auth/AuthProvider";
 // Correção 1: Importando Game, UserProfile e SocialFriend no mesmo lugar
 import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/domain";
@@ -1536,23 +1536,23 @@ const Home: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-3 pl-2">
-              <div className="flex flex-col items-end">
-                <span className="text-[8px] font-black uppercase tracking-widest text-white/20 select-none">
-                  {t("identity")}
-                </span>
-                <span className="text-[10px] font-black uppercase text-white/70">
-                  {userDisplay}
-                </span>
-              </div>
-
-              <button
-                onClick={() => setSignOutModalOpen(true)}
-                className="h-10 px-4 rounded-xl flex items-center justify-center gap-2 transition-all bg-white/[0.03] border border-white/[0.06] hover:bg-red-500/10 hover:border-red-500/20 group"
-              >
-                <LogOut className="w-3.5 h-3.5 text-white/30 group-hover:text-red-400 transition-colors" />
-              </button>
-            </div>
+              <ProfileDropdown
+                userDisplay={userDisplay}
+                email={user?.email || undefined}
+                avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}
+                onOpenProfile={() => {
+                  setActiveCategory("PROFILE");
+                  playSound("select");
+                }}
+                onOpenSettings={() => {
+                  setActiveCategory("SETTINGS");
+                  playSound("select");
+                }}
+                onLogout={() => {
+                  playSound("back");
+                  setSignOutModalOpen(true);
+                }}
+              />
           </div>
         </motion.div>
 
@@ -1662,6 +1662,7 @@ const Home: React.FC = () => {
                 games={games}
                 onOpenGame={openDetails}
                 onProfileUpdated={refreshProfile}
+                playSound={playSound}
               />
             </React.Suspense>
           ) : isLoading ? (
@@ -1929,6 +1930,7 @@ const Home: React.FC = () => {
               user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
               games={friendProfileModal.games}
               editable={false}
+              playSound={playSound}
             />
           </React.Suspense>
         )}

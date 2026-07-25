@@ -56,7 +56,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   onGameHydrated,
 }) => {
   const { user, userProfile } = useAuth();
-  const { t, language } = usePreferences();
+  const { t, language, closeOnLaunch } = usePreferences();
   const { notify } = useNotification();
   const [isLaunching, setIsLaunching] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("JOGAR");
@@ -882,6 +882,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         throw result.reason;
       }
 
+      if (closeOnLaunch) {
+        window.close();
+      }
+
       if (user?.uid) {
         updateLibraryGame(user.uid, game.id, {
           lastPlayedAt: new Date().toISOString(),
@@ -1502,35 +1506,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                             />
                           </label>
                         </div>
-                      </div>
-                      <div className="flex gap-4">
-                        <button
-                          onClick={() => {
-                            if (onEditGame && game) {
-                              playSound("select");
-                              onClose();
-                              onEditGame(game);
-                            }
-                          }}
-                          className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
-                        >
-                          {copy.edit}
-                        </button>
-                        <button
-                          onClick={() => notify(copy.shortcutComingSoon, "info")}
-                          className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-[10px] font-bold text-white/60 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest"
-                        >
-                          {copy.createShortcut}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeleteModalOpen(true);
-                            playSound("select");
-                          }}
-                          className="px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-400/60 hover:text-red-400 hover:bg-red-500/20 transition-all uppercase tracking-widest"
-                        >
-                          {copy.remove}
-                        </button>
                       </div>
                     </motion.div>
                   )}

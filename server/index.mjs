@@ -922,6 +922,51 @@ app.get("/api/gaming/news", steamPublicLimiter, async (_req, res) => {
   }
 });
 
+// Image proxy — bypasses hotlinking/referer restrictions on news sources
+const ALLOWED_IMAGE_HOSTS = [
+  "gamevicio.com",
+  "adrenaline.com.br",
+  "i.imgur.com",
+  "cdn.gamevicio.com",
+  "sm.ign.com",
+  "assets.gamevicio.com",
+];
+app.get("/api/proxy/image", steamPublicLimiter, async (req, res) => {
+  const raw = String(req.query.url || "").trim();
+  if (!raw) return res.status(400).end();
+  let target;
+  try {
+    target = new URL(raw);
+    if (target.protocol !== "https:") return res.status(400).end();
+    const hostOk = ALLOWED_IMAGE_HOSTS.some(
+      (h) => target.hostname === h || target.hostname.endsWith("." + h),
+    );
+    if (!hostOk) return res.status(403).end();
+  } catch {
+    return res.status(400).end();
+  }
+  try {
+    const upstream = await fetch(target.toString(), {
+      signal: AbortSignal.timeout(8_000),
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        Referer: `https://${target.hostname}/`,
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
+    if (!upstream.ok) return res.status(502).end();
+    const ct = upstream.headers.get("content-type") || "image/jpeg";
+    if (!ct.startsWith("image/")) return res.status(502).end();
+    res.set("Content-Type", ct);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.set("Access-Control-Allow-Origin", "*");
+    const buf = await upstream.arrayBuffer();
+    return res.send(Buffer.from(buf));
+  } catch {
+    return res.status(502).end();
+  }
+});
+
 const publicProfile = (id, data = {}) => ({
   uid: String(id || data.uid || ""),
   email: data.email || "",

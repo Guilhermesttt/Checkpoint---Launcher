@@ -20,9 +20,11 @@ import {
   Send,
   ImagePlus,
   MessageSquare,
+  Zap,
 } from "lucide-react";
 import Stepper, { Step } from "../ReactBits/Stepper";
 import GlassButton from "../ui/GlassButton";
+import { Switch } from "../ui/switch";
 import ModalShell from "../ui/ModalShell";
 import { useNotification } from "../NotificationCenter";
 import { searchCheckpointFriends } from "../../services/checkpointFriends";
@@ -288,6 +290,7 @@ export const SettingsPageV2: React.FC<{
   onTestOverlayAchievement,
 }) => {
     const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
+    const { openAtLogin, setOpenAtLogin, lowPerformanceMode, setLowPerformanceMode, closeOnLaunch, setCloseOnLaunch } = usePreferences();
     const led = useControllerLedStatus();
     const [achievementDiagnostics, setAchievementDiagnostics] = useState<AchievementDiagnostics | null>(null);
     const refreshAchievementDiagnostics = useCallback(async () => {
@@ -524,6 +527,48 @@ export const SettingsPageV2: React.FC<{
             t={t}
           />
         </div>
+
+        <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+          <SettingsHeader
+            icon={<Zap className="h-5 w-5 text-white/70" />}
+            title={t("performance")}
+            description=""
+          />
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
+              <div>
+                <p className="text-sm font-bold text-white">{t("openAtLogin")}</p>
+                <p className="text-[10px] text-white/40">{t("openAtLoginHint")}</p>
+              </div>
+              <Switch
+                checked={openAtLogin}
+                onCheckedChange={setOpenAtLogin}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
+              <div>
+                <p className="text-sm font-bold text-white">{t("lowPerformanceMode")}</p>
+                <p className="text-[10px] text-white/40">{t("lowPerformanceModeHint")}</p>
+              </div>
+              <Switch
+                checked={lowPerformanceMode}
+                onCheckedChange={setLowPerformanceMode}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
+              <div>
+                <p className="text-sm font-bold text-white">{t("closeOnLaunch")}</p>
+                <p className="text-[10px] text-white/40">{t("closeOnLaunchHint")}</p>
+              </div>
+              <Switch
+                checked={closeOnLaunch}
+                onCheckedChange={setCloseOnLaunch}
+              />
+            </div>
+          </div>
+        </section>
 
         <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
           <SettingsHeader

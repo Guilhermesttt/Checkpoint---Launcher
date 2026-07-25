@@ -1608,6 +1608,11 @@ const fetchEpicGamesStoreDetails = async (rawRequest) => {
 registerSecureIpcHandler("launcher:fetch-epic-store-details", async (_event, request) =>
   fetchEpicGamesStoreDetails(request));
 
+registerSecureIpcHandler("system:set-open-at-login", async (_event, open) => {
+  app.setLoginItemSettings({ openAtLogin: Boolean(open) });
+  return true;
+});
+
 registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath, rawLaunchProfile) => {
   const target = String(executablePath || "").trim();
   if (!target) {

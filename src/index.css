@@ -417,3 +417,18 @@ html[data-launcher-theme="sunset"] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* --- Low Performance Mode --- */
+body.low-performance * {
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+body.low-performance [class*="blob"],
+body.low-performance [class*="particle"],
+body.low-performance [class*="sparkle"] {
+  display: none !important;
+}

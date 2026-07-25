@@ -18,9 +18,9 @@ const integrations = [
     name: "Epic Games",
     image: EPIC_GAMES_ICON_PATH,
     description: "Busque jogos no catálogo da Epic para preencher capas, descrições e links",
-    statusLabel: "Disponível em análise",
-    statusClassName: "text-yellow-400",
-    dotClassName: "bg-yellow-400",
+    statusLabel: "Disponível e funcionando",
+    statusClassName: "text-green-500",
+    dotClassName: "bg-green-500",
   },
   {
     name: "Jogos Locais",

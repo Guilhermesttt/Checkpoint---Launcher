@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   detectRunningGames: (executablePaths) =>
     ipcRenderer.invoke("launcher:detect-running-games", executablePaths),
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
+  setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
   listLocalGames: (uid) => ipcRenderer.invoke("library:list", uid),

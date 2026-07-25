@@ -9,6 +9,7 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
+import { PCard3D, PGlow, useLowPerf } from "./PerformanceComponents";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 
 interface GameCardProps {
@@ -40,6 +41,8 @@ const GameCard: React.FC<GameCardProps> = ({
   isEpic = false,
 }) => {
   const reduceMotion = useReducedMotion();
+  const low = useLowPerf();
+  const noAnimation = reduceMotion || low;
   const [failedImageSrc, setFailedImageSrc] = React.useState<string | null>(null);
   const [isFocused, setIsFocused] = React.useState(false);
   const x = useMotionValue(0);
@@ -62,7 +65,7 @@ const GameCard: React.FC<GameCardProps> = ({
   );
 
   const handleMouseMove = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!visuallyActive || reduceMotion) return;
+    if (!visuallyActive || noAnimation) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -148,35 +151,22 @@ const GameCard: React.FC<GameCardProps> = ({
     >
       {/* Glow externo quando ativo */}
       {visuallyActive && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.8 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="pointer-events-none absolute inset-0 rounded-2xl"
-          style={{
-            background: "var(--launcher-accent-soft, rgba(255,255,255,0.15))",
-            filter: "blur(28px)",
-            transform: "translateY(8px) scale(0.95)",
-            zIndex: 0,
-          }}
+        <PGlow
+          className="absolute inset-0 rounded-2xl"
+          style={{ transform: "translateY(8px) scale(0.95)", zIndex: 0 }}
+          color="var(--launcher-accent-soft, rgba(255,255,255,0.15))"
+          size="100%"
+          opacity={0.8}
         />
       )}
 
-      <motion.div
+      <PCard3D
         className="relative z-10 origin-center"
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-          rotateX: visuallyActive && !reduceMotion ? rotateX : 0,
-          rotateY: visuallyActive && !reduceMotion ? rotateY : 0,
-          scale: visuallyActive ? 1.03 : 0.92,
-          transformStyle: "preserve-3d",
-        }}
-        transition={
-          reduceMotion
-            ? { duration: 0.2 }
-            : { type: "spring", stiffness: 350, damping: 25 }
-        }
+        style={{ width: CARD_WIDTH, height: CARD_HEIGHT }}
+        rotateX={visuallyActive && !noAnimation ? rotateX : 0}
+        rotateY={visuallyActive && !noAnimation ? rotateY : 0}
+        scale={visuallyActive ? 1.03 : 0.92}
+        isActive={visuallyActive}
       >
         <div
           className={`relative h-full w-full overflow-hidden rounded-2xl bg-[#08080c] transition-all duration-400 ease-out transform group-hover:scale-[1.02] ${visuallyActive
@@ -220,7 +210,7 @@ const GameCard: React.FC<GameCardProps> = ({
             <img
               src={image}
               alt={title}
-              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !reduceMotion
+              className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !noAnimation
                   ? "scale-110 duration-[12000ms]"
                   : "scale-100 duration-500"
                 }`}
@@ -245,7 +235,7 @@ const GameCard: React.FC<GameCardProps> = ({
           {visuallyActive && (
             <>
               {/* Brilho varrendo o card */}
-              {!reduceMotion && (
+              {!noAnimation && (
                 <motion.div
                   initial={{ x: "-150%" }}
                   animate={{ x: "150%" }}
@@ -269,7 +259,7 @@ const GameCard: React.FC<GameCardProps> = ({
               />
 
               {/* Brilho dinâmico do mouse */}
-              {!reduceMotion && (
+              {!noAnimation && (
                 <motion.div
                   className="pointer-events-none absolute inset-0 z-20 mix-blend-overlay"
                   style={{
@@ -351,21 +341,23 @@ const GameCard: React.FC<GameCardProps> = ({
               }`}
             style={{ transform: "translateZ(40px)" }}
           >
-            <motion.div
-              initial={reduceMotion ? false : { scale: visuallyActive ? 1 : 0.8, opacity: visuallyActive ? 1 : 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={
-                reduceMotion
-                  ? { duration: 0.2 }
-                  : { type: "spring", stiffness: 400, damping: 25, delay: 0.05 }
-              }
-              className="group/play flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md bg-white/10 border border-white/20 transition-all duration-300 hover:scale-110 hover:bg-white/25 hover:border-white/40 cursor-pointer"
-            >
-              <Play
-                className="h-5 w-5 fill-white text-white drop-shadow-md transition-transform duration-300 group-hover/play:scale-105"
-                style={{ marginLeft: 3 }}
-              />
-            </motion.div>
+            {!noAnimation ? (
+              <motion.div
+                initial={{ scale: visuallyActive ? 1 : 0.8, opacity: visuallyActive ? 1 : 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25, delay: 0.05 }}
+                className="group/play flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-md bg-white/10 border border-white/20 transition-all duration-300 hover:scale-110 hover:bg-white/25 hover:border-white/40 cursor-pointer"
+              >
+                <Play
+                  className="h-5 w-5 fill-white text-white drop-shadow-md transition-transform duration-300 group-hover/play:scale-105"
+                  style={{ marginLeft: 3 }}
+                />
+              </motion.div>
+            ) : (
+              <div className="group/play flex h-[52px] w-[52px] items-center justify-center rounded-full bg-white/10 border border-white/20 cursor-pointer hover:bg-white/25">
+                <Play className="h-5 w-5 fill-white text-white" style={{ marginLeft: 3 }} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -380,7 +372,7 @@ const GameCard: React.FC<GameCardProps> = ({
             }}
           />
         )}
-      </motion.div>
+      </PCard3D>
     </button>
   );
 };

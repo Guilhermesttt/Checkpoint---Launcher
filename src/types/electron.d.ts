@@ -159,6 +159,7 @@ declare global {
       getLocalAchievementState: (
         appId: string
       ) => Promise<{ [id: string]: { earned: boolean; earnedTime: number } }>;
+      setOpenAtLogin?: (open: boolean) => Promise<void>;
       getEpicLocalAchievements: (request: {
         gameId: string;
         title: string;
