@@ -16,6 +16,12 @@ interface PreferencesContextValue {
   setMusicVolume: (volume: number) => void;
   setSoundTheme: (theme: SoundTheme) => void;
   setVisualTheme: (theme: VisualTheme) => void;
+  openAtLogin: boolean;
+  setOpenAtLogin: (value: boolean) => void;
+  lowPerformanceMode: boolean;
+  setLowPerformanceMode: (value: boolean) => void;
+  closeOnLaunch: boolean;
+  setCloseOnLaunch: (value: boolean) => void;
   t: (key: TranslationKey) => string;
 }
 
@@ -46,6 +52,13 @@ const translations = {
     test: "Testar",
     mute: "Mudo",
     max: "Máximo",
+    performance: "Desempenho",
+    lowPerformanceMode: "Desativar Animações",
+    lowPerformanceModeHint: "Desativa animações e efeitos pesados para poupar CPU/GPU.",
+    openAtLogin: "Iniciar com o Windows",
+    openAtLoginHint: "Inicia o launcher silenciosamente em segundo plano ao ligar o PC.",
+    closeOnLaunch: "Ocultar ao Jogar",
+    closeOnLaunchHint: "Minimiza/Esconde o launcher completamente para liberar memória.",
     new: "Novo",
     searchPlaceholder: "Buscar jogo... (S)",
     connectSteam: "Conectar Steam",
@@ -167,6 +180,13 @@ const translations = {
     test: "Test",
     mute: "Mute",
     max: "Max",
+    performance: "Performance",
+    lowPerformanceMode: "Disable Animations",
+    lowPerformanceModeHint: "Disables heavy animations and effects to save CPU/GPU.",
+    openAtLogin: "Start with Windows",
+    openAtLoginHint: "Starts the launcher silently in the background on PC startup.",
+    closeOnLaunch: "Hide on Launch",
+    closeOnLaunchHint: "Minimizes/Hides the launcher completely to free memory.",
     new: "New",
     searchPlaceholder: "Search game... (S)",
     connectSteam: "Connect Steam",
@@ -288,6 +308,13 @@ const translations = {
     test: "Probar",
     mute: "Silencio",
     max: "Máximo",
+    performance: "Rendimiento",
+    lowPerformanceMode: "Desactivar Animaciones",
+    lowPerformanceModeHint: "Desactiva animaciones pesadas para ahorrar CPU/GPU.",
+    openAtLogin: "Iniciar con Windows",
+    openAtLoginHint: "Inicia el launcher silenciosamente en segundo plano.",
+    closeOnLaunch: "Ocultar al Jugar",
+    closeOnLaunchHint: "Oculta el launcher completamente para liberar memoria.",
     new: "Nuevo",
     searchPlaceholder: "Buscar juego... (S)",
     connectSteam: "Conectar Steam",
@@ -403,6 +430,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [musicVolume, setMusicVolume] = useState(9);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
+  const [openAtLogin, setOpenAtLoginState] = useState(false);
+  const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
+  const [closeOnLaunch, setCloseOnLaunch] = useState(true);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -415,6 +445,13 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       savedMusicVolumeRaw == null ? null : Number(savedMusicVolumeRaw);
     const savedSoundTheme = localStorage.getItem(prefKey(user.uid, "sound_theme"));
     const savedVisualTheme = localStorage.getItem(prefKey(user.uid, "visual_theme"));
+    const savedOpenAtLogin = localStorage.getItem(prefKey(user.uid, "open_at_login"));
+    const savedLowPerf = localStorage.getItem(prefKey(user.uid, "low_perf"));
+    const savedCloseLaunch = localStorage.getItem(prefKey(user.uid, "close_launch"));
+
+    if (savedOpenAtLogin !== null) setOpenAtLoginState(savedOpenAtLogin === "true");
+    if (savedLowPerf !== null) setLowPerformanceMode(savedLowPerf === "true");
+    if (savedCloseLaunch !== null) setCloseOnLaunch(savedCloseLaunch === "true");
 
     if (
       savedLanguage === "pt-BR" ||
@@ -449,11 +486,19 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(prefKey(user.uid, "music_volume"), String(musicVolume));
     localStorage.setItem(prefKey(user.uid, "sound_theme"), soundTheme);
     localStorage.setItem(prefKey(user.uid, "visual_theme"), visualTheme);
-  }, [effectsVolume, language, musicVolume, soundTheme, user?.uid, visualTheme]);
+    localStorage.setItem(prefKey(user.uid, "open_at_login"), String(openAtLogin));
+    localStorage.setItem(prefKey(user.uid, "low_perf"), String(lowPerformanceMode));
+    localStorage.setItem(prefKey(user.uid, "close_launch"), String(closeOnLaunch));
+  }, [effectsVolume, language, musicVolume, soundTheme, user?.uid, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch]);
 
   useEffect(() => {
     document.documentElement.dataset.launcherTheme = visualTheme;
-  }, [visualTheme]);
+    if (lowPerformanceMode) {
+      document.body.classList.add("low-performance");
+    } else {
+      document.body.classList.remove("low-performance");
+    }
+  }, [visualTheme, lowPerformanceMode]);
 
   const value = useMemo<PreferencesContextValue>(
     () => ({
@@ -467,9 +512,18 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setMusicVolume: (volume) => setMusicVolume(clampVolume(volume)),
       setSoundTheme,
       setVisualTheme,
+      openAtLogin,
+      setOpenAtLogin: (val) => {
+        setOpenAtLoginState(val);
+        window.electronAPI?.setOpenAtLogin?.(val).catch(console.error);
+      },
+      lowPerformanceMode,
+      setLowPerformanceMode,
+      closeOnLaunch,
+      setCloseOnLaunch,
       t: (key) => translations[language][key] ?? translations["pt-BR"][key],
     }),
-    [effectsVolume, language, musicVolume, soundTheme, visualTheme],
+    [effectsVolume, language, musicVolume, soundTheme, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch],
   );
 
   return (

@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useGamepadButton } from "@/context/GamepadContext";
@@ -140,10 +141,13 @@ const ModalShell: React.FC<ModalShellProps> = ({
     };
   }, [getFocusableElements, isOpen, moveLinearFocus]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div
+          key="modal-shell"
           className={cn(
             "fixed inset-0 flex items-center justify-center p-4 md:p-8",
             zIndexClassName,
@@ -183,7 +187,8 @@ const ModalShell: React.FC<ModalShellProps> = ({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

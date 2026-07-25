@@ -61,12 +61,7 @@ export function Navigation() {
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <a
-              href="/download"
-              className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}
-            >
-              Baixar
-            </a>
+
             <a
               href="/download"
               className={`rounded-full transition-all duration-500 inline-flex items-center ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6 py-2 text-sm"}`}
@@ -113,13 +108,7 @@ export function Navigation() {
             }`}
             style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
           >
-            <a
-              href="/download"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="flex-1 border border-foreground/30 rounded-full h-14 text-base flex items-center justify-center hover:bg-foreground/5 transition-colors"
-            >
-              Baixar
-            </a>
+
             <a
               href="/download"
               onClick={() => setIsMobileMenuOpen(false)}

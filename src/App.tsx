@@ -1,5 +1,5 @@
 import React from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import GameBootIntro from "./components/GameBootIntro";
@@ -26,7 +26,7 @@ const menuMusicLoaders: Record<SoundTheme, () => Promise<string>> = {
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { musicVolume, soundTheme } = usePreferences();
+  const { musicVolume, soundTheme, lowPerformanceMode } = usePreferences();
   useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState(false);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
@@ -104,6 +104,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   const startBackgroundMusic = React.useCallback(async () => {
+    if (lowPerformanceMode) return;
     if (document.hidden || !document.hasFocus()) {
       pendingMusicStartRef.current = true;
       return;
@@ -122,7 +123,7 @@ const AppContent: React.FC = () => {
       .catch(() => {
         pendingMusicStartRef.current = true;
       });
-  }, [ensureMusicSource, fadeMusicTo, musicVolume, soundTheme]);
+  }, [ensureMusicSource, fadeMusicTo, musicVolume, soundTheme, lowPerformanceMode]);
 
   const stopBackgroundMusic = React.useCallback(() => {
     const audio = musicRef.current;
@@ -132,6 +133,12 @@ const AppContent: React.FC = () => {
       audio.currentTime = 0;
     });
   }, [fadeMusicTo]);
+
+  React.useEffect(() => {
+    if (lowPerformanceMode) {
+      stopBackgroundMusic();
+    }
+  }, [lowPerformanceMode, stopBackgroundMusic]);
 
   React.useEffect(() => {
     if (loading) return;
@@ -249,29 +256,31 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
-      <div
-        className="absolute inset-0"
-        inert={isIntroVisible}
-        aria-hidden={isIntroVisible ? "true" : undefined}
-      >
-        <MainVideoBackground />
-        <Home />
-        <GamepadStatusOverlay />
-        <ControllerVirtualKeyboard />
+    <MotionConfig reducedMotion={lowPerformanceMode ? "always" : "never"}>
+      <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
+        <div
+          className="absolute inset-0"
+          inert={isIntroVisible}
+          aria-hidden={isIntroVisible ? "true" : undefined}
+        >
+          {!lowPerformanceMode && <MainVideoBackground />}
+          <Home />
+          <GamepadStatusOverlay />
+          <ControllerVirtualKeyboard />
+        </div>
+        <AnimatePresence mode="wait">
+          {isIntroVisible && (
+            <GameBootIntro
+              key="boot-intro"
+              onFinish={() => {
+                setIsIntroVisible(false);
+                startBackgroundMusic();
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
-      <AnimatePresence mode="wait">
-        {isIntroVisible && (
-          <GameBootIntro
-            key="boot-intro"
-            onFinish={() => {
-              setIsIntroVisible(false);
-              startBackgroundMusic();
-            }}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+    </MotionConfig>
   );
 };
 

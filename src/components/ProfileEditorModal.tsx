@@ -1,12 +1,14 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Camera, Check, LoaderCircle, Trash2, X } from "lucide-react";
 import type { EditableProfile, UserProfile } from "../types/domain";
 import {
   PROFILE_LIMITS,
   saveCurrentUserProfile,
 } from "../services/profile";
+import ModalShell from "./ui/ModalShell";
 
 interface ProfileEditorModalProps {
+  isOpen?: boolean;
   profile: UserProfile | null;
   fallbackName: string;
   fallbackPhotoURL?: string | null;
@@ -25,6 +27,7 @@ const AVAILABLE_GENRES = [
 ];
 
 const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
+  isOpen = true,
   profile,
   fallbackName,
   fallbackPhotoURL,
@@ -42,6 +45,20 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm({
+        displayName: profile?.displayName || fallbackName,
+        photoURL: profile?.photoURL || fallbackPhotoURL || "",
+        bio: profile?.bio || "",
+        website: profile?.website || "",
+        favoriteGenres: profile?.favoriteGenres || [],
+      });
+      setError("");
+      setSaving(false);
+    }
+  }, [isOpen, profile, fallbackName, fallbackPhotoURL]);
 
   const setField = (field: keyof EditableProfile, value: any) =>
     setForm((current) => ({ ...current, [field]: value }));
@@ -70,7 +87,7 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
         } else {
           if (height > MAX_SIZE) {
             width *= MAX_SIZE / height;
-            height = MAX_SIZE;
+            width = MAX_SIZE;
           }
         }
         
@@ -104,14 +121,14 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-5 backdrop-blur-md">
-      <button type="button" aria-label="Fechar editor" className="absolute inset-0" onClick={onClose} />
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-editor-title"
-        className="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[28px] border border-white/12 bg-[#090909] p-6 shadow-2xl thin-scrollbar"
-      >
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      maxWidthClassName="max-w-2xl"
+      zIndexClassName="z-[120]"
+      ariaLabel="Editar perfil"
+    >
+      <div className="relative max-h-[85vh] w-full overflow-y-auto rounded-[28px] border border-white/12 bg-[#090909] p-6 shadow-2xl thin-scrollbar text-white">
         <header className="mb-6 flex items-start justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Conta Checkpoint</p>
@@ -212,8 +229,8 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
             {saving ? "Salvando..." : "Salvar perfil"}
           </button>
         </footer>
-      </section>
-    </div>
+      </div>
+    </ModalShell>
   );
 };
 

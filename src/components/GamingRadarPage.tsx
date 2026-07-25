@@ -11,6 +11,11 @@ import {
 import { apiUrl } from "../services/api";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 
+const proxyImage = (url?: string) => {
+  if (!url) return "";
+  return apiUrl(`/api/proxy/image?url=${encodeURIComponent(url)}`);
+};
+
 interface GamingNewsItem {
   id: string;
   title: string;
@@ -169,7 +174,12 @@ const GamingRadarPage: React.FC = () => {
               >
                 {item.imageUrl ? (
                   <div className="h-40 overflow-hidden bg-white/[0.04]">
-                    <img src={item.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-95" />
+                    <img
+                      src={proxyImage(item.imageUrl)}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover opacity-75 transition duration-500 group-hover:scale-[1.03] group-hover:opacity-95"
+                    />
                   </div>
                 ) : (
                   <div className="flex h-24 items-center justify-center bg-white/[0.035]">

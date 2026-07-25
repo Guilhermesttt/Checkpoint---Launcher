@@ -16,6 +16,19 @@ import psShare from "../../assets/PlayStation Series/Vector/playstation5_button_
 import psDpadHorizontal from "../../assets/PlayStation Series/Vector/playstation_dpad_horizontal_outline.svg?raw";
 import psRightStickVertical from "../../assets/PlayStation Series/Vector/playstation_stick_r_vertical.svg?raw";
 
+import xboxA from "../../assets/Xbox Series/Vector/xbox_button_a.svg?raw";
+import xboxB from "../../assets/Xbox Series/Vector/xbox_button_b.svg?raw";
+import xboxX from "../../assets/Xbox Series/Vector/xbox_button_x.svg?raw";
+import xboxY from "../../assets/Xbox Series/Vector/xbox_button_y.svg?raw";
+import xboxLB from "../../assets/Xbox Series/Vector/xbox_lb.svg?raw";
+import xboxRB from "../../assets/Xbox Series/Vector/xbox_rb.svg?raw";
+import xboxLT from "../../assets/Xbox Series/Vector/xbox_lt.svg?raw";
+import xboxRT from "../../assets/Xbox Series/Vector/xbox_rt.svg?raw";
+import xboxMenu from "../../assets/Xbox Series/Vector/xbox_button_menu.svg?raw";
+import xboxView from "../../assets/Xbox Series/Vector/xbox_button_view.svg?raw";
+import xboxDpadHorizontal from "../../assets/Xbox Series/Vector/xbox_dpad_horizontal_outline.svg?raw";
+import xboxRightStickVertical from "../../assets/Xbox Series/Vector/xbox_stick_r_vertical.svg?raw";
+
 type ExtraHintButton = "L1_R1" | "L2_R2" | "DPAD" | "CONTEXT" | "SCROLL";
 
 export interface InputHintProps {
@@ -31,7 +44,7 @@ const KeyboardHint: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   </kbd>
 );
 
-const PsIcon: React.FC<{ svg: string; label: string; className?: string }> = ({
+const GamepadIcon: React.FC<{ svg: string; label: string; className?: string }> = ({
   svg,
   label,
   className = "h-5 w-5",
@@ -101,63 +114,83 @@ const getPCHint = (button: string) => {
 const getPSHint = (button: string) => {
   switch (button) {
     case "X":
-      return <PsIcon svg={psCross} label="Cross" />;
+      return <GamepadIcon svg={psCross} label="Cross" />;
     case "O":
-      return <PsIcon svg={psCircle} label="Circle" />;
+      return <GamepadIcon svg={psCircle} label="Circle" />;
     case "SQUARE":
-      return <PsIcon svg={psSquare} label="Square" />;
+      return <GamepadIcon svg={psSquare} label="Square" />;
     case "TRIANGLE":
-      return <PsIcon svg={psTriangle} label="Triangle" />;
+      return <GamepadIcon svg={psTriangle} label="Triangle" />;
     case "L1":
-      return <PsIcon svg={psL1} label="L1" className="h-6 w-6" />;
+      return <GamepadIcon svg={psL1} label="L1" className="h-6 w-6" />;
     case "R1":
-      return <PsIcon svg={psR1} label="R1" className="h-6 w-6" />;
+      return <GamepadIcon svg={psR1} label="R1" className="h-6 w-6" />;
     case "L1_R1":
       return (
         <div className="flex items-center gap-0.5">
-          <PsIcon svg={psL1} label="L1" className="h-6 w-6" />
-          <PsIcon svg={psR1} label="R1" className="h-6 w-6" />
+          <GamepadIcon svg={psL1} label="L1" className="h-6 w-6" />
+          <GamepadIcon svg={psR1} label="R1" className="h-6 w-6" />
         </div>
       );
     case "L2_R2":
       return (
         <div className="flex items-center gap-0.5">
-          <PsIcon svg={psL2} label="L2" className="h-6 w-6" />
-          <PsIcon svg={psR2} label="R2" className="h-6 w-6" />
+          <GamepadIcon svg={psL2} label="L2" className="h-6 w-6" />
+          <GamepadIcon svg={psR2} label="R2" className="h-6 w-6" />
         </div>
       );
     case "OPTIONS":
-      return <PsIcon svg={psOptions} label="Options" className="h-6 w-6" />;
+      return <GamepadIcon svg={psOptions} label="Options" className="h-6 w-6" />;
     case "SHARE":
-      return <PsIcon svg={psShare} label="Create" className="h-6 w-6" />;
+      return <GamepadIcon svg={psShare} label="Create" className="h-6 w-6" />;
     case "DPAD":
-      return <PsIcon svg={psDpadHorizontal} label="D-pad" className="h-6 w-6" />;
+      return <GamepadIcon svg={psDpadHorizontal} label="D-pad" className="h-6 w-6" />;
     case "SCROLL":
-      return <PsIcon svg={psRightStickVertical} label="Right stick vertical" className="h-6 w-6" />;
+      return <GamepadIcon svg={psRightStickVertical} label="Right stick vertical" className="h-6 w-6" />;
     default:
       return null;
   }
 };
 
 const getXboxHint = (button: string) => {
-  const xboxMap: Record<string, string> = {
-    X: "A",
-    O: "B",
-    SQUARE: "X",
-    TRIANGLE: "Y",
-    L1: "LB",
-    R1: "RB",
-    L2: "LT",
-    R2: "RT",
-    L1_R1: "LB/RB",
-    L2_R2: "LT/RT",
-    DPAD: "D-Pad",
-    SCROLL: "RS",
-    SHARE: "View",
-    OPTIONS: "Menu",
-  };
-
-  return <KeyboardHint>{xboxMap[button] ?? button}</KeyboardHint>;
+  switch (button) {
+    case "X":
+      return <GamepadIcon svg={xboxA} label="A" />;
+    case "O":
+      return <GamepadIcon svg={xboxB} label="B" />;
+    case "SQUARE":
+      return <GamepadIcon svg={xboxX} label="X" />;
+    case "TRIANGLE":
+      return <GamepadIcon svg={xboxY} label="Y" />;
+    case "L1":
+      return <GamepadIcon svg={xboxLB} label="LB" className="h-6 w-6" />;
+    case "R1":
+      return <GamepadIcon svg={xboxRB} label="RB" className="h-6 w-6" />;
+    case "L1_R1":
+      return (
+        <div className="flex items-center gap-0.5">
+          <GamepadIcon svg={xboxLB} label="LB" className="h-6 w-6" />
+          <GamepadIcon svg={xboxRB} label="RB" className="h-6 w-6" />
+        </div>
+      );
+    case "L2_R2":
+      return (
+        <div className="flex items-center gap-0.5">
+          <GamepadIcon svg={xboxLT} label="LT" className="h-6 w-6" />
+          <GamepadIcon svg={xboxRT} label="RT" className="h-6 w-6" />
+        </div>
+      );
+    case "OPTIONS":
+      return <GamepadIcon svg={xboxMenu} label="Menu" className="h-6 w-6" />;
+    case "SHARE":
+      return <GamepadIcon svg={xboxView} label="View" className="h-6 w-6" />;
+    case "DPAD":
+      return <GamepadIcon svg={xboxDpadHorizontal} label="D-pad" className="h-6 w-6" />;
+    case "SCROLL":
+      return <GamepadIcon svg={xboxRightStickVertical} label="Right stick vertical" className="h-6 w-6" />;
+    default:
+      return null;
+  }
 };
 
 const getGenericHint = (button: string) => {

@@ -1005,35 +1005,29 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       isOpen={isOpen}
       onClose={handleClose}
       maxWidthClassName="max-w-6xl"
-      className="p-0! border-0! bg-transparent shadow-none!"
-      backdropClassName="bg-black/80 backdrop-blur-xl"
       ariaLabel={gameToEdit ? copy.editInfo : copy.addGame}
     >
       <div
         aria-busy={isSaving || loading}
-        className="relative flex h-[calc(100dvh-2rem)] max-h-[860px] w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#08080b]/98 shadow-[0_36px_140px_rgba(0,0,0,0.92)] backdrop-blur-3xl md:h-[calc(100dvh-4rem)] md:rounded-[32px]"
+        className="relative flex h-[calc(100dvh-2rem)] max-h-[860px] w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[#090909] shadow-2xl md:h-[calc(100dvh-4rem)] text-white"
       >
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_22%_-15%,rgba(255,255,255,0.12),transparent_44%)]" />
-        <header className="relative flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.07] bg-white/[0.015] px-5 py-4 md:px-7 md:py-5">
+        <header className="relative flex shrink-0 items-center justify-between gap-4 border-b border-white/[0.07] px-5 py-4 md:px-7 md:py-5">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/[0.06] shadow-[inset_0_1px_rgba(255,255,255,0.08)]">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/12 bg-white/[0.06]">
               <LibraryBig size={20} className="text-white/80" />
             </div>
             <div className="min-w-0">
-              <p className="mb-1 text-[9px] font-black uppercase tracking-[0.24em] text-white/32">
+              <p className="mb-1 text-[10px] font-black uppercase tracking-[0.22em] text-white/32">
                 {copy.libraryKicker}
               </p>
               <h2 className="truncate text-xl font-black tracking-[-0.035em] text-white md:text-2xl">
                 {gameToEdit ? copy.editInfo : copy.addGame}
               </h2>
-              <p className="mt-1 hidden max-w-xl truncate text-[11px] text-white/38 sm:block">
-                {gameToEdit ? copy.editSubtitle : copy.addSubtitle}
-              </p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <div className="hidden items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-2 sm:flex">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-white/42">
+              <span className="text-[10px] font-bold text-white/42">
                 {completedSetupChecks}/3
               </span>
               <div className="h-1.5 w-16 overflow-hidden rounded-full bg-white/[0.07]">
@@ -1053,25 +1047,23 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
         <div className="add-game-scrollbar grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
           <form
+            id="add-game-form"
             onSubmit={(event) => {
               event.preventDefault();
               void handleSubmit();
             }}
-            className="add-game-scrollbar min-h-0 space-y-5 border-white/[0.07] p-5 lg:overflow-y-auto lg:border-r lg:p-7"
+            className="add-game-scrollbar min-h-0 space-y-8 border-white/[0.07] p-5 pb-8 lg:overflow-y-auto lg:border-r lg:p-7"
           >
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">01</span>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">{copy.platform}</h3>
-                  <p className="mt-0.5 text-[10px] text-white/34">{copy.platformSubtitle}</p>
-                </div>
+            <section>
+              <div className="mb-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.platform}</p>
+                <div className="mt-2 border-b border-white/[0.08]" />
               </div>
               <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
                 {([
-                  { id: "local" as const, label: copy.local, description: copy.localDescription, icon: () => <HardDrive size={17} /> },
-                  { id: "steam" as const, label: copy.steam, description: copy.steamDescription, icon: () => <Globe size={17} /> },
-                  { id: "epic" as const, label: copy.epic, description: copy.epicDescription, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
+                  { id: "local" as const, label: copy.local, icon: () => <HardDrive size={17} /> },
+                  { id: "steam" as const, label: copy.steam, icon: () => <Globe size={17} /> },
+                  { id: "epic" as const, label: copy.epic, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
                 ]).map((option) => {
                   const selected = formData.launcherType === option.id;
                   return (
@@ -1081,52 +1073,41 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       role="radio"
                       aria-checked={selected}
                       onClick={() => selectLauncherType(option.id)}
-                      className={"group relative min-h-[104px] rounded-2xl border p-3.5 text-left transition-all " + (selected
-                        ? "border-white/45 bg-white text-black shadow-[0_14px_36px_rgba(0,0,0,0.32)]"
-                        : "border-white/[0.07] bg-black/20 text-white hover:border-white/16 hover:bg-white/[0.045]")}
+                      className={"flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all " + (selected
+                        ? "border-white bg-white text-black"
+                        : "border-white/10 bg-transparent text-white hover:border-white/25 hover:bg-white/[0.04]")}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <span className={"grid h-8 w-8 place-items-center rounded-xl border " + (selected ? "border-black/10 bg-black/[0.06]" : "border-white/[0.08] bg-white/[0.04] text-white/58")}>
-                          {option.icon(selected)}
-                        </span>
-                        {selected && <CheckCircle2 size={17} className="text-black/70" />}
-                      </div>
-                      <strong className="mt-3 block text-[12px] font-black">{option.label}</strong>
-                      <span className={"mt-1 block text-[9px] leading-relaxed " + (selected ? "text-black/55" : "text-white/34")}>{option.description}</span>
+                      <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (selected ? "text-black/70" : "text-white/55")}>
+                        {option.icon(selected)}
+                      </span>
+                      <strong className="text-[13px] font-bold">{option.label}</strong>
+                      {selected && <CheckCircle2 size={16} className="ml-auto text-black/60" />}
                     </button>
                   );
                 })}
               </div>
             </section>
 
-            <section className="relative rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">02</span>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white">{copy.automaticFill}</h3>
-                    <p className="mt-0.5 text-[10px] text-white/34">{copy.automaticFillHint}</p>
-                  </div>
-                </div>
-                {loading && <RefreshCw size={15} className="shrink-0 animate-spin text-white/45" />}
+            <section className="relative">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.automaticFill}</p>
+                {loading && <RefreshCw size={14} className="animate-spin text-white/45" />}
               </div>
+              <div className="mb-3 border-b border-white/[0.08]" />
 
-              <label htmlFor="game-metadata-search" className="mb-2 block text-[9px] font-black uppercase tracking-[0.16em] text-white/38">
-                {formData.launcherType === "epic" ? copy.epicSearch : copy.steamSearch}
-                {formData.launcherType === "local" ? ` · ${copy.optional}` : ""}
-              </label>
               <div className="relative">
                 <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/24" />
                 <input
                   id="game-metadata-search"
                   role="combobox"
+                  aria-label={formData.launcherType === "epic" ? copy.epicSearch : copy.steamSearch}
                   aria-autocomplete="list"
                   aria-controls="game-search-results"
                   aria-expanded={searchQuery.length >= 3}
                   value={searchQuery}
                   onChange={(event) => scheduleSearch(event.target.value, formData.launcherType === "epic" ? "epic" : "steam")}
                   placeholder={copy.searchPlaceholder}
-                  className="w-full rounded-2xl border border-white/[0.09] bg-black/25 py-3.5 pl-11 pr-11 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.045]"
+                  className="w-full rounded-xl border border-white/10 bg-black/30 py-3.5 pl-11 pr-11 text-[13px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                 />
                 {isSearching && <RefreshCw size={14} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-white/32" />}
                 <GameSearchDropdown
@@ -1144,7 +1125,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   href={formData.epicStoreUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/38 transition-colors hover:text-white/70"
+                  className="mt-3 inline-flex items-center gap-2 text-[11px] font-bold text-white/38 transition-colors hover:text-white/70"
                 >
                   <EpicIcon className="h-3.5 w-3.5 opacity-60" /> {copy.viewOnEpicStore}
                 </a>
@@ -1159,49 +1140,42 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       playSound("select");
                       setFormData((prev) => ({ ...prev, hasGame: !prev.hasGame }));
                     }}
-                    className={`mt-4 flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${formData.hasGame
-                      ? "border-white/40 bg-white text-black shadow-[0_12px_30px_rgba(0,0,0,0.25)]"
-                      : "border-white/[0.08] bg-white/[0.025] text-white/48 hover:border-white/16 hover:bg-white/[0.055]"
+                    className={`mt-4 flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${formData.hasGame
+                      ? "border-white bg-white text-black"
+                      : "border-white/10 bg-transparent text-white/48 hover:border-white/25 hover:bg-white/[0.04]"
                       }`}
                   >
-                    <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border ${formData.hasGame ? "border-black/10 bg-black/[0.06]" : "border-white/10 bg-white/[0.04]"}`}>
-                      <Check size={15} strokeWidth={3} />
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${formData.hasGame ? "border-black/10 bg-black/[0.06]" : "border-white/10"}`}>
+                      <Check size={14} strokeWidth={3} />
                     </span>
-                    <span>
-                      <strong className="block text-[10px] font-black uppercase tracking-[0.12em]">{formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}</strong>
-                      <small className={`mt-1 block text-[9px] ${formData.hasGame ? "text-black/50" : "text-white/28"}`}>{platformLabel}</small>
-                    </span>
+                    <strong className="text-[12px] font-bold">{formData.hasGame ? copy.ownGameConfirmed : copy.ownGameConfirm}</strong>
                   </button>
                 )}
 
               {formData.launcherType === "epic" && (
-                <div className="mt-4 border-t border-white/[0.06] pt-4">
+                <div className="mt-4">
                   <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={(event) => handleExecutableFileFallback(event, "epic")} />
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <button type="button" onClick={() => void handleChooseExecutable("epic")} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white">
+                    <button type="button" onClick={() => void handleChooseExecutable("epic")} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-[11px] font-bold text-white/68 transition-all hover:bg-white/[0.06] hover:text-white">
                       <FolderOpen size={14} /> {copy.chooseExe}
                     </button>
-                    <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
-                      <p className="truncate text-[10px] text-white/52">{formData.executablePath || copy.noExecutable}</p>
+                    <div className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3">
+                      <p className="truncate text-[12px] text-white/52">{formData.executablePath || copy.noExecutable}</p>
                     </div>
                   </div>
-                  <p className="mt-2 text-[9px] leading-relaxed text-white/26">{copy.executableHint}</p>
                 </div>
               )}
             </section>
 
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">03</span>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">{copy.gameDetails}</h3>
-                  <p className="mt-0.5 text-[10px] text-white/34">{copy.gameDetailsHint}</p>
-                </div>
+            <section>
+              <div className="mb-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.gameDetails}</p>
+                <div className="mt-2 border-b border-white/[0.08]" />
               </div>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label htmlFor="game-title" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                    <Type size={14} className="text-white/20" /> {copy.title}
+                  <label htmlFor="game-title" className="text-[11px] font-bold text-white/40">
+                    {copy.title}
                   </label>
                   <input
                     id="game-title"
@@ -1210,13 +1184,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       setFormData({ ...formData, title: e.target.value })
                     }
                     placeholder={copy.titlePlaceholder}
-                    className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[12px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-[13px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="game-category" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                    <Tags size={14} className="text-white/20" /> {copy.category}
+                  <label htmlFor="game-category" className="text-[11px] font-bold text-white/40">
+                    {copy.category}
                   </label>
                   <div className="relative">
                     <select
@@ -1226,7 +1200,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                         playSound("navigate");
                         setFormData({ ...formData, category: event.target.value });
                       }}
-                      className="w-full appearance-none rounded-xl border border-white/[0.09] bg-[#0d0d11] px-4 py-3.5 pr-10 text-[12px] text-white/78 outline-none transition-all focus:border-white/24"
+                      className="w-full appearance-none rounded-xl border border-white/10 bg-[#0d0d11] px-4 py-3 pr-10 text-[13px] text-white/78 outline-none transition-all focus:border-white/24"
                     >
                       {CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
                     </select>
@@ -1235,34 +1209,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label htmlFor="game-description" className="text-[9px] font-black uppercase tracking-[0.16em] text-white/40">{copy.description}</label>
+                  <label htmlFor="game-description" className="text-[11px] font-bold text-white/40">{copy.description}</label>
                   <textarea
                     id="game-description"
                     rows={3}
                     value={formData.description}
                     onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                     placeholder={copy.descriptionPlaceholder}
-                    className="w-full resize-none rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] leading-relaxed text-white/72 outline-none transition-all placeholder:text-white/22 focus:border-white/24 focus:bg-white/[0.04]"
+                    className="w-full resize-none rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-[12px] leading-relaxed text-white/72 outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                   />
                 </div>
               </div>
             </section>
 
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">04</span>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">{copy.visualAssets}</h3>
-                  <p className="mt-0.5 text-[10px] text-white/34">{copy.visualAssetsHint}</p>
-                </div>
+            <section>
+              <div className="mb-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.visualAssets}</p>
+                <div className="mt-2 border-b border-white/[0.08]" />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
-                  <label htmlFor="game-cover-url" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
-                    <ImageIcon size={14} className="text-white/20" /> {copy.cover}
+                <div className="space-y-3">
+                  <label htmlFor="game-cover-url" className="text-[11px] font-bold text-white/40">
+                    {copy.cover}
                   </label>
                   <div
-                    className="h-24 rounded-xl border border-white/[0.07] bg-[#111116] bg-cover bg-center"
+                    className="h-24 rounded-xl border border-white/[0.08] bg-[#111116] bg-cover bg-center"
                     style={formData.cardImage || formData.image ? { backgroundImage: "linear-gradient(to top, rgba(0,0,0,.35), transparent), url(" + JSON.stringify(formData.cardImage || formData.image) + ")" } : undefined}
                   />
                   <input
@@ -1272,7 +1243,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       setFormData({ ...formData, cardImage: e.target.value })
                     }
                     placeholder="https://..."
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5 text-[9px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
+                    className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -1286,19 +1257,19 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <button
                         type="button"
                         onClick={() => coverInputRef.current?.click()}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.09] bg-white/[0.05] px-3 py-2.5 text-[9px] font-black uppercase tracking-wider text-white/58 transition-all hover:bg-white/10 hover:text-white"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-[11px] font-bold text-white/58 transition-all hover:bg-white/[0.06] hover:text-white"
                       >
                         <Upload size={13} /> {copy.upload}
                       </button>
                     </>
                   )}
                 </div>
-                <div className="space-y-3 rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
-                  <label htmlFor="game-wallpaper-url" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em] text-white/40">
-                    <ImageIcon size={14} className="text-white/20" /> {copy.wallpaper}
+                <div className="space-y-3">
+                  <label htmlFor="game-wallpaper-url" className="text-[11px] font-bold text-white/40">
+                    {copy.wallpaper}
                   </label>
                   <div
-                    className="h-24 rounded-xl border border-white/[0.07] bg-[#111116] bg-cover bg-center"
+                    className="h-24 rounded-xl border border-white/[0.08] bg-[#111116] bg-cover bg-center"
                     style={formData.backgroundImage ? { backgroundImage: "linear-gradient(to top, rgba(0,0,0,.35), transparent), url(" + JSON.stringify(formData.backgroundImage) + ")" } : undefined}
                   />
                   <input
@@ -1311,7 +1282,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       })
                     }
                     placeholder="https://..."
-                    className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-3 py-2.5 text-[9px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
+                    className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-[11px] text-white/60 outline-none placeholder:text-white/20 focus:border-white/20"
                   />
                   {formData.launcherType === "local" && (
                     <>
@@ -1325,7 +1296,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <button
                         type="button"
                         onClick={() => wallpaperInputRef.current?.click()}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.09] bg-white/[0.05] px-3 py-2.5 text-[9px] font-black uppercase tracking-wider text-white/58 transition-all hover:bg-white/10 hover:text-white"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2.5 text-[11px] font-bold text-white/58 transition-all hover:bg-white/[0.06] hover:text-white"
                       >
                         <Upload size={13} /> {copy.upload}
                       </button>
@@ -1335,35 +1306,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               </div>
             </section>
 
-            <section className="rounded-3xl border border-white/[0.08] bg-white/[0.025] p-4 md:p-5">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.05] text-[9px] font-black text-white/52">05</span>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">{copy.launchTitle}</h3>
-                  <p className="mt-0.5 text-[10px] text-white/34">{copy.launchHint}</p>
+            {formData.launcherType === "local" && (
+              <section>
+                <div className="mb-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.launchTitle}</p>
+                  <div className="mt-2 border-b border-white/[0.08]" />
                 </div>
-              </div>
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="game-size" className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                    <HardDrive size={14} className="text-white/20" /> {copy.sizeGB}
-                    ({copy.optional})
-                  </label>
-                  <input
-                    id="game-size"
-                    type="number"
-                    min={0}
-                    value={formData.sizeGB ?? ""}
-                    onChange={handleSizeChange}
-                    placeholder={copy.sizePlaceholder}
-                    className="w-full rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3.5 text-[11px] text-white/70 outline-none transition-all placeholder:text-white/22 focus:border-white/24"
-                  />
-                </div>
-
-                {formData.launcherType === "local" && (
-                  <div className="space-y-3 md:col-span-2">
-                    <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/40">
-                      <FolderOpen size={14} className="text-white/20" />{" "}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[11px] font-bold text-white/40">
                       {copy.executable}
                     </label>
                     <input
@@ -1377,163 +1328,67 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       <button
                         type="button"
                         onClick={() => void handleChooseExecutable("local")}
-                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] px-4 py-3 text-[9px] font-black uppercase tracking-wider text-white/68 transition-all hover:bg-white/10 hover:text-white"
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-[11px] font-bold text-white/68 transition-all hover:bg-white/[0.06] hover:text-white"
                       >
                         <FolderOpen size={14} /> {copy.chooseExe}
                       </button>
-                      <div className="min-w-0 flex-1 rounded-xl border border-white/[0.07] bg-black/20 px-4 py-3">
-                        <p className="truncate text-[10px] text-white/52">
+                      <div className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3">
+                        <p className="truncate text-[12px] text-white/52">
                           {formData.executablePath || copy.noExecutable}
                         </p>
                       </div>
                     </div>
-                    <p className="text-[9px] leading-relaxed text-white/26">
-                      {copy.executableHint}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <footer className="sticky bottom-0 z-20 -mx-5 -mb-5 border-t border-white/[0.08] bg-[#08080b]/92 px-5 pb-5 pt-4 shadow-[0_-20px_50px_rgba(0,0,0,0.45)] backdrop-blur-xl lg:-mx-7 lg:-mb-7 lg:px-7 lg:pb-7">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div aria-live="polite" className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${isFormValid()
-                      ? "border-white/18 bg-white/[0.09] text-white"
-                      : "border-white/[0.08] bg-white/[0.025] text-white/28"
-                      }`}
-                  >
-                    {isFormValid() ? <CheckCircle2 size={17} /> : <Sparkles size={17} />}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-[10px] font-extrabold text-white/72">
-                      {isFormValid() ? copy.ready : copy.missingFields}
-                    </p>
-                    <p className="mt-0.5 text-[9px] text-white/30">
-                      {completedSetupChecks}/{setupChecks.length} · {copy.setupStatus}
-                    </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleClose()}
-                    className="rounded-xl border border-white/[0.09] bg-white/[0.025] px-4 py-3 text-[9px] font-black uppercase tracking-[0.14em] text-white/48 transition-all hover:border-white/18 hover:bg-white/[0.06] hover:text-white"
-                  >
-                    {copy.cancel}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSaving || loading || !isFormValid()}
-                    className="group relative inline-flex min-w-40 items-center justify-center gap-2 overflow-hidden rounded-xl bg-white px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em] text-black shadow-[0_14px_34px_rgba(255,255,255,0.09)] transition-all hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/25 disabled:text-black/50 disabled:shadow-none"
-                  >
-                    <span className="pointer-events-none absolute inset-y-0 left-0 w-12 -translate-x-full skew-x-[-18deg] bg-white/60 blur-md transition-transform duration-700 group-hover:translate-x-[260px]" />
-                    {isSaving ? (
-                      <RefreshCw size={14} className="animate-spin" />
-                    ) : (
-                      <Check size={14} strokeWidth={3} />
-                    )}
-                    <span className="relative">
-                      {isSaving
-                        ? copy.saving
-                        : gameToEdit
-                          ? copy.saveChanges
-                          : copy.confirmAdd}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </footer>
+              </section>
+            )}
           </form>
 
           <aside
             aria-label={copy.previewPanel}
             className="relative flex min-h-[520px] flex-col overflow-hidden bg-[#060608] p-5 lg:min-h-0 lg:p-6"
           >
-            <div className="pointer-events-none absolute inset-0">
-              {previewWallpaper ? (
-                <img
-                  src={previewWallpaper}
-                  alt=""
-                  className="h-full w-full scale-110 object-cover opacity-[0.16] blur-2xl"
-                />
-              ) : null}
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,6,8,0.58),rgba(6,6,8,0.88)_48%,#060608_82%)]" />
-              <div className="absolute inset-x-8 top-8 h-36 rounded-full bg-white/[0.035] blur-3xl" />
-            </div>
-
-            <div className="relative z-10 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/30">
-                  {copy.previewPanel}
-                </p>
-                <p className="mt-1 text-[10px] text-white/46">{copy.libraryKicker}</p>
-              </div>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.09] bg-black/30 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-white/48 backdrop-blur-md">
+            <div className="relative flex items-center justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/32">
+                {copy.previewPanel}
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[10px] font-bold text-white/48">
                 <Globe size={11} /> {platformLabel}
               </span>
             </div>
 
-            <div className="relative z-10 mx-auto mt-6 w-full max-w-[230px]">
-              <div className="group relative aspect-[3/4] overflow-hidden rounded-[24px] border border-white/14 bg-[#101014] shadow-[0_28px_65px_rgba(0,0,0,0.62)]">
+            <div className="relative mx-auto mt-6 w-full max-w-[230px]">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/14 bg-[#101014]">
                 {previewImage ? (
                   <img
                     src={previewImage}
                     alt=""
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.1),transparent_42%),linear-gradient(160deg,#15151a,#08080b)]">
-                    <div className="grid h-20 w-20 place-items-center rounded-[24px] border border-white/10 bg-white/[0.04] text-white/20">
-                      <Gamepad2 size={34} strokeWidth={1.4} />
-                    </div>
+                  <div className="grid h-full w-full place-items-center bg-[#0d0d10]">
+                    <Gamepad2 size={34} strokeWidth={1.4} className="text-white/20" />
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/5 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5">
-                  <span className="mb-2 inline-flex rounded-md border border-white/12 bg-black/45 px-2 py-1 text-[7px] font-black uppercase tracking-[0.16em] text-white/55 backdrop-blur-md">
+                  <span className="mb-2 inline-flex rounded-md border border-white/12 bg-black/45 px-2 py-1 text-[9px] font-bold text-white/55">
                     {CATEGORIES.find((category) => category.id === formData.category)?.label || copy.category}
                   </span>
-                  <h3 className="line-clamp-2 text-xl font-black leading-[1.05] tracking-[-0.035em] text-white drop-shadow-lg">
+                  <h3 className="line-clamp-2 text-xl font-black leading-[1.05] tracking-[-0.035em] text-white">
                     {formData.title.trim() || copy.titlePlaceholder}
                   </h3>
-                  <p className="mt-2 text-[9px] font-semibold text-white/45">
+                  <p className="mt-2 text-[10px] font-semibold text-white/45">
                     {platformLabel}
-                    {formData.sizeGB != null ? ` · ${formData.sizeGB} GB` : ""}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="relative z-10 mt-6 rounded-2xl border border-white/[0.08] bg-black/30 p-4 backdrop-blur-xl">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/38">
-                    {copy.setupStatus}
-                  </p>
-                  <p className="mt-1 text-[10px] text-white/55">
-                    {isFormValid() ? copy.ready : copy.missingFields}
-                  </p>
-                </div>
-                <strong className="text-sm font-black text-white/72">{setupProgress}%</strong>
-              </div>
-              <div
-                className="mb-4 h-1.5 overflow-hidden rounded-full bg-white/[0.07]"
-                role="progressbar"
-                aria-label={copy.setupStatus}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={setupProgress}
-              >
-                <div
-                  className="h-full rounded-full bg-white transition-[width] duration-300"
-                  style={{ width: `${setupProgress}%` }}
-                />
-              </div>
+            <div className="relative mt-6">
               <ul className="space-y-2.5">
                 {setupChecks.map((item) => (
-                  <li key={item.label} className="flex items-center gap-2.5 text-[9px] text-white/45">
+                  <li key={item.label} className="flex items-center gap-2.5 text-[12px] text-white/45">
                     <CheckCircle2
                       size={14}
                       className={item.ready ? "text-white/80" : "text-white/16"}
@@ -1545,6 +1400,33 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             </div>
           </aside>
         </div>
+
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-white/[0.08] bg-[#090909] px-5 py-4 md:px-7">
+          <button
+            type="button"
+            onClick={() => handleClose()}
+            className="rounded-xl border border-white/10 px-4 py-3 text-[12px] font-bold text-white/55 transition-all hover:bg-white/[0.06] hover:text-white"
+          >
+            {copy.cancel}
+          </button>
+          <button
+            type="submit"
+            form="add-game-form"
+            disabled={isSaving || loading || !isFormValid()}
+            className="inline-flex min-w-40 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-[12px] font-bold text-black transition-all hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/25 disabled:text-black/50"
+          >
+            {isSaving ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              <Check size={14} strokeWidth={3} />
+            )}
+            {isSaving
+              ? copy.saving
+              : gameToEdit
+                ? copy.saveChanges
+                : copy.confirmAdd}
+          </button>
+        </footer>
       </div>
     </ModalShell>
   );

@@ -1,22 +1,62 @@
 <!doctype html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/Checkpoint_Logo.png" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Checkpoint - seu hub premium para organizar Steam, jogos locais e entradas assistidas da Epic." />
-    <meta name="theme-color" content="#0a0a0a" />
 
-    <!-- Google Fonts: Outfit -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/Checkpoint_Logo.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- SEO Optimization Meta Tags -->
+  <meta name="description" content="Checkpoint Launcher: O hub definitivo e premium para organizar todos os seus jogos de PC (Steam, Epic Games e títulos Locais) em uma única interface deslumbrante. Alternativa perfeita ao Big Picture." />
+  <meta name="keywords" content="launcher de jogos, organizar jogos pc, steam big picture alternativo, epic games alternativo, checkpoint launcher, centralizar jogos, hub de jogos, interface console pc, frontend gaming" />
+  <meta name="author" content="Checkpoint Launcher" />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#0a0a0a" />
 
-    <title>Checkpoint - Game Library</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <!-- Open Graph (Facebook/Discord/WhatsApp) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Checkpoint Launcher - Sua Biblioteca Universal de Jogos" />
+  <meta property="og:description" content="Organize toda sua biblioteca da Steam, Epic e jogos Locais em uma interface premium, amigável para controle e super rápida." />
+  <meta property="og:url" content="https://checkpoint-launcher.netlify.app/" />
+  <meta property="og:image" content="https://checkpoint-launcher.netlify.app/Checkpoint_Logo.png" />
+  <meta property="og:site_name" content="Checkpoint" />
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Checkpoint Launcher - O Hub Definitivo" />
+  <meta name="twitter:description" content="Junte seus jogos da Steam, Epic e Locais num launcher rápido e com design de console." />
+  <meta name="twitter:image" content="https://checkpoint-launcher.netlify.app/Checkpoint_Logo.png" />
+
+  <!-- Semantic JSON-LD Structured Data -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Checkpoint Launcher",
+      "operatingSystem": "Windows",
+      "applicationCategory": "GameApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "Um launcher universal para unir jogos da Steam, Epic Games e Locais em uma única interface limpa, premium e otimizada para controles.",
+      "url": "https://checkpoint-launcher.netlify.app/"
+    }
+  </script>
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+
+  <title>Checkpoint Launcher | A Biblioteca Definitiva para PC</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
