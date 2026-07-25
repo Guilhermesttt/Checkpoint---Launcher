@@ -67,8 +67,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Checkpoint Launcher",
-      "include": "build/installer.nsh"
+      "shortcutName": "Checkpoint Launcher"
     }
   },
   "dependencies": {
