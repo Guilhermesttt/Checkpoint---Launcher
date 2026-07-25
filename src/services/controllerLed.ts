@@ -10,16 +10,22 @@ export interface RgbColor {
 export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
   checkpoint: { r: 255, g: 255, b: 255 },
   playstation: { r: 37, g: 99, b: 235 },
+  ps4: { r: 0, g: 112, b: 209 },
+  psp: { r: 6, g: 182, b: 212 },
   gamecube: { r: 124, g: 58, b: 237 },
   xbox360: { r: 132, g: 204, b: 22 },
+  cyberpunk: { r: 255, g: 238, b: 0 },
 };
 
 /** Presets ajustados visualmente para a lightbar física do controle. */
 export const THEME_LED_COLORS: Record<VisualTheme, RgbColor> = {
   checkpoint: { r: 255, g: 255, b: 255 },
   playstation: { r: 0, g: 4, b: 255 }, // #0004FF
+  ps4: { r: 0, g: 112, b: 209 },
+  psp: { r: 6, g: 182, b: 212 },
   gamecube: { r: 167, g: 0, b: 255 }, // #A700FF
   xbox360: { r: 33, g: 255, b: 0 }, // #21FF00
+  cyberpunk: { r: 255, g: 238, b: 0 },
 };
 
 const SONY_VENDOR_ID = 0x054c;

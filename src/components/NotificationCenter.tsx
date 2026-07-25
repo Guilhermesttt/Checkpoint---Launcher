@@ -6,6 +6,7 @@ import { toast, Toaster } from "sonner";
 type NotificationType = "success" | "error" | "info" | "achievement";
 
 interface NotificationOptions {
+  id?: string | number;
   title?: string;
   imageUrl?: string;
   duration?: number;
@@ -145,7 +146,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             imageUrl={options?.imageUrl}
             t={t}
           />
-        ), { duration });
+        ), { id: options?.id, duration });
       } else {
         toast.custom((t) => (
           <StandardToast
@@ -154,7 +155,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             title={options?.title}
             t={t}
           />
-        ), { duration });
+        ), { id: options?.id, duration });
       }
     },
     []

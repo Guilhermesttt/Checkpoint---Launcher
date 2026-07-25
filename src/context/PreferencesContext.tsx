@@ -2,17 +2,21 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import { useAuth } from "../auth/AuthProvider";
 
 export type LauncherLanguage = "pt-BR" | "en-US" | "es-ES";
-export type SoundTheme = "ps5" | "ps2" | "gamecube" | "xbox360";
-export type VisualTheme = "playstation" | "gamecube" | "xbox360" | "checkpoint";
+export type SoundTheme = "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
+export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "cyberpunk";
 
 interface PreferencesContextValue {
   language: LauncherLanguage;
   effectsVolume: number;
+  achievementVolume: number;
+  notificationVolume: number;
   musicVolume: number;
   soundTheme: SoundTheme;
   visualTheme: VisualTheme;
   setLanguage: (language: LauncherLanguage) => void;
   setEffectsVolume: (volume: number) => void;
+  setAchievementVolume: (volume: number) => void;
+  setNotificationVolume: (volume: number) => void;
   setMusicVolume: (volume: number) => void;
   setSoundTheme: (theme: SoundTheme) => void;
   setVisualTheme: (theme: VisualTheme) => void;
@@ -33,6 +37,10 @@ const translations = {
     languageHint: "Preferência visual salva neste dispositivo.",
     soundEffects: "Efeitos sonoros",
     soundEffectsHint: "Volume de navegação, seleção e retorno.",
+    achievementSound: "Som de conquista",
+    achievementSoundHint: "Volume exclusivo do aviso de conquista desbloqueada.",
+    notificationSound: "Som de notificação",
+    notificationSoundHint: "Volume dos avisos de mensagens, amigos e solicitações.",
     music: "Música",
     musicHint: "Volume da trilha de fundo em loop.",
     soundTheme: "Tema sonoro",
@@ -161,6 +169,10 @@ const translations = {
     languageHint: "Visual preference saved on this device.",
     soundEffects: "Sound effects",
     soundEffectsHint: "Navigation, selection and back volume.",
+    achievementSound: "Achievement sound",
+    achievementSoundHint: "Dedicated volume for unlocked achievement notifications.",
+    notificationSound: "Notification sound",
+    notificationSoundHint: "Volume for message, friend and request alerts.",
     music: "Music",
     musicHint: "Background loop track volume.",
     soundTheme: "Sound theme",
@@ -289,6 +301,10 @@ const translations = {
     languageHint: "Preferencia visual guardada en este dispositivo.",
     soundEffects: "Efectos sonoros",
     soundEffectsHint: "Volumen de navegación, selección y retorno.",
+    achievementSound: "Sonido de logro",
+    achievementSoundHint: "Volumen exclusivo de las notificaciones de logros desbloqueados.",
+    notificationSound: "Sonido de notificación",
+    notificationSoundHint: "Volumen de las alertas de mensajes, amigos y solicitudes.",
     music: "Música",
     musicHint: "Volumen de la pista de fondo en loop.",
     soundTheme: "Tema sonoro",
@@ -427,6 +443,8 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const [language, setLanguage] = useState<LauncherLanguage>("pt-BR");
   const [effectsVolume, setEffectsVolume] = useState(30);
+  const [achievementVolume, setAchievementVolume] = useState(22);
+  const [notificationVolume, setNotificationVolume] = useState(40);
   const [musicVolume, setMusicVolume] = useState(9);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
@@ -438,9 +456,15 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user?.uid) return;
     const savedLanguage = localStorage.getItem(prefKey(user.uid, "language"));
     const savedEffectsVolumeRaw = localStorage.getItem(prefKey(user.uid, "effects_volume"));
+    const savedAchievementVolumeRaw = localStorage.getItem(prefKey(user.uid, "achievement_volume"));
+    const savedNotificationVolumeRaw = localStorage.getItem(prefKey(user.uid, "notification_volume"));
     const savedMusicVolumeRaw = localStorage.getItem(prefKey(user.uid, "music_volume"));
     const savedEffectsVolume =
       savedEffectsVolumeRaw == null ? null : Number(savedEffectsVolumeRaw);
+    const savedAchievementVolume =
+      savedAchievementVolumeRaw == null ? null : Number(savedAchievementVolumeRaw);
+    const savedNotificationVolume =
+      savedNotificationVolumeRaw == null ? null : Number(savedNotificationVolumeRaw);
     const savedMusicVolume =
       savedMusicVolumeRaw == null ? null : Number(savedMusicVolumeRaw);
     const savedSoundTheme = localStorage.getItem(prefKey(user.uid, "sound_theme"));
@@ -463,6 +487,12 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedEffectsVolume != null && Number.isFinite(savedEffectsVolume)) {
       setEffectsVolume(clampVolume(savedEffectsVolume));
     }
+    if (savedAchievementVolume != null && Number.isFinite(savedAchievementVolume)) {
+      setAchievementVolume(clampVolume(savedAchievementVolume));
+    }
+    if (savedNotificationVolume != null && Number.isFinite(savedNotificationVolume)) {
+      setNotificationVolume(clampVolume(savedNotificationVolume));
+    }
     if (savedMusicVolume != null && Number.isFinite(savedMusicVolume)) {
       setMusicVolume(clampVolume(savedMusicVolume));
     }
@@ -483,13 +513,15 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!user?.uid) return;
     localStorage.setItem(prefKey(user.uid, "language"), language);
     localStorage.setItem(prefKey(user.uid, "effects_volume"), String(effectsVolume));
+    localStorage.setItem(prefKey(user.uid, "achievement_volume"), String(achievementVolume));
+    localStorage.setItem(prefKey(user.uid, "notification_volume"), String(notificationVolume));
     localStorage.setItem(prefKey(user.uid, "music_volume"), String(musicVolume));
     localStorage.setItem(prefKey(user.uid, "sound_theme"), soundTheme);
     localStorage.setItem(prefKey(user.uid, "visual_theme"), visualTheme);
     localStorage.setItem(prefKey(user.uid, "open_at_login"), String(openAtLogin));
     localStorage.setItem(prefKey(user.uid, "low_perf"), String(lowPerformanceMode));
     localStorage.setItem(prefKey(user.uid, "close_launch"), String(closeOnLaunch));
-  }, [effectsVolume, language, musicVolume, soundTheme, user?.uid, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch]);
+  }, [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, user?.uid, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch]);
 
   useEffect(() => {
     document.documentElement.dataset.launcherTheme = visualTheme;
@@ -500,15 +532,27 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [visualTheme, lowPerformanceMode]);
 
+  useEffect(() => {
+    void window.electronAPI?.setAchievementVolume?.(achievementVolume).catch(console.error);
+  }, [achievementVolume]);
+
+  useEffect(() => {
+    void window.electronAPI?.setAchievementSoundTheme?.(soundTheme).catch(console.error);
+  }, [soundTheme]);
+
   const value = useMemo<PreferencesContextValue>(
     () => ({
       language,
       effectsVolume,
+      achievementVolume,
+      notificationVolume,
       musicVolume,
       soundTheme,
       visualTheme,
       setLanguage,
       setEffectsVolume: (volume) => setEffectsVolume(clampVolume(volume)),
+      setAchievementVolume: (volume) => setAchievementVolume(clampVolume(volume)),
+      setNotificationVolume: (volume) => setNotificationVolume(clampVolume(volume)),
       setMusicVolume: (volume) => setMusicVolume(clampVolume(volume)),
       setSoundTheme,
       setVisualTheme,
@@ -523,7 +567,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setCloseOnLaunch,
       t: (key) => translations[language][key] ?? translations["pt-BR"][key],
     }),
-    [effectsVolume, language, musicVolume, soundTheme, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch],
+    [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch],
   );
 
   return (

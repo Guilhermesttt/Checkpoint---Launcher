@@ -126,6 +126,25 @@ declare global {
       markLocalLibrarySummarySynced: (uid: string, revision: number) => Promise<void>;
       testOverlayWelcome: () => Promise<void>;
       testOverlayAchievement: () => Promise<void>;
+      setAchievementVolume: (volume: number) => Promise<{ volume: number }>;
+      setAchievementSoundTheme: (
+        theme: import("../context/PreferencesContext").SoundTheme,
+      ) => Promise<{ theme: import("../context/PreferencesContext").SoundTheme }>;
+      getVersion: () => Promise<string>;
+      getUpdateState: () => Promise<{
+        status: "idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error";
+        info: { version?: string } | null;
+        progress: { percent?: number } | null;
+        error: string;
+      }>;
+      checkForUpdates: () => Promise<unknown>;
+      quitAndInstallUpdate: () => Promise<void>;
+      onUpdateMessage: (
+        callback: (message: string, data?: { version?: string } | string) => void,
+      ) => () => void;
+      onDownloadProgress: (
+        callback: (progress: { percent?: number }) => void,
+      ) => () => void;
       toggleOverlayPanel: () => Promise<{ open: boolean }>;
       showGameStartOverlay: (payload: { gameTitle: string }) => Promise<void>;
       showFriendPlayingOverlay: (payload: {

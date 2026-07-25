@@ -318,17 +318,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           borderRight: "1px solid rgba(255,255,255,0.04)",
         }}
       >
-        {/* Logo — assinatura visual da régua. Um halo cônico na cor de
-            destaque gira devagar atrás da marca, amarrando o ícone ao
-            sistema de tema dinâmico do launcher (a mesma --launcher-accent
-            que colore os itens ativos). Ambiente, não chamativo, e some
-            se o usuário pedir menos movimento no sistema. */}
         <div className="relative mb-4 flex flex-col items-center shrink-0 group cursor-pointer">
           <div className="relative w-10 h-10 flex items-center justify-center">
             {!prefersReducedMotion && (
               <motion.div
                 aria-hidden="true"
-                className="absolute inset-[-6px] rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-500"
+                className="absolute inset-1.5 rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-500"
                 style={{
                   background:
                     "conic-gradient(from 0deg, rgb(var(--launcher-accent) / 0.5), transparent 30%, transparent 70%, rgb(var(--launcher-accent) / 0.5))",
@@ -344,10 +339,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        <div className="w-10 h-px mb-2 shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div className="w-10 h-px mb-2 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
-        {/* Navegação — agora em 3 clusters (biblioteca / plataformas / conta)
-            em vez de uma lista única de 8 itens sem hierarquia. */}
         <nav
           aria-label="Navegação principal"
           className="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto overscroll-contain px-3 no-scrollbar"
@@ -379,7 +372,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           ))}
         </nav>
 
-        <div className="w-10 h-px mt-auto mb-3 shrink-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div className="w-10 h-px mt-auto mb-3 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Settings — mesmo componente, sem duplicar estilos */}
         <div className="w-full px-3 shrink-0">

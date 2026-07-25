@@ -46,6 +46,14 @@ const initialsFor = (name: string) =>
     .join("")
     .toUpperCase();
 
+const openExternalProfile = async (url: string) => {
+  if (window.electronAPI?.openExternalUrl) {
+    await window.electronAPI.openExternalUrl(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
 const ProfileAvatar: React.FC<{
   profile: UserProfile | null;
   firebasePhotoURL?: string | null;
@@ -180,6 +188,10 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     { label: "Epic Games", value: stats.epicGames },
     { label: "Local", value: stats.localGames },
   ];
+  const steamId = String(userProfile?.steamId || "").trim();
+  const discordId = String(userProfile?.discordId || "").trim();
+  const hasSteamProfile = /^\d{10,20}$/.test(steamId);
+  const hasDiscordProfile = /^\d{10,24}$/.test(discordId);
 
   return (
     <motion.div
@@ -206,26 +218,24 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
               <div className="min-w-0">
                 <h1 className="truncate text-3xl font-black tracking-tight text-white">{displayName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {userProfile?.steamId && (
+                  {hasSteamProfile && (
                     <button
                       type="button"
-                      disabled={!/^\d{10,20}$/.test(userProfile.steamId)}
-                      onClick={() => window.electronAPI?.openExternalUrl(`https://steamcommunity.com/profiles/${userProfile.steamId}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-default"
+                      onClick={() => void openExternalProfile(`https://steamcommunity.com/profiles/${steamId}`)}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors hover:bg-white/10"
                     >
                       <FontAwesomeIcon icon={faSteam} className="h-3 w-3" />
-                      {userProfile.steamUsername || "Steam"}
+                      {userProfile?.steamUsername || "Steam"}
                     </button>
                   )}
-                  {userProfile?.discordId && (
+                  {hasDiscordProfile && (
                     <button
                       type="button"
-                      disabled={!/^\d{10,24}$/.test(userProfile.discordId)}
-                      onClick={() => window.electronAPI?.openExternalUrl(`https://discordapp.com/users/${userProfile.discordId}`)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors enabled:cursor-pointer enabled:hover:bg-white/10 disabled:cursor-default"
+                      onClick={() => void openExternalProfile(`https://discord.com/users/${discordId}`)}
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors hover:bg-white/10"
                     >
                       <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
-                      {userProfile.discordUsername || "Discord"}
+                      {userProfile?.discordUsername || "Discord"}
                     </button>
                   )}
                 </div>

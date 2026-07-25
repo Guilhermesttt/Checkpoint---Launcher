@@ -15,25 +15,52 @@ import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
-const menuMusicLoaders: Record<SoundTheme, () => Promise<string>> = {
-  ps5: () => import("./sounds/PS5_Sounds/menu_music.mp3").then((module) => module.default),
-  ps2: () => import("./sounds/PS2-System-Sounds/menu_music.mp3").then((module) => module.default),
+const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
+  ps5: () =>
+    import("./sounds/PS5_Plus/003. Home Menu.mp3").then((module) => module.default),
+  ps4: () => import("./sounds/PS4/01 Main.mp3").then((module) => module.default),
+  psp: () => import("./sounds/PSP Sounds/menu_music.mp3").then((module) => module.default),
+  ps2: () =>
+    import("./sounds/PS2 System Sounds/menu_music.mp3").then((module) => module.default),
   gamecube: () =>
     import("./sounds/Nintendo GameCube Menu SFX/menu_music.mp3").then((module) => module.default),
   xbox360: () =>
-    import("./sounds/Xbox 360 Metro UI Sounds/menu_music.mp3").then((module) => module.default),
+    import("./sounds/Xbox 360 UI/01. Amb 05 Engineroom Lr.mp3").then(
+      (module) => module.default,
+    ),
+  cyberpunk: () =>
+    import(
+      "./sounds/Cyberpunk 2077 UI SFX PACK/Cyberpunk_2077_-_Pause_Menu_Theme_KLICKAUD.mp3"
+    ).then((module) => module.default),
 } as const;
+
+// These source tracks were mastered much quieter than the other theme music.
+// The gain values bring their peaks close to -2 dB without changing the user's volume setting.
+const menuMusicGain: Record<SoundTheme, number> = {
+  ps5: 0.7,
+  ps4: 25,
+  psp: 1,
+  ps2: 1,
+  gamecube: 1,
+  xbox360: 1,
+  cyberpunk: 16,
+};
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const { musicVolume, soundTheme, lowPerformanceMode } = usePreferences();
   useControllerLed();
-  const [isIntroVisible, setIsIntroVisible] = React.useState(false);
+  const [isIntroVisible, setIsIntroVisible] = React.useState<boolean | null>(null);
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
+  const musicAudioContextRef = React.useRef<AudioContext | null>(null);
+  const musicGainRef = React.useRef<GainNode | null>(null);
   const musicFadeRef = React.useRef<number | null>(null);
   const musicStartTimerRef = React.useRef<number | null>(null);
   const pendingMusicStartRef = React.useRef(false);
   const loadedMusicSrcRef = React.useRef<string | null>(null);
+  const musicVolumeRef = React.useRef(musicVolume);
+  const musicTransitionRef = React.useRef(0);
+  const completedIntroUserRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -84,12 +111,26 @@ const AppContent: React.FC = () => {
     const loader = menuMusicLoaders[theme] ?? menuMusicLoaders.ps5;
     const musicSrc = await loader();
 
+    if (!musicSrc) {
+      musicRef.current?.pause();
+      loadedMusicSrcRef.current = null;
+      return null;
+    }
+
     if (!musicRef.current) {
-      musicRef.current = new Audio(musicSrc);
-      musicRef.current.loop = true;
-      musicRef.current.preload = "none";
+      const audio = new Audio(musicSrc);
+      audio.loop = true;
+      audio.preload = "none";
+      musicRef.current = audio;
+
+      const audioContext = new AudioContext();
+      const sourceNode = audioContext.createMediaElementSource(audio);
+      const gainNode = audioContext.createGain();
+      sourceNode.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      musicAudioContextRef.current = audioContext;
+      musicGainRef.current = gainNode;
       loadedMusicSrcRef.current = musicSrc;
-      return musicRef.current;
     }
 
     const audio = musicRef.current;
@@ -98,6 +139,10 @@ const AppContent: React.FC = () => {
       audio.src = musicSrc;
       audio.load();
       loadedMusicSrcRef.current = musicSrc;
+    }
+
+    if (musicGainRef.current) {
+      musicGainRef.current.gain.value = menuMusicGain[theme] ?? 1;
     }
 
     return audio;
@@ -110,8 +155,13 @@ const AppContent: React.FC = () => {
       return;
     }
     const audio = await ensureMusicSource(soundTheme);
-    if (!audio || !audio.paused) return;
+    if (!audio) return;
 
+    if (musicAudioContextRef.current?.state === "suspended") {
+      await musicAudioContextRef.current.resume().catch(() => {});
+    }
+
+    if (!audio.paused) return;
     audio.currentTime = 0;
     audio.volume = 0;
     audio
@@ -147,8 +197,8 @@ const AppContent: React.FC = () => {
     isBackendHealthy().catch(() => {});
 
     if (!currentUid) {
-      sessionStorage.removeItem("hasSeenIntro");
-      setIsIntroVisible(false);
+      completedIntroUserRef.current = null;
+      setIsIntroVisible(null);
       if (musicStartTimerRef.current) {
         window.clearTimeout(musicStartTimerRef.current);
         musicStartTimerRef.current = null;
@@ -157,12 +207,12 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    if (currentUid && !sessionStorage.getItem("hasSeenIntro")) {
-      sessionStorage.setItem("hasSeenIntro", "true");
+    if (completedIntroUserRef.current !== currentUid) {
       setIsIntroVisible(true);
       return;
     }
 
+    setIsIntroVisible(false);
     musicStartTimerRef.current = window.setTimeout(startBackgroundMusic, 1200);
     return () => {
       if (musicStartTimerRef.current) {
@@ -195,6 +245,7 @@ const AppContent: React.FC = () => {
   }, [startBackgroundMusic, user?.uid]);
 
   React.useEffect(() => {
+    musicVolumeRef.current = musicVolume;
     const audio = musicRef.current;
     if (!audio || audio.paused) return;
     fadeMusicTo(musicVolume / 100, 450);
@@ -203,18 +254,37 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     const audio = musicRef.current;
     const wasPlaying = Boolean(audio && !audio.paused);
+    const transitionId = ++musicTransitionRef.current;
 
-    void ensureMusicSource(soundTheme).then((resolvedAudio) => {
-      if (!resolvedAudio || !wasPlaying) return;
-      clearMusicFade();
-      resolvedAudio.volume = 0;
-      resolvedAudio.play().then(() => {
-        fadeMusicTo(musicVolume / 100, 700);
-      }).catch(() => {
-        pendingMusicStartRef.current = true;
+    const changeMusicSource = () => {
+      if (transitionId !== musicTransitionRef.current) return;
+
+      void ensureMusicSource(soundTheme).then((resolvedAudio) => {
+        if (!resolvedAudio || transitionId !== musicTransitionRef.current) return;
+        if (!wasPlaying) return;
+
+        resolvedAudio.volume = 0;
+        resolvedAudio.play().then(() => {
+          if (transitionId !== musicTransitionRef.current) return;
+          fadeMusicTo(musicVolumeRef.current / 100, 900);
+        }).catch(() => {
+          pendingMusicStartRef.current = true;
+        });
       });
-    });
-  }, [clearMusicFade, ensureMusicSource, fadeMusicTo, musicVolume, soundTheme]);
+    };
+
+    if (wasPlaying) {
+      fadeMusicTo(0, 650, changeMusicSource);
+    } else {
+      changeMusicSource();
+    }
+
+    return () => {
+      if (musicTransitionRef.current === transitionId) {
+        musicTransitionRef.current += 1;
+      }
+    };
+  }, [ensureMusicSource, fadeMusicTo, soundTheme]);
 
   React.useEffect(
     () => () => {
@@ -222,13 +292,15 @@ const AppContent: React.FC = () => {
       if (musicStartTimerRef.current) {
         window.clearTimeout(musicStartTimerRef.current);
       }
+      musicRef.current?.pause();
+      void musicAudioContextRef.current?.close();
     },
     [clearMusicFade],
   );
 
   React.useEffect(() => {
     const handleFocus = () => {
-      if (user?.uid && !loading && !isIntroVisible) {
+      if (user?.uid && !loading && isIntroVisible === false) {
         startBackgroundMusic();
       }
     };
@@ -255,30 +327,34 @@ const AppContent: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
+  if (isIntroVisible === null) {
+    return <AsyncLoader />;
+  }
+
   return (
     <MotionConfig reducedMotion={lowPerformanceMode ? "always" : "never"}>
       <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
-        <div
-          className="absolute inset-0"
-          inert={isIntroVisible}
-          aria-hidden={isIntroVisible ? "true" : undefined}
-        >
-          {!lowPerformanceMode && <MainVideoBackground />}
-          <Home />
-          <GamepadStatusOverlay />
-          <ControllerVirtualKeyboard />
-        </div>
-        <AnimatePresence mode="wait">
-          {isIntroVisible && (
+        {isIntroVisible ? (
+          <AnimatePresence mode="wait">
             <GameBootIntro
               key="boot-intro"
               onFinish={() => {
+                completedIntroUserRef.current = user.uid;
                 setIsIntroVisible(false);
-                startBackgroundMusic();
+                window.requestAnimationFrame(() => {
+                  startBackgroundMusic();
+                });
               }}
             />
-          )}
-        </AnimatePresence>
+          </AnimatePresence>
+        ) : (
+          <div className="absolute inset-0">
+            {!lowPerformanceMode && <MainVideoBackground />}
+            <Home />
+            <GamepadStatusOverlay />
+            <ControllerVirtualKeyboard />
+          </div>
+        )}
       </div>
     </MotionConfig>
   );

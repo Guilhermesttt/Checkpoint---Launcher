@@ -111,7 +111,7 @@ const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: strin
 ];
 
 const APP_THEME_OPTIONS: Array<{
-  id: "default" | "playstation" | "gamecube" | "xbox360";
+  id: "default" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
   label: string;
   hint: string;
   swatch: string;
@@ -120,16 +120,32 @@ const APP_THEME_OPTIONS: Array<{
 }> = [
     {
       id: "default",
-      label: "Padrao",
-      hint: "Visual Checkpoint + sons PS5",
+      label: "PlayStation 5",
+      hint: "Visual Checkpoint + sons PS5 Plus",
       swatch: "rgb(255 255 255)",
       soundTheme: "ps5",
       visualTheme: "checkpoint",
     },
     {
+      id: "ps4",
+      label: "PlayStation 4",
+      hint: "Azul cobalto + sons PS4",
+      swatch: "rgb(0 112 209)",
+      soundTheme: "ps4",
+      visualTheme: "ps4",
+    },
+    {
+      id: "psp",
+      label: "PSP",
+      hint: "Cyan Waves + sons PSP",
+      swatch: "rgb(6 182 212)",
+      soundTheme: "psp",
+      visualTheme: "psp",
+    },
+    {
       id: "playstation",
-      label: "PlayStation",
-      hint: "Azul frio + sons PS2",
+      label: "PlayStation 2",
+      hint: "Azul clássico + sons PS2",
       swatch: "rgb(37 99 235)",
       soundTheme: "ps2",
       visualTheme: "playstation",
@@ -141,6 +157,14 @@ const APP_THEME_OPTIONS: Array<{
       swatch: "rgb(124 58 237)",
       soundTheme: "gamecube",
       visualTheme: "gamecube",
+    },
+    {
+      id: "cyberpunk",
+      label: "Cyberpunk 2077",
+      hint: "Amarelo Neon + sons Cyberpunk 2077",
+      swatch: "rgb(255 238 0)",
+      soundTheme: "cyberpunk",
+      visualTheme: "cyberpunk",
     },
     {
       id: "xbox360",
@@ -201,17 +225,25 @@ const Home: React.FC = () => {
   const {
     language: launcherLanguage,
     effectsVolume,
+    achievementVolume,
+    notificationVolume,
     musicVolume,
     soundTheme,
     visualTheme,
     setLanguage: setLauncherLanguage,
     setEffectsVolume,
+    setAchievementVolume,
+    setNotificationVolume,
     setMusicVolume,
     setSoundTheme,
     setVisualTheme,
     t,
   } = usePreferences();
-  const { playSound } = useSoundEffects(effectsVolume / 100, soundTheme);
+  const { playSound } = useSoundEffects(
+    effectsVolume / 100,
+    soundTheme,
+    notificationVolume / 100,
+  );
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
   const resolvedSteamId = useMemo(
@@ -355,14 +387,39 @@ const Home: React.FC = () => {
 
   // ── Auto-Updater Global Listener ──────────────────────────────────────────
   useEffect(() => {
-    const api = window.electronAPI as typeof window.electronAPI & { onUpdateMessage?: (cb: (msg: string, data: { version?: string }) => void) => () => void };
+    const api = window.electronAPI;
     if (!api?.onUpdateMessage) return;
+
+    const showUpdateNotification = (status: string, data?: { version?: string } | string) => {
+      const version = typeof data === "object" ? data?.version : undefined;
+      if (status === "update-available") {
+        notify(
+          `Nova atualização disponível${version ? ` (v${version})` : ""}. O download começou automaticamente.`,
+          "success",
+          { id: "checkpoint-app-update", title: "Atualização do Checkpoint", duration: Infinity },
+        );
+      } else if (status === "update-downloaded") {
+        notify(
+          `A versão${version ? ` v${version}` : " nova"} está pronta. Vá em Configurações para reiniciar e atualizar.`,
+          "success",
+          { id: "checkpoint-app-update", title: "Atualização pronta", duration: Infinity },
+        );
+      }
+    };
+
+    void api.getUpdateState?.().then((state) => {
+      if (state.status === "available" || state.status === "downloading") {
+        showUpdateNotification("update-available", state.info || undefined);
+      } else if (state.status === "downloaded") {
+        showUpdateNotification("update-downloaded", state.info || undefined);
+      }
+    }).catch(() => undefined);
 
     const unsubscribe = api.onUpdateMessage((msg, data) => {
       if (msg === "update-available") {
-        notify(`Nova atualização disponível (v${data?.version})! Vá nas Configurações para baixar.`, "success");
+        showUpdateNotification(msg, data);
       } else if (msg === "update-downloaded") {
-        notify("Nova versão baixada! Reinicie o aplicativo para aplicar as atualizações.", "success");
+        showUpdateNotification(msg, data);
       }
     });
 
@@ -1561,6 +1618,8 @@ const Home: React.FC = () => {
             <SettingsPageV2
               language={launcherLanguage}
               effectsVolume={effectsVolume}
+              achievementVolume={achievementVolume}
+              notificationVolume={notificationVolume}
               musicVolume={musicVolume}
               soundTheme={soundTheme}
               visualTheme={visualTheme}
@@ -1576,6 +1635,8 @@ const Home: React.FC = () => {
               onEffectsVolumeChange={(next) => {
                 setEffectsVolume(next);
               }}
+              onAchievementVolumeChange={setAchievementVolume}
+              onNotificationVolumeChange={setNotificationVolume}
               onMusicVolumeChange={setMusicVolume}
               onSoundThemeChange={(next) => {
                 setSoundTheme(next);
@@ -1586,6 +1647,7 @@ const Home: React.FC = () => {
                 playSound("select");
               }}
               onPreviewSound={() => playSound("select")}
+              onTestNotificationSound={() => playSound("friendRequest")}
               t={t}
               steamConnected={Boolean(resolvedSteamId)}
               discordConnected={Boolean(resolvedDiscordId)}

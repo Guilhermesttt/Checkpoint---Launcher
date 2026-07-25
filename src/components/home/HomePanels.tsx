@@ -71,7 +71,7 @@ export interface LanguageOption {
 }
 
 export interface AppThemeOption {
-  id: "default" | "playstation" | "gamecube" | "xbox360";
+  id: "default" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
   label: string;
   hint: string;
   swatch: string;
@@ -228,6 +228,8 @@ const VolumeSettingsCard: React.FC<{
 export const SettingsPageV2: React.FC<{
   language: LauncherLanguage;
   effectsVolume: number;
+  achievementVolume: number;
+  notificationVolume: number;
   musicVolume: number;
   soundTheme: SoundTheme;
   visualTheme: VisualTheme;
@@ -238,10 +240,13 @@ export const SettingsPageV2: React.FC<{
   EpicIcon: BrandIcon;
   onLanguageChange: (language: LauncherLanguage) => void;
   onEffectsVolumeChange: (volume: number) => void;
+  onAchievementVolumeChange: (volume: number) => void;
+  onNotificationVolumeChange: (volume: number) => void;
   onMusicVolumeChange: (volume: number) => void;
   onSoundThemeChange: (theme: SoundTheme) => void;
   onVisualThemeChange: (theme: VisualTheme) => void;
   onPreviewSound: () => void;
+  onTestNotificationSound: () => void;
   t: TranslationFn;
   steamConnected: boolean;
   discordConnected: boolean;
@@ -260,6 +265,8 @@ export const SettingsPageV2: React.FC<{
 }> = ({
   language,
   effectsVolume,
+  achievementVolume,
+  notificationVolume,
   musicVolume,
   soundTheme,
   visualTheme,
@@ -269,10 +276,13 @@ export const SettingsPageV2: React.FC<{
   DiscordIcon,
   onLanguageChange,
   onEffectsVolumeChange,
+  onAchievementVolumeChange,
+  onNotificationVolumeChange,
   onMusicVolumeChange,
   onSoundThemeChange,
   onVisualThemeChange,
   onPreviewSound,
+  onTestNotificationSound,
   t,
   steamConnected,
   discordConnected,
@@ -308,11 +318,17 @@ export const SettingsPageV2: React.FC<{
     const activeAppTheme =
       visualTheme === "checkpoint"
         ? "default"
-        : soundTheme === "gamecube" || visualTheme === "gamecube"
-          ? "gamecube"
-          : soundTheme === "xbox360" || visualTheme === "xbox360"
-            ? "xbox360"
-            : "playstation";
+        : soundTheme === "cyberpunk" || visualTheme === "cyberpunk"
+          ? "cyberpunk"
+          : soundTheme === "ps4" || visualTheme === "ps4"
+            ? "ps4"
+            : soundTheme === "psp" || visualTheme === "psp"
+              ? "psp"
+              : soundTheme === "gamecube" || visualTheme === "gamecube"
+                ? "gamecube"
+                : soundTheme === "xbox360" || visualTheme === "xbox360"
+                  ? "xbox360"
+                  : "playstation";
 
     return (
       <SystemPageShell eyebrow={t("system")} title={t("settings")}>
@@ -519,6 +535,28 @@ export const SettingsPageV2: React.FC<{
           />
 
           <VolumeSettingsCard
+            title={t("achievementSound")}
+            description={t("achievementSoundHint")}
+            value={achievementVolume}
+            max={100}
+            actionLabel={t("test")}
+            onAction={onTestOverlayAchievement}
+            onChange={onAchievementVolumeChange}
+            t={t}
+          />
+
+          <VolumeSettingsCard
+            title={t("notificationSound")}
+            description={t("notificationSoundHint")}
+            value={notificationVolume}
+            max={100}
+            actionLabel={t("test")}
+            onAction={onTestNotificationSound}
+            onChange={onNotificationVolumeChange}
+            t={t}
+          />
+
+          <VolumeSettingsCard
             title={t("music")}
             description={t("musicHint")}
             value={musicVolume}
@@ -622,6 +660,17 @@ const AppUpdateSection: React.FC = () => {
     if ((window as any).electronAPI?.getVersion) {
       (window as any).electronAPI.getVersion().then(setCurrentVersion).catch(console.error);
     }
+    if ((window as any).electronAPI?.getUpdateState) {
+      (window as any).electronAPI.getUpdateState().then((state: any) => {
+        if (!state?.status || state.status === "idle") return;
+        setUpdateStatus(state.status);
+        if (state.info) setNewVersionInfo(state.info);
+        if (typeof state.progress?.percent === "number") {
+          setDownloadProgress(Math.round(state.progress.percent));
+        }
+        if (state.error) setErrorMessage(state.error);
+      }).catch(console.error);
+    }
 
     if ((window as any).electronAPI?.onUpdateMessage) {
       const unsubscribe = (window as any).electronAPI.onUpdateMessage((msg: string, data: any) => {
@@ -672,18 +721,6 @@ const AppUpdateSection: React.FC = () => {
     }
   };
 
-  const handleDownload = async () => {
-    if (!(window as any).electronAPI?.startDownload) return;
-    setUpdateStatus("downloading");
-    setDownloadProgress(0);
-    try {
-      await (window as any).electronAPI.startDownload();
-    } catch (err: any) {
-      setUpdateStatus("error");
-      setErrorMessage(err.message || "Erro ao baixar atualização.");
-    }
-  };
-
   const handleInstall = () => {
     if ((window as any).electronAPI?.quitAndInstallUpdate) {
       (window as any).electronAPI.quitAndInstallUpdate();
@@ -711,7 +748,7 @@ const AppUpdateSection: React.FC = () => {
             )}
             {updateStatus === "available" && (
               <p className="text-xs text-emerald-400">
-                Nova versão {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""} disponível!
+                Nova versão {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""} encontrada. O download iniciará automaticamente.
               </p>
             )}
             {updateStatus === "not-available" && (
@@ -747,23 +784,13 @@ const AppUpdateSection: React.FC = () => {
               </button>
             ) : null}
 
-            {updateStatus === "available" ? (
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="rounded-xl bg-sky-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-sky-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer"
-              >
-                Baixar Agora
-              </button>
-            ) : null}
-
             {updateStatus === "downloaded" ? (
               <button
                 type="button"
                 onClick={handleInstall}
                 className="rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
               >
-                Reiniciar e Instalar
+                Reiniciar e Atualizar
               </button>
             ) : null}
           </div>
@@ -1732,7 +1759,7 @@ export const ChatModal: React.FC<{
         message.senderId === friendUid
         && Boolean(message.id)
         && !knownServerMessageIds.has(message.id!))) {
-        playSound("friendRequest");
+        playSound("chatReceived");
       }
       knownServerMessageIds = nextServerMessageIds;
       messagesInitialized = true;
@@ -1857,7 +1884,7 @@ export const ChatModal: React.FC<{
     }
 
     try {
-      playSound("select");
+      playSound("chatSent");
       const optimisticId = `local-${now}`;
       const optimisticMessage: ChatMessage = {
         id: optimisticId,

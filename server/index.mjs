@@ -1358,6 +1358,8 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
     const stats = profileData.stats || {};
     const achievements = profileData.achievements || {};
     const platforms = profileData.platforms || {};
+    const steamId = String(platforms.steamId || "").trim();
+    const discordId = String(platforms.discordId || "").trim();
     const favoriteGames = Array.isArray(profileData.favoriteGames)
       ? profileData.favoriteGames
       : [];
@@ -1392,8 +1394,8 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
         favoriteGenres: Array.isArray(profileData.favoriteGenres)
           ? profileData.favoriteGenres.slice(0, 6)
           : [],
-        steamId: platforms.steamConnected ? "connected" : "",
-        discordId: platforms.discordConnected ? "connected" : "",
+        steamId: /^\d{10,20}$/.test(steamId) ? steamId : "",
+        discordId: /^\d{10,24}$/.test(discordId) ? discordId : "",
         achievementSummary: {
           unlocked: Math.max(0, Number(achievements.unlocked) || 0),
           available: Math.max(0, Number(achievements.total) || 0),

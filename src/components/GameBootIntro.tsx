@@ -26,14 +26,6 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
       "keydown",
       "keyup",
       "keypress",
-      "pointerdown",
-      "pointerup",
-      "click",
-      "dblclick",
-      "contextmenu",
-      "wheel",
-      "touchstart",
-      "touchend",
     ];
 
     blockedEvents.forEach((eventName) => {
@@ -73,7 +65,7 @@ const GameBootIntro: React.FC<GameBootIntroProps> = ({ onFinish }) => {
       animate={{ opacity: isFadingOut ? 0 : 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: isFadingOut ? 0.65 : 0.5, ease: "easeInOut" }}
-      className="fixed inset-0 z-500 bg-black flex items-center justify-center overflow-hidden pointer-events-auto cursor-none"
+      className="fixed inset-0 z-500 bg-black flex items-center justify-center overflow-hidden pointer-events-auto cursor-default"
       role="presentation"
     >
       <video

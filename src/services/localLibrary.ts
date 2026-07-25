@@ -124,8 +124,8 @@ export const syncPublicLibrarySummary = async (
     profile?.bio || "",
     profile?.website || "",
     profile?.favoriteGenres || [],
-    Boolean(profile?.steamId),
-    Boolean(profile?.discordId),
+    profile?.steamId || "",
+    profile?.discordId || "",
   ]);
   const fingerprintKey = `checkpoint_public_profile_fingerprint_${uid}`;
   if (
@@ -146,6 +146,8 @@ export const syncPublicLibrarySummary = async (
       ...summary.platforms,
       steamConnected: Boolean(profile?.steamId),
       discordConnected: Boolean(profile?.discordId),
+      steamId: profile?.steamId || "",
+      discordId: profile?.discordId || "",
     },
     achievements: summary.achievements,
     topGames: summary.topGames,

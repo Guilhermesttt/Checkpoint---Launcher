@@ -47,24 +47,34 @@ const emitUnread = () => {
 const normalizeMessage = (
   id: string,
   value: Record<string, unknown>,
-): ChatMessage => ({
-  id,
-  chatId: String(value.chatId || ""),
-  senderId: String(value.senderId || ""),
-  receiverId: String(value.receiverId || ""),
-  text: String(value.text || ""),
-  createdAt: typeof value.createdAt === "number"
-    ? new Date(value.createdAt).toISOString()
-    : String(value.createdAt || new Date().toISOString()),
-  read: false,
-  attachmentName: value.attachmentName ? String(value.attachmentName) : undefined,
-  attachmentUrl: value.attachmentUrl ? String(value.attachmentUrl) : undefined,
-  attachmentType: value.attachmentType ? String(value.attachmentType) : undefined,
-  attachmentSize: typeof value.attachmentSize === "number"
-    ? value.attachmentSize
-    : undefined,
-  attachmentPath: value.attachmentPath ? String(value.attachmentPath) : undefined,
-});
+): ChatMessage => {
+  let createdAtIso: string;
+  if (typeof value.createdAt === "number") {
+    createdAtIso = new Date(value.createdAt).toISOString();
+  } else if (typeof value.createdAt === "string" && value.createdAt) {
+    const parsed = Date.parse(value.createdAt);
+    createdAtIso = Number.isFinite(parsed) ? new Date(parsed).toISOString() : value.createdAt;
+  } else {
+    createdAtIso = new Date().toISOString();
+  }
+
+  return {
+    id,
+    chatId: String(value.chatId || ""),
+    senderId: String(value.senderId || ""),
+    receiverId: String(value.receiverId || ""),
+    text: String(value.text || ""),
+    createdAt: createdAtIso,
+    read: false,
+    attachmentName: value.attachmentName ? String(value.attachmentName) : undefined,
+    attachmentUrl: value.attachmentUrl ? String(value.attachmentUrl) : undefined,
+    attachmentType: value.attachmentType ? String(value.attachmentType) : undefined,
+    attachmentSize: typeof value.attachmentSize === "number"
+      ? value.attachmentSize
+      : undefined,
+    attachmentPath: value.attachmentPath ? String(value.attachmentPath) : undefined,
+  };
+};
 
 const messageTimestamp = (message: Pick<ChatMessage, "createdAt">) => {
   const timestamp = Date.parse(String(message.createdAt || ""));
@@ -207,7 +217,7 @@ export const sendChatMessage = async (
       attachmentSize: Math.max(0, Number(attachment.attachmentSize) || 0),
       attachmentPath: String(attachment.attachmentPath || "").slice(0, 500),
     } : {}),
-    createdAt: serverTimestamp(),
+    createdAt,
   };
   await set(messageRef, messageData);
   await update(ref(realtimeDb), {

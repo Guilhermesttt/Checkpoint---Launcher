@@ -97,11 +97,13 @@ let overlayPanelState = {
   achievements: { unlocked: 0, available: 0, items: [], loading: false },
   currentGame: null,
   captures: [],
-  settings: { captureShortcut: "F8" },
+  settings: { captureShortcut: "F8", achievementVolume: 22, achievementSoundTheme: "ps5" },
   chat: null,
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
 let captureShortcut = "F8";
+let achievementVolume = 22;
+let achievementSoundTheme = "ps5";
 let recentCaptures = [];
 let captureInProgress = false;
 const CAPTURE_HISTORY_LIMIT = 60;
@@ -619,7 +621,11 @@ const captureDirectory = () => path.join(app.getPath("pictures"), "Checkpoint Ca
 const saveOverlaySettings = () => {
   try {
     fs.mkdirSync(path.dirname(overlaySettingsFile()), { recursive: true });
-    fs.writeFileSync(overlaySettingsFile(), JSON.stringify({ captureShortcut }, null, 2), "utf8");
+    fs.writeFileSync(
+      overlaySettingsFile(),
+      JSON.stringify({ captureShortcut, achievementVolume, achievementSoundTheme }, null, 2),
+      "utf8",
+    );
   } catch (error) {
     console.warn("[overlay] Nao foi possivel salvar as configuracoes:", error);
   }
@@ -857,7 +863,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       monitoring: payload.currentGame.monitoring === "verified" ? "verified" : "unverified",
     } : null,
     captures: recentCaptures,
-    settings: { captureShortcut },
+    settings: { captureShortcut, achievementVolume, achievementSoundTheme },
     chat: payload?.chat ? {
       friendId: String(payload.chat.friendId || "").slice(0, 128),
       friendName: String(payload.chat.friendName || "Amigo").slice(0, 80),
@@ -972,7 +978,11 @@ const playOverlaySound = (sound) => {
     throw new Error("Overlay indisponivel.");
   }
 
-  sendOverlayEvent("overlay:play-sound", { sound });
+  sendOverlayEvent("overlay:play-sound", {
+    sound,
+    volume: achievementVolume,
+    theme: achievementSoundTheme,
+  });
 };
 
 const steamAppIdFromGameKey = (gameId) => {
@@ -2298,6 +2308,30 @@ registerSecureIpcHandler("overlay:test-achievement", async () => {
   playOverlaySound("achievement-unlock");
 });
 
+registerSecureIpcHandler("overlay:set-achievement-volume", async (_event, requestedVolume) => {
+  const numericVolume = Number(requestedVolume);
+  achievementVolume = Number.isFinite(numericVolume)
+    ? Math.min(100, Math.max(0, Math.round(numericVolume)))
+    : 22;
+  overlayPanelState = {
+    ...overlayPanelState,
+    settings: { ...overlayPanelState.settings, achievementVolume },
+  };
+  saveOverlaySettings();
+  return { volume: achievementVolume };
+});
+
+registerSecureIpcHandler("overlay:set-achievement-sound-theme", async (_event, requestedTheme) => {
+  const supportedThemes = new Set(["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"]);
+  achievementSoundTheme = supportedThemes.has(requestedTheme) ? requestedTheme : "ps5";
+  overlayPanelState = {
+    ...overlayPanelState,
+    settings: { ...overlayPanelState.settings, achievementSoundTheme },
+  };
+  saveOverlaySettings();
+  return { theme: achievementSoundTheme };
+});
+
 registerSecureIpcHandler("overlay:toggle-panel", async () => {
   setOverlayPanelOpen(!overlayPanelOpen);
   return { open: overlayPanelOpen };
@@ -2465,49 +2499,63 @@ registerSecureIpcHandler("game:scan-local", async (_event) => {
 // ─── Auto-Updater ───────────────────────────────────────────────────────────
 const { autoUpdater } = require("electron-updater");
 
-// Desativa o autoDownload para dar controle ao usuário (ele decide baixar pelo botão)
-autoUpdater.autoDownload = false;
+// Baixa novas versões em segundo plano; o usuário decide quando reiniciar e instalar.
+autoUpdater.autoDownload = true;
+let updaterState = {
+  status: "idle",
+  info: null,
+  progress: null,
+  error: "",
+};
+
+const sendUpdaterMessage = (message, data) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("update:message", message, data);
+  }
+};
 
 // Repassa eventos do autoUpdater para a interface de usuário (Vite/React)
 autoUpdater.on("checking-for-update", () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("update:message", "checking-for-update");
-  }
+  if (updaterState.status === "downloaded") return;
+  updaterState = { ...updaterState, status: "checking", error: "" };
+  sendUpdaterMessage("checking-for-update");
 });
 
 autoUpdater.on("update-available", (info) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("update:message", "update-available", info);
-  }
+  if (updaterState.status === "downloaded") return;
+  updaterState = { status: "available", info, progress: null, error: "" };
+  sendUpdaterMessage("update-available", info);
 });
 
 autoUpdater.on("update-not-available", (info) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("update:message", "update-not-available", info);
-  }
+  if (updaterState.status === "downloaded") return;
+  updaterState = { status: "not-available", info, progress: null, error: "" };
+  sendUpdaterMessage("update-not-available", info);
 });
 
 autoUpdater.on("error", (err) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("update:message", "error", err ? err.message : "Erro desconhecido");
-  }
+  const message = err ? err.message : "Erro desconhecido";
+  updaterState = { ...updaterState, status: "error", error: message };
+  sendUpdaterMessage("error", message);
 });
 
 autoUpdater.on("download-progress", (progressObj) => {
+  updaterState = { ...updaterState, status: "downloading", progress: progressObj, error: "" };
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("update:download-progress", progressObj);
   }
 });
 
 autoUpdater.on("update-downloaded", (info) => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("update:message", "update-downloaded", info);
-  }
+  updaterState = { status: "downloaded", info, progress: { percent: 100 }, error: "" };
+  sendUpdaterMessage("update-downloaded", info);
 });
 
 registerSecureIpcHandler("app:get-version", () => {
   return app.getVersion();
 });
+
+registerSecureIpcHandler("update:get-state", () => updaterState);
 
 registerSecureIpcHandler("update:check-for-updates", async () => {
   try {
@@ -2518,15 +2566,6 @@ registerSecureIpcHandler("update:check-for-updates", async () => {
     return result;
   } catch (error) {
     console.error("[auto-updater] Erro ao checar atualizações:", error);
-    throw error;
-  }
-});
-
-registerSecureIpcHandler("update:start-download", async () => {
-  try {
-    return await autoUpdater.downloadUpdate();
-  } catch (error) {
-    console.error("[auto-updater] Erro ao iniciar download:", error);
     throw error;
   }
 });
@@ -2559,6 +2598,13 @@ app.whenReady().then(async () => {
       const saved = JSON.parse(fs.readFileSync(overlaySettingsFile(), "utf8"));
       const savedShortcut = normalizeCaptureShortcut(saved?.captureShortcut);
       if (savedShortcut) captureShortcut = savedShortcut;
+      const savedAchievementVolume = Number(saved?.achievementVolume);
+      if (Number.isFinite(savedAchievementVolume)) {
+        achievementVolume = Math.min(100, Math.max(0, Math.round(savedAchievementVolume)));
+      }
+      if (["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"].includes(saved?.achievementSoundTheme)) {
+        achievementSoundTheme = saved.achievementSoundTheme;
+      }
     } catch {
       // Primeira execucao ou configuracao ainda nao criada.
     }
@@ -2566,7 +2612,7 @@ app.whenReady().then(async () => {
     overlayPanelState = {
       ...overlayPanelState,
       captures: recentCaptures,
-      settings: { captureShortcut },
+      settings: { captureShortcut, achievementVolume, achievementSoundTheme },
     };
 
     const iconPath = path.join(app.getAppPath(), "assets", "icon.png");

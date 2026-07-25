@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
+  setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),
+  setAchievementSoundTheme: (theme) => ipcRenderer.invoke("overlay:set-achievement-sound-theme", theme),
   toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
 
@@ -61,8 +63,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
   // ─ Auto-Updater APIs ────────────────────────────────────────────────────────
   getVersion: () => ipcRenderer.invoke("app:get-version"),
+  getUpdateState: () => ipcRenderer.invoke("update:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("update:check-for-updates"),
-  startDownload: () => ipcRenderer.invoke("update:start-download"),
   quitAndInstallUpdate: () => ipcRenderer.invoke("update:quit-and-install"),
   onUpdateMessage: (callback) => {
     const handler = (_event, message, data) => callback(message, data);

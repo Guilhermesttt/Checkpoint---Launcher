@@ -17,6 +17,24 @@ html[data-launcher-theme="playstation"] {
   --launcher-tint: rgba(30, 64, 175, 0.32);
 }
 
+html[data-launcher-theme="ps4"] {
+  --launcher-accent: 0 112 209;
+  --launcher-accent-soft: rgba(0, 112, 209, 0.36);
+  --launcher-tint: rgba(0, 55, 145, 0.34);
+}
+
+html[data-launcher-theme="psp"] {
+  --launcher-accent: 6 182 212;
+  --launcher-accent-soft: rgba(6, 182, 212, 0.36);
+  --launcher-tint: rgba(14, 116, 144, 0.34);
+}
+
+html[data-launcher-theme="cyberpunk"] {
+  --launcher-accent: 255 238 0;
+  --launcher-accent-soft: rgba(255, 238, 0, 0.36);
+  --launcher-tint: rgba(0, 240, 255, 0.34);
+}
+
 html[data-launcher-theme="gamecube"] {
   --launcher-accent: 124 58 237;
   --launcher-accent-soft: rgba(124, 58, 237, 0.36);
