@@ -41,13 +41,11 @@ export function useLowPerf() {
 // Substituto direto dos componentes `motion.*` do Framer Motion.
 // Em modo desempenho renderiza o elemento HTML puro (sem props de animação).
 
-type PMotionProps<T extends keyof JSX.IntrinsicElements> = HTMLMotionProps<T> & {
-  as?: T;
-};
+type PMotionProps = any;
 
-function createPMotion<T extends keyof JSX.IntrinsicElements>(tag: T) {
+function createPMotion(tag: any) {
   const MotionTag = (motion as any)[tag];
-  return function PMotionComponent({ children, className, style, onClick, onMouseMove, onMouseLeave, as: _as, ...rest }: PMotionProps<T>) {
+  return function PMotionComponent({ children, className, style, onClick, onMouseMove, onMouseLeave, as: _as, ...rest }: any) {
     const low = useLowPerf();
     if (low) {
       const Tag = tag as any;

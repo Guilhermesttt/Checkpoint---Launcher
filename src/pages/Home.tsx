@@ -1662,7 +1662,7 @@ const Home: React.FC = () => {
                 games={games}
                 onOpenGame={openDetails}
                 onProfileUpdated={refreshProfile}
-                playSound={playSound}
+                playSound={playSound as any}
               />
             </React.Suspense>
           ) : isLoading ? (
@@ -1930,7 +1930,7 @@ const Home: React.FC = () => {
               user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
               games={friendProfileModal.games}
               editable={false}
-              playSound={playSound}
+              playSound={playSound as any}
             />
           </React.Suspense>
         )}
