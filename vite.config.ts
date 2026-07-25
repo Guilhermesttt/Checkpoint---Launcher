@@ -11,6 +11,26 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("three") || id.includes("@react-three")) {
+              return "three-vendor";
+            }
+            if (id.includes("firebase")) {
+              return "firebase-vendor";
+            }
+            if (id.includes("framer-motion") || id.includes("lucide-react") || id.includes("@radix-ui")) {
+              return "ui-vendor";
+            }
+          }
+        },
+      },
+    },
+  },
   server: {
     host: "127.0.0.1",
     port: 5173,
