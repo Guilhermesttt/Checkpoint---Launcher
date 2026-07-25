@@ -469,6 +469,18 @@ const steamStoreFetchHeaders = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 };
 
+const STORE_LOCALES = {
+  "pt-BR": { locale: "pt-BR", steam: "brazilian", country: "BR" },
+  "en-US": { locale: "en-US", steam: "english", country: "US" },
+  "es-ES": { locale: "es-ES", steam: "spanish", country: "ES" },
+  "fr-FR": { locale: "fr-FR", steam: "french", country: "FR" },
+  "de-DE": { locale: "de-DE", steam: "german", country: "DE" },
+  "it-IT": { locale: "it-IT", steam: "italian", country: "IT" },
+};
+
+const resolveStoreLocale = (value) =>
+  STORE_LOCALES[String(value || "").trim()] || STORE_LOCALES["pt-BR"];
+
 const EPIC_CATALOG_ITEM_QUERY = `
   query catalogItemQuery($namespace: String!, $id: String!, $locale: String, $withOffers: Boolean!) {
     Catalog {
@@ -710,8 +722,10 @@ const pickSteamTrailerUrl = (movies) => {
   return null;
 };
 
-const fetchSteamAchievementSchema = async (appId) => {
-  const cached = achievementSchemaCache.get(appId);
+const fetchSteamAchievementSchema = async (appId, language = "pt-BR") => {
+  const storeLocale = resolveStoreLocale(language);
+  const cacheKey = `${appId}:${storeLocale.locale}`;
+  const cached = achievementSchemaCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
@@ -721,7 +735,7 @@ const fetchSteamAchievementSchema = async (appId) => {
   );
   url.searchParams.set("key", steamApiKey);
   url.searchParams.set("appid", appId);
-  url.searchParams.set("l", "brazilian");
+  url.searchParams.set("l", storeLocale.steam);
 
   const response = await fetch(url.toString());
   if (!response.ok) {
@@ -743,7 +757,7 @@ const fetchSteamAchievementSchema = async (appId) => {
       }))
     : [];
 
-  achievementSchemaCache.set(appId, {
+  achievementSchemaCache.set(cacheKey, {
     data: schema,
     timestamp: Date.now(),
   });
@@ -1348,7 +1362,10 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
   try {
     const firestore = getFirestore();
-    const profileSnap = await firestore.doc(`publicProfiles/${friendUid}`).get();
+    const [profileSnap, linkedProfileSnap] = await Promise.all([
+      firestore.doc(`publicProfiles/${friendUid}`).get(),
+      firestore.doc(`profiles/${friendUid}`).get(),
+    ]);
     if (!profileSnap.exists) {
       res.status(404).json({ error: "Perfil não encontrado." });
       return;
@@ -1358,8 +1375,13 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
     const stats = profileData.stats || {};
     const achievements = profileData.achievements || {};
     const platforms = profileData.platforms || {};
-    const steamId = String(platforms.steamId || "").trim();
-    const discordId = String(platforms.discordId || "").trim();
+    const linkedProfile = linkedProfileSnap.exists ? linkedProfileSnap.data() || {} : {};
+    const steamId = String(platforms.steamId || linkedProfile.steamId || "").trim();
+    const discordId = String(platforms.discordId || linkedProfile.discordId || "").trim();
+    const steamUsername = String(platforms.steamUsername || linkedProfile.steamUsername || "").trim();
+    const discordUsername = String(platforms.discordUsername || linkedProfile.discordUsername || "").trim();
+    const steamAvatar = String(platforms.steamAvatar || linkedProfile.steamAvatar || "").trim();
+    const discordAvatar = String(platforms.discordAvatar || linkedProfile.discordAvatar || "").trim();
     const favoriteGames = Array.isArray(profileData.favoriteGames)
       ? profileData.favoriteGames
       : [];
@@ -1396,6 +1418,10 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
           : [],
         steamId: /^\d{10,20}$/.test(steamId) ? steamId : "",
         discordId: /^\d{10,24}$/.test(discordId) ? discordId : "",
+        steamUsername: steamUsername.slice(0, 80),
+        discordUsername: discordUsername.slice(0, 80),
+        steamAvatar: /^https:\/\//i.test(steamAvatar) ? steamAvatar : "",
+        discordAvatar: /^https:\/\//i.test(discordAvatar) ? discordAvatar : "",
         achievementSummary: {
           unlocked: Math.max(0, Number(achievements.unlocked) || 0),
           available: Math.max(0, Number(achievements.total) || 0),
@@ -2299,11 +2325,12 @@ app.post("/api/steam/achievement-summary", steamPrivateLimiter, requireFirebaseU
   });
 });
 
-const fetchSteamSearchItems = async (query) => {
+const fetchSteamSearchItems = async (query, language = "pt-BR") => {
+  const storeLocale = resolveStoreLocale(language);
   const url = new URL("https://store.steampowered.com/api/storesearch/");
   url.searchParams.set("term", query);
-  url.searchParams.set("l", "brazilian");
-  url.searchParams.set("cc", "BR");
+  url.searchParams.set("l", storeLocale.steam);
+  url.searchParams.set("cc", storeLocale.country);
   const response = await fetch(url.toString(), { headers: steamStoreFetchHeaders });
   if (!response.ok) {
     throw new Error(`Falha na busca Steam Store (status ${response.status}).`);
@@ -2320,7 +2347,7 @@ const handleSteamSearch = async (req, res) => {
   }
 
   try {
-    res.json({ items: await fetchSteamSearchItems(query) });
+    res.json({ items: await fetchSteamSearchItems(query, req.query.language) });
   } catch {
     res
       .status(500)
@@ -2397,12 +2424,13 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
 app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
   const catalogId = String(req.query.catalogId ?? "").trim();
   const namespace = String(req.query.namespace ?? epicSandboxId ?? "").trim();
+  const storeLocale = resolveStoreLocale(req.query.language);
   if (!catalogId || !namespace) {
     res.status(400).json({ error: "catalogId ou namespace inválido." });
     return;
   }
 
-  const cacheKey = `epic_${namespace}_${catalogId}`;
+  const cacheKey = `epic_${namespace}_${catalogId}_${storeLocale.locale}`;
   const cached = appDetailsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     res.json(cached.data);
@@ -2410,7 +2438,11 @@ app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
   }
 
   try {
-    const catalogItem = await fetchEpicCatalogItem(namespace, catalogId);
+    const catalogItem = await fetchEpicCatalogItem(
+      namespace,
+      catalogId,
+      storeLocale.locale,
+    );
     if (!catalogItem) {
       res.status(404).json({ error: "Detalhes não encontrados para este item Epic." });
       return;
@@ -2472,13 +2504,14 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
 
   const steamId = req.steamId;
   const appId = String(req.query.appId ?? "").trim();
+  const storeLocale = resolveStoreLocale(req.query.language);
 
   if (!/^\d+$/.test(appId)) {
     res.status(400).json({ error: "appId inválido." });
     return;
   }
 
-  const cacheKey = `${steamId}_${appId}`;
+  const cacheKey = `${steamId}_${appId}_${storeLocale.locale}`;
   const cached = achievementsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     res.json(cached.data);
@@ -2490,11 +2523,11 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
     url.searchParams.set("key", steamApiKey);
     url.searchParams.set("steamid", steamId);
     url.searchParams.set("appid", appId);
-    url.searchParams.set("l", "brazilian");
+    url.searchParams.set("l", storeLocale.steam);
 
     const [response, schema] = await Promise.all([
       fetch(url.toString()),
-      fetchSteamAchievementSchema(appId).catch(() => []),
+      fetchSteamAchievementSchema(appId, storeLocale.locale).catch(() => []),
     ]);
     if (!response.ok) {
       if (response.status === 400 || response.status === 404) {
@@ -2563,13 +2596,14 @@ app.get("/api/steam/achievement-schema", steamPublicLimiter, async (req, res) =>
   }
 
   const appId = String(req.query.appId ?? "").trim();
+  const storeLocale = resolveStoreLocale(req.query.language);
   if (!/^\d+$/.test(appId)) {
     res.status(400).json({ error: "appId invalido." });
     return;
   }
 
   try {
-    const schema = await fetchSteamAchievementSchema(appId);
+    const schema = await fetchSteamAchievementSchema(appId, storeLocale.locale);
     const achievements = schema.map((achievement) => ({
       apiName: achievement.apiName,
       achieved: false,
@@ -2593,12 +2627,14 @@ app.get("/api/steam/achievement-schema", steamPublicLimiter, async (req, res) =>
 
 app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
   const appId = String(req.query.appId ?? "").trim();
+  const storeLocale = resolveStoreLocale(req.query.language);
   if (!/^\d+$/.test(appId)) {
     res.status(400).json({ error: "appId inválido." });
     return;
   }
 
-  const cached = appDetailsCache.get(appId);
+  const cacheKey = `steam:${appId}:${storeLocale.locale}`;
+  const cached = appDetailsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     res.json(cached.data);
     return;
@@ -2607,8 +2643,8 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
   try {
     const url = new URL("https://store.steampowered.com/api/appdetails");
     url.searchParams.set("appids", appId);
-    url.searchParams.set("l", "brazilian");
-    url.searchParams.set("cc", "BR");
+    url.searchParams.set("l", storeLocale.steam);
+    url.searchParams.set("cc", storeLocale.country);
 
     const response = await fetch(url.toString(), {
       headers: steamStoreFetchHeaders,
@@ -2666,7 +2702,7 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
       sizeGB: parseDiskSizeGb(requirements),
     };
 
-    appDetailsCache.set(appId, { data: result, timestamp: Date.now() });
+    appDetailsCache.set(cacheKey, { data: result, timestamp: Date.now() });
     res.json(result);
   } catch {
     res.status(500).json({ error: "Erro interno ao buscar detalhes do jogo." });

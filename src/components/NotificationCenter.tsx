@@ -136,7 +136,7 @@ const StandardToast = ({
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const notify = useCallback(
     (message: string, type: NotificationType = "info", options?: NotificationOptions) => {
-      const duration = options?.duration || 4200;
+      const duration = options?.duration ?? 4200;
 
       if (type === "achievement") {
         toast.custom((t) => (

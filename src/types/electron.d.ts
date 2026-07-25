@@ -30,6 +30,7 @@ declare global {
         catalogId: string;
         namespace: string;
         productSlug: string;
+        language?: import("../context/PreferencesContext").LauncherLanguage;
       }) => Promise<{
         catalogId: string;
         namespace: string;
@@ -64,6 +65,7 @@ declare global {
       detectRunningGames: (executablePaths: string[]) => Promise<string[]>;
       startGoogleBrowserAuth: () => Promise<{ state: string }>;
       openExternalUrl: (url: string) => Promise<void>;
+      copyToClipboard: (value: string) => Promise<{ ok: boolean }>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
       listLocalGames: (uid: string) => Promise<import("./domain").Game[]>;
       createLocalGame: (
@@ -138,6 +140,7 @@ declare global {
         error: string;
       }>;
       checkForUpdates: () => Promise<unknown>;
+      downloadUpdate: () => Promise<unknown>;
       quitAndInstallUpdate: () => Promise<void>;
       onUpdateMessage: (
         callback: (message: string, data?: { version?: string } | string) => void,
@@ -178,7 +181,10 @@ declare global {
       getLocalAchievementState: (
         appId: string
       ) => Promise<{ [id: string]: { earned: boolean; earnedTime: number } }>;
-      setOpenAtLogin?: (open: boolean) => Promise<void>;
+      setOpenAtLogin?: (open: boolean) => Promise<{
+        openAtLogin: boolean;
+        supported: boolean;
+      }>;
       getEpicLocalAchievements: (request: {
         gameId: string;
         title: string;
@@ -235,6 +241,7 @@ declare global {
         avatarUrl?: string;
       }) => Promise<void>;
       updateOverlayPanel: (payload: {
+        language?: import("../context/PreferencesContext").LauncherLanguage;
         friends: Array<{ id: string; name: string; status: string; playing?: string; avatar?: string; unread?: number; canChat?: boolean }>;
         achievements: {
           unlocked: number;

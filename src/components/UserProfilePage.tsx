@@ -4,6 +4,7 @@ import { Clock, ExternalLink, Gamepad2, Pencil, Star, Trophy, TrendingUp, User }
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
+import type { LauncherLanguage } from "../context/PreferencesContext";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
@@ -22,7 +23,67 @@ interface UserProfilePageProps {
   onProfileUpdated?: () => Promise<void> | void;
   editable?: boolean;
   playSound?: (sound: string) => void;
+  language?: LauncherLanguage;
+  copyFriendDiscord?: boolean;
+  onNotify?: (message: string, type?: "success" | "error" | "info") => void;
 }
+
+const profileCopy = {
+  "pt-BR": {
+    connected: "Conectado", disconnected: "Não conectado", player: "Jogador",
+    edit: "Editar perfil", games: "Jogos", hours: "Horas", favorites: "Favoritos",
+    platforms: "Plataformas", achievements: "Conquistas", library: "Biblioteca",
+    mostPlayed: "Mais jogados", unlocked: "conquistas desbloqueadas",
+    catalogued: "jogos catalogados", catalog: "Catálogo e atalhos",
+    noFavorites: "Nenhum favorito ainda.", emptyTitle: "Perfil em construção",
+    emptyBody: "Jogue e favorite jogos para preencher esta área.", copiedNickname: "Nickname do Discord copiado.", copiedId: "ID do Discord copiado.", copyError: "Não foi possível copiar o Discord.",
+  },
+  "en-US": {
+    connected: "Connected", disconnected: "Not connected", player: "Player",
+    edit: "Edit profile", games: "Games", hours: "Hours", favorites: "Favorites",
+    platforms: "Platforms", achievements: "Achievements", library: "Library",
+    mostPlayed: "Most played", unlocked: "achievements unlocked",
+    catalogued: "games catalogued", catalog: "Catalog and shortcuts",
+    noFavorites: "No favorites yet.", emptyTitle: "Profile under construction",
+    emptyBody: "Play and favorite games to fill this area.", copiedNickname: "Discord nickname copied.", copiedId: "Discord ID copied.", copyError: "Could not copy Discord.",
+  },
+  "es-ES": {
+    connected: "Conectado", disconnected: "No conectado", player: "Jugador",
+    edit: "Editar perfil", games: "Juegos", hours: "Horas", favorites: "Favoritos",
+    platforms: "Plataformas", achievements: "Logros", library: "Biblioteca",
+    mostPlayed: "Más jugados", unlocked: "logros desbloqueados",
+    catalogued: "juegos catalogados", catalog: "Catálogo y accesos directos",
+    noFavorites: "Aún no hay favoritos.", emptyTitle: "Perfil en construcción",
+    emptyBody: "Juega y marca juegos como favoritos para completar esta área.", copiedNickname: "Nickname de Discord copiado.", copiedId: "ID de Discord copiado.", copyError: "No se pudo copiar Discord.",
+  },
+  "fr-FR": {
+    connected: "Connecté", disconnected: "Non connecté", player: "Joueur",
+    edit: "Modifier le profil", games: "Jeux", hours: "Heures", favorites: "Favoris",
+    platforms: "Plateformes", achievements: "Succès", library: "Bibliothèque",
+    mostPlayed: "Les plus joués", unlocked: "succès débloqués",
+    catalogued: "jeux catalogués", catalog: "Catalogue et raccourcis",
+    noFavorites: "Aucun favori.", emptyTitle: "Profil en construction",
+    emptyBody: "Jouez et ajoutez des jeux aux favoris pour remplir cette zone.", copiedNickname: "Pseudo Discord copié.", copiedId: "ID Discord copié.", copyError: "Impossible de copier Discord.",
+  },
+  "de-DE": {
+    connected: "Verbunden", disconnected: "Nicht verbunden", player: "Spieler",
+    edit: "Profil bearbeiten", games: "Spiele", hours: "Stunden", favorites: "Favoriten",
+    platforms: "Plattformen", achievements: "Erfolge", library: "Bibliothek",
+    mostPlayed: "Meistgespielt", unlocked: "Erfolge freigeschaltet",
+    catalogued: "Spiele katalogisiert", catalog: "Katalog und Verknüpfungen",
+    noFavorites: "Noch keine Favoriten.", emptyTitle: "Profil im Aufbau",
+    emptyBody: "Spiele und markiere Favoriten, um diesen Bereich zu füllen.", copiedNickname: "Discord-Name kopiert.", copiedId: "Discord-ID kopiert.", copyError: "Discord konnte nicht kopiert werden.",
+  },
+  "it-IT": {
+    connected: "Connesso", disconnected: "Non connesso", player: "Giocatore",
+    edit: "Modifica profilo", games: "Giochi", hours: "Ore", favorites: "Preferiti",
+    platforms: "Piattaforme", achievements: "Obiettivi", library: "Libreria",
+    mostPlayed: "Più giocati", unlocked: "obiettivi sbloccati",
+    catalogued: "giochi catalogati", catalog: "Catalogo e collegamenti",
+    noFavorites: "Nessun preferito.", emptyTitle: "Profilo in costruzione",
+    emptyBody: "Gioca e aggiungi giochi ai preferiti per riempire questa area.", copiedNickname: "Nickname Discord copiato.", copiedId: "ID Discord copiato.", copyError: "Impossibile copiare Discord.",
+  },
+} as const;
 
 const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
   <img
@@ -54,6 +115,35 @@ const openExternalProfile = async (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
+const copyToClipboard = async (value: string) => {
+  if (window.electronAPI?.copyToClipboard) {
+    try {
+      const result = await window.electronAPI.copyToClipboard(value);
+      if (result?.ok !== false) return;
+    } catch {
+      // Builds antigos ou um preload ainda em memória podem não expor o IPC.
+      // Nesse caso, continuamos com os fallbacks do Chromium abaixo.
+    }
+  }
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // O Electron pode bloquear navigator.clipboard dependendo do foco/permissão.
+    }
+  }
+  const input = document.createElement("textarea");
+  input.value = value;
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = typeof document.execCommand === "function" && document.execCommand("copy");
+  input.remove();
+  if (!copied) throw new Error("Clipboard unavailable");
+};
+
 const ProfileAvatar: React.FC<{
   profile: UserProfile | null;
   firebasePhotoURL?: string | null;
@@ -79,7 +169,9 @@ const PlatformCard: React.FC<{
   username?: string;
   avatar?: string;
   icon: React.ReactNode;
-}> = ({ name, connected, username, avatar, icon }) => (
+  connectedLabel: string;
+  disconnectedLabel: string;
+}> = ({ name, connected, username, avatar, icon, connectedLabel, disconnectedLabel }) => (
   <div
     className={`flex items-center gap-3 rounded-2xl border p-3 ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
       }`}
@@ -90,7 +182,7 @@ const PlatformCard: React.FC<{
     <div className="min-w-0 flex-1">
       <p className="truncate text-xs font-black text-white">{name}</p>
       <p className="truncate text-[10px] text-white/40">
-        {connected ? username || "Conectado" : "Nao conectado"}
+        {connected ? username || connectedLabel : disconnectedLabel}
       </p>
     </div>
     <span className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-white" : "bg-white/15"}`} />
@@ -132,6 +224,9 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   onProfileUpdated,
   editable = true,
   playSound,
+  language = "pt-BR",
+  copyFriendDiscord = false,
+  onNotify,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -141,7 +236,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     disableX: true,
     disableO: true,
   });
-  const displayName = userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
+  const copy = profileCopy[language];
+  const displayName = userProfile?.displayName || user?.email?.split("@")[0] || copy.player;
   const email = userProfile?.email || user?.email || "";
 
   const stats = useMemo(() => {
@@ -192,6 +288,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const discordId = String(userProfile?.discordId || "").trim();
   const hasSteamProfile = /^\d{10,20}$/.test(steamId);
   const hasDiscordProfile = /^\d{10,24}$/.test(discordId);
+  const discordDisplayName = String(userProfile?.discordUsername || discordId).trim();
 
   return (
     <motion.div
@@ -231,11 +328,22 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   {hasDiscordProfile && (
                     <button
                       type="button"
-                      onClick={() => void openExternalProfile(`https://discord.com/users/${discordId}`)}
+                      onClick={() => {
+                        if (!copyFriendDiscord) {
+                          void openExternalProfile(`https://discord.com/users/${discordId}`);
+                          return;
+                        }
+                        void copyToClipboard(discordDisplayName).then(() => {
+                          onNotify?.(
+                            userProfile?.discordUsername ? copy.copiedNickname : copy.copiedId,
+                            "success",
+                          );
+                        }).catch(() => onNotify?.(copy.copyError, "error"));
+                      }}
                       className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] px-2 py-1 text-[10px] font-black text-white transition-colors hover:bg-white/10"
                     >
                       <FontAwesomeIcon icon={faDiscord} className="h-3 w-3" />
-                      {userProfile?.discordUsername || "Discord"}
+                      {discordDisplayName}
                     </button>
                   )}
                 </div>
@@ -274,13 +382,13 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   }}
                   className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs font-black text-white/65 transition hover:bg-white/12 hover:text-white"
                 >
-                  <Pencil className="h-3.5 w-3.5" /> Editar perfil
+                  <Pencil className="h-3.5 w-3.5" /> {copy.edit}
                 </button>
               )}
               <div className="grid grid-cols-3 gap-3">
-                <StatCard icon={<Gamepad2 className="h-4 w-4" />} label="Jogos" value={stats.totalGames} />
-                <StatCard icon={<Clock className="h-4 w-4" />} label="Horas" value={`${formatPlayedHours(stats.totalHours)}h`} />
-                <StatCard icon={<Star className="h-4 w-4" />} label="Favoritos" value={stats.favorites} />
+                <StatCard icon={<Gamepad2 className="h-4 w-4" />} label={copy.games} value={stats.totalGames} />
+                <StatCard icon={<Clock className="h-4 w-4" />} label={copy.hours} value={`${formatPlayedHours(stats.totalHours)}h`} />
+                <StatCard icon={<Star className="h-4 w-4" />} label={copy.favorites} value={stats.favorites} />
               </div>
             </div>
           </div>
@@ -288,7 +396,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[285px_1fr]">
           <div className="space-y-5">
-            <Section title="Plataformas">
+            <Section title={copy.platforms}>
               <div className="space-y-2">
                 <PlatformCard
                   name="Steam"
@@ -296,12 +404,16 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   avatar={userProfile?.steamAvatar}
                   username={userProfile?.steamUsername || userProfile?.steamId}
                   icon={<FontAwesomeIcon icon={faSteam} className="h-4 w-4" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
                 />
                 <PlatformCard
                   name="Epic Games"
                   connected={stats.epicGames > 0}
-                  username={stats.epicGames > 0 ? `${stats.epicGames} jogos catalogados` : "Catálogo e atalhos"}
+                  username={stats.epicGames > 0 ? `${stats.epicGames} ${copy.catalogued}` : copy.catalog}
                   icon={<EpicIcon className="h-5 w-5" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
                 />
                 <PlatformCard
                   name="Discord"
@@ -309,11 +421,13 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   avatar={userProfile?.discordAvatar}
                   username={userProfile?.discordUsername}
                   icon={<FontAwesomeIcon icon={faDiscord} className="h-4 w-4" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
                 />
               </div>
             </Section>
 
-            <Section title="Conquistas">
+            <Section title={copy.achievements}>
               <div className="mb-3 flex items-end justify-between">
                 <div>
                   <span className="text-4xl font-black text-white">{stats.totalAchievements}</span>
@@ -330,11 +444,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                 />
               </div>
               <p className="mt-3 flex items-center gap-1.5 text-[10px] text-white/35">
-                <Trophy className="h-3 w-3" /> {stats.totalAchievements} conquistas desbloqueadas
+                <Trophy className="h-3 w-3" /> {stats.totalAchievements} {copy.unlocked}
               </p>
             </Section>
 
-            <Section title="Biblioteca">
+            <Section title={copy.library}>
               <div className="space-y-3">
                 {libraryRows.map((row) => (
                   <div key={row.label}>
@@ -357,7 +471,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
           </div>
 
           <div className="space-y-5">
-            <Section title="Mais jogados" icon={<TrendingUp className="h-4 w-4" />} className="min-h-[346px]">
+            <Section title={copy.mostPlayed} icon={<TrendingUp className="h-4 w-4" />} className="min-h-[346px]">
               {topGames.length > 0 ? (
                 <div className="space-y-4">
                   {topGames.map((game, index) => {
@@ -396,11 +510,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   })}
                 </div>
               ) : (
-                <EmptyProfileState />
+                <EmptyProfileState title={copy.emptyTitle} body={copy.emptyBody} />
               )}
             </Section>
 
-            <Section title="Favoritos" icon={<Star className="h-4 w-4" />}>
+            <Section title={copy.favorites} icon={<Star className="h-4 w-4" />}>
               {favoriteGames.length > 0 ? (
                 <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                   {favoriteGames.map((game) => (
@@ -421,7 +535,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   ))}
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm font-bold text-white/35">Nenhum favorito ainda.</p>
+                <p className="py-8 text-center text-sm font-bold text-white/35">{copy.noFavorites}</p>
               )}
             </Section>
           </div>
@@ -442,11 +556,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   );
 };
 
-const EmptyProfileState: React.FC = () => (
+const EmptyProfileState: React.FC<{ title: string; body: string }> = ({ title, body }) => (
   <div className="flex h-56 flex-col items-center justify-center text-center">
     <User className="mb-4 h-9 w-9 text-white/20" />
-    <p className="text-sm font-black text-white/40">Perfil em construcao</p>
-    <p className="mt-1 text-xs text-white/25">Jogue e favorite jogos para preencher esta area.</p>
+    <p className="text-sm font-black text-white/40">{title}</p>
+    <p className="mt-1 text-xs text-white/25">{body}</p>
   </div>
 );
 

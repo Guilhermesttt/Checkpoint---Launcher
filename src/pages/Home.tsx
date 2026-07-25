@@ -108,6 +108,9 @@ const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: strin
   { id: "pt-BR", label: "Português", hint: "Brasil" },
   { id: "en-US", label: "English", hint: "United States" },
   { id: "es-ES", label: "Español", hint: "España" },
+  { id: "fr-FR", label: "Français", hint: "France" },
+  { id: "de-DE", label: "Deutsch", hint: "Deutschland" },
+  { id: "it-IT", label: "Italiano", hint: "Italia" },
 ];
 
 const APP_THEME_OPTIONS: Array<{
@@ -311,6 +314,7 @@ const Home: React.FC = () => {
     setIsLoading,
     setSelectedIndex,
     onLibraryChanged: refreshLibrary,
+    language: launcherLanguage,
   });
 
   const {
@@ -394,7 +398,7 @@ const Home: React.FC = () => {
       const version = typeof data === "object" ? data?.version : undefined;
       if (status === "update-available") {
         notify(
-          `Nova atualização disponível${version ? ` (v${version})` : ""}. O download começou automaticamente.`,
+          `Nova atualização pendente${version ? ` (v${version})` : ""}. Abra as Configurações para baixar e atualizar.`,
           "success",
           { id: "checkpoint-app-update", title: "Atualização do Checkpoint", duration: Infinity },
         );
@@ -1121,6 +1125,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (!window.electronAPI?.updateOverlayPanel) return;
     void window.electronAPI.updateOverlayPanel({
+      language: launcherLanguage,
       friends: socialFriends.map((friend) => ({
         id: friend.id,
         name: friend.name,
@@ -1204,6 +1209,7 @@ const Home: React.FC = () => {
     overlayChatTyping,
     overlayCurrentGame,
     overlaySessionStartedAt,
+    launcherLanguage,
     currentPresenceExecutablePath,
     presenceVerification,
     games,
@@ -1421,6 +1427,7 @@ const Home: React.FC = () => {
         activeCategory={activeCategory}
         onCategory={setActiveCategory}
         settingsLabel={t("settings")}
+        language={launcherLanguage}
         playSound={playSound}
         notificationCount={
           incomingFriendRequests.length
@@ -1597,6 +1604,7 @@ const Home: React.FC = () => {
                 userDisplay={userDisplay}
                 email={user?.email || undefined}
                 avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}
+                language={launcherLanguage}
                 onOpenProfile={() => {
                   setActiveCategory("PROFILE");
                   playSound("select");
@@ -1679,6 +1687,7 @@ const Home: React.FC = () => {
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
               t={t}
+              language={launcherLanguage}
               discordConnected={Boolean(resolvedDiscordId)}
               userDisplay={userDisplay}
               discordUsername={userProfile?.discordUsername}
@@ -1725,6 +1734,7 @@ const Home: React.FC = () => {
                 onOpenGame={openDetails}
                 onProfileUpdated={refreshProfile}
                 playSound={playSound as any}
+                language={launcherLanguage}
               />
             </React.Suspense>
           ) : isLoading ? (
@@ -1993,6 +2003,9 @@ const Home: React.FC = () => {
               games={friendProfileModal.games}
               editable={false}
               playSound={playSound as any}
+              language={launcherLanguage}
+              copyFriendDiscord
+              onNotify={notify}
             />
           </React.Suspense>
         )}

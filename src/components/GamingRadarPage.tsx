@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { apiUrl } from "../services/api";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
+import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
 
 const proxyImage = (url?: string) => {
   if (!url) return "";
@@ -41,21 +42,37 @@ const openExternal = async (url: string) => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
-const relativeTime = (date: string) => {
+const radarCopy: Record<LauncherLanguage, {
+  eyebrow: string; title: string; subtitle: string; refresh: string; all: string;
+  stale: string; unavailable: string; loadError: string; read: string;
+  communities: string; adrenaline: string; steam: string;
+}> = {
+  "pt-BR": { eyebrow: "Atualizações do mundo gamer", title: "Radar Gamer", subtitle: "Notícias reunidas em um só lugar.", refresh: "Atualizar", all: "Todas", stale: "Exibindo o último cache disponível", unavailable: "Radar temporariamente indisponível", loadError: "Não foi possível carregar as notícias.", read: "Ler matéria", communities: "Comunidades para discutir", adrenaline: "Hardware, lançamentos e discussões da comunidade.", steam: "Fóruns organizados por jogo e pela comunidade Steam." },
+  "en-US": { eyebrow: "Gaming world updates", title: "Gaming Radar", subtitle: "Gaming news gathered in one place.", refresh: "Refresh", all: "All", stale: "Showing the latest available cache", unavailable: "Radar temporarily unavailable", loadError: "Could not load the news.", read: "Read article", communities: "Communities to discuss", adrenaline: "Hardware, releases, and community discussions.", steam: "Forums organized by game and the Steam community." },
+  "es-ES": { eyebrow: "Actualizaciones del mundo gamer", title: "Radar Gamer", subtitle: "Noticias reunidas en un solo lugar.", refresh: "Actualizar", all: "Todas", stale: "Mostrando la última caché disponible", unavailable: "Radar temporalmente no disponible", loadError: "No se pudieron cargar las noticias.", read: "Leer artículo", communities: "Comunidades para debatir", adrenaline: "Hardware, lanzamientos y debates de la comunidad.", steam: "Foros organizados por juego y por la comunidad de Steam." },
+  "fr-FR": { eyebrow: "Actualités du monde du jeu", title: "Radar Gaming", subtitle: "Toute l’actualité gaming au même endroit.", refresh: "Actualiser", all: "Toutes", stale: "Affichage du dernier cache disponible", unavailable: "Radar temporairement indisponible", loadError: "Impossible de charger les actualités.", read: "Lire l’article", communities: "Communautés de discussion", adrenaline: "Matériel, sorties et discussions de la communauté.", steam: "Forums organisés par jeu et par la communauté Steam." },
+  "de-DE": { eyebrow: "Neuigkeiten aus der Gaming-Welt", title: "Gaming-Radar", subtitle: "Gaming-News an einem Ort.", refresh: "Aktualisieren", all: "Alle", stale: "Letzter verfügbarer Cache wird angezeigt", unavailable: "Radar vorübergehend nicht verfügbar", loadError: "Nachrichten konnten nicht geladen werden.", read: "Artikel lesen", communities: "Communities zum Diskutieren", adrenaline: "Hardware, Veröffentlichungen und Community-Diskussionen.", steam: "Foren nach Spiel und Steam-Community geordnet." },
+  "it-IT": { eyebrow: "Aggiornamenti dal mondo gaming", title: "Radar Gaming", subtitle: "Notizie gaming raccolte in un unico posto.", refresh: "Aggiorna", all: "Tutte", stale: "Visualizzazione dell’ultima cache disponibile", unavailable: "Radar temporaneamente non disponibile", loadError: "Impossibile caricare le notizie.", read: "Leggi articolo", communities: "Community di discussione", adrenaline: "Hardware, uscite e discussioni della community.", steam: "Forum organizzati per gioco e dalla community di Steam." },
+};
+
+const relativeTime = (date: string, language: LauncherLanguage) => {
   const timestamp = Date.parse(date);
   if (Number.isNaN(timestamp)) return "";
   const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
-  if (minutes < 60) return `há ${minutes || 1} min`;
+  const formatter = new Intl.RelativeTimeFormat(language, { numeric: "always", style: "narrow" });
+  if (minutes < 60) return formatter.format(-(minutes || 1), "minute");
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `há ${hours}h`;
-  return `há ${Math.round(hours / 24)}d`;
+  if (hours < 24) return formatter.format(-hours, "hour");
+  return formatter.format(-Math.round(hours / 24), "day");
 };
 
 const GamingRadarPage: React.FC = () => {
+  const { language } = usePreferences();
+  const copy = radarCopy[language];
   const scrollRef = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<GamingNewsItem[]>([]);
   const [sources, setSources] = useState<NewsPayload["sources"]>([]);
-  const [activeSource, setActiveSource] = useState("Todas");
+  const [activeSource, setActiveSource] = useState("__all__");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
@@ -73,16 +90,16 @@ const GamingRadarPage: React.FC = () => {
     try {
       const response = await fetch(apiUrl("/api/gaming/news"));
       const payload = await response.json() as NewsPayload;
-      if (!response.ok) throw new Error(payload.error || "Não foi possível carregar as notícias.");
+      if (!response.ok) throw new Error(payload.error || copy.loadError);
       setItems(Array.isArray(payload.items) ? payload.items : []);
       setSources(payload.sources || []);
       setStale(Boolean(payload.stale));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Não foi possível carregar as notícias.");
+      setError(loadError instanceof Error ? loadError.message : copy.loadError);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [copy.loadError]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => void loadNews(), 0);
@@ -90,7 +107,7 @@ const GamingRadarPage: React.FC = () => {
   }, [loadNews]);
 
   const visibleItems = useMemo(
-    () => activeSource === "Todas"
+    () => activeSource === "__all__"
       ? items
       : items.filter((item) => item.source === activeSource),
     [activeSource, items],
@@ -114,11 +131,11 @@ const GamingRadarPage: React.FC = () => {
         <header className="mb-6 flex flex-col justify-between gap-4 rounded-[28px] border border-white/10 bg-black/65 p-6 md:flex-row md:items-center">
           <div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-white/35">
-              <Radio className="h-3.5 w-3.5" /> Atualizações do mundo gamer
+              <Radio className="h-3.5 w-3.5" /> {copy.eyebrow}
             </div>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-white">Radar Gamer</h1>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-white">{copy.title}</h1>
             <p className="mt-2 max-w-xl text-sm text-white/40">
-              Notícias reunidas em um só lugar.
+              {copy.subtitle}
             </p>
           </div>
           <button
@@ -127,12 +144,12 @@ const GamingRadarPage: React.FC = () => {
             onClick={() => void loadNews()}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.06] px-4 py-2.5 text-xs font-black text-white/65 hover:bg-white/12 hover:text-white disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Atualizar
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> {copy.refresh}
           </button>
         </header>
 
         <div className="mb-5 flex flex-wrap gap-2">
-          {["Todas", ...(sources || []).filter((source) => source.available).map((source) => source.name)].map((source) => (
+          {["__all__", ...(sources || []).filter((source) => source.available).map((source) => source.name)].map((source) => (
             <button
               key={source}
               type="button"
@@ -142,16 +159,16 @@ const GamingRadarPage: React.FC = () => {
                   : "border-white/10 bg-white/[0.04] text-white/40 hover:text-white"
                 }`}
             >
-              {source}
+              {source === "__all__" ? copy.all : source}
             </button>
           ))}
-          {stale && <span className="self-center text-[10px] font-bold text-amber-200/60">Exibindo o último cache disponível</span>}
+          {stale && <span className="self-center text-[10px] font-bold text-amber-200/60">{copy.stale}</span>}
         </div>
 
         {error ? (
           <div className="flex min-h-72 flex-col items-center justify-center rounded-[26px] border border-red-300/15 bg-red-300/[0.04] text-center">
             <AlertCircle className="mb-3 h-8 w-8 text-red-200/45" />
-            <p className="font-black text-white/65">Radar temporariamente indisponível</p>
+            <p className="font-black text-white/65">{copy.unavailable}</p>
             <p className="mt-1 text-xs text-white/35">{error}</p>
           </div>
         ) : loading && !items.length ? (
@@ -189,12 +206,12 @@ const GamingRadarPage: React.FC = () => {
                 <div className="p-5">
                   <div className="mb-2 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.18em] text-white/30">
                     <span>{item.source}</span>
-                    <span>{relativeTime(item.publishedAt)}</span>
+                    <span>{relativeTime(item.publishedAt, language)}</span>
                   </div>
                   <h2 className="line-clamp-2 text-base font-black leading-snug text-white/85 group-hover:text-white">{item.title}</h2>
                   {item.summary && <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/35">{item.summary}</p>}
                   <span className="mt-4 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-white/45 group-hover:text-white">
-                    Ler matéria <ExternalLink className="h-3 w-3" />
+                    {copy.read} <ExternalLink className="h-3 w-3" />
                   </span>
                 </div>
               </motion.button>
@@ -205,16 +222,16 @@ const GamingRadarPage: React.FC = () => {
         <section className="mt-6 rounded-[26px] border border-white/10 bg-black/55 p-5">
           <div className="mb-4 flex items-center gap-2">
             <Users className="h-4 w-4 text-white/35" />
-            <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Comunidades para discutir</h2>
+            <h2 className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">{copy.communities}</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <button type="button" onClick={() => void openExternal("https://forum.adrenaline.com.br/")} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left hover:bg-white/[0.08]">
               <p className="text-sm font-black text-white/75">Fórum Adrenaline</p>
-              <p className="mt-1 text-xs text-white/30">Hardware, lançamentos e discussões da comunidade.</p>
+              <p className="mt-1 text-xs text-white/30">{copy.adrenaline}</p>
             </button>
             <button type="button" onClick={() => void openExternal("https://steamcommunity.com/discussions/")} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left hover:bg-white/[0.08]">
               <p className="text-sm font-black text-white/75">Discussões Steam</p>
-              <p className="mt-1 text-xs text-white/30">Fóruns organizados por jogo e pela comunidade Steam.</p>
+              <p className="mt-1 text-xs text-white/30">{copy.steam}</p>
             </button>
           </div>
         </section>

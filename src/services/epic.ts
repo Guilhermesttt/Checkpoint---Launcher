@@ -1,4 +1,5 @@
 import { apiUrl } from "./api";
+import type { LauncherLanguage } from "../context/PreferencesContext";
 
 export interface EpicAppDetails {
   catalogId: string;
@@ -46,6 +47,7 @@ export const fetchEpicAppDetailsResult = async (
   catalogId: string,
   namespaceOverride?: string,
   productSlugOverride?: string,
+  language: LauncherLanguage = "pt-BR",
 ): Promise<EpicAppDetailsFetchResult> => {
   const parts = decodeURIComponent(catalogId).split(":");
   const namespace = namespaceOverride || (parts.length >= 2 ? parts[0] : "");
@@ -54,6 +56,7 @@ export const fetchEpicAppDetailsResult = async (
   if (namespace) params.set("namespace", namespace);
   const productSlug = String(productSlugOverride || "").trim();
   if (productSlug) params.set("productSlug", productSlug);
+  params.set("language", language);
 
   if (window.electronAPI?.fetchEpicStoreDetails && productSlug) {
     try {
@@ -61,6 +64,7 @@ export const fetchEpicAppDetailsResult = async (
         catalogId: itemId,
         namespace,
         productSlug,
+        language,
       });
       return { ok: true, data };
     } catch (error) {

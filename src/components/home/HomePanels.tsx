@@ -301,6 +301,14 @@ export const SettingsPageV2: React.FC<{
 }) => {
     const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
     const { openAtLogin, setOpenAtLogin, lowPerformanceMode, setLowPerformanceMode, closeOnLaunch, setCloseOnLaunch } = usePreferences();
+    const controllerCopy = {
+      "pt-BR": ["Controle", "Controle conectado", "Nenhum controle conectado", "Conecte via USB ou Bluetooth para navegar pelo launcher.", "Testar LED", "Autorizar"],
+      "en-US": ["Controller", "Controller connected", "No controller connected", "Connect through USB or Bluetooth to navigate the launcher.", "Test LED", "Authorize"],
+      "es-ES": ["Mando", "Mando conectado", "Ningún mando conectado", "Conecta por USB o Bluetooth para navegar por el launcher.", "Probar LED", "Autorizar"],
+      "fr-FR": ["Manette", "Manette connectée", "Aucune manette connectée", "Connectez-la en USB ou Bluetooth pour naviguer.", "Tester la LED", "Autoriser"],
+      "de-DE": ["Controller", "Controller verbunden", "Kein Controller verbunden", "Über USB oder Bluetooth verbinden, um den Launcher zu steuern.", "LED testen", "Autorisieren"],
+      "it-IT": ["Controller", "Controller collegato", "Nessun controller collegato", "Collega tramite USB o Bluetooth per navigare.", "Prova LED", "Autorizza"],
+    }[language];
     const led = useControllerLedStatus();
     const [achievementDiagnostics, setAchievementDiagnostics] = useState<AchievementDiagnostics | null>(null);
     const refreshAchievementDiagnostics = useCallback(async () => {
@@ -431,7 +439,7 @@ export const SettingsPageV2: React.FC<{
         <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
           <SettingsHeader
             icon={<Gamepad2 className="h-5 w-5 text-white/70" />}
-            title="Controle"
+            title={controllerCopy[0]}
             description="Status da navegacao e da iluminacao do controle conectado."
           />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
@@ -439,10 +447,10 @@ export const SettingsPageV2: React.FC<{
               <div className={`h-3 w-3 shrink-0 rounded-full ${isGamepadConnected ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.7)]" : "bg-white/20"}`} />
               <div className="min-w-0">
                 <p className="text-sm font-black text-white">
-                  {isGamepadConnected ? "Controle conectado" : "Nenhum controle conectado"}
+                  {isGamepadConnected ? controllerCopy[1] : controllerCopy[2]}
                 </p>
                 <p className="mt-1 truncate text-xs text-white/40">
-                  {connectedGamepadId || "Conecte via USB ou Bluetooth para navegar pelo launcher."}
+                  {connectedGamepadId || controllerCopy[3]}
                 </p>
               </div>
               {isGamepadConnected && (
@@ -465,7 +473,7 @@ export const SettingsPageV2: React.FC<{
                   disabled={led.status === "connecting"}
                   className="shrink-0 rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-white/85"
                 >
-                  {led.status === "connected" ? "Testar LED" : led.status === "connecting" ? "Enviando" : "Autorizar"}
+                  {led.status === "connected" ? controllerCopy[4] : led.status === "connecting" ? "..." : controllerCopy[5]}
                 </button>
               )}
             </div>
@@ -649,6 +657,15 @@ export const SettingsPageV2: React.FC<{
   };
 
 const AppUpdateSection: React.FC = () => {
+  const { language } = usePreferences();
+  const updateCopy = {
+    "pt-BR": ["Atualizações do Sistema", "Versão instalada atualmente", "Mantenha seu Checkpoint Launcher na versão mais recente.", "Buscando atualizações...", "Nova versão disponível para baixar.", "Você já está usando a versão mais recente.", "Baixando atualização", "Atualização pronta para instalar.", "Ambiente de desenvolvimento local.", "Erro", "Buscar Atualizações", "Baixar e Atualizar", "Reiniciar e Atualizar"],
+    "en-US": ["System Updates", "Currently installed version", "Keep Checkpoint Launcher up to date.", "Checking for updates...", "A new version is available to download.", "You already have the latest version.", "Downloading update", "Update ready to install.", "Local development environment.", "Error", "Check for Updates", "Download and Update", "Restart and Update"],
+    "es-ES": ["Actualizaciones del sistema", "Versión instalada", "Mantén Checkpoint Launcher actualizado.", "Buscando actualizaciones...", "Hay una nueva versión disponible.", "Ya tienes la última versión.", "Descargando actualización", "Actualización lista para instalar.", "Entorno de desarrollo local.", "Error", "Buscar actualizaciones", "Descargar y actualizar", "Reiniciar y actualizar"],
+    "fr-FR": ["Mises à jour système", "Version installée", "Gardez Checkpoint Launcher à jour.", "Recherche de mises à jour...", "Une nouvelle version est disponible.", "Vous utilisez déjà la dernière version.", "Téléchargement de la mise à jour", "Mise à jour prête à installer.", "Environnement de développement local.", "Erreur", "Rechercher des mises à jour", "Télécharger et mettre à jour", "Redémarrer et mettre à jour"],
+    "de-DE": ["Systemupdates", "Installierte Version", "Halte Checkpoint Launcher auf dem neuesten Stand.", "Suche nach Updates...", "Eine neue Version ist verfügbar.", "Du verwendest bereits die neueste Version.", "Update wird heruntergeladen", "Update ist installationsbereit.", "Lokale Entwicklungsumgebung.", "Fehler", "Nach Updates suchen", "Herunterladen und aktualisieren", "Neu starten und aktualisieren"],
+    "it-IT": ["Aggiornamenti di sistema", "Versione installata", "Mantieni Checkpoint Launcher aggiornato.", "Ricerca aggiornamenti...", "È disponibile una nuova versione.", "Hai già la versione più recente.", "Download aggiornamento", "Aggiornamento pronto per l’installazione.", "Ambiente di sviluppo locale.", "Errore", "Cerca aggiornamenti", "Scarica e aggiorna", "Riavvia e aggiorna"],
+  }[language];
   const [currentVersion, setCurrentVersion] = useState<string>("0.0.0");
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error" | "dev">("idle");
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
@@ -680,6 +697,9 @@ const AppUpdateSection: React.FC = () => {
         } else if (msg === "update-available") {
           setUpdateStatus("available");
           setNewVersionInfo(data);
+        } else if (msg === "download-started") {
+          setUpdateStatus("downloading");
+          setDownloadProgress(0);
         } else if (msg === "update-not-available") {
           setUpdateStatus("not-available");
         } else if (msg === "update-downloaded") {
@@ -727,49 +747,64 @@ const AppUpdateSection: React.FC = () => {
     }
   };
 
+  const handleDownloadUpdate = async () => {
+    if (!window.electronAPI?.downloadUpdate) return;
+    setUpdateStatus("downloading");
+    setDownloadProgress(0);
+    setErrorMessage("");
+    try {
+      await window.electronAPI.downloadUpdate();
+    } catch (err) {
+      setUpdateStatus("error");
+      setErrorMessage(
+        err instanceof Error ? err.message : "Não foi possível baixar a atualização.",
+      );
+    }
+  };
+
   return (
     <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
       <SettingsHeader
         icon={<Sparkles className="h-5 w-5 text-white/70" />}
-        title="Atualizações do Sistema"
-        description={`Versão instalada atualmente: v${currentVersion}`}
+        title={updateCopy[0]}
+        description={`${updateCopy[1]}: v${currentVersion}`}
       />
       <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.03] p-5">
         <div className="flex items-center justify-between">
           <div>
             {updateStatus === "idle" && (
-              <p className="text-xs text-white/50">Mantenha seu Checkpoint Launcher na versão mais recente para novos recursos.</p>
+              <p className="text-xs text-white/50">{updateCopy[2]}</p>
             )}
             {updateStatus === "checking" && (
               <p className="text-xs text-amber-300 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-amber-300 animate-pulse" />
-                Buscando atualizações no GitHub...
+                {updateCopy[3]}
               </p>
             )}
             {updateStatus === "available" && (
               <p className="text-xs text-emerald-400">
-                Nova versão {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""} encontrada. O download iniciará automaticamente.
+                {updateCopy[4]} {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""}
               </p>
             )}
             {updateStatus === "not-available" && (
-              <p className="text-xs text-white/70">Você já está usando a versão mais recente do launcher.</p>
+              <p className="text-xs text-white/70">{updateCopy[5]}</p>
             )}
             {updateStatus === "downloading" && (
               <div className="space-y-2">
-                <p className="text-xs text-sky-400">Baixando atualização... {downloadProgress}%</p>
+                <p className="text-xs text-sky-400">{updateCopy[6]}... {downloadProgress}%</p>
                 <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full bg-sky-400 transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
                 </div>
               </div>
             )}
             {updateStatus === "downloaded" && (
-              <p className="text-xs text-emerald-400">Atualização baixada com sucesso! Pronto para instalar.</p>
+              <p className="text-xs text-emerald-400">{updateCopy[7]}</p>
             )}
             {updateStatus === "dev" && (
-              <p className="text-xs text-amber-300/80">Você está rodando em ambiente de desenvolvimento local (código-fonte).</p>
+              <p className="text-xs text-amber-300/80">{updateCopy[8]}</p>
             )}
             {updateStatus === "error" && (
-              <p className="text-xs text-red-400">Erro: {errorMessage}</p>
+              <p className="text-xs text-red-400">{updateCopy[9]}: {errorMessage}</p>
             )}
           </div>
 
@@ -780,7 +815,17 @@ const AppUpdateSection: React.FC = () => {
                 onClick={handleCheckForUpdates}
                 className="rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase text-black hover:bg-white/90 active:scale-95 transition-all cursor-pointer"
               >
-                Buscar Atualizações
+                {updateCopy[10]}
+              </button>
+            ) : null}
+
+            {updateStatus === "available" ? (
+              <button
+                type="button"
+                onClick={handleDownloadUpdate}
+                className="rounded-xl bg-sky-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-sky-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(14,165,233,0.3)] cursor-pointer"
+              >
+                {updateCopy[11]}
               </button>
             ) : null}
 
@@ -790,7 +835,7 @@ const AppUpdateSection: React.FC = () => {
                 onClick={handleInstall}
                 className="rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase text-white hover:bg-emerald-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-pointer"
               >
-                Reiniciar e Atualizar
+                {updateCopy[12]}
               </button>
             ) : null}
           </div>
@@ -800,8 +845,18 @@ const AppUpdateSection: React.FC = () => {
   );
 };
 
+const friendsCopy = {
+  "pt-BR": { playing: "Jogando", online: "Online", offline: "Offline", connected: "Perfil conectado ao Discord", connectHint: "Conecte o Discord para usar avatar e nome", connect: "Conectar Discord", total: "Total", requests: "Solicitações recebidas", requestHint: "Aceite ou rejeite quem quer adicionar você no Checkpoint.", user: "Usuário", wantsFriend: "Quer ser seu amigo", reject: "Rejeitar", accept: "Aceitar", search: "Pesquisar amigos...", connectEmpty: "Conecte o Discord para usar nome e avatar no perfil social.", noFriends: "Nenhum amigo do Checkpoint ainda.", noSearch: "Nenhum amigo corresponde à busca.", discordConnected: "Discord conectado", oneGame: "um jogo", now: "agora", openChat: "Abrir chat", chat: "Chat", openingProfile: "Abrindo perfil", viewProfile: "Ver perfil", profile: "Perfil", remove: "Remover amigo" },
+  "en-US": { playing: "Playing", online: "Online", offline: "Offline", connected: "Profile connected to Discord", connectHint: "Connect Discord to use your avatar and name", connect: "Connect Discord", total: "Total", requests: "Received requests", requestHint: "Accept or reject people who want to add you on Checkpoint.", user: "User", wantsFriend: "Wants to be your friend", reject: "Reject", accept: "Accept", search: "Search friends...", connectEmpty: "Connect Discord to use your name and avatar on your social profile.", noFriends: "No Checkpoint friends yet.", noSearch: "No friends match your search.", discordConnected: "Discord connected", oneGame: "a game", now: "now", openChat: "Open chat", chat: "Chat", openingProfile: "Opening profile", viewProfile: "View profile", profile: "Profile", remove: "Remove friend" },
+  "es-ES": { playing: "Jugando", online: "En línea", offline: "Desconectado", connected: "Perfil conectado a Discord", connectHint: "Conecta Discord para usar tu avatar y nombre", connect: "Conectar Discord", total: "Total", requests: "Solicitudes recibidas", requestHint: "Acepta o rechaza a quienes quieran añadirte en Checkpoint.", user: "Usuario", wantsFriend: "Quiere ser tu amigo", reject: "Rechazar", accept: "Aceptar", search: "Buscar amigos...", connectEmpty: "Conecta Discord para usar tu nombre y avatar en el perfil social.", noFriends: "Aún no tienes amigos de Checkpoint.", noSearch: "Ningún amigo coincide con la búsqueda.", discordConnected: "Discord conectado", oneGame: "un juego", now: "ahora", openChat: "Abrir chat", chat: "Chat", openingProfile: "Abriendo perfil", viewProfile: "Ver perfil", profile: "Perfil", remove: "Eliminar amigo" },
+  "fr-FR": { playing: "Joue à", online: "En ligne", offline: "Hors ligne", connected: "Profil connecté à Discord", connectHint: "Connectez Discord pour utiliser votre avatar et votre nom", connect: "Connecter Discord", total: "Total", requests: "Demandes reçues", requestHint: "Acceptez ou refusez les personnes qui souhaitent vous ajouter sur Checkpoint.", user: "Utilisateur", wantsFriend: "Veut devenir votre ami", reject: "Refuser", accept: "Accepter", search: "Rechercher des amis...", connectEmpty: "Connectez Discord pour utiliser votre nom et avatar sur le profil social.", noFriends: "Aucun ami Checkpoint.", noSearch: "Aucun ami ne correspond à la recherche.", discordConnected: "Discord connecté", oneGame: "un jeu", now: "maintenant", openChat: "Ouvrir le chat", chat: "Chat", openingProfile: "Ouverture du profil", viewProfile: "Voir le profil", profile: "Profil", remove: "Supprimer l’ami" },
+  "de-DE": { playing: "Spielt", online: "Online", offline: "Offline", connected: "Profil mit Discord verbunden", connectHint: "Verbinde Discord, um Avatar und Namen zu verwenden", connect: "Discord verbinden", total: "Gesamt", requests: "Erhaltene Anfragen", requestHint: "Akzeptiere oder lehne Personen ab, die dich auf Checkpoint hinzufügen möchten.", user: "Benutzer", wantsFriend: "Möchte dein Freund sein", reject: "Ablehnen", accept: "Annehmen", search: "Freunde suchen...", connectEmpty: "Verbinde Discord, um Namen und Avatar im sozialen Profil zu verwenden.", noFriends: "Noch keine Checkpoint-Freunde.", noSearch: "Keine Freunde entsprechen der Suche.", discordConnected: "Discord verbunden", oneGame: "ein Spiel", now: "jetzt", openChat: "Chat öffnen", chat: "Chat", openingProfile: "Profil wird geöffnet", viewProfile: "Profil anzeigen", profile: "Profil", remove: "Freund entfernen" },
+  "it-IT": { playing: "Gioca a", online: "Online", offline: "Offline", connected: "Profilo collegato a Discord", connectHint: "Collega Discord per usare avatar e nome", connect: "Collega Discord", total: "Totale", requests: "Richieste ricevute", requestHint: "Accetta o rifiuta chi vuole aggiungerti su Checkpoint.", user: "Utente", wantsFriend: "Vuole essere tuo amico", reject: "Rifiuta", accept: "Accetta", search: "Cerca amici...", connectEmpty: "Collega Discord per usare nome e avatar nel profilo social.", noFriends: "Ancora nessun amico Checkpoint.", noSearch: "Nessun amico corrisponde alla ricerca.", discordConnected: "Discord collegato", oneGame: "un gioco", now: "ora", openChat: "Apri chat", chat: "Chat", openingProfile: "Apertura profilo", viewProfile: "Vedi profilo", profile: "Profilo", remove: "Rimuovi amico" },
+} as const;
+
 export const FriendsPage: React.FC<{
   t: TranslationFn;
+  language: LauncherLanguage;
   discordConnected: boolean;
   userDisplay: string;
   discordUsername?: string;
@@ -821,6 +876,7 @@ export const FriendsPage: React.FC<{
   onOpenChat: (friend: HomeSocialFriend) => void;
 }> = ({
   t,
+  language,
   discordConnected,
   userDisplay,
   discordUsername,
@@ -839,6 +895,7 @@ export const FriendsPage: React.FC<{
   onAddFriendClick,
   onOpenChat,
 }) => {
+    const copy = friendsCopy[language];
     const [friendSearch, setFriendSearch] = useState("");
     const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
     const onlineCount = presenceFriends.filter((friend) => friend.status !== "offline").length;
@@ -880,13 +937,13 @@ export const FriendsPage: React.FC<{
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">
-                    {currentPresenceGame ? `Jogando ${currentPresenceGame}` : "Online"}
+                    {currentPresenceGame ? `${copy.playing} ${currentPresenceGame}` : copy.online}
                   </p>
                 </div>
                 <p className="mt-1 text-[10px] text-white/40">
                   {discordConnected
-                    ? "Perfil conectado ao Discord"
-                    : "Conecte o Discord para usar avatar e nome"}
+                    ? copy.connected
+                    : copy.connectHint}
                 </p>
               </div>
             </div>
@@ -904,7 +961,7 @@ export const FriendsPage: React.FC<{
                   onClick={onConnectDiscord}
                   className="h-8 rounded-lg bg-indigo-500/20 px-4 text-[9px] font-bold uppercase tracking-wider text-indigo-400 transition-all hover:bg-indigo-500/30"
                 >
-                  Conectar Discord
+                  {copy.connect}
                 </button>
               )}
             </div>
@@ -912,9 +969,9 @@ export const FriendsPage: React.FC<{
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {[
-              { label: "Online", value: onlineCount },
-              { label: "Jogando", value: playingCount },
-              { label: "Total", value: friends.length },
+              { label: copy.online, value: onlineCount },
+              { label: copy.playing, value: playingCount },
+              { label: copy.total, value: friends.length },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
@@ -930,9 +987,9 @@ export const FriendsPage: React.FC<{
           <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-black text-white">Solicitacoes recebidas</p>
+                <p className="text-sm font-black text-white">{copy.requests}</p>
                 <p className="mt-0.5 text-[10px] text-white/40">
-                  Aceite ou rejeite quem quer adicionar voce no Checkpoint.
+                  {copy.requestHint}
                 </p>
               </div>
               <span className="flex h-8 min-w-8 items-center justify-center rounded-xl bg-white/10 px-3 text-xs font-black text-white">
@@ -955,10 +1012,10 @@ export const FriendsPage: React.FC<{
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-white">
-                        {request.displayName || "Usuario"}
+                        {request.displayName || copy.user}
                       </p>
                       <p className="text-[10px] uppercase tracking-widest text-white/35">
-                        Quer ser seu amigo
+                        {copy.wantsFriend}
                       </p>
                     </div>
                   </div>
@@ -968,14 +1025,14 @@ export const FriendsPage: React.FC<{
                       onClick={() => onRejectRequest(request.uid)}
                       className="h-9 rounded-lg px-3 text-[10px] font-black uppercase text-red-300/80 hover:bg-red-500/10"
                     >
-                      Rejeitar
+                      {copy.reject}
                     </button>
                     <button
                       type="button"
                       onClick={() => onAcceptRequest(request.uid)}
                       className="h-9 rounded-lg bg-white px-3 text-[10px] font-black uppercase text-black hover:bg-white/90"
                     >
-                      Aceitar
+                      {copy.accept}
                     </button>
                   </div>
                 </div>
@@ -991,7 +1048,7 @@ export const FriendsPage: React.FC<{
               <input
                 value={friendSearch}
                 onChange={(event) => setFriendSearch(event.target.value)}
-                placeholder="Pesquisar amigos..."
+                placeholder={copy.search}
                 className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
               />
             </div>
@@ -1004,10 +1061,10 @@ export const FriendsPage: React.FC<{
               <Users className="mx-auto mb-4 h-8 w-8 text-white/35" />
               <p className="text-sm font-bold text-white/70">
                 {!discordConnected
-                  ? "Conecte o Discord para usar nome e avatar no perfil social."
+                  ? copy.connectEmpty
                   : friends.length === 0
-                    ? "Nenhum amigo do Checkpoint ainda."
-                    : "Nenhum amigo corresponde a busca."}
+                    ? copy.noFriends
+                    : copy.noSearch}
               </p>
               {discordConnected && friends.length === 0 && (
                 <p className="mt-2 text-xs text-white/35">{t("addFriendEmptyHint")}</p>
@@ -1037,18 +1094,18 @@ export const FriendsPage: React.FC<{
                     <p className="truncate text-sm font-bold text-white">{friend.name}</p>
                     <p className="truncate text-[10px] uppercase tracking-widest text-white/35">
                       {friend.source === "discord_friend"
-                        ? "Discord conectado"
+                        ? copy.discordConnected
                         : friend.source === "checkpoint"
                           ? friend.status === "playing"
-                            ? `Jogando ${friend.playing || "um jogo"}`
+                            ? `${copy.playing} ${friend.playing || copy.oneGame}`
                             : friend.status === "online"
-                              ? "Online"
-                              : "Offline"
+                              ? copy.online
+                              : copy.offline
                           : friend.status === "playing"
-                            ? `Jogando ${friend.playing || "agora"}`
+                            ? `${copy.playing} ${friend.playing || copy.now}`
                             : friend.status === "online"
-                              ? "Online"
-                              : "Offline"}
+                              ? copy.online
+                              : copy.offline}
                     </p>
                   </div>
                 </div>
@@ -1057,12 +1114,12 @@ export const FriendsPage: React.FC<{
                     <button
                       type="button"
                       onClick={() => onOpenChat(friend)}
-                      aria-label="Abrir chat"
-                      title="Abrir chat"
+                      aria-label={copy.openChat}
+                      title={copy.openChat}
                       className="relative flex h-10 items-center gap-2 rounded-xl bg-white px-3.5 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-white/85"
                     >
                       <MessageSquare className="h-4 w-4" />
-                      Chat
+                      {copy.chat}
                       {Number(unreadMessagesByFriend[friend.id.split(":")[1]] || 0) > 0 && (
                         <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black leading-none text-white shadow-[0_0_12px_rgba(239,68,68,0.35)]">
                           {Math.min(unreadMessagesByFriend[friend.id.split(":")[1]], 99)}
@@ -1076,25 +1133,25 @@ export const FriendsPage: React.FC<{
                     disabled={friendProfileLoadingId === friend.id}
                     aria-label={
                       friendProfileLoadingId === friend.id
-                        ? "Abrindo perfil"
-                        : "Ver perfil"
+                        ? copy.openingProfile
+                        : copy.viewProfile
                     }
                     title={
                       friendProfileLoadingId === friend.id
-                        ? "Abrindo perfil"
-                        : "Ver perfil"
+                        ? copy.openingProfile
+                        : copy.viewProfile
                     }
                     className="flex h-10 items-center gap-2 rounded-xl border border-white/10 px-3.5 text-[10px] font-black uppercase tracking-wider text-white/65 transition hover:bg-white/10 hover:text-white disabled:opacity-40"
                   >
                     <User className="h-4 w-4" />
-                    Perfil
+                    {copy.profile}
                   </button>
                   {!friend.source?.startsWith("discord") && (
                     <button
                       type="button"
                       onClick={() => onRemoveFriend(friend)}
-                      aria-label="Remover amigo"
-                      title="Remover amigo"
+                      aria-label={copy.remove}
+                      title={copy.remove}
                       className="flex h-10 shrink-0 items-center justify-center rounded-xl border border-red-400/10 px-3 text-red-300/70 hover:bg-red-500/10"
                     >
                       <Trash2 className="h-4 w-4" />

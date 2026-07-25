@@ -18,6 +18,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam, faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
+import type { LauncherLanguage } from "../context/PreferencesContext";
 
 export const SteamBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
   className,
@@ -119,6 +120,7 @@ interface SidebarProps {
   settingsLabel: string;
   playSound: (t: SoundEffectType) => void;
   notificationCount?: number;
+  language?: LauncherLanguage;
 }
 
 interface SidebarButtonProps {
@@ -292,8 +294,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   settingsLabel,
   playSound,
   notificationCount = 0,
+  language = "pt-BR",
 }) => {
   const prefersReducedMotion = useReducedMotion();
+  const sidebarLabels: Record<string, string> = {
+    ALL: { "pt-BR": "Todos", "en-US": "All", "es-ES": "Todos", "fr-FR": "Tous", "de-DE": "Alle", "it-IT": "Tutti" }[language],
+    FAVORITES: { "pt-BR": "Favoritos", "en-US": "Favorites", "es-ES": "Favoritos", "fr-FR": "Favoris", "de-DE": "Favoriten", "it-IT": "Preferiti" }[language],
+    FRIENDS: { "pt-BR": "Amigos", "en-US": "Friends", "es-ES": "Amigos", "fr-FR": "Amis", "de-DE": "Freunde", "it-IT": "Amici" }[language],
+    FEED: { "pt-BR": "Radar", "en-US": "Radar", "es-ES": "Radar", "fr-FR": "Radar", "de-DE": "Radar", "it-IT": "Radar" }[language],
+    LOCAL: { "pt-BR": "Local", "en-US": "Local", "es-ES": "Local", "fr-FR": "Local", "de-DE": "Lokal", "it-IT": "Locale" }[language],
+    PROFILE: { "pt-BR": "Perfil", "en-US": "Profile", "es-ES": "Perfil", "fr-FR": "Profil", "de-DE": "Profil", "it-IT": "Profilo" }[language],
+  };
 
   const handleSelect = (id: string) => {
     onCategory(id);
@@ -358,7 +369,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ? `${category.id}-${notificationCount}`
                         : category.id}
                       id={category.id}
-                      label={category.label}
+                      label={sidebarLabels[category.id] || category.label}
                       Icon={category.Icon}
                       active={activeCategory === category.id}
                       onClick={() => handleSelect(category.id)}

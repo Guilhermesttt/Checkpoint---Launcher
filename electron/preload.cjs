@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
   setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
+  copyToClipboard: (value) => ipcRenderer.invoke("system:copy-to-clipboard", value),
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
   listLocalGames: (uid) => ipcRenderer.invoke("library:list", uid),
   createLocalGame: (uid, game) => ipcRenderer.invoke("library:create", uid, game),
@@ -65,6 +66,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getVersion: () => ipcRenderer.invoke("app:get-version"),
   getUpdateState: () => ipcRenderer.invoke("update:get-state"),
   checkForUpdates: () => ipcRenderer.invoke("update:check-for-updates"),
+  downloadUpdate: () => ipcRenderer.invoke("update:download"),
   quitAndInstallUpdate: () => ipcRenderer.invoke("update:quit-and-install"),
   onUpdateMessage: (callback) => {
     const handler = (_event, message, data) => callback(message, data);

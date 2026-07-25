@@ -9,6 +9,7 @@ import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
   fetchSteamAchievementDetails,
   fetchSteamAchievementSchema,
+  fetchSteamAppDetailsResult,
   searchSteamGames,
   type SteamAchievement,
 } from "../services/steam";
@@ -83,6 +84,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   }>>([]);
   const [isSavingLaunchProfile, setIsSavingLaunchProfile] = React.useState(false);
   const hydratedEpicGamesRef = React.useRef(new Set<string>());
+  const hydratedSteamGamesRef = React.useRef(new Set<string>());
 
   React.useEffect(() => {
     if (
@@ -91,7 +93,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       || !game?.id
       || game.launcherType !== "epic"
       || !game.epicStoreUrl
-      || hydratedEpicGamesRef.current.has(game.id)
+      || hydratedEpicGamesRef.current.has(`${game.id}:${language}`)
     ) return;
     let productSlug = "";
     try {
@@ -101,7 +103,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       return;
     }
     if (!productSlug) return;
-    hydratedEpicGamesRef.current.add(game.id);
+    hydratedEpicGamesRef.current.add(`${game.id}:${language}`);
     const launchParts = String(game.epicLaunchId || "").split(":");
     const namespace = launchParts.length >= 2 ? launchParts[0] : "";
     let cancelled = false;
@@ -109,6 +111,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       String(game.epicCatalogId || ""),
       namespace,
       productSlug,
+      language,
     ).then(async (result) => {
       if (cancelled || !result.ok) return;
       const details = result.data;
@@ -142,10 +145,50 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [game, isOpen, onGameHydrated, onLibraryChanged, user?.uid]);
+  }, [game, isOpen, language, onGameHydrated, onLibraryChanged, user?.uid]);
+
+  React.useEffect(() => {
+    const appId = String(game?.steamAppId || "").trim();
+    const hydrationKey = `${game?.id || ""}:${language}`;
+    if (
+      !isOpen
+      || !user?.uid
+      || !game?.id
+      || !/^\d+$/.test(appId)
+      || hydratedSteamGamesRef.current.has(hydrationKey)
+    ) return;
+
+    hydratedSteamGamesRef.current.add(hydrationKey);
+    let cancelled = false;
+    void fetchSteamAppDetailsResult(appId, language).then(async (result) => {
+      if (cancelled || !result.ok) return;
+      const details = result.data;
+      const patch: Partial<Game> = {
+        description: details.description || game.description,
+        aboutTheGame: details.aboutTheGame || details.description || game.aboutTheGame,
+        releaseDate: details.releaseDate || game.releaseDate,
+        developer: details.developer || game.developer,
+        publisher: details.publisher || game.publisher,
+        tags: details.tags || game.tags || [],
+      };
+      const updated = { ...game, ...patch };
+      await updateLibraryGame(user.uid, game.id, patch);
+      if (cancelled) return;
+      onGameHydrated?.(updated);
+      await onLibraryChanged?.();
+    }).catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [game, isOpen, language, onGameHydrated, onLibraryChanged, user?.uid]);
 
 
-  const copy = {
+  const detailLanguage =
+    language === "pt-BR" || language === "en-US" || language === "es-ES"
+      ? language
+      : "en-US";
+  const baseCopy = {
     "pt-BR": {
       tabPlay: "JOGAR",
       tabAchievements: "CONQUISTAS",
@@ -410,10 +453,242 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       verifyNotFound: "Ejecutable no encontrado en la ruta especificada.",
       shortcutComingSoon: "Creación de accesos directos disponible pronto.",
     },
-  }[language];
+  }[detailLanguage];
 
-  const locale =
-    language === "en-US" ? "en-US" : language === "es-ES" ? "es-ES" : "pt-BR";
+  const extraCopy = {
+    "fr-FR": {
+      tabPlay: "JOUER",
+      tabAchievements: "SUCCÈS",
+      tabAbout: "À PROPOS",
+      tabManage: "GÉRER",
+      localLabel: "PC local",
+      library: "Bibliothèque",
+      timePlayed: "TEMPS DE JEU",
+      lastSession: "DERNIÈRE SESSION",
+      neverStarted: "Pas encore lancé",
+      achievements: "SUCCÈS",
+      epicShortcut: "Raccourci direct",
+      epicStore: "Via la boutique",
+      source: "Source",
+      sourceSteamSync: "Synchronisation Steam",
+      sourceEpicCatalog: "Catalogue Epic",
+      sourceManual: "Manuel",
+      photoWall: "Mur de captures",
+      viewGallery: "Voir la galerie",
+      noScreenshot: "Aucune capture",
+      about: "À propos",
+      seeMore: "Voir plus →",
+      popularTags: "Tags populaires",
+      developer: "Développeur",
+      publisher: "Éditeur",
+      releaseDate: "Date de sortie",
+      category: "Catégorie",
+      notInformed: "Non renseigné",
+      management: "Gestion",
+      verify: "Vérifier",
+      edit: "Modifier",
+      createShortcut: "Créer un raccourci",
+      remove: "Supprimer",
+      platform: "Plateforme",
+      noDescription: "Aucune description disponible pour ce jeu.",
+      gallery: "GALERIE",
+      previous: "← Précédent",
+      next: "Suivant →",
+      removeGame: "Supprimer le jeu",
+      cannotUndo: "Cette action est irréversible",
+      cancel: "Annuler",
+      removing: "Suppression...",
+      close: "Fermer",
+      loginToRemove: "Vous devez être connecté pour supprimer un jeu.",
+      removedSuccess: "Jeu supprimé.",
+      removeError: "Erreur lors de la suppression du jeu.",
+      launchGenericError: "Impossible de lancer le jeu.",
+      achievementsLoading: "Chargement des succès Steam...",
+      achievementsLoadingLocal: "Chargement des succès locaux...",
+      achievementsEmpty: "Aucun succès trouvé pour ce jeu.",
+      achievementsSource: "Vos succès",
+      achievementsLocalSource: "Succès locaux",
+      achievementsLocked: "Verrouillé",
+      achievementsUnlocked: "Déverrouillé",
+      achievementsUnlockedAt: "Déverrouillé le",
+      verifySuccess: "Exécutable trouvé.",
+      verifyNotFound: "Exécutable introuvable au chemin indiqué.",
+    },
+    "de-DE": {
+      tabPlay: "SPIELEN",
+      tabAchievements: "ERFOLGE",
+      tabAbout: "ÜBER DAS SPIEL",
+      tabManage: "VERWALTEN",
+      localLabel: "Lokaler PC",
+      library: "Bibliothek",
+      timePlayed: "SPIELZEIT",
+      lastSession: "LETZTE SITZUNG",
+      neverStarted: "Noch nicht gestartet",
+      achievements: "ERFOLGE",
+      epicShortcut: "Direkte Verknüpfung",
+      epicStore: "Über den Store",
+      source: "Quelle",
+      sourceSteamSync: "Steam-Synchronisierung",
+      sourceEpicCatalog: "Epic-Katalog",
+      sourceManual: "Manuell",
+      photoWall: "Screenshot-Wand",
+      viewGallery: "Galerie ansehen",
+      noScreenshot: "Keine Screenshots",
+      about: "Über das Spiel",
+      seeMore: "Mehr anzeigen →",
+      popularTags: "Beliebte Tags",
+      developer: "Entwickler",
+      publisher: "Publisher",
+      releaseDate: "Veröffentlichung",
+      category: "Kategorie",
+      notInformed: "Nicht angegeben",
+      management: "Verwaltung",
+      verify: "Überprüfen",
+      edit: "Bearbeiten",
+      createShortcut: "Verknüpfung erstellen",
+      remove: "Entfernen",
+      platform: "Plattform",
+      noDescription: "Für dieses Spiel ist keine Beschreibung verfügbar.",
+      gallery: "GALERIE",
+      previous: "← Zurück",
+      next: "Weiter →",
+      removeGame: "Spiel entfernen",
+      cannotUndo: "Diese Aktion kann nicht rückgängig gemacht werden",
+      cancel: "Abbrechen",
+      removing: "Wird entfernt...",
+      close: "Schließen",
+      loginToRemove: "Du musst angemeldet sein, um ein Spiel zu entfernen.",
+      removedSuccess: "Spiel entfernt.",
+      removeError: "Fehler beim Entfernen des Spiels.",
+      launchGenericError: "Das Spiel konnte nicht gestartet werden.",
+      achievementsLoading: "Steam-Erfolge werden geladen...",
+      achievementsLoadingLocal: "Lokale Erfolge werden geladen...",
+      achievementsEmpty: "Für dieses Spiel wurden keine Erfolge gefunden.",
+      achievementsSource: "Deine Erfolge",
+      achievementsLocalSource: "Lokale Erfolge",
+      achievementsLocked: "Gesperrt",
+      achievementsUnlocked: "Freigeschaltet",
+      achievementsUnlockedAt: "Freigeschaltet am",
+      verifySuccess: "Ausführbare Datei gefunden.",
+      verifyNotFound: "Ausführbare Datei wurde am angegebenen Pfad nicht gefunden.",
+    },
+    "it-IT": {
+      tabPlay: "GIOCA",
+      tabAchievements: "OBIETTIVI",
+      tabAbout: "INFORMAZIONI",
+      tabManage: "GESTISCI",
+      localLabel: "PC locale",
+      library: "Libreria",
+      timePlayed: "TEMPO DI GIOCO",
+      lastSession: "ULTIMA SESSIONE",
+      neverStarted: "Non ancora avviato",
+      achievements: "OBIETTIVI",
+      epicShortcut: "Collegamento diretto",
+      epicStore: "Tramite negozio",
+      source: "Fonte",
+      sourceSteamSync: "Sincronizzazione Steam",
+      sourceEpicCatalog: "Catalogo Epic",
+      sourceManual: "Manuale",
+      photoWall: "Raccolta screenshot",
+      viewGallery: "Apri galleria",
+      noScreenshot: "Nessuno screenshot",
+      about: "Informazioni",
+      seeMore: "Mostra altro →",
+      popularTags: "Tag popolari",
+      developer: "Sviluppatore",
+      publisher: "Editore",
+      releaseDate: "Data di uscita",
+      category: "Categoria",
+      notInformed: "Non specificato",
+      management: "Gestione",
+      verify: "Verifica",
+      edit: "Modifica",
+      createShortcut: "Crea collegamento",
+      remove: "Rimuovi",
+      platform: "Piattaforma",
+      noDescription: "Nessuna descrizione disponibile per questo gioco.",
+      gallery: "GALLERIA",
+      previous: "← Precedente",
+      next: "Successivo →",
+      removeGame: "Rimuovi gioco",
+      cannotUndo: "Questa azione non può essere annullata",
+      cancel: "Annulla",
+      removing: "Rimozione...",
+      close: "Chiudi",
+      loginToRemove: "Devi accedere per rimuovere un gioco.",
+      removedSuccess: "Gioco rimosso.",
+      removeError: "Errore durante la rimozione del gioco.",
+      launchGenericError: "Impossibile avviare il gioco.",
+      achievementsLoading: "Caricamento obiettivi Steam...",
+      achievementsLoadingLocal: "Caricamento obiettivi locali...",
+      achievementsEmpty: "Nessun obiettivo trovato per questo gioco.",
+      achievementsSource: "I tuoi obiettivi",
+      achievementsLocalSource: "Obiettivi locali",
+      achievementsLocked: "Bloccato",
+      achievementsUnlocked: "Sbloccato",
+      achievementsUnlockedAt: "Sbloccato il",
+      verifySuccess: "Eseguibile trovato.",
+      verifyNotFound: "Eseguibile non trovato nel percorso indicato.",
+    },
+  }[language as "fr-FR" | "de-DE" | "it-IT"] || {};
+
+  const copy = { ...baseCopy, ...extraCopy };
+
+  const locale = language;
+  const categoryLabels: Record<string, Record<string, string>> = {
+    ACTION: {
+      "pt-BR": "Ação",
+      "en-US": "Action",
+      "es-ES": "Acción",
+      "fr-FR": "Action",
+      "de-DE": "Action",
+      "it-IT": "Azione",
+    },
+    ADVENTURE: {
+      "pt-BR": "Aventura",
+      "en-US": "Adventure",
+      "es-ES": "Aventura",
+      "fr-FR": "Aventure",
+      "de-DE": "Abenteuer",
+      "it-IT": "Avventura",
+    },
+    RPG: {
+      "pt-BR": "RPG",
+      "en-US": "RPG",
+      "es-ES": "RPG",
+      "fr-FR": "RPG",
+      "de-DE": "Rollenspiel",
+      "it-IT": "GDR",
+    },
+    SPORTS: {
+      "pt-BR": "Esportes",
+      "en-US": "Sports",
+      "es-ES": "Deportes",
+      "fr-FR": "Sport",
+      "de-DE": "Sport",
+      "it-IT": "Sport",
+    },
+    RACING: {
+      "pt-BR": "Corrida",
+      "en-US": "Racing",
+      "es-ES": "Carreras",
+      "fr-FR": "Course",
+      "de-DE": "Rennspiel",
+      "it-IT": "Corse",
+    },
+    STRATEGY: {
+      "pt-BR": "Estratégia",
+      "en-US": "Strategy",
+      "es-ES": "Estrategia",
+      "fr-FR": "Stratégie",
+      "de-DE": "Strategie",
+      "it-IT": "Strategia",
+    },
+  };
+  const localizedCategory =
+    categoryLabels[String(game?.category || "").toUpperCase()]?.[language]
+    || game?.category
+    || copy.library;
 
   const handleAddAchievement = async () => {
     setIsAddAchModalOpen(false);
@@ -606,13 +881,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
         let result =
           game.launcherType === "local"
-            ? await fetchSteamAchievementSchema(resolvedAppId)
+            ? await fetchSteamAchievementSchema(resolvedAppId, language)
             : userProfile?.steamId
               ? await fetchSteamAchievementDetails(
                 userProfile.steamId,
                 resolvedAppId,
+                language,
               )
-              : await fetchSteamAchievementSchema(resolvedAppId);
+              : await fetchSteamAchievementSchema(resolvedAppId, language);
 
         if (cancelled) return;
 
@@ -733,6 +1009,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     game?.steamAppId,
     game?.title,
     game?.totalAchievements,
+    language,
     onLibraryChanged,
     user?.uid,
     userProfile?.steamId,
@@ -1035,7 +1312,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 </span>
                 <span className="h-1 w-1 rounded-full bg-white/20" />
                 <span className="text-[10px] font-bold tracking-[0.3em] text-white/30 uppercase">
-                  {game.category || copy.library}
+                  {localizedCategory}
                 </span>
               </motion.div>
 
@@ -1260,7 +1537,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           />
                           <TechnicalDetail
                             label={copy.category}
-                            value={game.category}
+                            value={localizedCategory}
                             fallback={copy.notInformed}
                           />
                         </motion.div>

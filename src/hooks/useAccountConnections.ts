@@ -11,6 +11,7 @@ import {
 } from "../services/discord";
 import { deleteLibraryGamesByLauncher } from "../services/localLibrary";
 import type { SoundEffectType } from "./useSoundEffects";
+import type { LauncherLanguage } from "../context/PreferencesContext";
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const steamIdKey = (uid: string) => `checkpoint_steam_id_${uid}`;
@@ -24,6 +25,7 @@ interface UseAccountConnectionsProps {
   setIsLoading: (val: boolean) => void;
   setSelectedIndex: (val: number) => void;
   onLibraryChanged?: () => Promise<void> | void;
+  language: LauncherLanguage;
 }
 
 export function useAccountConnections({
@@ -35,6 +37,7 @@ export function useAccountConnections({
   setIsLoading,
   setSelectedIndex,
   onLibraryChanged,
+  language,
 }: UseAccountConnectionsProps) {
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
@@ -53,7 +56,7 @@ export function useAccountConnections({
     setIsLoading(true);
     setSteamSyncing(true);
     try {
-      const count = await syncSteamLibraryToLocal(userUid, resolvedSteamId);
+      const count = await syncSteamLibraryToLocal(userUid, resolvedSteamId, language);
       notify(
         count === 0
           ? "Nenhum jogo retornado. Verifique se o perfil é público."

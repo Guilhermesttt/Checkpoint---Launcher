@@ -30,6 +30,34 @@ describe("API publica", () => {
     await request(app).get("/api/epic/app-details").expect(400);
   });
 
+  it("consulta e separa os detalhes da Steam pelo idioma selecionado", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({
+        "987654": {
+          success: true,
+          data: {
+            name: "Jeu localisé",
+            short_description: "Description française",
+            genres: [{ description: "Aventure" }],
+          },
+        },
+      }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    );
+
+    try {
+      const response = await request(app)
+        .get("/api/steam/app-details?appId=987654&language=fr-FR")
+        .expect(200);
+
+      expect(response.body.description).toBe("Description française");
+      expect(response.body.tags).toContain("Aventure");
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("l=french");
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("cc=FR");
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it("nao mistura resultados de outra loja quando o GraphQL da Epic e bloqueado", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response("", { status: 403 }));

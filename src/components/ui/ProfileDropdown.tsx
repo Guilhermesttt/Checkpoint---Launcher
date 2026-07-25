@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
+import type { LauncherLanguage } from "../../context/PreferencesContext";
 
 interface ProfileDropdownProps {
   userDisplay: string;
@@ -17,7 +18,17 @@ interface ProfileDropdownProps {
   onLogout: () => void;
   onOpenProfile?: () => void;
   onOpenSettings?: () => void;
+  language?: LauncherLanguage;
 }
+
+const dropdownCopy = {
+  "pt-BR": { identity: "Identidade", profile: "Ver perfil", settings: "Configurações", logout: "Sair" },
+  "en-US": { identity: "Identity", profile: "View profile", settings: "Settings", logout: "Sign out" },
+  "es-ES": { identity: "Identidad", profile: "Ver perfil", settings: "Configuración", logout: "Salir" },
+  "fr-FR": { identity: "Identité", profile: "Voir le profil", settings: "Paramètres", logout: "Se déconnecter" },
+  "de-DE": { identity: "Identität", profile: "Profil anzeigen", settings: "Einstellungen", logout: "Abmelden" },
+  "it-IT": { identity: "Identità", profile: "Vedi profilo", settings: "Impostazioni", logout: "Esci" },
+} as const;
 
 export function ProfileDropdown({
   userDisplay,
@@ -26,8 +37,10 @@ export function ProfileDropdown({
   onLogout,
   onOpenProfile,
   onOpenSettings,
+  language = "pt-BR",
 }: ProfileDropdownProps) {
   const initials = userDisplay.slice(0, 2).toUpperCase();
+  const copy = dropdownCopy[language];
 
   return (
     <DropdownMenu>
@@ -35,7 +48,7 @@ export function ProfileDropdown({
         <button className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20">
           <div className="flex flex-col items-end pl-2">
             <span className="text-[8px] font-black uppercase tracking-widest text-white/30">
-              Identidade
+              {copy.identity}
             </span>
             <span className="text-[10px] font-black uppercase text-white/80">
               {userDisplay}
@@ -72,7 +85,7 @@ export function ProfileDropdown({
               className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-semibold text-white/70 transition-colors focus:bg-white/10 focus:text-white"
             >
               <User className="h-4 w-4" />
-              Ver perfil
+              {copy.profile}
             </DropdownMenuItem>
           )}
           {onOpenSettings && (
@@ -81,7 +94,7 @@ export function ProfileDropdown({
               className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-semibold text-white/70 transition-colors focus:bg-white/10 focus:text-white"
             >
               <Settings className="h-4 w-4" />
-              Configurações
+              {copy.settings}
             </DropdownMenuItem>
           )}
         </DropdownMenuGroup>
@@ -92,7 +105,7 @@ export function ProfileDropdown({
             className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-bold text-red-400 transition-colors focus:bg-red-500/15 focus:text-red-300"
           >
             <LogOut className="h-4 w-4" />
-            Sair
+            {copy.logout}
           </DropdownMenuItem>
         </div>
       </DropdownMenuContent>

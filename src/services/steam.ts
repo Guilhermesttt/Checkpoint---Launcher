@@ -5,6 +5,7 @@ import {
 import { auth } from "../../Firebase";
 import { apiUrl } from "./api";
 import type { Game, SteamOwnedGame } from "../types/domain";
+import type { LauncherLanguage } from "../context/PreferencesContext";
 import {
   profileDocRef,
 } from "./firestorePaths";
@@ -128,12 +129,13 @@ export type SteamAppDetailsFetchResult =
 
 export const fetchSteamAppDetailsResult = async (
   appId: string,
+  language: LauncherLanguage = "pt-BR",
 ): Promise<SteamAppDetailsFetchResult> => {
   if (!/^\d+$/.test(appId)) {
     return { ok: false, message: "App ID deve conter só dígitos." };
   }
   const url = apiUrl(
-    `/api/steam/app-details?appId=${encodeURIComponent(appId)}`,
+    `/api/steam/app-details?appId=${encodeURIComponent(appId)}&language=${encodeURIComponent(language)}`,
   );
   try {
     const response = await fetch(url);
@@ -190,13 +192,14 @@ export const fetchSteamAchievements = async (
 export const fetchSteamAchievementDetails = async (
   steamId: string,
   appId: string,
+  language: LauncherLanguage = "pt-BR",
 ): Promise<{
   achievements: SteamAchievement[];
   total: number;
   unlocked: number;
 }> => {
   const url = apiUrl(
-    `/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}`,
+    `/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}&language=${encodeURIComponent(language)}`,
   );
 
   try {
@@ -223,13 +226,14 @@ export const fetchSteamAchievementDetails = async (
 
 export const fetchSteamAchievementSchema = async (
   appId: string,
+  language: LauncherLanguage = "pt-BR",
 ): Promise<{
   achievements: SteamAchievement[];
   total: number;
   unlocked: number;
 }> => {
   const url = apiUrl(
-    `/api/steam/achievement-schema?appId=${encodeURIComponent(appId)}`,
+    `/api/steam/achievement-schema?appId=${encodeURIComponent(appId)}&language=${encodeURIComponent(language)}`,
   );
 
   try {
@@ -269,8 +273,9 @@ export const searchSteamGames = async (query: string) => {
 
 export const fetchSteamAppDetails = async (
   appId: string,
+  language: LauncherLanguage = "pt-BR",
 ): Promise<SteamAppDetails | null> => {
-  const r = await fetchSteamAppDetailsResult(appId);
+  const r = await fetchSteamAppDetailsResult(appId, language);
   return r.ok ? r.data : null;
 };
 
@@ -378,6 +383,7 @@ export const fetchSteamAchievementSummary = async (
 export const syncSteamLibraryToLocal = async (
   uid: string,
   steamId: string,
+  language: LauncherLanguage = "pt-BR",
 ) => {
   const payload = await fetchSteamLibrary(steamId);
 
@@ -407,7 +413,7 @@ export const syncSteamLibraryToLocal = async (
     await Promise.all(
       chunk.map(async (owned) => {
         const appId = String(owned.appid);
-        const details = await fetchSteamAppDetails(appId).catch(() => null);
+        const details = await fetchSteamAppDetails(appId, language).catch(() => null);
         detailsCache.set(appId, details);
       }),
     );

@@ -179,7 +179,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 }) => {
   const { user } = useAuth();
   const { language } = usePreferences();
-  const copy = {
+  const modalLanguage =
+    language === "pt-BR" || language === "en-US" || language === "es-ES"
+      ? language
+      : "en-US";
+  const baseCopy = {
     "pt-BR": {
       editInfo: "Editar informações",
       addGame: "Adicionar Jogo",
@@ -369,7 +373,118 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       selected: "Seleccionado",
       imageTooLarge: "La imagen es demasiado grande. Elige un archivo menor o usa un enlace.",
     },
-  }[language];
+  }[modalLanguage];
+  const extraCopy = {
+    "fr-FR": {
+      editInfo: "Modifier les informations",
+      addGame: "Ajouter un jeu",
+      steamSearch: "Rechercher sur Steam",
+      epicSearch: "Rechercher sur Epic",
+      optional: "Facultatif",
+      searchPlaceholder: "Rechercher un jeu pour remplir les informations...",
+      title: "Titre",
+      titlePlaceholder: "Nom du jeu",
+      category: "Catégorie",
+      cover: "Jaquette",
+      link: "Lien",
+      platform: "Plateforme",
+      upload: "Importer",
+      confirmAdd: "Confirmer",
+      saving: "Enregistrement...",
+      executable: "Exécutable",
+      chooseExe: "Choisir un .exe",
+      noExecutable: "Aucun exécutable sélectionné",
+      noSearchResults: "Aucun résultat trouvé.",
+      searchError: "Erreur pendant la recherche. Réessayez.",
+      sizeGB: "Taille (Go)",
+      viewOnEpicStore: "Voir sur l’Epic Games Store",
+      ownGameConfirmed: "Je possède ce jeu",
+      ownGameConfirm: "Confirmer que vous possédez ce jeu",
+      automaticFill: "Informations automatiques",
+      automaticFillHint: "Recherchez un jeu pour importer les images et les métadonnées.",
+      gameDetails: "Identité du jeu",
+      visualAssets: "Images de la bibliothèque",
+      description: "Description",
+      descriptionPlaceholder: "Une courte description du jeu...",
+      cancel: "Annuler",
+      saveChanges: "Enregistrer",
+      ready: "Prêt à enregistrer",
+      selected: "Sélectionné",
+    },
+    "de-DE": {
+      editInfo: "Informationen bearbeiten",
+      addGame: "Spiel hinzufügen",
+      steamSearch: "Steam durchsuchen",
+      epicSearch: "Epic durchsuchen",
+      optional: "Optional",
+      searchPlaceholder: "Spiel zum automatischen Ausfüllen suchen...",
+      title: "Titel",
+      titlePlaceholder: "Name des Spiels",
+      category: "Kategorie",
+      cover: "Cover",
+      link: "Link",
+      platform: "Plattform",
+      upload: "Hochladen",
+      confirmAdd: "Bestätigen",
+      saving: "Wird gespeichert...",
+      executable: "Ausführbare Datei",
+      chooseExe: ".exe auswählen",
+      noExecutable: "Keine ausführbare Datei ausgewählt",
+      noSearchResults: "Keine Ergebnisse gefunden.",
+      searchError: "Fehler bei der Spielsuche. Versuche es erneut.",
+      sizeGB: "Größe (GB)",
+      viewOnEpicStore: "Im Epic Games Store ansehen",
+      ownGameConfirmed: "Ich besitze dieses Spiel",
+      ownGameConfirm: "Bestätigen, dass du dieses Spiel besitzt",
+      automaticFill: "Automatische Details",
+      automaticFillHint: "Suche ein Spiel, um Bilder und Metadaten zu importieren.",
+      gameDetails: "Spielidentität",
+      visualAssets: "Bibliotheksgrafik",
+      description: "Beschreibung",
+      descriptionPlaceholder: "Eine kurze Beschreibung des Spiels...",
+      cancel: "Abbrechen",
+      saveChanges: "Änderungen speichern",
+      ready: "Bereit zum Speichern",
+      selected: "Ausgewählt",
+    },
+    "it-IT": {
+      editInfo: "Modifica informazioni",
+      addGame: "Aggiungi gioco",
+      steamSearch: "Cerca su Steam",
+      epicSearch: "Cerca su Epic",
+      optional: "Facoltativo",
+      searchPlaceholder: "Cerca un gioco per compilare automaticamente...",
+      title: "Titolo",
+      titlePlaceholder: "Nome del gioco",
+      category: "Categoria",
+      cover: "Copertina",
+      link: "Link",
+      platform: "Piattaforma",
+      upload: "Carica",
+      confirmAdd: "Conferma",
+      saving: "Salvataggio...",
+      executable: "Eseguibile",
+      chooseExe: "Seleziona .exe",
+      noExecutable: "Nessun eseguibile selezionato",
+      noSearchResults: "Nessun risultato trovato.",
+      searchError: "Errore durante la ricerca. Riprova.",
+      sizeGB: "Dimensione (GB)",
+      viewOnEpicStore: "Vedi su Epic Games Store",
+      ownGameConfirmed: "Possiedo questo gioco",
+      ownGameConfirm: "Conferma di possedere questo gioco",
+      automaticFill: "Dettagli automatici",
+      automaticFillHint: "Cerca un gioco per importare immagini e metadati.",
+      gameDetails: "Identità del gioco",
+      visualAssets: "Immagini della libreria",
+      description: "Descrizione",
+      descriptionPlaceholder: "Una breve descrizione del gioco...",
+      cancel: "Annulla",
+      saveChanges: "Salva modifiche",
+      ready: "Pronto per salvare",
+      selected: "Selezionato",
+    },
+  }[language as "fr-FR" | "de-DE" | "it-IT"] || {};
+  const copy = { ...baseCopy, ...extraCopy };
   const { notify } = useNotification();
   const executableInputRef = React.useRef<HTMLInputElement>(null);
   const coverInputRef = React.useRef<HTMLInputElement>(null);
@@ -547,7 +662,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     setIsSearching(true);
     try {
       const resp = await fetch(
-        apiUrl(`/api/steam/search?query=${encodeURIComponent(query)}`),
+        apiUrl(
+          `/api/steam/search?query=${encodeURIComponent(query)}&language=${encodeURIComponent(language)}`,
+        ),
       );
       const data = await resp.json();
       if (requestId === searchRequestRef.current) {
@@ -573,7 +690,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const appId = String(game.id);
     setLoading(true);
     try {
-      const details = await fetchSteamAppDetailsResult(appId);
+      const details = await fetchSteamAppDetailsResult(appId, language);
       if (requestId !== detailsRequestRef.current) return;
       if (details.ok) {
         const d = details.data;
@@ -684,7 +801,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       const productSlug = String(game.productSlug || "").trim();
       const details =
         productSlug
-          ? await fetchEpicAppDetailsResult(catalogId, namespace, productSlug).catch(() => null)
+          ? await fetchEpicAppDetailsResult(
+              catalogId,
+              namespace,
+              productSlug,
+              language,
+            ).catch(() => null)
           : null;
       const d = details?.ok ? details.data : null;
       if (requestId !== detailsRequestRef.current) return;

@@ -1,7 +1,13 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 
-export type LauncherLanguage = "pt-BR" | "en-US" | "es-ES";
+export type LauncherLanguage =
+  | "pt-BR"
+  | "en-US"
+  | "es-ES"
+  | "fr-FR"
+  | "de-DE"
+  | "it-IT";
 export type SoundTheme = "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
 export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "cyberpunk";
 
@@ -430,6 +436,320 @@ const translations = {
 
 export type TranslationKey = keyof (typeof translations)["pt-BR"];
 
+type AdditionalLanguage = "fr-FR" | "de-DE" | "it-IT";
+
+const additionalTranslations: Record<
+  AdditionalLanguage,
+  Partial<Record<TranslationKey, string>>
+> = {
+  "fr-FR": {
+    settings: "Paramètres",
+    system: "Système",
+    language: "Langue",
+    languageHint: "Préférence visuelle enregistrée sur cet appareil.",
+    soundEffects: "Effets sonores",
+    soundEffectsHint: "Volume de navigation, de sélection et de retour.",
+    achievementSound: "Son des succès",
+    achievementSoundHint: "Volume réservé aux notifications de succès débloqués.",
+    notificationSound: "Son des notifications",
+    notificationSoundHint: "Volume des messages, amis et demandes.",
+    music: "Musique",
+    musicHint: "Volume de la musique de fond en boucle.",
+    soundTheme: "Thème sonore",
+    soundThemeHint: "Pack de sons utilisé par l’interface.",
+    visualTheme: "Thème visuel",
+    visualThemeHint: "Palette de couleurs appliquée au launcher.",
+    themes: "Thèmes",
+    themesHint: "Chaque thème applique des visuels et des sons assortis.",
+    defaultTheme: "Par défaut",
+    test: "Tester",
+    mute: "Muet",
+    max: "Maximum",
+    performance: "Performances",
+    lowPerformanceMode: "Désactiver les animations",
+    lowPerformanceModeHint: "Désactive les effets lourds pour économiser le CPU/GPU.",
+    openAtLogin: "Démarrer avec Windows",
+    openAtLoginHint: "Démarre le launcher silencieusement en arrière-plan.",
+    closeOnLaunch: "Masquer au lancement",
+    closeOnLaunchHint: "Masque le launcher pendant que vous jouez.",
+    new: "Nouveau",
+    searchPlaceholder: "Rechercher un jeu... (S)",
+    connectSteam: "Connecter Steam",
+    connecting: "Connexion...",
+    unlink: "Dissocier",
+    sync: "Synchroniser",
+    syncing: "Synchronisation...",
+    identity: "Identité",
+    playNow: "Jouer maintenant",
+    viaSteam: "Via Steam",
+    favorite: "Favori",
+    emptyLibrary: "Bibliothèque vide",
+    noResults: "Aucun résultat",
+    noResultsHint: "Essayez un autre terme.",
+    emptyHintConnected: "Aucun jeu enregistré. Ajoutez-en un manuellement.",
+    emptyHintDisconnected: "Ajoutez un jeu ou connectez votre compte Steam.",
+    newGame: "Nouveau jeu",
+    editMetadata: "Modifier les métadonnées",
+    addFavorite: "Ajouter aux favoris",
+    removeFavorite: "Retirer des favoris",
+    removeFromLibrary: "Retirer de la bibliothèque",
+    cancel: "Annuler",
+    confirm: "Confirmer",
+    signOutTitle: "Se déconnecter",
+    signOutDescription: "Vous serez déconnecté et renvoyé à l’écran de connexion.",
+    signOutConfirm: "Se déconnecter",
+    launching: "Lancement...",
+    play: "Jouer",
+    connectedAccounts: "Comptes connectés",
+    connectedAccountsHint: "Associez Steam et Discord.",
+    connectEpic: "Catalogue Epic",
+    connectDiscord: "Connecter Discord",
+    connected: "Connecté",
+    notConnected: "Non connecté",
+    friends: "Amis",
+    friendsHint: "Consultez vos amis Steam, Discord et Checkpoint.",
+    overviewContinue: "Continuer",
+    overviewResumeSession: "Reprendre la session",
+    overviewFriends: "Amis",
+    overviewPlayingNow: "Joue actuellement",
+    overviewNobodyPlaying: "Personne ne joue actuellement.",
+    overviewFavorites: "Favoris",
+    overviewActivity: "Activité",
+    overviewNoRecentNews: "Aucune nouveauté récente.",
+    overviewOnline: "En ligne",
+    addFriendTitle: "Ajouter un ami",
+    addFriendHint: "Rechercher par nom d’utilisateur ou e-mail",
+    addFriendSearchPlaceholder: "Saisissez le nom ou l’e-mail...",
+    addFriendSearchButton: "Rechercher",
+    addFriendSearching: "Recherche d’utilisateurs...",
+    addFriendRecentSearches: "Recherches récentes",
+    addFriendClear: "Effacer",
+    addFriendEmpty: "Rechercher des amis",
+    addFriendEmptyHint: "Saisissez un nom ou un e-mail",
+    addFriendNoResults: "Aucun utilisateur trouvé",
+    addFriendNoResultsHint: "Vérifiez le nom ou l’e-mail",
+    addFriendSend: "Envoyer",
+    addFriendYou: "Vous",
+    addFriendAlreadyFriend: "Ami",
+    addFriendPending: "En attente",
+    addFriendRespond: "Répondre",
+    addFriendOnline: "En ligne",
+    addFriendOffline: "Hors ligne",
+    addFriendPlaying: "Joue à",
+    steamFriends: "Amis Steam",
+    epicFriends: "Amis Epic",
+    discordFriends: "Amis Discord",
+    priceAlerts: "Alertes de prix",
+    priceAlertsHint: "Surveillez les promotions de votre bibliothèque.",
+    addAlert: "Suivre l’offre",
+    noAlerts: "Aucune alerte créée.",
+  },
+  "de-DE": {
+    settings: "Einstellungen",
+    system: "System",
+    language: "Sprache",
+    languageHint: "Darstellungseinstellung auf diesem Gerät gespeichert.",
+    soundEffects: "Soundeffekte",
+    soundEffectsHint: "Lautstärke für Navigation, Auswahl und Zurück.",
+    achievementSound: "Erfolgssound",
+    achievementSoundHint: "Eigene Lautstärke für freigeschaltete Erfolge.",
+    notificationSound: "Benachrichtigungston",
+    notificationSoundHint: "Lautstärke für Nachrichten, Freunde und Anfragen.",
+    music: "Musik",
+    musicHint: "Lautstärke der Hintergrundmusik.",
+    soundTheme: "Sounddesign",
+    soundThemeHint: "Von der Oberfläche verwendetes Soundpaket.",
+    visualTheme: "Design",
+    visualThemeHint: "Auf den Launcher angewendetes Farbschema.",
+    themes: "Designs",
+    themesHint: "Jedes Design verwendet passende Grafik und Sounds.",
+    defaultTheme: "Standard",
+    test: "Testen",
+    mute: "Stumm",
+    max: "Maximum",
+    performance: "Leistung",
+    lowPerformanceMode: "Animationen deaktivieren",
+    lowPerformanceModeHint: "Deaktiviert aufwendige Effekte, um CPU/GPU zu schonen.",
+    openAtLogin: "Mit Windows starten",
+    openAtLoginHint: "Startet den Launcher unauffällig im Hintergrund.",
+    closeOnLaunch: "Beim Spielen ausblenden",
+    closeOnLaunchHint: "Blendet den Launcher beim Spielen vollständig aus.",
+    new: "Neu",
+    searchPlaceholder: "Spiel suchen... (S)",
+    connectSteam: "Steam verbinden",
+    connecting: "Verbindung...",
+    unlink: "Trennen",
+    sync: "Synchronisieren",
+    syncing: "Synchronisierung...",
+    identity: "Identität",
+    playNow: "Jetzt spielen",
+    viaSteam: "Über Steam",
+    favorite: "Favorit",
+    emptyLibrary: "Leere Bibliothek",
+    noResults: "Keine Ergebnisse",
+    noResultsHint: "Versuche einen anderen Suchbegriff.",
+    emptyHintConnected: "Keine Spiele gespeichert. Füge ein Spiel manuell hinzu.",
+    emptyHintDisconnected: "Füge ein Spiel hinzu oder verbinde dein Steam-Konto.",
+    newGame: "Neues Spiel",
+    editMetadata: "Metadaten bearbeiten",
+    addFavorite: "Zu Favoriten hinzufügen",
+    removeFavorite: "Aus Favoriten entfernen",
+    removeFromLibrary: "Aus Bibliothek entfernen",
+    cancel: "Abbrechen",
+    confirm: "Bestätigen",
+    signOutTitle: "Abmelden",
+    signOutDescription: "Du wirst abgemeldet und zur Anmeldung zurückgeleitet.",
+    signOutConfirm: "Abmelden",
+    launching: "Wird gestartet...",
+    play: "Spielen",
+    connectedAccounts: "Verbundene Konten",
+    connectedAccountsHint: "Verbinde Steam und Discord.",
+    connectEpic: "Epic-Katalog",
+    connectDiscord: "Discord verbinden",
+    connected: "Verbunden",
+    notConnected: "Nicht verbunden",
+    friends: "Freunde",
+    friendsHint: "Sieh deine Freunde von Steam, Discord und Checkpoint.",
+    overviewContinue: "Fortsetzen",
+    overviewResumeSession: "Sitzung fortsetzen",
+    overviewFriends: "Freunde",
+    overviewPlayingNow: "Spielt gerade",
+    overviewNobodyPlaying: "Gerade spielt niemand.",
+    overviewFavorites: "Favoriten",
+    overviewActivity: "Aktivität",
+    overviewNoRecentNews: "Keine aktuellen Neuigkeiten.",
+    overviewOnline: "Online",
+    addFriendTitle: "Freund hinzufügen",
+    addFriendHint: "Nach Benutzername oder E-Mail suchen",
+    addFriendSearchPlaceholder: "Name oder E-Mail eingeben...",
+    addFriendSearchButton: "Suchen",
+    addFriendSearching: "Benutzer werden gesucht...",
+    addFriendRecentSearches: "Letzte Suchen",
+    addFriendClear: "Löschen",
+    addFriendEmpty: "Freunde suchen",
+    addFriendEmptyHint: "Gib einen Namen oder eine E-Mail ein",
+    addFriendNoResults: "Keine Benutzer gefunden",
+    addFriendNoResultsHint: "Überprüfe den Namen oder die E-Mail",
+    addFriendSend: "Senden",
+    addFriendYou: "Du",
+    addFriendAlreadyFriend: "Freund",
+    addFriendPending: "Ausstehend",
+    addFriendRespond: "Antworten",
+    addFriendOnline: "Online",
+    addFriendOffline: "Offline",
+    addFriendPlaying: "Spielt",
+    steamFriends: "Steam-Freunde",
+    epicFriends: "Epic-Freunde",
+    discordFriends: "Discord-Freunde",
+    priceAlerts: "Preisalarm",
+    priceAlertsHint: "Überwache Angebote für deine Spiele.",
+    addAlert: "Angebot verfolgen",
+    noAlerts: "Keine Alarme erstellt.",
+  },
+  "it-IT": {
+    settings: "Impostazioni",
+    system: "Sistema",
+    language: "Lingua",
+    languageHint: "Preferenza visiva salvata su questo dispositivo.",
+    soundEffects: "Effetti sonori",
+    soundEffectsHint: "Volume di navigazione, selezione e ritorno.",
+    achievementSound: "Suono degli obiettivi",
+    achievementSoundHint: "Volume dedicato agli obiettivi sbloccati.",
+    notificationSound: "Suono delle notifiche",
+    notificationSoundHint: "Volume di messaggi, amici e richieste.",
+    music: "Musica",
+    musicHint: "Volume della musica di sottofondo.",
+    soundTheme: "Tema sonoro",
+    soundThemeHint: "Pacchetto audio usato dall’interfaccia.",
+    visualTheme: "Tema visivo",
+    visualThemeHint: "Schema di colori applicato al launcher.",
+    themes: "Temi",
+    themesHint: "Ogni tema applica grafica e suoni coordinati.",
+    defaultTheme: "Predefinito",
+    test: "Prova",
+    mute: "Muto",
+    max: "Massimo",
+    performance: "Prestazioni",
+    lowPerformanceMode: "Disattiva animazioni",
+    lowPerformanceModeHint: "Disattiva gli effetti pesanti per ridurre l’uso di CPU/GPU.",
+    openAtLogin: "Avvia con Windows",
+    openAtLoginHint: "Avvia il launcher silenziosamente in background.",
+    closeOnLaunch: "Nascondi durante il gioco",
+    closeOnLaunchHint: "Nasconde completamente il launcher durante il gioco.",
+    new: "Nuovo",
+    searchPlaceholder: "Cerca gioco... (S)",
+    connectSteam: "Collega Steam",
+    connecting: "Connessione...",
+    unlink: "Scollega",
+    sync: "Sincronizza",
+    syncing: "Sincronizzazione...",
+    identity: "Identità",
+    playNow: "Gioca ora",
+    viaSteam: "Tramite Steam",
+    favorite: "Preferito",
+    emptyLibrary: "Libreria vuota",
+    noResults: "Nessun risultato",
+    noResultsHint: "Prova a cercare un altro termine.",
+    emptyHintConnected: "Non ci sono giochi salvati. Aggiungine uno manualmente.",
+    emptyHintDisconnected: "Aggiungi un gioco o collega il tuo account Steam.",
+    newGame: "Nuovo gioco",
+    editMetadata: "Modifica metadati",
+    addFavorite: "Aggiungi ai preferiti",
+    removeFavorite: "Rimuovi dai preferiti",
+    removeFromLibrary: "Rimuovi dalla libreria",
+    cancel: "Annulla",
+    confirm: "Conferma",
+    signOutTitle: "Esci",
+    signOutDescription: "Verrai disconnesso e tornerai alla schermata di accesso.",
+    signOutConfirm: "Esci",
+    launching: "Avvio...",
+    play: "Gioca",
+    connectedAccounts: "Account collegati",
+    connectedAccountsHint: "Collega Steam e Discord.",
+    connectEpic: "Catalogo Epic",
+    connectDiscord: "Collega Discord",
+    connected: "Collegato",
+    notConnected: "Non collegato",
+    friends: "Amici",
+    friendsHint: "Visualizza gli amici di Steam, Discord e Checkpoint.",
+    overviewContinue: "Continua",
+    overviewResumeSession: "Riprendi sessione",
+    overviewFriends: "Amici",
+    overviewPlayingNow: "Sta giocando",
+    overviewNobodyPlaying: "Nessuno sta giocando.",
+    overviewFavorites: "Preferiti",
+    overviewActivity: "Attività",
+    overviewNoRecentNews: "Nessuna novità recente.",
+    overviewOnline: "Online",
+    addFriendTitle: "Aggiungi amico",
+    addFriendHint: "Cerca per nome utente o e-mail",
+    addFriendSearchPlaceholder: "Inserisci nome o e-mail...",
+    addFriendSearchButton: "Cerca",
+    addFriendSearching: "Ricerca utenti...",
+    addFriendRecentSearches: "Ricerche recenti",
+    addFriendClear: "Cancella",
+    addFriendEmpty: "Cerca amici",
+    addFriendEmptyHint: "Inserisci un nome o un’e-mail",
+    addFriendNoResults: "Nessun utente trovato",
+    addFriendNoResultsHint: "Controlla il nome o l’e-mail",
+    addFriendSend: "Invia",
+    addFriendYou: "Tu",
+    addFriendAlreadyFriend: "Amico",
+    addFriendPending: "In attesa",
+    addFriendRespond: "Rispondi",
+    addFriendOnline: "Online",
+    addFriendOffline: "Offline",
+    addFriendPlaying: "Sta giocando",
+    steamFriends: "Amici Steam",
+    epicFriends: "Amici Epic",
+    discordFriends: "Amici Discord",
+    priceAlerts: "Avvisi di prezzo",
+    priceAlertsHint: "Monitora le offerte dei giochi nella tua libreria.",
+    addAlert: "Segui offerta",
+    noAlerts: "Nessun avviso creato.",
+  },
+};
+
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 const clampVolume = (value: number) =>
@@ -473,14 +793,25 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedLowPerf = localStorage.getItem(prefKey(user.uid, "low_perf"));
     const savedCloseLaunch = localStorage.getItem(prefKey(user.uid, "close_launch"));
 
-    if (savedOpenAtLogin !== null) setOpenAtLoginState(savedOpenAtLogin === "true");
+    if (savedOpenAtLogin !== null) {
+      const shouldOpenAtLogin = savedOpenAtLogin === "true";
+      setOpenAtLoginState(shouldOpenAtLogin);
+      if (shouldOpenAtLogin) {
+        void window.electronAPI?.setOpenAtLogin?.(true).then((result) => {
+          setOpenAtLoginState(result.openAtLogin);
+        }).catch(console.error);
+      }
+    }
     if (savedLowPerf !== null) setLowPerformanceMode(savedLowPerf === "true");
     if (savedCloseLaunch !== null) setCloseOnLaunch(savedCloseLaunch === "true");
 
     if (
       savedLanguage === "pt-BR" ||
       savedLanguage === "en-US" ||
-      savedLanguage === "es-ES"
+      savedLanguage === "es-ES" ||
+      savedLanguage === "fr-FR" ||
+      savedLanguage === "de-DE" ||
+      savedLanguage === "it-IT"
     ) {
       setLanguage(savedLanguage);
     }
@@ -524,6 +855,10 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, user?.uid, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch]);
 
   useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
+  useEffect(() => {
     document.documentElement.dataset.launcherTheme = visualTheme;
     if (lowPerformanceMode) {
       document.body.classList.add("low-performance");
@@ -559,13 +894,24 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       openAtLogin,
       setOpenAtLogin: (val) => {
         setOpenAtLoginState(val);
-        window.electronAPI?.setOpenAtLogin?.(val).catch(console.error);
+        window.electronAPI?.setOpenAtLogin?.(val).then((result) => {
+          setOpenAtLoginState(result.openAtLogin);
+        }).catch(console.error);
       },
       lowPerformanceMode,
       setLowPerformanceMode,
       closeOnLaunch,
       setCloseOnLaunch,
-      t: (key) => translations[language][key] ?? translations["pt-BR"][key],
+      t: (key) => {
+        if (language === "pt-BR" || language === "en-US" || language === "es-ES") {
+          return translations[language][key] ?? translations["pt-BR"][key];
+        }
+        return (
+          additionalTranslations[language][key]
+          ?? translations["en-US"][key]
+          ?? translations["pt-BR"][key]
+        );
+      },
     }),
     [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch],
   );

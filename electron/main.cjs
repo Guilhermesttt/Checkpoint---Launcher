@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer } = require("electron");
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -38,6 +38,8 @@ const {
 const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
 const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
 const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
+const AUTO_START_ARG = "--checkpoint-autostart";
+const IS_AUTO_START = process.argv.includes(AUTO_START_ARG);
 const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_INJECTION === "1";
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
@@ -93,6 +95,7 @@ let overlayReady = false;
 let overlayDisplayId = null;
 let overlayPanelOpen = false;
 let overlayPanelState = {
+  language: "pt-BR",
   friends: [],
   achievements: { unlocked: 0, available: 0, items: [], loading: false },
   currentGame: null,
@@ -101,6 +104,15 @@ let overlayPanelState = {
   chat: null,
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
+const overlayEventCopy = {
+  "pt-BR": { enjoy: "Divirta-se", active: "O overlay está ativo enquanto você joga.", playing: "Você está jogando agora", open: "Abra sem sair do jogo", shortcut: "Use o botão central do controle ou Ctrl + Shift + O.", player: "Jogador", now: "agora", friendPlaying: "Está jogando agora", request: "Enviou um pedido de amizade", accepted: "Aceitou seu pedido de amizade", firstKill: "Primeiro Abate", testAchievement: "Teste visual do overlay do Checkpoint.", newMessage: "Nova mensagem", captureSaved: "Captura salva" },
+  "en-US": { enjoy: "Have fun", active: "The overlay is active while you play.", playing: "You are now playing", open: "Open without leaving the game", shortcut: "Use the controller’s center button or Ctrl + Shift + O.", player: "Player", now: "now", friendPlaying: "Is now playing", request: "Sent you a friend request", accepted: "Accepted your friend request", firstKill: "First Kill", testAchievement: "Checkpoint overlay visual test.", newMessage: "New message", captureSaved: "Capture saved" },
+  "es-ES": { enjoy: "Diviértete", active: "El overlay está activo mientras juegas.", playing: "Ahora estás jugando a", open: "Ábrelo sin salir del juego", shortcut: "Usa el botón central del mando o Ctrl + Shift + O.", player: "Jugador", now: "ahora", friendPlaying: "Está jugando ahora a", request: "Te envió una solicitud de amistad", accepted: "Aceptó tu solicitud de amistad", firstKill: "Primera baja", testAchievement: "Prueba visual del overlay de Checkpoint.", newMessage: "Nuevo mensaje", captureSaved: "Captura guardada" },
+  "fr-FR": { enjoy: "Amusez-vous", active: "L’overlay est actif pendant que vous jouez.", playing: "Vous jouez maintenant à", open: "Ouvrez-le sans quitter le jeu", shortcut: "Utilisez le bouton central de la manette ou Ctrl + Shift + O.", player: "Joueur", now: "maintenant", friendPlaying: "Joue maintenant à", request: "Vous a envoyé une demande d’ami", accepted: "A accepté votre demande d’ami", firstKill: "Première élimination", testAchievement: "Test visuel de l’overlay Checkpoint.", newMessage: "Nouveau message", captureSaved: "Capture enregistrée" },
+  "de-DE": { enjoy: "Viel Spaß", active: "Das Overlay ist während des Spielens aktiv.", playing: "Du spielst jetzt", open: "Öffnen, ohne das Spiel zu verlassen", shortcut: "Verwende die mittlere Controllertaste oder Strg + Umschalt + O.", player: "Spieler", now: "jetzt", friendPlaying: "Spielt jetzt", request: "Hat dir eine Freundschaftsanfrage gesendet", accepted: "Hat deine Freundschaftsanfrage angenommen", firstKill: "Erster Abschuss", testAchievement: "Visueller Test des Checkpoint-Overlays.", newMessage: "Neue Nachricht", captureSaved: "Aufnahme gespeichert" },
+  "it-IT": { enjoy: "Buon divertimento", active: "L’overlay è attivo mentre giochi.", playing: "Ora stai giocando a", open: "Apri senza uscire dal gioco", shortcut: "Usa il pulsante centrale del controller o Ctrl + Maiusc + O.", player: "Giocatore", now: "ora", friendPlaying: "Sta giocando ora a", request: "Ti ha inviato una richiesta di amicizia", accepted: "Ha accettato la tua richiesta di amicizia", firstKill: "Prima eliminazione", testAchievement: "Test visivo dell’overlay Checkpoint.", newMessage: "Nuovo messaggio", captureSaved: "Cattura salvata" },
+};
+const getOverlayEventCopy = () => overlayEventCopy[overlayPanelState.language] || overlayEventCopy["pt-BR"];
 let captureShortcut = "F8";
 let achievementVolume = 22;
 let achievementSoundTheme = "ps5";
@@ -349,10 +361,12 @@ const createWindow = async () => {
   configureHidAccess(mainWindow.webContents.session);
 
   mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
+    if (!IS_AUTO_START) {
+      mainWindow.show();
+    }
   });
   setTimeout(() => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+    if (!IS_AUTO_START && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
       mainWindow.show();
     }
   }, 2500);
@@ -740,7 +754,7 @@ const runCapture = async () => {
     if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
     sendOverlayEvent("overlay:social", {
       kind: "capture-saved",
-      title: "Captura salva",
+      title: getOverlayEventCopy().captureSaved,
       description: capture.name,
     });
     return { ok: true, capture };
@@ -840,6 +854,9 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
     })).filter((message) => message.id && (message.text || message.attachmentUrl))
     : [];
   overlayPanelState = {
+    language: ["pt-BR", "en-US", "es-ES", "fr-FR", "de-DE", "it-IT"].includes(payload?.language)
+      ? payload.language
+      : "pt-BR",
     friends,
     achievements: {
       unlocked: Math.max(0, Number(payload?.achievements?.unlocked) || 0),
@@ -1220,8 +1237,9 @@ registerSecureIpcHandler("achievement:unlock", async (_event, gameId, achievemen
 });
 
 registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) => {
-  const senderName = String(payload?.senderName || "").trim() || "Amigo";
-  const messageText = String(payload?.messageText || "").trim() || "Nova mensagem";
+  const copy = getOverlayEventCopy();
+  const senderName = String(payload?.senderName || "").trim() || copy.player;
+  const messageText = String(payload?.messageText || "").trim() || copy.newMessage;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
@@ -1585,16 +1603,18 @@ const fetchEpicGamesStoreDetails = async (rawRequest) => {
   if (!/^[a-z0-9][a-z0-9-]{0,199}$/i.test(productSlug)) {
     throw new Error("Produto Epic invalido.");
   }
-  const cacheKey = productSlug.toLocaleLowerCase("en-US");
+  const supportedLocales = new Set(["pt-BR", "en-US", "es-ES", "fr-FR", "de-DE", "it-IT"]);
+  const locale = supportedLocales.has(rawRequest?.language) ? rawRequest.language : "pt-BR";
+  const cacheKey = `${locale}:${productSlug.toLocaleLowerCase("en-US")}`;
   const cached = epicStoreDetailsCache.get(cacheKey);
   if (cached && Date.now() - cached.createdAt < 15 * 60 * 1_000) return cached.details;
 
-  const url = `https://store-content-ipv4.ak.epicgames.com/api/pt-BR/content/products/${encodeURIComponent(productSlug)}`;
+  const url = `https://store-content-ipv4.ak.epicgames.com/api/${locale}/content/products/${encodeURIComponent(productSlug)}`;
   const response = await fetch(url, {
     headers: {
       Accept: "application/json",
-      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-      Referer: `https://store.epicgames.com/pt-BR/p/${productSlug}`,
+      "Accept-Language": `${locale},en;q=0.8`,
+      Referer: `https://store.epicgames.com/${locale}/p/${productSlug}`,
     },
     signal: AbortSignal.timeout(15_000),
   });
@@ -1619,8 +1639,34 @@ registerSecureIpcHandler("launcher:fetch-epic-store-details", async (_event, req
   fetchEpicGamesStoreDetails(request));
 
 registerSecureIpcHandler("system:set-open-at-login", async (_event, open) => {
-  app.setLoginItemSettings({ openAtLogin: Boolean(open) });
-  return true;
+  const shouldOpen = Boolean(open);
+
+  if (process.platform === "win32") {
+    // Remove the legacy entry first. Older builds could leave Electron/dev
+    // arguments registered instead of the installed launcher executable.
+    app.setLoginItemSettings({ openAtLogin: false });
+    app.setLoginItemSettings({
+      openAtLogin: false,
+      path: process.execPath,
+      args: [AUTO_START_ARG],
+    });
+
+    if (shouldOpen && app.isPackaged) {
+      app.setLoginItemSettings({
+        openAtLogin: true,
+        path: process.execPath,
+        args: [AUTO_START_ARG],
+      });
+    }
+
+    return {
+      openAtLogin: shouldOpen && app.isPackaged,
+      supported: app.isPackaged,
+    };
+  }
+
+  app.setLoginItemSettings({ openAtLogin: shouldOpen });
+  return { openAtLogin: shouldOpen, supported: true };
 });
 
 registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath, rawLaunchProfile) => {
@@ -2282,24 +2328,33 @@ registerSecureIpcHandler("shell:open-external", async (_event, url) => {
   await shell.openExternal(rawUrl);
 });
 
+registerSecureIpcHandler("system:copy-to-clipboard", async (_event, value) => {
+  const text = String(value ?? "").slice(0, 512);
+  if (!text) throw new Error("Nenhum texto para copiar.");
+  clipboard.writeText(text, "clipboard");
+  return { ok: true };
+});
+
 registerSecureIpcHandler("overlay:test-welcome", async () => {
+  const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
-    title: "Divirta-se",
-    description: "O overlay esta ativo enquanto voce joga.",
+    title: copy.enjoy,
+    description: copy.active,
   });
 });
 
 registerSecureIpcHandler("overlay:test-achievement", async () => {
+  const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
   sendOverlayEvent("achievement:unlock", {
     gameId: "checkpoint-lab",
     achievementId: "overlay-smoke-test",
     achievement: {
       id: "overlay-smoke-test",
-      name: "Primeiro Abate",
-      description: "Teste visual do overlay do Checkpoint.",
+      name: copy.firstKill,
+      description: copy.testAchievement,
       icon: overlayIconUrl(),
     },
     unlockedAt: new Date().toISOString(),
@@ -2338,57 +2393,61 @@ registerSecureIpcHandler("overlay:toggle-panel", async () => {
 });
 
 registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
+  const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
   const gameTitle = String(payload?.gameTitle || "").trim();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
-    title: "Divirta-se",
+    title: copy.enjoy,
     description: gameTitle
-      ? `Você está jogando agora ${gameTitle}`
-      : "O overlay está ativo enquanto você joga.",
+      ? `${copy.playing} ${gameTitle}`
+      : copy.active,
   });
   setTimeout(() => {
     sendOverlayEvent("overlay:social", {
       kind: "overlay-hint",
-      title: "Abra sem sair do jogo",
-      description: "Use o botão central do controle ou Ctrl + Shift + O.",
+      title: copy.open,
+      description: copy.shortcut,
     });
   }, 1400);
 });
 
 registerSecureIpcHandler("overlay:show-friend-playing", async (_event, payload) => {
-  const playerName = String(payload?.playerName || "").trim() || "Jogador";
-  const gameTitle = String(payload?.gameTitle || "").trim() || "agora";
+  const copy = getOverlayEventCopy();
+  const playerName = String(payload?.playerName || "").trim() || copy.player;
+  const gameTitle = String(payload?.gameTitle || "").trim() || copy.now;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-playing",
     title: playerName,
-    description: `Esta jogando agora ${gameTitle}`,
+    description: `${copy.friendPlaying} ${gameTitle}`,
     avatarUrl: avatarUrl || overlayIconUrl(),
   });
 });
 
 registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) => {
-  const playerName = String(payload?.playerName || "").trim() || "Jogador";
+  const copy = getOverlayEventCopy();
+  const playerName = String(payload?.playerName || "").trim() || copy.player;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-request",
     title: playerName,
-    description: "Enviou um pedido de amizade",
+    description: copy.request,
     avatarUrl: avatarUrl || overlayIconUrl(),
   });
 });
 
 registerSecureIpcHandler("overlay:show-friend-accepted", async (_event, payload) => {
-  const playerName = String(payload?.playerName || "").trim() || "Jogador";
+  const copy = getOverlayEventCopy();
+  const playerName = String(payload?.playerName || "").trim() || copy.player;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-accepted",
     title: playerName,
-    description: "Aceitou teu pedido de amizade",
+    description: copy.accepted,
     avatarUrl: avatarUrl || overlayIconUrl(),
   });
 });
@@ -2499,8 +2558,8 @@ registerSecureIpcHandler("game:scan-local", async (_event) => {
 // ─── Auto-Updater ───────────────────────────────────────────────────────────
 const { autoUpdater } = require("electron-updater");
 
-// Baixa novas versões em segundo plano; o usuário decide quando reiniciar e instalar.
-autoUpdater.autoDownload = true;
+// O usuário escolhe quando iniciar o download. Depois de baixada, escolhe quando reiniciar.
+autoUpdater.autoDownload = false;
 let updaterState = {
   status: "idle",
   info: null,
@@ -2568,6 +2627,28 @@ registerSecureIpcHandler("update:check-for-updates", async () => {
     console.error("[auto-updater] Erro ao checar atualizações:", error);
     throw error;
   }
+});
+
+registerSecureIpcHandler("update:download", async () => {
+  if (!app.isPackaged) {
+    return { status: "development", message: "O atualizador não funciona em ambiente de desenvolvimento." };
+  }
+  if (updaterState.status === "downloaded" || updaterState.status === "downloading") {
+    return updaterState;
+  }
+  if (updaterState.status !== "available") {
+    throw new Error("Nenhuma atualização está pronta para download.");
+  }
+
+  updaterState = {
+    ...updaterState,
+    status: "downloading",
+    progress: { percent: 0 },
+    error: "",
+  };
+  sendUpdaterMessage("download-started", updaterState.info);
+  await autoUpdater.downloadUpdate();
+  return updaterState;
 });
 
 registerSecureIpcHandler("update:quit-and-install", () => {

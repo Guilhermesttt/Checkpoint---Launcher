@@ -3144,6 +3144,160 @@
       achievements: localStorage.getItem("checkpoint-overlay-achievements") !== "false",
       animations: localStorage.getItem("checkpoint-overlay-animations") !== "false",
     };
+    const overlayTranslations = {
+      "pt-BR": {
+        home: "Início", game: "Jogo", media: "Mídia", achievements: "Conquistas", settings: "Config.",
+        hello: "Olá,", searchFriends: "Buscar amigos...", myProfile: "Meu perfil", onlineFriends: "Amigos online",
+        offlineFriends: "Amigos offline", viewAll: "Ver todos ›", showLess: "Mostrar menos", noGame: "Nenhum jogo detectado",
+        conversations: "Conversas", conversationsHint: "Continue suas conversas sem sair do jogo.",
+        typeMessage: "Escreva uma mensagem...", runningGame: "Jogo em execução", sessionInfo: "Informações da sua sessão atual.",
+        currentSession: "Sessão atual", totalTime: "Tempo total", friendsPlaying: "Amigos jogando",
+        platform: "Plataforma", executable: "Executável", developer: "Desenvolvedor", release: "Lançamento",
+        windowMode: "Modo de janela", resolution: "Resolução", unlocked: "desbloqueadas", captures: "Capturas",
+        captureHint: "Registre seus melhores momentos sem sair da partida.", captureNow: "Capturar agora",
+        recentCaptures: "Capturas recentes", openFolder: "Abrir pasta", overlaySettings: "Configurações do overlay",
+        personalize: "Personalize o comportamento durante suas partidas.", notifications: "Notificações",
+        experience: "Experiência", screenshot: "Captura de tela", friends: "Amigos", online: "Online", offline: "Offline",
+        player: "Jogador", unavailable: "Indisponível", playing: "Jogando", noDescription: "Sem descrição.",
+        locked: "Bloqueada", achievementUnlocked: "Desbloqueada", achievementUpdated: "CONQUISTA ATUALIZADA",
+        achievementNew: "CONQUISTA DESBLOQUEADA", loadingAchievements: "Carregando conquistas do jogo...",
+        discordConnected: "Discord conectado", typing: "digitando...", chatConversation: "Conversa pelo Checkpoint",
+        startConversation: "Comece a conversa por aqui.", noInfo: "Não informado", automatic: "Automática",
+        overlayAvailable: "Overlay disponível", controllerConnected: "Controle conectado", friendRequest: "Pedido de amizade", requestAccepted: "Pedido aceito", friendPlayingBadge: "Amigo jogando", newMessage: "Nova mensagem", gameStarted: "Jogo iniciado",
+      },
+      "en-US": {
+        home: "Home", game: "Game", media: "Media", achievements: "Achievements", settings: "Settings",
+        hello: "Hello,", searchFriends: "Search friends...", myProfile: "My profile", onlineFriends: "Online friends",
+        offlineFriends: "Offline friends", viewAll: "View all ›", showLess: "Show less", noGame: "No game detected",
+        conversations: "Conversations", conversationsHint: "Keep chatting without leaving the game.",
+        typeMessage: "Write a message...", runningGame: "Game running", sessionInfo: "Information about your current session.",
+        currentSession: "Current session", totalTime: "Total time", friendsPlaying: "Friends playing",
+        platform: "Platform", executable: "Executable", developer: "Developer", release: "Release",
+        windowMode: "Window mode", resolution: "Resolution", unlocked: "unlocked", captures: "Captures",
+        captureHint: "Save your best moments without leaving the match.", captureNow: "Capture now",
+        recentCaptures: "Recent captures", openFolder: "Open folder", overlaySettings: "Overlay settings",
+        personalize: "Customize behavior while you play.", notifications: "Notifications",
+        experience: "Experience", screenshot: "Screenshot", friends: "Friends", online: "Online", offline: "Offline",
+        player: "Player", unavailable: "Unavailable", playing: "Playing", noDescription: "No description.",
+        locked: "Locked", achievementUnlocked: "Unlocked", achievementUpdated: "ACHIEVEMENT UPDATED",
+        achievementNew: "ACHIEVEMENT UNLOCKED", loadingAchievements: "Loading game achievements...",
+        discordConnected: "Discord connected", typing: "typing...", chatConversation: "Checkpoint conversation",
+        startConversation: "Start the conversation here.", noInfo: "Not provided", automatic: "Automatic",
+        overlayAvailable: "Overlay available", controllerConnected: "Controller connected", friendRequest: "Friend request", requestAccepted: "Request accepted", friendPlayingBadge: "Friend playing", newMessage: "New message", gameStarted: "Game started",
+      },
+      "es-ES": {
+        home: "Inicio", game: "Juego", media: "Multimedia", achievements: "Logros", settings: "Ajustes",
+        hello: "Hola,", searchFriends: "Buscar amigos...", myProfile: "Mi perfil", onlineFriends: "Amigos en línea",
+        offlineFriends: "Amigos desconectados", viewAll: "Ver todos ›", showLess: "Mostrar menos", noGame: "Ningún juego detectado",
+        conversations: "Conversaciones", conversationsHint: "Sigue conversando sin salir del juego.",
+        typeMessage: "Escribe un mensaje...", runningGame: "Juego en ejecución", sessionInfo: "Información de tu sesión actual.",
+        currentSession: "Sesión actual", totalTime: "Tiempo total", friendsPlaying: "Amigos jugando",
+        platform: "Plataforma", executable: "Ejecutable", developer: "Desarrollador", release: "Lanzamiento",
+        windowMode: "Modo de ventana", resolution: "Resolución", unlocked: "desbloqueados", captures: "Capturas",
+        captureHint: "Guarda tus mejores momentos sin salir de la partida.", captureNow: "Capturar ahora",
+        recentCaptures: "Capturas recientes", openFolder: "Abrir carpeta", overlaySettings: "Configuración del overlay",
+        personalize: "Personaliza el comportamiento durante tus partidas.", notifications: "Notificaciones",
+        experience: "Experiencia", screenshot: "Captura de pantalla", friends: "Amigos", online: "En línea", offline: "Desconectado",
+        player: "Jugador", unavailable: "No disponible", playing: "Jugando", noDescription: "Sin descripción.",
+        locked: "Bloqueado", achievementUnlocked: "Desbloqueado", achievementUpdated: "LOGRO ACTUALIZADO",
+        achievementNew: "LOGRO DESBLOQUEADO", loadingAchievements: "Cargando logros del juego...",
+        discordConnected: "Discord conectado", typing: "escribiendo...", chatConversation: "Conversación de Checkpoint",
+        startConversation: "Comienza la conversación aquí.", noInfo: "No informado", automatic: "Automática",
+        overlayAvailable: "Overlay disponible", controllerConnected: "Mando conectado", friendRequest: "Solicitud de amistad", requestAccepted: "Solicitud aceptada", friendPlayingBadge: "Amigo jugando", newMessage: "Nuevo mensaje", gameStarted: "Juego iniciado",
+      },
+      "fr-FR": {
+        home: "Accueil", game: "Jeu", media: "Médias", achievements: "Succès", settings: "Paramètres",
+        hello: "Bonjour,", searchFriends: "Rechercher des amis...", myProfile: "Mon profil", onlineFriends: "Amis en ligne",
+        offlineFriends: "Amis hors ligne", viewAll: "Voir tous ›", showLess: "Afficher moins", noGame: "Aucun jeu détecté",
+        conversations: "Conversations", conversationsHint: "Continuez à discuter sans quitter le jeu.",
+        typeMessage: "Écrivez un message...", runningGame: "Jeu en cours", sessionInfo: "Informations sur votre session actuelle.",
+        currentSession: "Session actuelle", totalTime: "Temps total", friendsPlaying: "Amis en jeu",
+        platform: "Plateforme", executable: "Exécutable", developer: "Développeur", release: "Sortie",
+        windowMode: "Mode fenêtre", resolution: "Résolution", unlocked: "débloqués", captures: "Captures",
+        captureHint: "Enregistrez vos meilleurs moments sans quitter la partie.", captureNow: "Capturer",
+        recentCaptures: "Captures récentes", openFolder: "Ouvrir le dossier", overlaySettings: "Paramètres de l’overlay",
+        personalize: "Personnalisez le comportement pendant vos parties.", notifications: "Notifications",
+        experience: "Expérience", screenshot: "Capture d’écran", friends: "Amis", online: "En ligne", offline: "Hors ligne",
+        player: "Joueur", unavailable: "Indisponible", playing: "Joue à", noDescription: "Aucune description.",
+        locked: "Verrouillé", achievementUnlocked: "Débloqué", achievementUpdated: "SUCCÈS MIS À JOUR",
+        achievementNew: "SUCCÈS DÉBLOQUÉ", loadingAchievements: "Chargement des succès du jeu...",
+        discordConnected: "Discord connecté", typing: "écrit...", chatConversation: "Conversation Checkpoint",
+        startConversation: "Commencez la conversation ici.", noInfo: "Non renseigné", automatic: "Automatique",
+        overlayAvailable: "Overlay disponible", controllerConnected: "Manette connectée", friendRequest: "Demande d’ami", requestAccepted: "Demande acceptée", friendPlayingBadge: "Ami en jeu", newMessage: "Nouveau message", gameStarted: "Jeu lancé",
+      },
+      "de-DE": {
+        home: "Start", game: "Spiel", media: "Medien", achievements: "Erfolge", settings: "Einstellungen",
+        hello: "Hallo,", searchFriends: "Freunde suchen...", myProfile: "Mein Profil", onlineFriends: "Freunde online",
+        offlineFriends: "Freunde offline", viewAll: "Alle anzeigen ›", showLess: "Weniger anzeigen", noGame: "Kein Spiel erkannt",
+        conversations: "Unterhaltungen", conversationsHint: "Chatte weiter, ohne das Spiel zu verlassen.",
+        typeMessage: "Nachricht schreiben...", runningGame: "Laufendes Spiel", sessionInfo: "Informationen zur aktuellen Sitzung.",
+        currentSession: "Aktuelle Sitzung", totalTime: "Gesamtzeit", friendsPlaying: "Spielende Freunde",
+        platform: "Plattform", executable: "Programmdatei", developer: "Entwickler", release: "Veröffentlichung",
+        windowMode: "Fenstermodus", resolution: "Auflösung", unlocked: "freigeschaltet", captures: "Aufnahmen",
+        captureHint: "Halte deine besten Momente fest, ohne das Spiel zu verlassen.", captureNow: "Jetzt aufnehmen",
+        recentCaptures: "Letzte Aufnahmen", openFolder: "Ordner öffnen", overlaySettings: "Overlay-Einstellungen",
+        personalize: "Passe das Verhalten während des Spielens an.", notifications: "Benachrichtigungen",
+        experience: "Erlebnis", screenshot: "Screenshot", friends: "Freunde", online: "Online", offline: "Offline",
+        player: "Spieler", unavailable: "Nicht verfügbar", playing: "Spielt", noDescription: "Keine Beschreibung.",
+        locked: "Gesperrt", achievementUnlocked: "Freigeschaltet", achievementUpdated: "ERFOLG AKTUALISIERT",
+        achievementNew: "ERFOLG FREIGESCHALTET", loadingAchievements: "Spielerfolge werden geladen...",
+        discordConnected: "Discord verbunden", typing: "tippt...", chatConversation: "Checkpoint-Unterhaltung",
+        startConversation: "Beginne die Unterhaltung hier.", noInfo: "Nicht angegeben", automatic: "Automatisch",
+        overlayAvailable: "Overlay verfügbar", controllerConnected: "Controller verbunden", friendRequest: "Freundschaftsanfrage", requestAccepted: "Anfrage angenommen", friendPlayingBadge: "Freund spielt", newMessage: "Neue Nachricht", gameStarted: "Spiel gestartet",
+      },
+      "it-IT": {
+        home: "Home", game: "Gioco", media: "Media", achievements: "Obiettivi", settings: "Impostazioni",
+        hello: "Ciao,", searchFriends: "Cerca amici...", myProfile: "Il mio profilo", onlineFriends: "Amici online",
+        offlineFriends: "Amici offline", viewAll: "Vedi tutti ›", showLess: "Mostra meno", noGame: "Nessun gioco rilevato",
+        conversations: "Conversazioni", conversationsHint: "Continua a chattare senza uscire dal gioco.",
+        typeMessage: "Scrivi un messaggio...", runningGame: "Gioco in esecuzione", sessionInfo: "Informazioni sulla sessione attuale.",
+        currentSession: "Sessione attuale", totalTime: "Tempo totale", friendsPlaying: "Amici in gioco",
+        platform: "Piattaforma", executable: "Eseguibile", developer: "Sviluppatore", release: "Uscita",
+        windowMode: "Modalità finestra", resolution: "Risoluzione", unlocked: "sbloccati", captures: "Catture",
+        captureHint: "Salva i tuoi momenti migliori senza uscire dalla partita.", captureNow: "Cattura ora",
+        recentCaptures: "Catture recenti", openFolder: "Apri cartella", overlaySettings: "Impostazioni overlay",
+        personalize: "Personalizza il comportamento durante le partite.", notifications: "Notifiche",
+        experience: "Esperienza", screenshot: "Cattura schermo", friends: "Amici", online: "Online", offline: "Offline",
+        player: "Giocatore", unavailable: "Non disponibile", playing: "Gioca a", noDescription: "Nessuna descrizione.",
+        locked: "Bloccato", achievementUnlocked: "Sbloccato", achievementUpdated: "OBIETTIVO AGGIORNATO",
+        achievementNew: "OBIETTIVO SBLOCCATO", loadingAchievements: "Caricamento obiettivi del gioco...",
+        discordConnected: "Discord collegato", typing: "sta scrivendo...", chatConversation: "Conversazione Checkpoint",
+        startConversation: "Inizia la conversazione qui.", noInfo: "Non specificato", automatic: "Automatica",
+        overlayAvailable: "Overlay disponibile", controllerConnected: "Controller collegato", friendRequest: "Richiesta di amicizia", requestAccepted: "Richiesta accettata", friendPlayingBadge: "Amico in gioco", newMessage: "Nuovo messaggio", gameStarted: "Gioco avviato",
+      },
+    };
+    let overlayLanguage = "pt-BR";
+    const overlayTextOrigins = new WeakMap();
+    const overlayStaticKeys = new Map([
+      ["Início", "home"], ["Jogo", "game"], ["Mídia", "media"], ["Conquistas", "achievements"], ["Config.", "settings"],
+      ["Olá,", "hello"], ["Meu perfil", "myProfile"], ["Amigos online", "onlineFriends"], ["Amigos offline", "offlineFriends"],
+      ["Ver todos ›", "viewAll"], ["Conversas", "conversations"], ["Continue suas conversas sem sair do jogo.", "conversationsHint"],
+      ["Jogo em execução", "runningGame"], ["Informações da sua sessão atual.", "sessionInfo"], ["Sessão atual", "currentSession"],
+      ["Tempo total", "totalTime"], ["Amigos jogando", "friendsPlaying"], ["Plataforma", "platform"], ["Executável", "executable"],
+      ["Desenvolvedor", "developer"], ["Lançamento", "release"], ["Modo de janela", "windowMode"], ["Resolução", "resolution"],
+      ["desbloqueadas", "unlocked"], ["Capturas", "captures"], ["Registre seus melhores momentos sem sair da partida.", "captureHint"],
+      ["Capturar agora", "captureNow"], ["Capturas recentes", "recentCaptures"], ["Abrir pasta", "openFolder"],
+      ["Configurações do overlay", "overlaySettings"], ["Personalize o comportamento durante suas partidas.", "personalize"],
+      ["Notificações", "notifications"], ["Experiência", "experience"], ["Captura de tela", "screenshot"], ["Amigos", "friends"],
+    ]);
+    const overlayT = (key) => overlayTranslations[overlayLanguage]?.[key] || overlayTranslations["pt-BR"][key] || key;
+    const applyOverlayLanguage = (language) => {
+      overlayLanguage = overlayTranslations[language] ? language : "pt-BR";
+      document.documentElement.lang = overlayLanguage;
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node;
+      while ((node = walker.nextNode())) {
+        if (!overlayTextOrigins.has(node)) overlayTextOrigins.set(node, node.nodeValue || "");
+        const original = overlayTextOrigins.get(node);
+        const trimmed = original.trim();
+        const key = overlayStaticKeys.get(trimmed);
+        if (key) node.nodeValue = original.replace(trimmed, overlayT(key));
+      }
+      const search = document.getElementById("friend-search");
+      if (search) search.placeholder = overlayT("searchFriends");
+      const chatInput = document.getElementById("chat-input");
+      if (chatInput) chatInput.placeholder = overlayT("typeMessage");
+    };
     const overlaySoundMap = {
       "achievement-unlock": {
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_achievement_toast.wav", window.location.href).toString(),
@@ -3294,14 +3448,14 @@
     };
 
     const socialBadgeLabel = (kind) => {
-      if (kind === "capture-saved") return "Captura de tela";
-      if (kind === "overlay-hint") return "Overlay disponível";
-      if (kind === "controller-connected") return "Controle conectado";
-      if (kind === "friend-request") return "Pedido de amizade";
-      if (kind === "friend-accepted") return "Pedido aceito";
-      if (kind === "friend-playing") return "Amigo jogando";
-      if (kind === "friend-message") return "Nova mensagem";
-      return "Jogo iniciado";
+      if (kind === "capture-saved") return overlayT("screenshot");
+      if (kind === "overlay-hint") return overlayT("overlayAvailable");
+      if (kind === "controller-connected") return overlayT("controllerConnected");
+      if (kind === "friend-request") return overlayT("friendRequest");
+      if (kind === "friend-accepted") return overlayT("requestAccepted");
+      if (kind === "friend-playing") return overlayT("friendPlayingBadge");
+      if (kind === "friend-message") return overlayT("newMessage");
+      return overlayT("gameStarted");
     };
 
     const formatPlaytime = (minutes) => {
@@ -3399,7 +3553,7 @@
 
       const eyebrow = document.createElement("div");
       eyebrow.className = "achievement-eyebrow";
-      eyebrow.textContent = payload.duplicate ? "CONQUISTA ATUALIZADA" : "CONQUISTA DESBLOQUEADA";
+      eyebrow.textContent = payload.duplicate ? overlayT("achievementUpdated") : overlayT("achievementNew");
 
       const title = document.createElement("h2");
       title.className = "achievement-title";
@@ -3540,6 +3694,7 @@
 
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
+      applyOverlayLanguage(state.language);
       const onlineRoot = document.getElementById("panel-friends-online");
       const offlineRoot = document.getElementById("panel-friends-offline");
       if (!onlineRoot || !offlineRoot) return;
@@ -3549,13 +3704,13 @@
       if (gameBackdrop) gameBackdrop.style.backgroundImage = gameImage ? `url("${gameImage}")` : "none";
       document.getElementById("panel-game").textContent = currentGame?.title
         ? `Jogando agora: ${currentGame.title}`
-        : "Nenhum jogo detectado.";
+        : `${overlayT("noGame")}.`;
       document.getElementById("achievement-game-label").textContent = currentGame?.title
         ? `Progresso atual em ${currentGame.title}`
         : "Inicie um jogo para acompanhar o progresso.";
 
       const profile = state.profile || {};
-      const profileName = profile.name || "Jogador";
+      const profileName = profile.name || overlayT("player");
       const profileAvatar = safeImageUrl(profile.avatar) || checkpointIconUrl;
       document.getElementById("panel-profile-name").textContent = profileName.split(" ")[0];
       document.getElementById("sidebar-profile-name").textContent = profileName.split(" ")[0];
@@ -3565,7 +3720,7 @@
       document.getElementById("profile-page-name").textContent = profileName;
       const discordPill = document.getElementById("profile-discord");
       discordPill.hidden = !profile.discordConnected;
-      document.getElementById("profile-discord-name").textContent = profile.discordUsername || "Discord conectado";
+      document.getElementById("profile-discord-name").textContent = profile.discordUsername || overlayT("discordConnected");
 
       const allFriends = Array.isArray(state.friends) ? state.friends : [];
       const searchTerm = document.getElementById("friend-search").value.trim().toLowerCase();
@@ -3574,8 +3729,8 @@
         : allFriends;
       const onlineFriends = friends.filter((friend) => friend.status !== "offline");
       const offlineFriends = friends.filter((friend) => friend.status === "offline");
-      document.getElementById("panel-friend-count").textContent = `${allFriends.length} amigos`;
-      document.getElementById("panel-online-count").textContent = `${allFriends.filter((friend) => friend.status !== "offline").length} online`;
+      document.getElementById("panel-friend-count").textContent = `${allFriends.length} ${overlayT("friends").toLocaleLowerCase(overlayLanguage)}`;
+      document.getElementById("panel-online-count").textContent = `${allFriends.filter((friend) => friend.status !== "offline").length} ${overlayT("online").toLocaleLowerCase(overlayLanguage)}`;
       document.getElementById("online-heading-count").textContent = `(${onlineFriends.length})`;
       document.getElementById("offline-heading-count").textContent = `(${offlineFriends.length})`;
       document.getElementById("profile-friends-total").textContent = String(allFriends.length);
@@ -3596,10 +3751,10 @@
         copy.className = "friend-copy";
         const name = document.createElement("div");
         name.className = "friend-name";
-        name.textContent = friend.name || "Jogador";
+        name.textContent = friend.name || overlayT("player");
         const status = document.createElement("div");
         status.className = "friend-status";
-        status.textContent = friend.playing ? `Jogando ${friend.playing}` : friend.status === "online" ? "Online" : "Offline";
+        status.textContent = friend.playing ? `${overlayT("playing")} ${friend.playing}` : friend.status === "online" ? overlayT("online") : overlayT("offline");
         copy.append(name, status);
         card.append(avatar, copy);
         if (friend.unread > 0) {
@@ -3610,7 +3765,7 @@
         }
         const chat = document.createElement("button");
         chat.className = "chat-button";
-        chat.textContent = friend.canChat ? "Chat" : "Indisponível";
+        chat.textContent = friend.canChat ? "Chat" : overlayT("unavailable");
         chat.disabled = !friend.canChat;
         chat.addEventListener("click", () => {
           const chatNav = document.querySelector('[data-panel-tab="chats"]');
@@ -3660,9 +3815,9 @@
         const copy = document.createElement("span");
         copy.className = "conversation-copy";
         const name = document.createElement("strong");
-        name.textContent = friend.name || "Jogador";
+        name.textContent = friend.name || overlayT("player");
         const preview = document.createElement("span");
-        preview.textContent = friend.playing ? `Jogando ${friend.playing}` : friend.status === "offline" ? "Offline" : "Disponível para conversar";
+        preview.textContent = friend.playing ? `${overlayT("playing")} ${friend.playing}` : friend.status === "offline" ? overlayT("offline") : overlayT("online");
         copy.append(name, preview);
         const meta = document.createElement("span");
         meta.className = "conversation-meta";
@@ -3679,13 +3834,13 @@
 
       const contextArt = document.getElementById("context-game-art");
       contextArt.style.backgroundImage = gameImage ? `url("${gameImage}")` : "";
-      document.getElementById("context-game-title").textContent = currentGame?.title || "Nenhum jogo detectado";
+      document.getElementById("context-game-title").textContent = currentGame?.title || overlayT("noGame");
       document.getElementById("context-game-message").textContent = currentGame
         ? "Acompanhe conquistas e converse com amigos sem sair da partida."
         : "Inicie um jogo para acessar conquistas e recursos do overlay.";
       const gamePageArt = document.getElementById("game-page-art");
       gamePageArt.style.backgroundImage = gameImage ? `url("${gameImage}")` : "";
-      document.getElementById("game-page-title").textContent = currentGame?.title || "Nenhum jogo detectado";
+      document.getElementById("game-page-title").textContent = currentGame?.title || overlayT("noGame");
       document.getElementById("game-page-message").textContent = currentGame
         ? currentGame.monitoring === "verified"
           ? "O processo está sendo acompanhado pelo Checkpoint em segundo plano."
@@ -3698,12 +3853,12 @@
       document.getElementById("game-live-status").classList.toggle("is-unverified", Boolean(currentGame && currentGame.monitoring !== "verified"));
       const platformLabels = { steam: "Steam", epic: "Epic Games", local: "Jogo local" };
       document.getElementById("game-platform").textContent = platformLabels[String(currentGame?.platform || "").toLowerCase()] || currentGame?.platform || "—";
-      document.getElementById("game-executable").textContent = currentGame?.executableName || "Não informado";
-      document.getElementById("game-developer").textContent = currentGame?.developer || "Não informado";
-      document.getElementById("game-release-date").textContent = currentGame?.releaseDate || "Não informado";
+      document.getElementById("game-executable").textContent = currentGame?.executableName || overlayT("noInfo");
+      document.getElementById("game-developer").textContent = currentGame?.developer || overlayT("noInfo");
+      document.getElementById("game-release-date").textContent = currentGame?.releaseDate || overlayT("noInfo");
       document.getElementById("game-window-mode").textContent = currentGame?.windowMode === "borderless"
         ? "Sem bordas" : currentGame?.windowMode === "windowed" ? "Janela" : "Padrão do jogo";
-      document.getElementById("game-resolution").textContent = currentGame?.resolution || "Automática";
+      document.getElementById("game-resolution").textContent = currentGame?.resolution || overlayT("automatic");
       document.getElementById("game-total-playtime").textContent = formatPlaytime(currentGame?.totalPlaytimeMinutes);
       const friendsPlaying = allFriends.filter((friend) => currentGame?.title && String(friend.playing || "").toLowerCase() === String(currentGame.title).toLowerCase()).length;
       document.getElementById("game-friends-playing").textContent = String(friendsPlaying);
@@ -3723,7 +3878,7 @@
       if (achievements.loading) {
         const loading = document.createElement("div");
         loading.className = "panel-card";
-        loading.textContent = "Carregando conquistas do jogo...";
+        loading.textContent = overlayT("loadingAchievements");
         achievementsRoot.appendChild(loading);
       } else if (!currentGame) {
         const empty = document.createElement("div");
@@ -3753,12 +3908,12 @@
             name.textContent = achievement.name || achievement.id;
             const description = document.createElement("div");
             description.className = "achievement-description-small";
-            description.textContent = achievement.description || "Sem descrição.";
+            description.textContent = achievement.description || overlayT("noDescription");
             const status = document.createElement("div");
             status.className = "achievement-state";
             status.textContent = achievement.achieved
-              ? `Desbloqueada${achievement.unlockedAt ? ` · ${new Date(achievement.unlockedAt).toLocaleDateString("pt-BR")}` : ""}`
-              : "Bloqueada";
+              ? `${overlayT("achievementUnlocked")}${achievement.unlockedAt ? ` · ${new Date(achievement.unlockedAt).toLocaleDateString(overlayLanguage)}` : ""}`
+              : overlayT("locked");
             copy.append(name, description, status);
             item.append(icon, copy);
             achievementsRoot.appendChild(item);
@@ -3844,14 +3999,14 @@
       document.getElementById("panel-chat-list").hidden = Boolean(chat);
       document.getElementById("panel-chat-view").hidden = !chat;
       if (chat) {
-        document.getElementById("chat-name").textContent = chat.friendName || "Amigo";
+        document.getElementById("chat-name").textContent = chat.friendName || overlayT("friends");
         setAvatarSource(
           document.getElementById("chat-avatar"),
           chat.friendAvatar,
           chat.friendName,
         );
-        document.getElementById("chat-status").textContent = chat.typing ? "digitando..." : "Conversa pelo Checkpoint";
-        document.getElementById("chat-typing").textContent = chat.typing ? `${chat.friendName} está digitando...` : "";
+        document.getElementById("chat-status").textContent = chat.typing ? overlayT("typing") : overlayT("chatConversation");
+        document.getElementById("chat-typing").textContent = chat.typing ? `${chat.friendName} ${overlayT("typing")}` : "";
         document.getElementById("chat-error").textContent = chat.error || "";
         document.getElementById("chat-send").disabled = Boolean(chat.sending);
         document.getElementById("chat-attach").disabled = Boolean(chat.sending);
@@ -3860,7 +4015,7 @@
         if (!chat.messages?.length) {
           const empty = document.createElement("div");
           empty.className = "chat-empty";
-          empty.textContent = "Comece a conversa por aqui.";
+          empty.textContent = overlayT("startConversation");
           messagesRoot.appendChild(empty);
         } else {
           let previousDayKey = null;
@@ -3937,7 +4092,7 @@
     document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
     document.getElementById("show-all-friends")?.addEventListener("click", (event) => {
       showAllOnlineFriends = !showAllOnlineFriends;
-      event.currentTarget.textContent = showAllOnlineFriends ? "Mostrar menos" : "Ver todos ›";
+      event.currentTarget.textContent = showAllOnlineFriends ? overlayT("showLess") : overlayT("viewAll");
       renderPanelState(latestPanelState);
     });
     document.getElementById("chat-back")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close-chat" }));

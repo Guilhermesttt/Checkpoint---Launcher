@@ -125,7 +125,11 @@ export const syncPublicLibrarySummary = async (
     profile?.website || "",
     profile?.favoriteGenres || [],
     profile?.steamId || "",
+    profile?.steamUsername || "",
+    profile?.steamAvatar || "",
     profile?.discordId || "",
+    profile?.discordUsername || "",
+    profile?.discordAvatar || "",
   ]);
   const fingerprintKey = `checkpoint_public_profile_fingerprint_${uid}`;
   if (
@@ -147,7 +151,11 @@ export const syncPublicLibrarySummary = async (
       steamConnected: Boolean(profile?.steamId),
       discordConnected: Boolean(profile?.discordId),
       steamId: profile?.steamId || "",
+      steamUsername: profile?.steamUsername || "",
+      steamAvatar: profile?.steamAvatar || "",
       discordId: profile?.discordId || "",
+      discordUsername: profile?.discordUsername || "",
+      discordAvatar: profile?.discordAvatar || "",
     },
     achievements: summary.achievements,
     topGames: summary.topGames,

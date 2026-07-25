@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import UserProfilePage from "../src/components/UserProfilePage";
 
@@ -18,8 +18,13 @@ describe("links externos do perfil", () => {
     });
   });
 
-  it("abre os perfis Steam e Discord usando os IDs públicos", () => {
+  it("abre a Steam e copia o nickname do Discord no perfil do amigo", async () => {
     const openExternalUrl = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
       value: { openExternalUrl },
@@ -32,23 +37,23 @@ describe("links externos do perfil", () => {
           displayName: "Amigo",
           steamId: "76561198000000000",
           discordId: "123456789012345678",
+          discordUsername: "AmigoDiscord",
         }}
         user={null}
         games={[]}
         editable={false}
+        copyFriendDiscord
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Steam" }));
-    fireEvent.click(screen.getByRole("button", { name: "Discord" }));
+    fireEvent.click(screen.getByRole("button", { name: "AmigoDiscord" }));
 
     expect(openExternalUrl).toHaveBeenNthCalledWith(
       1,
       "https://steamcommunity.com/profiles/76561198000000000",
     );
-    expect(openExternalUrl).toHaveBeenNthCalledWith(
-      2,
-      "https://discord.com/users/123456789012345678",
-    );
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("AmigoDiscord"));
+    expect(openExternalUrl).toHaveBeenCalledTimes(1);
   });
 });
