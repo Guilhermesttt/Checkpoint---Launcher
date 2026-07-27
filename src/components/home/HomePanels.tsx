@@ -39,7 +39,7 @@ import {
   subscribeToFriendTyping,
 } from "../../services/chat";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../../context/PreferencesContext";
-import type { SoundEffectType } from "../../hooks/useSoundEffects";
+import { useSoundEffects, type SoundEffectType } from "../../hooks/useSoundEffects";
 import type {
   ChatMessage,
   CheckpointFriendRequest,
@@ -138,11 +138,13 @@ const SettingsChoice: React.FC<{
   hint: string;
   swatch?: string;
   onClick: () => void;
-}> = ({ active, label, hint, swatch, onClick }) => (
+  onHover?: () => void;
+}> = ({ active, label, hint, swatch, onClick, onHover }) => (
   <button
     type="button"
     onClick={onClick}
-    className="relative overflow-hidden rounded-2xl border p-4 text-left transition-all"
+    onMouseEnter={onHover}
+    className="relative cursor-pointer overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 hover:scale-[1.03] hover:border-white/30 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] active:scale-[0.98]"
     style={{
       background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.04)",
       borderColor: active
@@ -181,9 +183,10 @@ const VolumeSettingsCard: React.FC<{
   max: number;
   actionLabel?: string;
   onAction?: () => void;
+  onHover?: () => void;
   onChange: (volume: number) => void;
   t: TranslationFn;
-}> = ({ title, description, value, max, actionLabel, onAction, onChange, t }) => (
+}> = ({ title, description, value, max, actionLabel, onAction, onHover, onChange, t }) => (
   <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
     <SettingsHeader
       icon={<Volume2 className="h-5 w-5 text-white/70" />}
@@ -199,7 +202,8 @@ const VolumeSettingsCard: React.FC<{
         <button
           type="button"
           onClick={onAction}
-          className="h-10 rounded-xl bg-white px-4 text-[10px] font-black uppercase tracking-wider text-black"
+          onMouseEnter={onHover}
+          className="h-10 cursor-pointer rounded-xl bg-white px-4 text-[10px] font-black uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95"
         >
           {actionLabel}
         </button>
@@ -212,7 +216,8 @@ const VolumeSettingsCard: React.FC<{
       step={1}
       value={value}
       onChange={(event) => onChange(Number(event.target.value))}
-      className="w-full accent-white"
+      onMouseEnter={onHover}
+      className="w-full cursor-pointer accent-white hover:brightness-125 transition-all"
     />
     <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
       <span>{t("mute")}</span>
@@ -295,6 +300,11 @@ export const SettingsPageV2: React.FC<{
   onTestOverlayWelcome,
   onTestOverlayAchievement,
 }) => {
+    const { playSound } = useSoundEffects(
+      effectsVolume / 100,
+      soundTheme,
+      notificationVolume / 100,
+    );
     const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
     const { openAtLogin, setOpenAtLogin, lowPerformanceMode, setLowPerformanceMode, closeOnLaunch, setCloseOnLaunch } = usePreferences();
     const controllerCopy = {
@@ -346,14 +356,16 @@ export const SettingsPageV2: React.FC<{
                 <div className="flex items-center gap-2">
                   <button
                     onClick={onSyncSteam}
+                    onMouseEnter={() => playSound("hover")}
                     disabled={steamSyncing}
-                    className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-white/60 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
+                    className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-white/60 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                   >
                     {steamSyncing ? t("syncing") : t("sync")}
                   </button>
                   <button
                     onClick={onDisconnectSteam}
-                    className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
                   >
                     {t("unlink")}
                   </button>
@@ -361,8 +373,9 @@ export const SettingsPageV2: React.FC<{
               ) : (
                 <button
                   onClick={onConnectSteam}
+                  onMouseEnter={() => playSound("hover")}
                   disabled={steamConnecting}
-                  className="rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
+                  className="cursor-pointer rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                 >
                   {steamConnecting ? t("connecting") : t("connectSteam")}
                 </button>
@@ -402,15 +415,17 @@ export const SettingsPageV2: React.FC<{
               {discordConnected ? (
                 <button
                   onClick={onDisconnectDiscord}
-                  className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300"
+                  onMouseEnter={() => playSound("hover")}
+                  className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
                 >
                   {t("unlink")}
                 </button>
               ) : (
                 <button
                   onClick={onConnectDiscord}
+                  onMouseEnter={() => playSound("hover")}
                   disabled={discordConnecting}
-                  className="rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
+                  className="cursor-pointer rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                 >
                   {discordConnecting ? t("connecting") : t("connectDiscord")}
                 </button>
@@ -453,8 +468,9 @@ export const SettingsPageV2: React.FC<{
                 <button
                   type="button"
                   onClick={led.status === "connected" ? led.testLed : led.requestAccess}
+                  onMouseEnter={() => playSound("hover")}
                   disabled={led.status === "connecting"}
-                  className="shrink-0 rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-black transition hover:bg-white/85"
+                  className="shrink-0 cursor-pointer rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   {led.status === "connected" ? controllerCopy[4] : led.status === "connecting" ? "..." : controllerCopy[5]}
                 </button>
@@ -485,6 +501,7 @@ export const SettingsPageV2: React.FC<{
                   active={language === option.id}
                   label={option.label}
                   hint={option.hint}
+                  onHover={() => playSound("hover")}
                   onClick={() => onLanguageChange(option.id)}
                 />
               ))}
@@ -505,6 +522,7 @@ export const SettingsPageV2: React.FC<{
                   label={option.label}
                   hint={option.hint}
                   swatch={option.swatch}
+                  onHover={() => playSound("hover")}
                   onClick={() => {
                     onVisualThemeChange(option.visualTheme);
                     onSoundThemeChange(option.soundTheme);
@@ -521,6 +539,7 @@ export const SettingsPageV2: React.FC<{
             max={100}
             actionLabel={t("test")}
             onAction={onPreviewSound}
+            onHover={() => playSound("hover")}
             onChange={onEffectsVolumeChange}
             t={t}
           />
@@ -532,6 +551,7 @@ export const SettingsPageV2: React.FC<{
             max={100}
             actionLabel={t("test")}
             onAction={onTestOverlayAchievement}
+            onHover={() => playSound("hover")}
             onChange={onAchievementVolumeChange}
             t={t}
           />
@@ -543,6 +563,7 @@ export const SettingsPageV2: React.FC<{
             max={100}
             actionLabel={t("test")}
             onAction={onTestNotificationSound}
+            onHover={() => playSound("hover")}
             onChange={onNotificationVolumeChange}
             t={t}
           />
@@ -552,6 +573,7 @@ export const SettingsPageV2: React.FC<{
             description={t("musicHint")}
             value={musicVolume}
             max={35}
+            onHover={() => playSound("hover")}
             onChange={onMusicVolumeChange}
             t={t}
           />
@@ -609,7 +631,8 @@ export const SettingsPageV2: React.FC<{
             <button
               type="button"
               onClick={onTestOverlayWelcome}
-              className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left transition-all hover:bg-white/[0.08]"
+              onMouseEnter={() => playSound("hover")}
+              className="cursor-pointer rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-white/25 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.08)] active:scale-[0.98]"
             >
               <span className="block text-sm font-black uppercase tracking-wider text-white">
                 Testar divirta-se
@@ -621,7 +644,8 @@ export const SettingsPageV2: React.FC<{
             <button
               type="button"
               onClick={onTestOverlayAchievement}
-              className="rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.08] px-5 py-4 text-left transition-all hover:bg-emerald-500/[0.14]"
+              onMouseEnter={() => playSound("hover")}
+              className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.08] px-5 py-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-emerald-400/40 hover:bg-emerald-500/[0.14] hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] active:scale-[0.98]"
             >
               <span className="block text-sm font-black uppercase tracking-wider text-white">
                 Testar conquista
@@ -631,7 +655,6 @@ export const SettingsPageV2: React.FC<{
               </span>
             </button>
           </div>
-
         </section>
 
         <AppUpdateSection />

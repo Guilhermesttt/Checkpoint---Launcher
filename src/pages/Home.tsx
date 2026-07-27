@@ -1067,8 +1067,13 @@ const Home: React.FC = () => {
               {} as Record<string, { earned: boolean; earnedTime: number }>
             )),
           ]);
+          const savedAchievements: Record<string, { unlockedAt: string }> =
+            progress?.unlockedAchievements ?? {};
           const progressById = new Map(
-            Object.entries(progress?.unlockedAchievements || {}).map(([id, value]) => [id.toLowerCase(), value]),
+            Object.entries(savedAchievements).map(([id, value]) => [
+              id.toLowerCase(),
+              value,
+            ]),
           );
           items = items.map((achievement) => {
             const saved = progressById.get(achievement.apiName.toLowerCase());
@@ -1501,7 +1506,7 @@ const Home: React.FC = () => {
                     playSound("search");
                   }}
                   onMouseEnter={() => playSound("hover")}
-                  className="p-1 hover:bg-white/5 rounded-full transition-all group"
+                  className="cursor-pointer p-1.5 hover:bg-white/10 hover:scale-110 active:scale-90 transition-all duration-200 rounded-full group"
                 >
                   <Search className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
                 </button>
@@ -1534,7 +1539,7 @@ const Home: React.FC = () => {
                   openAddGameModal();
                 }}
                 onMouseEnter={() => playSound("hover")}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
+                className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/10 active:scale-95 group"
               >
                 <Plus className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
                 <span className="text-[10px] font-black uppercase tracking-wider text-white/40 group-hover:text-white transition-colors">
@@ -1552,7 +1557,7 @@ const Home: React.FC = () => {
                       setDisconnectSteamModalOpen(true);
                     }}
                     onMouseEnter={() => playSound("hover")}
-                    className="relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-red-500/10 group/steam"
+                    className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-red-500/10 active:scale-95 group/steam"
                   >
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] group-hover/steam:bg-red-500 group-hover/steam:shadow-[0_0_8px_rgba(239,68,68,0.6)] transition-all" />
                     <div className="relative h-3 overflow-hidden min-w-[40px]">
@@ -1579,7 +1584,7 @@ const Home: React.FC = () => {
                     onClick={handleSyncSteam}
                     onMouseEnter={() => playSound("hover")}
                     disabled={steamSyncing}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/5 active:scale-95 disabled:opacity-50 group"
+                    className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/5 active:scale-95 disabled:opacity-50 group"
                   >
                     <RefreshCw
                       className={`w-3 h-3 text-white/30 group-hover:text-white/60 ${steamSyncing ? "animate-spin" : ""}`}
@@ -1594,7 +1599,7 @@ const Home: React.FC = () => {
                   onClick={connectSteam}
                   onMouseEnter={() => playSound("hover")}
                   disabled={steamConnecting}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
+                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/10 active:scale-95 group"
                 >
                   <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
                   <span className="text-[10px] font-black uppercase tracking-wider text-red-500/60 group-hover:text-white transition-colors">
@@ -1604,7 +1609,7 @@ const Home: React.FC = () => {
               )}
             </div>
 
-              <ProfileDropdown
+            <ProfileDropdown
                 userDisplay={userDisplay}
                 email={user?.email || undefined}
                 avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}

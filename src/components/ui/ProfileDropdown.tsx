@@ -51,7 +51,7 @@ export function ProfileDropdown({
         <button
           onPointerEnter={() => playSound("hover")}
           onClick={() => playSound("select")}
-          className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          className="flex cursor-pointer items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           <div className="flex flex-col items-end pl-2">
             <span className="text-[8px] font-black uppercase tracking-widest text-white/30">

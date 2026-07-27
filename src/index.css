@@ -124,6 +124,23 @@ html[data-launcher-theme="sunset"] {
     overflow-x: hidden;
   }
 
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="range"] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled {
+    cursor: not-allowed;
+  }
+
   :focus:not(:focus-visible) { outline: none; }
   :focus-visible {
     outline: 2px solid rgba(255, 255, 255, 0.75);
