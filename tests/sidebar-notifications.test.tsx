@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "../src/components/Sidebar";
 
@@ -40,5 +41,31 @@ describe("notificacoes da sidebar", () => {
     expect(screen.getByRole("button", {
       name: "Amigos, 120 notificacoes",
     })).toHaveTextContent("99+");
+  });
+
+  it("mostra o nome em um tooltip fora da sidebar e indica os botoes clicaveis", async () => {
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    const user = userEvent.setup();
+    render(
+      <Sidebar
+        activeCategory="ALL"
+        onCategory={vi.fn()}
+        settingsLabel="Ajustes"
+        playSound={vi.fn()}
+      />,
+    );
+
+    const settings = screen.getByRole("button", { name: "Ajustes" });
+    expect(settings).toHaveClass("cursor-pointer");
+
+    await user.hover(settings);
+
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Ajustes");
+    expect(tooltip.closest("aside")).toBeNull();
   });
 });

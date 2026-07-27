@@ -4,7 +4,6 @@ import type { SoundTheme } from "../context/PreferencesContext";
 import ps5PlusNavigateSound from "../sounds/PS5_Plus/deck_ui_navigation.wav";
 import ps5PlusHoverSound from "../sounds/PS5_Plus/deck_ui_slider_down.wav";
 import ps5PlusActivationSound from "../sounds/PS5_Plus/deck_ui_default_activation.wav";
-import ps5PlusReturnSound from "../sounds/PS5_Plus/deck_ui_side_menu_fly_out.wav";
 import ps5PlusHideModalSound from "../sounds/PS5_Plus/deck_ui_hide_modal.wav";
 import ps5PlusSwitchOnSound from "../sounds/PS5_Plus/deck_ui_switch_toggle_on.wav";
 import ps5PlusSwitchOffSound from "../sounds/PS5_Plus/deck_ui_switch_toggle_off.wav";
@@ -30,7 +29,6 @@ import ps4FriendRequestSound from "../sounds/PS4/02. Src1 Se Morpheus Noti.mp3";
 import pspNavigateSound from "../sounds/PSP Sounds/deck_ui_navigation.wav";
 import pspHoverSound from "../sounds/PSP Sounds/deck_ui_slider_down.wav";
 import pspPositiveSound from "../sounds/PSP Sounds/confirmation_positive.wav";
-import pspNegativeSound from "../sounds/PSP Sounds/confirmation_negative.wav";
 import pspHideModalSound from "../sounds/PSP Sounds/deck_ui_hide_modal.wav";
 import pspSwitchOnSound from "../sounds/PSP Sounds/deck_ui_switch_toggle_on.wav";
 import pspSwitchOffSound from "../sounds/PSP Sounds/deck_ui_switch_toggle_off.wav";
@@ -41,7 +39,6 @@ import pspIntoGameDetailSound from "../sounds/PSP Sounds/deck_ui_into_game_detai
 import pspToastSound from "../sounds/PSP Sounds/deck_ui_toast.wav";
 import pspAchievementToastSound from "../sounds/PSP Sounds/deck_ui_achievement_toast.wav";
 
-import xbPageRightSound from "../sounds/Xbox 360 UI/PageRight.wav";
 import xbSelect2Sound from "../sounds/Xbox 360 UI/Select2.wav";
 import xbSelectSound from "../sounds/Xbox 360 UI/Select.wav";
 import xbBackSound from "../sounds/Xbox 360 UI/Back.wav";
@@ -57,7 +54,6 @@ import xbDownloadCompleteSound from "../sounds/Xbox 360 UI/dl_complete.wav";
 import cyberpunkNavigateSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_navigation.wav";
 import cyberpunkHoverSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_slider_down.wav";
 import cyberpunkActivationSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_default_activation.wav";
-import cyberpunkReturnSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_side_menu_fly_out.wav";
 import cyberpunkHideModalSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_hide_modal.wav";
 import cyberpunkSwitchOnSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_switch_toggle_on.wav";
 import cyberpunkSwitchOffSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_switch_toggle_off.wav";
@@ -71,11 +67,10 @@ import cyberpunkAchievementToastSound from "../sounds/Cyberpunk 2077 UI SFX PACK
 import ps2NavigateSound from "../sounds/PS2 System Sounds/deck_ui_navigation.wav";
 import ps2ClickSound from "../sounds/PS2 System Sounds/deck_ui_toast.wav";
 import ps2ActivationSound from "../sounds/PS2 System Sounds/deck_ui_default_activation.wav";
-import ps2ReturnSound from "../sounds/PS2 System Sounds/deck_ui_side_menu_fly_out.wav";
 import ps2EditModalSound from "../sounds/PS2 System Sounds/deck_ui_hide_modal.wav";
 import ps2FavoriteOnSound from "../sounds/PS2 System Sounds/deck_ui_switch_toggle_on.wav";
 import ps2FavoriteOffSound from "../sounds/PS2 System Sounds/deck_ui_switch_toggle_off.wav";
-import ps2DeleteSound from "../sounds/PS2 System Sounds/deck_ui_out_of_game_detail.wav";
+import ps2OutOfGameDetailSound from "../sounds/PS2 System Sounds/deck_ui_out_of_game_detail.wav";
 import ps2PlaySoundEffect from "../sounds/PS2 System Sounds/deck_ui_achievement_toast.wav";
 import ps2GameBootSound from "../sounds/PS2 System Sounds/deck_ui_launch_game.wav";
 import ps2SearchSound from "../sounds/PS2 System Sounds/deck_ui_tab_transition_01.wav";
@@ -84,11 +79,10 @@ import ps2DetailOpenSound from "../sounds/PS2 System Sounds/deck_ui_into_game_de
 import gcNavigateSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
 import gcHoverSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_navigation.wav";
 import gcClickSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav";
-import gcReturnSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_out.wav";
 import gcEditModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_hide_modal.wav";
 import gcFavoriteOnSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_up.wav";
 import gcFavoriteOffSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
-import gcDeleteSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
+import gcOutOfGameDetailSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
 import gcPlaySoundEffect from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
 import gcGameBootSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
 import gcSearchSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
@@ -99,9 +93,9 @@ const soundThemes = {
     navigate: ps5PlusNavigateSound,
     hover: ps5PlusHoverSound,
     select: ps5PlusActivationSound,
-    back: ps5PlusReturnSound,
+    back: ps5PlusOutOfGameDetailSound,
     edit: ps5PlusHideModalSound,
-    modalClose: ps5PlusHideModalSound,
+    modalClose: ps5PlusOutOfGameDetailSound,
     favoriteOn: ps5PlusSwitchOnSound,
     favoriteOff: ps5PlusSwitchOffSound,
     delete: ps5PlusOutOfGameDetailSound,
@@ -122,9 +116,9 @@ const soundThemes = {
     navigate: ps4NavigateSound,
     hover: ps4NavigateSound,
     select: ps4ShowModalSound,
-    back: ps4ReturnSound,
+    back: ps4OutOfGameDetailSound,
     edit: ps4FlyInSound,
-    modalClose: ps4ReturnSound,
+    modalClose: ps4OutOfGameDetailSound,
     favoriteOn: ps4FlyInSound,
     favoriteOff: ps4ReturnSound,
     delete: ps4OutOfGameDetailSound,
@@ -145,9 +139,9 @@ const soundThemes = {
     navigate: pspNavigateSound,
     hover: pspHoverSound,
     select: pspPositiveSound,
-    back: pspNegativeSound,
+    back: pspOutOfGameDetailSound,
     edit: pspHideModalSound,
-    modalClose: pspHideModalSound,
+    modalClose: pspOutOfGameDetailSound,
     favoriteOn: pspSwitchOnSound,
     favoriteOff: pspSwitchOffSound,
     delete: pspOutOfGameDetailSound,
@@ -168,7 +162,7 @@ const soundThemes = {
     navigate: xbSelect2Sound,
     hover: xbSelect2Sound,
     select: xbSelectSound,
-    back: xbPageRightSound,
+    back: xbBackSound,
     edit: xbSelectA2Sound,
     modalClose: xbBackSound,
     favoriteOn: xbSelectASound,
@@ -191,9 +185,9 @@ const soundThemes = {
     navigate: cyberpunkNavigateSound,
     hover: cyberpunkHoverSound,
     select: cyberpunkActivationSound,
-    back: cyberpunkReturnSound,
+    back: cyberpunkOutOfGameDetailSound,
     edit: cyberpunkHideModalSound,
-    modalClose: cyberpunkHideModalSound,
+    modalClose: cyberpunkOutOfGameDetailSound,
     favoriteOn: cyberpunkSwitchOnSound,
     favoriteOff: cyberpunkSwitchOffSound,
     delete: cyberpunkOutOfGameDetailSound,
@@ -214,12 +208,12 @@ const soundThemes = {
     navigate: ps2NavigateSound,
     hover: ps2NavigateSound,
     select: ps2ActivationSound,
-    back: ps2ReturnSound,
+    back: ps2OutOfGameDetailSound,
     edit: ps2EditModalSound,
-    modalClose: ps2EditModalSound,
+    modalClose: ps2OutOfGameDetailSound,
     favoriteOn: ps2FavoriteOnSound,
     favoriteOff: ps2FavoriteOffSound,
-    delete: ps2DeleteSound,
+    delete: ps2OutOfGameDetailSound,
     play: ps2GameBootSound,
     boot: ps2GameBootSound,
     search: ps2SearchSound,
@@ -237,12 +231,12 @@ const soundThemes = {
     navigate: gcHoverSound,
     hover: gcNavigateSound,
     select: gcClickSound,
-    back: gcReturnSound,
+    back: gcOutOfGameDetailSound,
     edit: gcEditModalSound,
-    modalClose: gcEditModalSound,
+    modalClose: gcOutOfGameDetailSound,
     favoriteOn: gcFavoriteOnSound,
     favoriteOff: gcFavoriteOffSound,
-    delete: gcDeleteSound,
+    delete: gcOutOfGameDetailSound,
     play: gcPlaySoundEffect,
     boot: gcGameBootSound,
     search: gcSearchSound,

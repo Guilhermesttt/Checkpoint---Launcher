@@ -249,10 +249,79 @@
       display: none;
     }
 
+    .social-card.kind-capture-saved .icon-avatar {
+      overflow: visible;
+      background: transparent;
+      border-color: transparent;
+    }
+
+    .social-card.kind-capture-saved .icon-avatar svg {
+      width: 64%;
+      height: 64%;
+    }
+
     .icon-avatar svg {
       width: 50%;
       height: 50%;
       color: rgba(var(--ctx-color), 1);
+    }
+
+    .animate-icon {
+      overflow: visible;
+    }
+
+    .animate-icon-trophy {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: animate-icon-trophy-loop 1.8s cubic-bezier(0.22, 0.9, 0.32, 1) infinite;
+    }
+
+    .animate-icon-controller .controller-shell {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: animate-icon-controller-shell 1.5s ease-in-out infinite;
+    }
+
+    .animate-icon-controller .controller-controls {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: animate-icon-controller-controls 1.5s ease-in-out infinite;
+    }
+
+    .animate-icon-camera .camera-lens {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: animate-icon-camera-lens 1.35s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+    }
+
+    @keyframes animate-icon-trophy-loop {
+      0%, 45%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+      60% { transform: translateY(-1px) scale(1.08) rotate(-3deg); }
+      75% { transform: translateY(0) scale(0.98) rotate(2deg); }
+    }
+
+    @keyframes animate-icon-controller-shell {
+      0%, 42%, 100% { transform: scale(1); }
+      58% { transform: scale(0.95); }
+    }
+
+    @keyframes animate-icon-controller-controls {
+      0%, 42%, 100% { transform: scale(1) rotate(0deg); }
+      56% { transform: scale(0.85) rotate(20deg); }
+      70% { transform: scale(1) rotate(-20deg); }
+    }
+
+    @keyframes animate-icon-camera-lens {
+      0%, 38%, 100% { transform: scale(1); }
+      50% { transform: scale(0.45); }
+      68% { transform: scale(1.15); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-icon,
+      .animate-icon * {
+        animation: none !important;
+      }
     }
 
     .overlay-content {
@@ -3308,7 +3377,16 @@
         xbox360: new URL("../src/sounds/Xbox 360 UI/Achievement.wav", window.location.href).toString(),
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav", window.location.href).toString(),
       },
-      "screenshot": new URL("../src/sounds/PS5_Plus/deck_ui_toast.wav", window.location.href).toString(),
+      "screenshot": {
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_toast.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/deck_ui_toast.wav", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/deck_ui_toast.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_toast.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox 360 UI/dl_complete.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_toast.wav", window.location.href).toString(),
+      },
+      "screenshot-trigger": new URL("../src/sounds/PS5_Plus/37. Take Screenshot Psfx Take Screen.mp3", window.location.href).toString(),
       "ui-hover": {
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_slider_down.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/deck_ui_navigation.wav", window.location.href).toString(),
@@ -3326,6 +3404,15 @@
         gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav", window.location.href).toString(),
         xbox360: new URL("../src/sounds/Xbox 360 UI/Select.wav", window.location.href).toString(),
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_default_activation.wav", window.location.href).toString(),
+      },
+      "ui-back": {
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox 360 UI/Back.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
       },
     };
 
@@ -3345,11 +3432,12 @@
         : sourceEntry?.[requestedTheme] || sourceEntry?.ps5;
       if (!src) return;
       const audio = new Audio(src);
-      const isUiSound = sound === "ui-hover" || sound === "ui-click";
+      const isUiSound = sound === "ui-hover" || sound === "ui-click" || sound === "ui-back";
       const normalizedVolume = Number(requestedVolume);
-      audio.volume = Number.isFinite(normalizedVolume)
+      const baseVolume = Number.isFinite(normalizedVolume)
         ? Math.min(1, Math.max(0, normalizedVolume / 100))
         : 0.22;
+      audio.volume = isUiSound ? baseVolume * 0.22 : baseVolume;
       if (isUiSound) {
         lastOverlayUiSoundAt = Date.now();
       }
@@ -3391,7 +3479,7 @@
       `;
 
     const trophySvg = () => `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg class="animate-icon animate-icon-trophy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
           <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
           <path d="M4 22h16"></path>
@@ -3401,12 +3489,21 @@
       `;
 
     const controllerSvg = () => `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6.8 8h10.4a3 3 0 0 1 2.9 2.26l1.1 4.25a2.5 2.5 0 0 1-4.42 2.2L14.9 14H9.1l-1.88 2.71a2.5 2.5 0 0 1-4.42-2.2l1.1-4.25A3 3 0 0 1 6.8 8Z"></path>
-          <path d="M8 11v4"></path>
-          <path d="M6 13h4"></path>
-          <path d="M15.5 12h.01"></path>
-          <path d="M18 14h.01"></path>
+        <svg class="animate-icon animate-icon-controller" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path class="controller-shell" d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5Z"></path>
+          <g class="controller-controls">
+            <path d="M6 11h4"></path>
+            <path d="M8 9v4"></path>
+            <path d="M15 12h.01"></path>
+            <path d="M18 10h.01"></path>
+          </g>
+        </svg>
+      `;
+
+    const cameraSvg = () => `
+        <svg class="animate-icon animate-icon-camera" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4Z"></path>
+          <circle class="camera-lens" cx="12" cy="13" r="3"></circle>
         </svg>
       `;
 
@@ -3627,17 +3724,27 @@
       const isGameStart = payload.kind === "game-start";
       const isControllerConnected = payload.kind === "controller-connected";
       const isOverlayHint = payload.kind === "overlay-hint";
+      const isCaptureSaved = payload.kind === "capture-saved";
       shell.appendChild(
         createIconColumn({
-          ring: !isGameStart && !isOverlayHint,
+          ring: !isGameStart && !isOverlayHint && !isCaptureSaved,
           avatarSrc:
             isGameStart
               ? checkpointIconUrl
-              : isControllerConnected || isOverlayHint
+              : isControllerConnected || isOverlayHint || isCaptureSaved
                 ? ""
                 : payload.avatarUrl || checkpointIconUrl,
-          avatarSvg: isControllerConnected || isOverlayHint ? controllerSvg() : "",
-          isPhoto: !isGameStart && !isControllerConnected && !isOverlayHint && Boolean(payload.avatarUrl),
+          avatarSvg: isCaptureSaved
+            ? cameraSvg()
+            : isControllerConnected || isOverlayHint
+              ? controllerSvg()
+              : "",
+          isPhoto:
+            !isGameStart &&
+            !isControllerConnected &&
+            !isOverlayHint &&
+            !isCaptureSaved &&
+            Boolean(payload.avatarUrl),
           isLogo: isGameStart || isControllerConnected || isOverlayHint,
         }),
       );
@@ -4144,7 +4251,10 @@
         ? event.target.closest(overlayInteractiveSelector)
         : null;
       if (!target || target.disabled || target.getAttribute("aria-disabled") === "true") return;
-      playOverlayUiSound("ui-click");
+      const label = String(target.getAttribute("aria-label") || "").toLowerCase();
+      const isBackAction = ["panel-close-top", "chat-back", "capture-viewer-close"].includes(target.id)
+        || /fechar|voltar|cancelar/.test(label);
+      playOverlayUiSound(isBackAction ? "ui-back" : "ui-click");
     });
     document.getElementById("panel-close-top")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close" }));
     document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
@@ -4265,6 +4375,16 @@
     document.querySelectorAll("[data-media]").forEach((button) => button.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: button.dataset.media })));
     window.setInterval(updateSessionDuration, 1000);
     window.addEventListener("keydown", async (event) => {
+      if (
+        event.key === "Escape"
+        && (
+          captureShortcutRecording
+          || captureViewerIndex >= 0
+          || commandPanel?.classList.contains("is-open")
+        )
+      ) {
+        playOverlayUiSound("ui-back");
+      }
       if (captureShortcutRecording) {
         event.preventDefault();
         event.stopImmediatePropagation();

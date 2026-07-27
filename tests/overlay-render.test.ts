@@ -7,6 +7,7 @@ type OverlayCallback = (payload: Record<string, unknown>) => void;
 
 describe("overlay de conquistas", () => {
   let unlock: OverlayCallback;
+  let social: OverlayCallback;
   let panelVisibility: OverlayCallback;
   let panelAction: ReturnType<typeof vi.fn>;
   let mediaPlay: ReturnType<typeof vi.fn>;
@@ -70,7 +71,7 @@ describe("overlay de conquistas", () => {
       value: {
         onUnlock: (callback: OverlayCallback) => { unlock = callback; },
         onWelcome: () => undefined,
-        onSocial: () => undefined,
+        onSocial: (callback: OverlayCallback) => { social = callback; },
         onPlaySound: () => undefined,
         onPanelVisibility: (callback: OverlayCallback) => { panelVisibility = callback; },
         onPanelState: () => undefined,
@@ -111,6 +112,52 @@ describe("overlay de conquistas", () => {
 
     expect(mediaPlay).toHaveBeenCalledTimes(2);
     expect(mediaPause).not.toHaveBeenCalled();
+    mediaPlay.mock.instances.forEach((audio) => {
+      expect((audio as HTMLAudioElement).volume).toBeGreaterThan(0);
+      expect((audio as HTMLAudioElement).volume).toBeLessThanOrEqual(0.077);
+    });
+  });
+
+  it("usa o som de retorno ao fechar ou voltar no overlay", () => {
+    panelVisibility({
+      open: true,
+      state: {
+        settings: {
+          achievementVolume: 35,
+          achievementSoundTheme: "ps5",
+        },
+      },
+    });
+    mediaPlay.mockClear();
+
+    document.getElementById("chat-back")?.click();
+
+    expect(mediaPlay).toHaveBeenCalled();
+    expect(
+      mediaPlay.mock.instances.some((audio) =>
+        (audio as HTMLAudioElement).src.includes("PS5_Plus/deck_ui_out_of_game_detail.wav"),
+      ),
+    ).toBe(true);
+  });
+
+  it("dispara o som tematico depois de salvar uma captura", () => {
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+    const overlaySource = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+
+    expect(mainSource).toContain('playOverlaySound("screenshot")');
+    expect(overlaySource).toContain('"screenshot": {');
+    expect(overlaySource).toContain("Xbox 360 UI/dl_complete.wav");
+  });
+
+  it("toca o efeito de disparo antes de processar a captura", () => {
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+    const overlaySource = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+    const triggerIndex = mainSource.indexOf('playOverlaySound("screenshot-trigger")');
+    const captureIndex = mainSource.indexOf("await captureCurrentDisplay()", triggerIndex);
+
+    expect(triggerIndex).toBeGreaterThan(-1);
+    expect(captureIndex).toBeGreaterThan(triggerIndex);
+    expect(overlaySource).toContain("37. Take Screenshot Psfx Take Screen.mp3");
   });
 
   it("mantem os toasts compactos mesmo em uma janela fullscreen", () => {
@@ -347,5 +394,24 @@ describe("overlay de conquistas", () => {
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(document.getElementById("capture-viewer")?.classList.contains("is-open")).toBe(false);
+  });
+
+  it("usa apenas o icone de camera no aviso de captura salva", () => {
+    social({
+      kind: "capture-saved",
+      title: "Captura salva",
+      description: "Desktop.png",
+    });
+
+    const card = document.querySelector(".social-card.kind-capture-saved");
+    expect(card?.querySelector(".icon-avatar svg")?.classList.contains("animate-icon-camera")).toBe(true);
+    expect(card?.querySelector(".icon-avatar img")).toBeNull();
+    expect(card?.querySelector(".icon-ring")).toBeNull();
+
+    social({
+      kind: "controller-connected",
+      title: "Controle conectado",
+    });
+    expect(document.querySelector(".kind-controller-connected .animate-icon-controller")).not.toBeNull();
   });
 });

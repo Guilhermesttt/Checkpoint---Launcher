@@ -13,7 +13,20 @@ import {
   Settings,
   Users,
   Newspaper,
+  Laptop,
 } from "lucide-react";
+import {
+  GamepadIcon as AnimatedGamepadIcon,
+  LaptopIcon as AnimatedLaptopIcon,
+  RadioIcon as AnimatedRadioIcon,
+  SettingsIcon as AnimatedSettingsIcon,
+  StarIcon as AnimatedStarIcon,
+  UserIcon as AnimatedUserIcon,
+  UsersIcon as AnimatedUsersIcon,
+  type AnimatedIconHandle,
+  type AnimatedIconProps,
+} from "./animated/SidebarIcons";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam, faDiscord } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -77,14 +90,14 @@ export const EpicBrandIcon: React.FC<{ className?: string; style?: React.CSSProp
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const CATEGORIES = [
-  { id: "ALL", label: "Todos", Icon: Gamepad2 },
-  { id: "FAVORITES", label: "Favoritos", Icon: Star },
-  { id: "FRIENDS", label: "Amigos", Icon: Users },
-  { id: "FEED", label: "Radar", Icon: Newspaper },
+  { id: "ALL", label: "Todos", Icon: Gamepad2, AnimatedIcon: AnimatedGamepadIcon },
+  { id: "FAVORITES", label: "Favoritos", Icon: Star, AnimatedIcon: AnimatedStarIcon },
+  { id: "FRIENDS", label: "Amigos", Icon: Users, AnimatedIcon: AnimatedUsersIcon },
+  { id: "FEED", label: "Radar", Icon: Newspaper, AnimatedIcon: AnimatedRadioIcon },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },
-  { id: "LOCAL", label: "Local", Icon: Gamepad2 },
-  { id: "PROFILE", label: "Perfil", Icon: User },
+  { id: "LOCAL", label: "Local", Icon: Laptop, AnimatedIcon: AnimatedLaptopIcon },
+  { id: "PROFILE", label: "Perfil", Icon: User, AnimatedIcon: AnimatedUserIcon },
   { id: "RACING", label: "Corrida", Icon: Car },
   { id: "ROLEPLAYING", label: "RPG", Icon: Swords },
   { id: "SPORTS", label: "Esportes", Icon: Trophy },
@@ -127,6 +140,7 @@ interface SidebarButtonProps {
   id: string;
   label: string;
   Icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  AnimatedIcon?: AnimatedSidebarIcon;
   active: boolean;
   onClick: () => void;
   notificationCount?: number;
@@ -135,6 +149,10 @@ interface SidebarButtonProps {
   rotateOnHover?: boolean;
 }
 
+type AnimatedSidebarIcon = React.ForwardRefExoticComponent<
+  AnimatedIconProps & React.RefAttributes<AnimatedIconHandle>
+>;
+
 // Um único componente cuida do visual de qualquer item (categoria ou settings).
 // Isso elimina a duplicação entre o .map() e o botão de Settings de fora dele,
 // então qualquer ajuste de estilo/animação passa a valer para os dois automaticamente.
@@ -142,6 +160,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   id,
   label,
   Icon,
+  AnimatedIcon,
   active,
   onClick,
   notificationCount = 0,
@@ -149,31 +168,58 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   rotateOnHover = false,
 }) => {
   const hasNotifications = notificationCount > 0;
+  const animatedIconRef = React.useRef<AnimatedIconHandle>(null);
+  const animationTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => () => {
+    if (animationTimerRef.current) {
+      clearTimeout(animationTimerRef.current);
+    }
+  }, []);
+
+  const playIconAnimation = () => {
+    if (!AnimatedIcon || reducedMotion || animationTimerRef.current) return;
+
+    animatedIconRef.current?.startAnimation();
+    animationTimerRef.current = setTimeout(() => {
+      animatedIconRef.current?.stopAnimation();
+      animationTimerRef.current = null;
+    }, 1_300);
+  };
+
+  const iconStyle = {
+    color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.4)",
+    filter: active ? "drop-shadow(0 0 4px rgb(var(--launcher-accent) / 0.5))" : "none",
+  };
+
   return (
-    <motion.button
-      onClick={onClick}
-      aria-label={hasNotifications ? `${label}, ${notificationCount} notificacoes` : label}
-      aria-current={active ? "page" : undefined}
-      data-sidebar-item={id}
-      data-notification-count={notificationCount}
-      animate={hasNotifications && !reducedMotion ? {
-        y: [0, -7, 0, -3, 0],
-        rotate: [0, -1.5, 1.5, 0],
-      } : { y: 0, rotate: 0 }}
-      transition={hasNotifications && !reducedMotion
-        ? { duration: 0.68, ease: [0.16, 1, 0.3, 1] }
-        : { duration: 0.01 }}
-      className={`relative group flex flex-col items-center justify-center gap-1.5 w-full py-2.5 rounded-xl
-        transition-all duration-300 ease-out
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--launcher-accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-black
-        ${!active ? "hover:bg-white/5" : ""}`}
-      style={{
-        background: active ? "var(--launcher-accent-soft)" : "transparent",
-        boxShadow: active
-          ? "0 4px 20px -2px rgb(var(--launcher-accent) / 0.25), inset 0 0 0 1px rgb(var(--launcher-accent) / 0.2)"
-          : "none",
-      }}
-    >
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <motion.button
+          onClick={onClick}
+          onMouseEnter={playIconAnimation}
+          aria-label={hasNotifications ? `${label}, ${notificationCount} notificacoes` : label}
+          aria-current={active ? "page" : undefined}
+          data-sidebar-item={id}
+          data-notification-count={notificationCount}
+          animate={hasNotifications && !reducedMotion ? {
+            y: [0, -7, 0, -3, 0],
+            rotate: [0, -1.5, 1.5, 0],
+          } : { y: 0, rotate: 0 }}
+          transition={hasNotifications && !reducedMotion
+            ? { duration: 0.68, ease: [0.16, 1, 0.3, 1] }
+            : { duration: 0.01 }}
+          className={`relative group flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl py-2.5
+            transition-all duration-300 ease-out
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--launcher-accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-black
+            ${!active ? "hover:bg-white/5" : ""}`}
+          style={{
+            background: active ? "var(--launcher-accent-soft)" : "transparent",
+            boxShadow: active
+              ? "0 4px 20px -2px rgb(var(--launcher-accent) / 0.25), inset 0 0 0 1px rgb(var(--launcher-accent) / 0.2)"
+              : "none",
+          }}
+        >
       {hasNotifications && (
         <>
           <motion.span
@@ -219,16 +265,23 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       {/* Ícone com feedback de hover + clique */}
       <motion.div
         whileTap={{ scale: 0.88 }}
-        className={`transform transition-transform duration-300 group-hover:scale-110 ${rotateOnHover ? "group-hover:rotate-45" : ""
+        className={`transform transition-transform duration-300 ${AnimatedIcon ? "" : "group-hover:scale-110"} ${rotateOnHover && !AnimatedIcon ? "group-hover:rotate-45" : ""
           }`}
       >
-        <Icon
-          className="w-[18px] h-[18px] transition-colors duration-300"
-          style={{
-            color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.4)",
-            filter: active ? "drop-shadow(0 0 4px rgb(var(--launcher-accent) / 0.5))" : "none",
-          }}
-        />
+        {AnimatedIcon ? (
+          <AnimatedIcon
+            ref={animatedIconRef}
+            size={18}
+            duration={1}
+            className="h-[18px] w-[18px] transition-colors duration-300"
+            style={iconStyle}
+          />
+        ) : (
+          <Icon
+            className="w-[18px] h-[18px] transition-colors duration-300"
+            style={iconStyle}
+          />
+        )}
       </motion.div>
 
       {/* Rótulo */}
@@ -241,40 +294,17 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
         {label}
       </span>
 
-      {/* Tooltip flutuante — aparece no hover E no foco (teclado).
-          Ganhou identidade própria: borda de destaque na cor do tema ativo
-          e uma seta apontando pro botão, em vez do balão genérico cinza. */}
-      <div
-        role="tooltip"
-        className="absolute left-full ml-4 top-1/2 -translate-y-1/2 flex items-center opacity-0 pointer-events-none
-          transition-all duration-300 ease-out z-50 translate-x-2 scale-95 origin-left
-          group-hover:opacity-100 group-hover:translate-x-0 group-hover:scale-100
-          group-focus-visible:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:scale-100"
+        </motion.button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="center"
+        sideOffset={10}
+        className="border border-white/10 bg-[rgba(14,14,22,0.96)] px-3 py-1.5 font-semibold text-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-xl [&>svg]:bg-[rgba(14,14,22,0.96)] [&>svg]:fill-[rgba(14,14,22,0.96)]"
       >
-        <span
-          className="w-2 h-2 rotate-45 -mr-1 shrink-0"
-          style={{
-            background: "rgba(14,14,22,0.95)",
-            borderLeft: "1px solid rgb(var(--launcher-accent) / 0.35)",
-            borderBottom: "1px solid rgb(var(--launcher-accent) / 0.35)",
-          }}
-        />
-        <span
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap"
-          style={{
-            background: "rgba(14,14,22,0.95)",
-            borderTop: "1px solid rgb(var(--launcher-accent) / 0.35)",
-            borderRight: "1px solid rgb(var(--launcher-accent) / 0.35)",
-            borderBottom: "1px solid rgb(var(--launcher-accent) / 0.35)",
-            color: "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 10px 40px -10px rgba(0,0,0,0.8)",
-          }}
-        >
-          {label}
-        </span>
-      </div>
-    </motion.button>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -371,6 +401,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       id={category.id}
                       label={sidebarLabels[category.id] || category.label}
                       Icon={category.Icon}
+                      AnimatedIcon={category.AnimatedIcon}
                       active={activeCategory === category.id}
                       onClick={() => handleSelect(category.id)}
                       notificationCount={category.id === "FRIENDS" ? notificationCount : 0}
@@ -391,6 +422,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             id="SETTINGS"
             label={settingsLabel}
             Icon={Settings}
+            AnimatedIcon={AnimatedSettingsIcon}
             active={activeCategory === "SETTINGS"}
             onClick={() => handleSelect("SETTINGS")}
             reducedMotion={Boolean(prefersReducedMotion)}

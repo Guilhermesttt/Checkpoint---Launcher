@@ -750,6 +750,7 @@ const runCapture = async () => {
   if (captureInProgress) return { ok: false, error: "Uma captura ja esta em andamento." };
   captureInProgress = true;
   try {
+    playOverlaySound("screenshot-trigger");
     const capture = await captureCurrentDisplay();
     if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
     sendOverlayEvent("overlay:social", {
@@ -757,6 +758,7 @@ const runCapture = async () => {
       title: getOverlayEventCopy().captureSaved,
       description: capture.name,
     });
+    playOverlaySound("screenshot");
     return { ok: true, capture };
   } catch (error) {
     console.error("[overlay] Falha ao capturar a tela:", error);
