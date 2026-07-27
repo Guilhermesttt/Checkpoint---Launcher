@@ -39,6 +39,8 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
     displayName: profile?.displayName || fallbackName,
     photoURL: profile?.photoURL || fallbackPhotoURL || "",
     bio: profile?.bio || "",
+    location: profile?.location || "",
+    pronouns: profile?.pronouns || "",
     website: profile?.website || "",
     favoriteGenres: profile?.favoriteGenres || [],
   });
@@ -52,6 +54,8 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
         displayName: profile?.displayName || fallbackName,
         photoURL: profile?.photoURL || fallbackPhotoURL || "",
         bio: profile?.bio || "",
+        location: profile?.location || "",
+        pronouns: profile?.pronouns || "",
         website: profile?.website || "",
         favoriteGenres: profile?.favoriteGenres || [],
       });
@@ -69,7 +73,11 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       setError("Use uma imagem JPG, PNG ou WebP.");
       return;
     }
-    
+    if (file.size > PROFILE_LIMITS.avatarBytes) {
+      setError("A imagem deve ter no máximo 5 MB.");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();

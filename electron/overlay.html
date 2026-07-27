@@ -3309,6 +3309,24 @@
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav", window.location.href).toString(),
       },
       "screenshot": new URL("../src/sounds/PS5_Plus/deck_ui_toast.wav", window.location.href).toString(),
+      "ui-hover": {
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_slider_down.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/deck_ui_navigation.wav", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/deck_ui_slider_down.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_navigation.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox 360 UI/Select2.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_slider_down.wav", window.location.href).toString(),
+      },
+      "ui-click": {
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_default_activation.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/deck_ui_show_modal.wav", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/confirmation_positive.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_default_activation.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox 360 UI/Select.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_default_activation.wav", window.location.href).toString(),
+      },
     };
 
     const scheduleRemoval = (node, duration = 4800) => {
@@ -3318,6 +3336,8 @@
       }, duration);
     };
 
+    let lastOverlayUiSoundAt = Number.NEGATIVE_INFINITY;
+
     const playOverlaySound = (sound, requestedVolume, requestedTheme) => {
       const sourceEntry = overlaySoundMap[sound];
       const src = typeof sourceEntry === "string"
@@ -3325,11 +3345,25 @@
         : sourceEntry?.[requestedTheme] || sourceEntry?.ps5;
       if (!src) return;
       const audio = new Audio(src);
+      const isUiSound = sound === "ui-hover" || sound === "ui-click";
       const normalizedVolume = Number(requestedVolume);
       audio.volume = Number.isFinite(normalizedVolume)
         ? Math.min(1, Math.max(0, normalizedVolume / 100))
         : 0.22;
-      audio.play().catch((error) => console.error("[overlay] Falha ao tocar som:", error));
+      if (isUiSound) {
+        lastOverlayUiSoundAt = Date.now();
+      }
+      const playback = audio.play();
+      playback?.catch((error) => console.error("[overlay] Falha ao tocar som:", error));
+    };
+
+    const playOverlayUiSound = (sound) => {
+      const settings = latestPanelState.settings || {};
+      playOverlaySound(
+        sound,
+        settings.achievementVolume,
+        settings.achievementSoundTheme,
+      );
     };
 
     const applyStagger = (stack, card) => {
@@ -4088,6 +4122,30 @@
       const navButton = document.querySelector(`[data-panel-tab="${tab}"]`);
       activatePanelTab(tab, navButton);
     }));
+    const overlayInteractiveSelector = [
+      "button",
+      "[role='button']",
+      "[data-panel-tab]",
+      "input[type='checkbox']",
+      ".capture-card",
+    ].join(",");
+    document.addEventListener("pointerover", (event) => {
+      if (!document.body.classList.contains("panel-open")) return;
+      const target = event.target instanceof Element
+        ? event.target.closest(overlayInteractiveSelector)
+        : null;
+      if (!target || target.disabled || target.getAttribute("aria-disabled") === "true") return;
+      if (event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return;
+      playOverlayUiSound("ui-hover");
+    });
+    document.addEventListener("click", (event) => {
+      if (!document.body.classList.contains("panel-open")) return;
+      const target = event.target instanceof Element
+        ? event.target.closest(overlayInteractiveSelector)
+        : null;
+      if (!target || target.disabled || target.getAttribute("aria-disabled") === "true") return;
+      playOverlayUiSound("ui-click");
+    });
     document.getElementById("panel-close-top")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close" }));
     document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
     document.getElementById("show-all-friends")?.addEventListener("click", (event) => {
@@ -4268,12 +4326,16 @@
         playOverlaySound(sound, volume, theme);
       });
       window.achievementOverlay.onPanelVisibility(({ open, state }) => {
+        const wasOpen = commandPanel?.classList.contains("is-open");
         commandPanel?.classList.toggle("is-open", Boolean(open));
         commandPanel?.setAttribute("aria-hidden", open ? "false" : "true");
         document.body.classList.toggle("panel-open", Boolean(open));
         if (!open && captureShortcutRecording) stopCaptureShortcutRecording();
         if (!open) closeCaptureViewer();
         if (state) renderPanelState(state);
+        if (Boolean(open) !== Boolean(wasOpen) && Date.now() - lastOverlayUiSoundAt > 120) {
+          playOverlayUiSound("ui-click");
+        }
       });
       window.achievementOverlay.onPanelState(renderPanelState);
     }

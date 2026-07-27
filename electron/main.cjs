@@ -1669,7 +1669,12 @@ registerSecureIpcHandler("system:set-open-at-login", async (_event, open) => {
   return { openAtLogin: shouldOpen, supported: true };
 });
 
-registerSecureIpcHandler("launcher:open-executable", async (_event, executablePath, rawLaunchProfile) => {
+registerSecureIpcHandler("launcher:open-executable", async (
+  _event,
+  executablePath,
+  rawLaunchProfile,
+  rawLaunchOptions,
+) => {
   const target = String(executablePath || "").trim();
   if (!target) {
     throw new Error("Caminho do executavel vazio.");
@@ -1697,6 +1702,7 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
 
   const defaultWorkingDirectory = path.dirname(normalizedTarget);
   const launchProfile = normalizeLaunchProfile(rawLaunchProfile, defaultWorkingDirectory);
+  const hideLauncher = rawLaunchOptions?.hideLauncher !== false;
   if (!fs.existsSync(launchProfile.workingDirectory) || !fs.statSync(launchProfile.workingDirectory).isDirectory()) {
     launchProfile.workingDirectory = defaultWorkingDirectory;
   }
@@ -2026,8 +2032,9 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
       startGameProcessMonitor(watcherKey, normalizedTarget, {
         rootPid: child.pid,
         baselineProcesses: launchProcessBaseline,
+        restoreLauncher: hideLauncher,
       });
-      if (mainWindow) {
+      if (hideLauncher && mainWindow) {
         mainWindow.hide();
       }
     });
@@ -2083,8 +2090,9 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
         applyWindowProfile(normalizedTarget, launchProfile);
         startGameProcessMonitor(watcherKey, normalizedTarget, {
           baselineProcesses: launchProcessBaseline,
+          restoreLauncher: hideLauncher,
         });
-        if (mainWindow) mainWindow.hide();
+        if (hideLauncher && mainWindow) mainWindow.hide();
       }
     });
 
@@ -2102,8 +2110,9 @@ registerSecureIpcHandler("launcher:open-executable", async (_event, executablePa
       applyWindowProfile(normalizedTarget, launchProfile);
       startGameProcessMonitor(watcherKey, normalizedTarget, {
         baselineProcesses: launchProcessBaseline,
+        restoreLauncher: hideLauncher,
       });
-      if (mainWindow) mainWindow.hide();
+      if (hideLauncher && mainWindow) mainWindow.hide();
     }
   }
 });
@@ -2214,9 +2223,10 @@ const stopGameProcessMonitor = (watcherKey) => {
 };
 
 const finishMonitoredGameSession = (watcherKey) => {
+  const restoreLauncher = activeGameMonitors.get(watcherKey)?.restoreLauncher === true;
   stopGameProcessMonitor(watcherKey);
   stopGameWatcher(watcherKey);
-  if (mainWindow && !mainWindow.isDestroyed()) {
+  if (restoreLauncher && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
     mainWindow.focus();
   }
@@ -2240,6 +2250,7 @@ const startGameProcessMonitor = (watcherKey, executablePath, options = {}) => {
     requestedExecutablePath: normalizeWindowsPath(executablePath),
     activeExecutablePath: normalizeWindowsPath(executablePath),
     lastStatus: "starting",
+    restoreLauncher: options.restoreLauncher === true,
     tracker,
   };
 

@@ -1,87 +1,16 @@
-/**
- * PerformanceComponents.tsx
- *
- * Wrappers inteligentes que consultam o `lowPerformanceMode` do PreferencesContext
- * e substituem automaticamente elementos pesados (3D, blur, animações, vídeo)
- * por versões leves quando o modo de desempenho está ativo.
- *
- * Uso:
- *   import { PMotion, PBackdrop, PGlow, PVideoBackground } from "../components/PerformanceComponents";
- *
- *   <PMotion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>...</PMotion.div>
- *   → No modo desempenho: renderiza um <div> comum sem nenhuma animação.
- *
- *   <PBackdrop>...</PBackdrop>
- *   → No modo desempenho: remove o backdrop-filter blur do container.
- *
- *   <PGlow color="rgb(120,80,255)" />
- *   → No modo desempenho: não renderiza nada (null).
- *
- *   <PVideoBackground src="..." />
- *   → No modo desempenho: não renderiza nada (null).
- */
-
 import React from "react";
 import {
   motion,
-  type HTMLMotionProps,
   AnimatePresence,
   type AnimatePresenceProps,
+  type MotionValue,
 } from "framer-motion";
 import { usePreferences } from "../context/PreferencesContext";
-
-// ─── Hook auxiliar ─────────────────────────────────────────────────────────────
 
 export function useLowPerf() {
   const { lowPerformanceMode } = usePreferences();
   return lowPerformanceMode;
 }
-
-// ─── PMotion ──────────────────────────────────────────────────────────────────
-// Substituto direto dos componentes `motion.*` do Framer Motion.
-// Em modo desempenho renderiza o elemento HTML puro (sem props de animação).
-
-type PMotionProps = any;
-
-function createPMotion(tag: any) {
-  const MotionTag = (motion as any)[tag];
-  return function PMotionComponent({ children, className, style, onClick, onMouseMove, onMouseLeave, as: _as, ...rest }: any) {
-    const low = useLowPerf();
-    if (low) {
-      const Tag = tag as any;
-      return (
-        <Tag className={className} style={style} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave}>
-          {children}
-        </Tag>
-      );
-    }
-    return (
-      <MotionTag className={className} style={style} onClick={onClick} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} {...rest}>
-        {children}
-      </MotionTag>
-    );
-  };
-}
-
-export const PMotion = {
-  div: createPMotion("div"),
-  span: createPMotion("span"),
-  section: createPMotion("section"),
-  article: createPMotion("article"),
-  aside: createPMotion("aside"),
-  header: createPMotion("header"),
-  footer: createPMotion("footer"),
-  ul: createPMotion("ul"),
-  li: createPMotion("li"),
-  button: createPMotion("button"),
-  img: createPMotion("img"),
-  p: createPMotion("p"),
-  h1: createPMotion("h1"),
-  h2: createPMotion("h2"),
-};
-
-// ─── PAnimatePresence ─────────────────────────────────────────────────────────
-// Em modo desempenho, apenas renderiza os filhos sem a lógica de exit animation.
 
 export const PAnimatePresence: React.FC<AnimatePresenceProps & { children: React.ReactNode }> = ({
   children,
@@ -92,13 +21,9 @@ export const PAnimatePresence: React.FC<AnimatePresenceProps & { children: React
   return <AnimatePresence {...props}>{children}</AnimatePresence>;
 };
 
-// ─── PBackdrop ────────────────────────────────────────────────────────────────
-// Container com backdrop-blur. Em modo desempenho remove o blur e usa fundo sólido.
-
 interface PBackdropProps {
   children: React.ReactNode;
   className?: string;
-  /** Cor de fundo sólida usada no modo desempenho. Default: rgba(10,10,14,0.96) */
   fallbackBg?: string;
   style?: React.CSSProperties;
 }
@@ -124,9 +49,6 @@ export const PBackdrop: React.FC<PBackdropProps> = ({
     </div>
   );
 };
-
-// ─── PGlow ────────────────────────────────────────────────────────────────────
-// Elemento decorativo de brilho (blob, radial glow). Em modo desempenho não renderiza.
 
 interface PGlowProps {
   className?: string;
@@ -155,9 +77,6 @@ export const PGlow: React.FC<PGlowProps> = ({ className, style, color, size = 40
   );
 };
 
-// ─── PVideoBackground ─────────────────────────────────────────────────────────
-// Vídeo de fundo decorativo. Em modo desempenho não renderiza.
-
 interface PVideoBackgroundProps {
   src: string;
   className?: string;
@@ -182,15 +101,12 @@ export const PVideoBackground: React.FC<PVideoBackgroundProps> = ({ src, classNa
   );
 };
 
-// ─── PCard3D ──────────────────────────────────────────────────────────────────
-// Wrapper para cards com efeito 3D (rotateX/Y). Em modo desempenho, desliga perspectiva e transformações.
-
 interface PCard3DProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
-  rotateX?: any; // MotionValue
-  rotateY?: any; // MotionValue
+  rotateX?: number | MotionValue<number> | MotionValue<string>;
+  rotateY?: number | MotionValue<number> | MotionValue<string>;
   scale?: number;
   isActive?: boolean;
 }
@@ -232,9 +148,6 @@ export const PCard3D: React.FC<PCard3DProps> = ({
   );
 };
 
-// ─── PShadow ──────────────────────────────────────────────────────────────────
-// Aplica box-shadow pesado apenas se não estiver em modo desempenho.
-
 interface PShadowProps {
   children: React.ReactNode;
   shadow: string;
@@ -254,14 +167,10 @@ export const PShadow: React.FC<PShadowProps> = ({ children, shadow, className, s
   );
 };
 
-// ─── PTransition ──────────────────────────────────────────────────────────────
-// CSS transition wrapper. Em modo desempenho aplica duration-0 para tudo ser instantâneo.
-
 interface PTransitionProps {
   children: React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
-  /** Classes CSS de transição normais, ex: "transition-all duration-500 ease-out" */
   transition?: string;
 }
 

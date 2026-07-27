@@ -277,6 +277,8 @@ export const useSoundEffects = (
   notificationVolume = 0.4,
 ) => {
   const lastNavigateAtRef = useRef(0);
+  const lastHoverAtRef = useRef(0);
+  const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
   const sounds = soundThemes[theme] ?? soundThemes.ps5;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
@@ -284,36 +286,62 @@ export const useSoundEffects = (
     Array.from(new Set(Object.values(soundPaths))).forEach(preloadAudio);
   }, [soundPaths]);
 
+  const stopActiveSounds = useCallback(() => {
+    activeAudiosRef.current.forEach((audio) => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    activeAudiosRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    const stopWhenInactive = () => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) {
+        stopActiveSounds();
+      }
+    };
+
+    window.addEventListener("blur", stopActiveSounds);
+    document.addEventListener("visibilitychange", stopWhenInactive);
+    return () => {
+      window.removeEventListener("blur", stopActiveSounds);
+      document.removeEventListener("visibilitychange", stopWhenInactive);
+      stopActiveSounds();
+    };
+  }, [stopActiveSounds]);
+
   const playSound = useCallback(
     (type: SoundEffectType) => {
-      if (
-        type !== "friendRequest" &&
-        type !== "chatReceived" &&
-        type !== "chatSent" &&
-        type !== "overlayAchievement"
-      ) {
-        if (document.hidden || !document.hasFocus()) {
-          return;
-        }
-      }
+      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+
+      const now = performance.now();
       if (type === "navigate") {
-        const now = performance.now();
-        if (now - lastNavigateAtRef.current < 85) return;
+        if (lastNavigateAtRef.current > 0 && now - lastNavigateAtRef.current < 85) return;
         lastNavigateAtRef.current = now;
       }
+      if (type === "hover") {
+        if (lastHoverAtRef.current > 0 && now - lastHoverAtRef.current < 70) return;
+        lastHoverAtRef.current = now;
+      }
+
       const path = soundPaths[type];
       if (!path) return;
       const cachedAudio = preloadAudio(path);
       const audio = cachedAudio?.cloneNode(true) as HTMLAudioElement | undefined;
       if (!audio) return;
+
       const isNotificationSound =
         type === "friendRequest" || type === "chatReceived" || type === "chatSent";
       audio.volume = isNotificationSound ? notificationVolume : volume;
+      activeAudiosRef.current.add(audio);
+      audio.addEventListener("ended", () => {
+        activeAudiosRef.current.delete(audio);
+      }, { once: true });
       audio.play().catch(() => {
-        return;
+        activeAudiosRef.current.delete(audio);
       });
     },
-    [soundPaths, volume, notificationVolume],
+    [notificationVolume, soundPaths, volume],
   );
 
   return { playSound };

@@ -19,7 +19,6 @@ export const useGameColor = (imageUrl?: string) => {
     const handleLoad = () => {
       try {
         const extracted = fac.getColor(img);
-        // To make the color more vibrant for accents, we can use the hex
         setColor({ hex: extracted.hex, isDark: extracted.isDark });
       } catch {
         setColor({ hex: '#ffffff', isDark: false });

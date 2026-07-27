@@ -72,6 +72,8 @@ export interface UserProfile {
   displayName?: string | null;
   photoURL?: string | null;
   bio?: string;
+  location?: string;
+  pronouns?: string;
   website?: string;
   favoriteGenres?: string[];
   steamId?: string;
@@ -133,6 +135,8 @@ export interface EditableProfile {
   displayName: string;
   photoURL?: string;
   bio: string;
+  location?: string;
+  pronouns?: string;
   website: string;
   favoriteGenres: string[];
 }

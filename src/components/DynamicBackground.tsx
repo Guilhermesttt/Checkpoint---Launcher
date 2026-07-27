@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PVideoBackground, PGlow, useLowPerf } from "./PerformanceComponents";
 
@@ -8,13 +8,8 @@ interface DynamicBackgroundProps {
 }
 
 const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, reducedEffects = false }) => {
-  const [currentImg, setCurrentImg] = useState(backgroundImage);
   const low = useLowPerf();
   const noFx = reducedEffects || low;
-
-  useEffect(() => {
-    setCurrentImg(backgroundImage);
-  }, [backgroundImage]);
 
   return (
     <div className="fixed inset-0 z-0 bg-[#050507] overflow-hidden pointer-events-none">
@@ -26,8 +21,8 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
 
       <AnimatePresence mode="popLayout">
         <motion.img
-          key={currentImg}
-          src={currentImg}
+          key={backgroundImage}
+          src={backgroundImage}
           initial={{ opacity: 0 }}
           animate={{ opacity: noFx ? 0.3 : 0.45 }}
           exit={{ opacity: 0 }}
@@ -42,7 +37,6 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
       <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-[#050507]/40 to-transparent opacity-95" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#050507]/60 via-transparent to-transparent opacity-80" />
 
-      {/* Radial accent glow — removido no modo desempenho via PGlow */}
       <PGlow
         className="absolute inset-0 w-full h-full"
         style={{
@@ -54,7 +48,6 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
         color="transparent"
       />
 
-      {/* Noise texture — removida no modo desempenho */}
       {!low && (
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />
       )}

@@ -8,8 +8,11 @@ export const PROFILE_LIMITS = {
   displayName: 50,
   bio: 280,
   website: 300,
+  location: 80,
+  pronouns: 40,
   genres: 6,
   genre: 32,
+  avatarBytes: 5 * 1024 * 1024,
 } as const;
 
 const clean = (value: string, limit: number) =>
@@ -31,6 +34,8 @@ export const normalizeEditableProfile = (
   return {
     displayName,
     bio: input.bio.trim().slice(0, PROFILE_LIMITS.bio),
+    location: clean(input.location || "", PROFILE_LIMITS.location),
+    pronouns: clean(input.pronouns || "", PROFILE_LIMITS.pronouns),
     website: website.slice(0, PROFILE_LIMITS.website),
     favoriteGenres: [...new Set(input.favoriteGenres
       .map((genre) => clean(genre, PROFILE_LIMITS.genre))

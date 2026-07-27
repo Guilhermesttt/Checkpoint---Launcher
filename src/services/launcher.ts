@@ -59,11 +59,23 @@ const buildEpicLaunchUri = (game: Game): string | null => {
 const launchLocalExecutable = async (
   executablePath: string,
   launchProfile?: GameLaunchProfile,
+  hideLauncher = true,
 ) => {
-  await window.electronAPI?.launchExecutable(executablePath, launchProfile);
+  await window.electronAPI?.launchExecutable(executablePath, launchProfile, {
+    hideLauncher,
+  });
 };
 
-export const launchGame = async (game: Game): Promise<void> => {
+interface LaunchGameOptions {
+  hideLauncher?: boolean;
+}
+
+export const launchGame = async (
+  game: Game,
+  options: LaunchGameOptions = {},
+): Promise<void> => {
+  const hideLauncher = options.hideLauncher ?? true;
+
   if (!game.executablePath && !game.epicCatalogId && !game.epicLaunchId && !game.epicStoreUrl) {
     throw new Error("Jogo sem caminho de execucao ou link da loja configurado.");
   }
@@ -73,7 +85,11 @@ export const launchGame = async (game: Game): Promise<void> => {
       window.electronAPI?.launchExecutable &&
       getMonitorableExecutablePath(game)
     ) {
-      await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
+      await launchLocalExecutable(
+        String(game.executablePath).trim(),
+        game.launchProfile,
+        hideLauncher,
+      );
       return;
     }
 
@@ -98,7 +114,11 @@ export const launchGame = async (game: Game): Promise<void> => {
       window.electronAPI?.launchExecutable &&
       getMonitorableExecutablePath(game)
     ) {
-      await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
+      await launchLocalExecutable(
+        String(game.executablePath).trim(),
+        game.launchProfile,
+        hideLauncher,
+      );
       return;
     }
 
@@ -124,7 +144,11 @@ export const launchGame = async (game: Game): Promise<void> => {
     window.electronAPI?.launchExecutable &&
     getMonitorableExecutablePath(game)
   ) {
-    await launchLocalExecutable(String(game.executablePath).trim(), game.launchProfile);
+    await launchLocalExecutable(
+      String(game.executablePath).trim(),
+      game.launchProfile,
+      hideLauncher,
+    );
     return;
   }
 

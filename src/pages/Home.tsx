@@ -1533,6 +1533,7 @@ const Home: React.FC = () => {
                 onClick={() => {
                   openAddGameModal();
                 }}
+                onMouseEnter={() => playSound("hover")}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
               >
                 <Plus className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" />
@@ -1550,6 +1551,7 @@ const Home: React.FC = () => {
                       playSound("back");
                       setDisconnectSteamModalOpen(true);
                     }}
+                    onMouseEnter={() => playSound("hover")}
                     className="relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-red-500/10 group/steam"
                   >
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] group-hover/steam:bg-red-500 group-hover/steam:shadow-[0_0_8px_rgba(239,68,68,0.6)] transition-all" />
@@ -1575,6 +1577,7 @@ const Home: React.FC = () => {
 
                   <button
                     onClick={handleSyncSteam}
+                    onMouseEnter={() => playSound("hover")}
                     disabled={steamSyncing}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:bg-white/5 active:scale-95 disabled:opacity-50 group"
                   >
@@ -1589,6 +1592,7 @@ const Home: React.FC = () => {
               ) : (
                 <button
                   onClick={connectSteam}
+                  onMouseEnter={() => playSound("hover")}
                   disabled={steamConnecting}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:bg-white/10 group"
                 >
@@ -1605,6 +1609,7 @@ const Home: React.FC = () => {
                 email={user?.email || undefined}
                 avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}
                 language={launcherLanguage}
+                playSound={playSound}
                 onOpenProfile={() => {
                   setActiveCategory("PROFILE");
                   playSound("select");

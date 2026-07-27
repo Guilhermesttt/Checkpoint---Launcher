@@ -19,7 +19,6 @@ export function useInterval(
     if (delay === null) return;
 
     let id: number | null = null;
-    let isPaused = false;
 
     const tick = () => {
       savedCallback.current();
@@ -27,38 +26,27 @@ export function useInterval(
 
     const start = () => {
       if (id === null) {
-        if (isPaused) {
-          console.log(`[useInterval] Polling retomado (delay: ${delay}ms)`);
-          isPaused = false;
-        }
         id = window.setInterval(tick, delay);
       }
     };
 
-    const stop = (pausedByVisibility = false) => {
+    const stop = () => {
       if (id !== null) {
         window.clearInterval(id);
         id = null;
-        if (pausedByVisibility) {
-          console.log(`[useInterval] Polling pausado (delay: ${delay}ms)`);
-          isPaused = true;
-        }
       }
     };
 
     const handleVisibilityChange = () => {
       if (!options?.pauseWhenHidden) return;
       if (document.visibilityState === "hidden") {
-        stop(true);
+        stop();
       } else {
         start();
       }
     };
 
-    if (options?.pauseWhenHidden && document.visibilityState === "hidden") {
-      isPaused = true;
-      console.log(`[useInterval] Polling iniciado em estado pausado (delay: ${delay}ms)`);
-    } else {
+    if (!options?.pauseWhenHidden || document.visibilityState !== "hidden") {
       start();
     }
 

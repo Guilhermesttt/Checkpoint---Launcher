@@ -6,6 +6,7 @@ declare global {
       launchExecutable: (
         executablePath: string,
         launchProfile?: import("./domain").GameLaunchProfile,
+        launchOptions?: { hideLauncher?: boolean },
       ) => Promise<void>;
       selectExecutable: () => Promise<string | null>;
       searchEpicStore: (query: string) => Promise<Array<{

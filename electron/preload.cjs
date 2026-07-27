@@ -1,8 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  launchExecutable: (executablePath, launchProfile) =>
-    ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile),
+  launchExecutable: (executablePath, launchProfile, launchOptions) =>
+    ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile, launchOptions),
   selectExecutable: () => ipcRenderer.invoke("launcher:select-executable"),
   searchEpicStore: (query) =>
     ipcRenderer.invoke("launcher:search-epic-store", query),

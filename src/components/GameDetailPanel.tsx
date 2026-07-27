@@ -31,7 +31,6 @@ interface GameDetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
   playSound: (type: SoundEffectType) => void;
-  onEditGame?: (game: Game) => void;
   onLibraryChanged?: () => Promise<void> | void;
   onGameHydrated?: (game: Game) => void;
 }
@@ -52,7 +51,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   isOpen,
   onClose,
   playSound,
-  onEditGame,
   onLibraryChanged,
   onGameHydrated,
 }) => {
@@ -1151,16 +1149,12 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     playSound("play");
     try {
       const [result] = await Promise.allSettled([
-        launchGame(game),
+        launchGame(game, { hideLauncher: closeOnLaunch }),
         wait(MIN_LAUNCH_SCREEN_MS),
       ]);
 
       if (result.status === "rejected") {
         throw result.reason;
-      }
-
-      if (closeOnLaunch) {
-        window.close();
       }
 
       if (user?.uid) {

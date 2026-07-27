@@ -9,9 +9,21 @@ describe("overlay de conquistas", () => {
   let unlock: OverlayCallback;
   let panelVisibility: OverlayCallback;
   let panelAction: ReturnType<typeof vi.fn>;
+  let mediaPlay: ReturnType<typeof vi.fn>;
+  let mediaPause: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mediaPlay = vi.fn().mockResolvedValue(undefined);
+    mediaPause = vi.fn();
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      value: mediaPlay,
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "pause", {
+      configurable: true,
+      value: mediaPause,
+    });
     panelAction = vi.fn(() => Promise.resolve());
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
     const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
@@ -78,6 +90,27 @@ describe("overlay de conquistas", () => {
     views.forEach((view) => {
       expect(content?.querySelector(`:scope > [data-panel-view="${view}"]`)).not.toBeNull();
     });
+  });
+
+  it("toca hover e clique do overlay sem cortar o primeiro efeito", () => {
+    panelVisibility({
+      open: true,
+      state: {
+        settings: {
+          achievementVolume: 35,
+          achievementSoundTheme: "ps5",
+        },
+      },
+    });
+    mediaPlay.mockClear();
+    mediaPause.mockClear();
+
+    const button = document.getElementById("capture-now");
+    button?.dispatchEvent(new Event("pointerover", { bubbles: true }));
+    button?.click();
+
+    expect(mediaPlay).toHaveBeenCalledTimes(2);
+    expect(mediaPause).not.toHaveBeenCalled();
   });
 
   it("mantem os toasts compactos mesmo em uma janela fullscreen", () => {

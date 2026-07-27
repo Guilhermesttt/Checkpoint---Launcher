@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "./dropdown-menu";
 import type { LauncherLanguage } from "../../context/PreferencesContext";
+import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 interface ProfileDropdownProps {
   userDisplay: string;
@@ -19,6 +20,7 @@ interface ProfileDropdownProps {
   onOpenProfile?: () => void;
   onOpenSettings?: () => void;
   language?: LauncherLanguage;
+  playSound: (type: SoundEffectType) => void;
 }
 
 const dropdownCopy = {
@@ -38,6 +40,7 @@ export function ProfileDropdown({
   onOpenProfile,
   onOpenSettings,
   language = "pt-BR",
+  playSound,
 }: ProfileDropdownProps) {
   const initials = userDisplay.slice(0, 2).toUpperCase();
   const copy = dropdownCopy[language];
@@ -45,7 +48,11 @@ export function ProfileDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20">
+        <button
+          onPointerEnter={() => playSound("hover")}
+          onClick={() => playSound("select")}
+          className="flex items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+        >
           <div className="flex flex-col items-end pl-2">
             <span className="text-[8px] font-black uppercase tracking-widest text-white/30">
               {copy.identity}
@@ -82,6 +89,7 @@ export function ProfileDropdown({
           {onOpenProfile && (
             <DropdownMenuItem
               onClick={onOpenProfile}
+              onPointerEnter={() => playSound("hover")}
               className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-semibold text-white/70 transition-colors focus:bg-white/10 focus:text-white"
             >
               <User className="h-4 w-4" />
@@ -91,6 +99,7 @@ export function ProfileDropdown({
           {onOpenSettings && (
             <DropdownMenuItem
               onClick={onOpenSettings}
+              onPointerEnter={() => playSound("hover")}
               className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-semibold text-white/70 transition-colors focus:bg-white/10 focus:text-white"
             >
               <Settings className="h-4 w-4" />
@@ -102,6 +111,7 @@ export function ProfileDropdown({
         <div className="p-1">
           <DropdownMenuItem
             onClick={onLogout}
+            onPointerEnter={() => playSound("hover")}
             className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-bold text-red-400 transition-colors focus:bg-red-500/15 focus:text-red-300"
           >
             <LogOut className="h-4 w-4" />

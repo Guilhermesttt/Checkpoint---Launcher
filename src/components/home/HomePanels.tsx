@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpotify } from "@fortawesome/free-brands-svg-icons";
@@ -59,10 +59,6 @@ type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProp
 type HomeSocialFriend = SocialFriend;
 type HomeCheckpointFriendRequest = CheckpointFriendRequest;
 type HomePriceAlert = PriceAlert;
-
-type AchievementDiagnostics = Awaited<
-  ReturnType<NonNullable<Window["electronAPI"]>["getAchievementDiagnostics"]>
->;
 
 export interface LanguageOption {
   id: LauncherLanguage;
@@ -310,19 +306,6 @@ export const SettingsPageV2: React.FC<{
       "it-IT": ["Controller", "Controller collegato", "Nessun controller collegato", "Collega tramite USB o Bluetooth per navigare.", "Prova LED", "Autorizza"],
     }[language];
     const led = useControllerLedStatus();
-    const [achievementDiagnostics, setAchievementDiagnostics] = useState<AchievementDiagnostics | null>(null);
-    const refreshAchievementDiagnostics = useCallback(async () => {
-      if (!window.electronAPI?.getAchievementDiagnostics) return;
-      setAchievementDiagnostics(await window.electronAPI.getAchievementDiagnostics());
-    }, []);
-    useEffect(() => {
-      const initial = window.setTimeout(() => void refreshAchievementDiagnostics(), 0);
-      const interval = window.setInterval(() => void refreshAchievementDiagnostics(), 5000);
-      return () => {
-        window.clearTimeout(initial);
-        window.clearInterval(interval);
-      };
-    }, [refreshAchievementDiagnostics]);
     const activeAppTheme =
       visualTheme === "checkpoint"
         ? "default"

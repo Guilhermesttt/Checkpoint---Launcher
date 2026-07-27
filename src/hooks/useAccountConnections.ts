@@ -48,6 +48,7 @@ export function useAccountConnections({
       notify("Conecte sua conta Steam para sincronizar.", "info");
       return;
     }
+    playSound("select");
     const healthy = await isBackendHealthy();
     if (!healthy) {
       notify("Backend Steam offline.", "error");

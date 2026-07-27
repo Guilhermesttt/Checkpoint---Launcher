@@ -2,10 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
-  ImageIcon,
-  Type,
   Search,
-  Tags,
   Globe,
   Gamepad2,
   RefreshCw,
@@ -15,7 +12,6 @@ import {
   CheckCircle2,
   ChevronDown,
   LibraryBig,
-  Sparkles,
   Upload,
 } from "lucide-react";
 import ModalShell from "./ui/ModalShell";
@@ -959,18 +955,6 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     }
   };
 
-  const handleSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    if (raw === "") {
-      setFormData((prev) => ({ ...prev, sizeGB: undefined }));
-      return;
-    }
-    const parsed = Number(raw);
-    if (!Number.isNaN(parsed) && parsed >= 0) {
-      setFormData((prev) => ({ ...prev, sizeGB: parsed }));
-    }
-  };
-
   const resetSearch = () => {
     searchRequestRef.current += 1;
     if (searchDebounceRef.current) {
@@ -1053,7 +1037,6 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   };
 
   const previewImage = formData.cardImage || formData.image || formData.backgroundImage || "";
-  const previewWallpaper = formData.backgroundImage || formData.cardImage || formData.image || "";
   const platformLabel =
     formData.launcherType === "steam"
       ? copy.steam
