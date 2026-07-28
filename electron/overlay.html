@@ -75,6 +75,41 @@
       width: var(--overlay-width);
     }
 
+    #achievement-stack[data-position="top-left"] {
+      top: 24px;
+      right: auto;
+      bottom: auto;
+      left: 24px;
+    }
+
+    #achievement-stack[data-position="top-right"] {
+      top: 24px;
+      right: 24px;
+      bottom: auto;
+      left: auto;
+    }
+
+    #achievement-stack[data-position="bottom-left"] {
+      top: auto;
+      right: auto;
+      bottom: 24px;
+      left: 24px;
+      flex-direction: column-reverse;
+    }
+
+    #achievement-stack[data-position="bottom-right"] {
+      top: auto;
+      right: 24px;
+      bottom: 24px;
+      left: auto;
+      flex-direction: column-reverse;
+    }
+
+    #achievement-stack[data-position="top-left"] .achievement-card,
+    #achievement-stack[data-position="bottom-left"] .achievement-card {
+      --entry-x: -18px;
+    }
+
     #social-stack {
       left: 24px;
       bottom: 64px;
@@ -3210,9 +3245,13 @@
     const checkpointIconUrl = new URL("../assets/icon.png", window.location.href).toString();
     const overlayPreferences = {
       social: localStorage.getItem("checkpoint-overlay-social") !== "false",
-      achievements: localStorage.getItem("checkpoint-overlay-achievements") !== "false",
       animations: localStorage.getItem("checkpoint-overlay-animations") !== "false",
     };
+    const achievementPositions = new Set(["top-left", "top-right", "bottom-left", "bottom-right"]);
+    const applyAchievementPosition = (position) => {
+      achievementStack.dataset.position = achievementPositions.has(position) ? position : "top-right";
+    };
+    applyAchievementPosition("top-right");
     const overlayTranslations = {
       "pt-BR": {
         home: "Início", game: "Jogo", media: "Mídia", achievements: "Conquistas", settings: "Config.",
@@ -3659,7 +3698,7 @@
     };
 
     const enqueueAchievement = (payload) => {
-      if (!overlayPreferences.achievements) return;
+      applyAchievementPosition(payload?.position || latestPanelState.settings?.achievementNotificationPosition);
       const duration = 5000;
       const card = document.createElement("article");
       card.className = "overlay-card achievement-card";
@@ -3835,6 +3874,11 @@
 
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
+      applyAchievementPosition(state.settings?.achievementNotificationPosition);
+      const achievementSetting = document.getElementById("setting-achievements");
+      if (achievementSetting) {
+        achievementSetting.checked = state.settings?.achievementNotificationsEnabled !== false;
+      }
       applyOverlayLanguage(state.language);
       const onlineRoot = document.getElementById("panel-friends-online");
       const offlineRoot = document.getElementById("panel-friends-offline");
@@ -4266,17 +4310,25 @@
     document.getElementById("chat-back")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close-chat" }));
     const syncOverlayPreferences = () => {
       overlayPreferences.social = document.getElementById("setting-social").checked;
-      overlayPreferences.achievements = document.getElementById("setting-achievements").checked;
       overlayPreferences.animations = document.getElementById("setting-animations").checked;
       localStorage.setItem("checkpoint-overlay-social", String(overlayPreferences.social));
-      localStorage.setItem("checkpoint-overlay-achievements", String(overlayPreferences.achievements));
       localStorage.setItem("checkpoint-overlay-animations", String(overlayPreferences.animations));
       document.body.classList.toggle("overlay-reduced-motion", !overlayPreferences.animations);
     };
     document.getElementById("setting-social").checked = overlayPreferences.social;
-    document.getElementById("setting-achievements").checked = overlayPreferences.achievements;
+    document.getElementById("setting-achievements").checked =
+      latestPanelState.settings?.achievementNotificationsEnabled !== false;
+    document.getElementById("setting-achievements")?.addEventListener("change", (event) => {
+      window.achievementOverlay.panelAction({
+        kind: "set-achievement-notifications",
+        enabled: event.currentTarget.checked,
+        custom: latestPanelState.settings?.customAchievementNotifications !== false,
+        position: latestPanelState.settings?.achievementNotificationPosition || "top-right",
+      });
+    });
     document.getElementById("setting-animations").checked = overlayPreferences.animations;
-    document.querySelectorAll(".setting-switch").forEach((input) => input.addEventListener("change", syncOverlayPreferences));
+    document.querySelectorAll(".setting-switch:not(#setting-achievements)")
+      .forEach((input) => input.addEventListener("change", syncOverlayPreferences));
     syncOverlayPreferences();
     document.getElementById("capture-now")?.addEventListener("click", async (event) => {
       const button = event.currentTarget;

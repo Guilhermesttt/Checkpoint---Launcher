@@ -306,7 +306,20 @@ export const SettingsPageV2: React.FC<{
       notificationVolume / 100,
     );
     const { isGamepadConnected, gamepadFamily, connectedGamepadId } = useGamepad();
-    const { openAtLogin, setOpenAtLogin, lowPerformanceMode, setLowPerformanceMode, closeOnLaunch, setCloseOnLaunch } = usePreferences();
+    const {
+      openAtLogin,
+      setOpenAtLogin,
+      lowPerformanceMode,
+      setLowPerformanceMode,
+      closeOnLaunch,
+      setCloseOnLaunch,
+      achievementNotificationsEnabled,
+      setAchievementNotificationsEnabled,
+      customAchievementNotifications,
+      setCustomAchievementNotifications,
+      achievementNotificationPosition,
+      setAchievementNotificationPosition,
+    } = usePreferences();
     const controllerCopy = {
       "pt-BR": ["Controle", "Controle conectado", "Nenhum controle conectado", "Conecte via USB ou Bluetooth para navegar pelo launcher.", "Testar LED", "Autorizar"],
       "en-US": ["Controller", "Controller connected", "No controller connected", "Connect through USB or Bluetooth to navigate the launcher.", "Test LED", "Authorize"],
@@ -315,6 +328,74 @@ export const SettingsPageV2: React.FC<{
       "de-DE": ["Controller", "Controller verbunden", "Kein Controller verbunden", "Über USB oder Bluetooth verbinden, um den Launcher zu steuern.", "LED testen", "Autorisieren"],
       "it-IT": ["Controller", "Controller collegato", "Nessun controller collegato", "Collega tramite USB o Bluetooth per navigare.", "Prova LED", "Autorizza"],
     }[language];
+    const achievementNotificationCopy = {
+      "pt-BR": {
+        title: "Notificações de conquistas",
+        description: "Escolha como e onde os desbloqueios aparecem durante o jogo.",
+        enabled: "Notificar ao desbloquear",
+        enabledHint: "Desliga completamente o aviso visual e o som de conquistas.",
+        custom: "Notificação customizada",
+        customHint: "Desligada, usa a notificação nativa do Windows — inclusive em tela cheia exclusiva.",
+        position: "Posição da notificação customizada",
+        positions: ["Superior esquerda", "Superior direita", "Inferior esquerda", "Inferior direita"],
+      },
+      "en-US": {
+        title: "Achievement notifications",
+        description: "Choose how and where unlocks appear while you play.",
+        enabled: "Notify when unlocked",
+        enabledHint: "Turns off both the achievement visual alert and its sound.",
+        custom: "Custom notification",
+        customHint: "When off, uses the native Windows notification, including exclusive fullscreen.",
+        position: "Custom notification position",
+        positions: ["Top left", "Top right", "Bottom left", "Bottom right"],
+      },
+      "es-ES": {
+        title: "Notificaciones de logros",
+        description: "Elige cómo y dónde aparecen los desbloqueos durante el juego.",
+        enabled: "Notificar al desbloquear",
+        enabledHint: "Desactiva por completo el aviso visual y el sonido.",
+        custom: "Notificación personalizada",
+        customHint: "Desactivada, usa la notificación nativa de Windows, incluso en pantalla completa exclusiva.",
+        position: "Posición de la notificación",
+        positions: ["Arriba izquierda", "Arriba derecha", "Abajo izquierda", "Abajo derecha"],
+      },
+      "fr-FR": {
+        title: "Notifications de succès",
+        description: "Choisissez comment et où les succès apparaissent pendant le jeu.",
+        enabled: "Notifier au déverrouillage",
+        enabledHint: "Désactive entièrement l’alerte visuelle et le son.",
+        custom: "Notification personnalisée",
+        customHint: "Désactivée, utilise la notification native de Windows, même en plein écran exclusif.",
+        position: "Position de la notification",
+        positions: ["Haut gauche", "Haut droite", "Bas gauche", "Bas droite"],
+      },
+      "de-DE": {
+        title: "Erfolgsbenachrichtigungen",
+        description: "Lege fest, wie und wo Freischaltungen im Spiel erscheinen.",
+        enabled: "Bei Freischaltung benachrichtigen",
+        enabledHint: "Schaltet den visuellen Hinweis und den Ton vollständig aus.",
+        custom: "Benutzerdefinierte Benachrichtigung",
+        customHint: "Ausgeschaltet wird die native Windows-Benachrichtigung verwendet, auch im exklusiven Vollbild.",
+        position: "Position der Benachrichtigung",
+        positions: ["Oben links", "Oben rechts", "Unten links", "Unten rechts"],
+      },
+      "it-IT": {
+        title: "Notifiche degli obiettivi",
+        description: "Scegli come e dove mostrare gli sblocchi durante il gioco.",
+        enabled: "Notifica allo sblocco",
+        enabledHint: "Disattiva completamente l’avviso visivo e il suono.",
+        custom: "Notifica personalizzata",
+        customHint: "Se disattivata usa la notifica nativa di Windows, anche a schermo intero esclusivo.",
+        position: "Posizione della notifica",
+        positions: ["In alto a sinistra", "In alto a destra", "In basso a sinistra", "In basso a destra"],
+      },
+    }[language];
+    const achievementPositions = [
+      "top-left",
+      "top-right",
+      "bottom-left",
+      "bottom-right",
+    ] as const;
     const led = useControllerLedStatus();
     const activeAppTheme =
       visualTheme === "checkpoint"
@@ -532,6 +613,58 @@ export const SettingsPageV2: React.FC<{
             </div>
           </section>
 
+          <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+            <SettingsHeader
+              icon={<Bell className="h-5 w-5 text-white/70" />}
+              title={achievementNotificationCopy.title}
+              description={achievementNotificationCopy.description}
+            />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-5 rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
+                <div>
+                  <p className="text-sm font-bold text-white">{achievementNotificationCopy.enabled}</p>
+                  <p className="text-[10px] text-white/40">{achievementNotificationCopy.enabledHint}</p>
+                </div>
+                <Switch
+                  checked={achievementNotificationsEnabled}
+                  onCheckedChange={setAchievementNotificationsEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-5 rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
+                <div>
+                  <p className="text-sm font-bold text-white">{achievementNotificationCopy.custom}</p>
+                  <p className="text-[10px] text-white/40">{achievementNotificationCopy.customHint}</p>
+                </div>
+                <Switch
+                  checked={customAchievementNotifications}
+                  disabled={!achievementNotificationsEnabled}
+                  onCheckedChange={setCustomAchievementNotifications}
+                />
+              </div>
+              <div
+                className={!achievementNotificationsEnabled || !customAchievementNotifications
+                  ? "pointer-events-none opacity-40"
+                  : ""}
+              >
+                <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white/40">
+                  {achievementNotificationCopy.position}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {achievementPositions.map((position, index) => (
+                    <SettingsChoice
+                      key={position}
+                      active={achievementNotificationPosition === position}
+                      label={achievementNotificationCopy.positions[index]}
+                      hint=""
+                      onHover={() => playSound("hover")}
+                      onClick={() => setAchievementNotificationPosition(position)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
           <VolumeSettingsCard
             title={t("soundEffects")}
             description={t("soundEffectsHint")}
@@ -550,7 +683,7 @@ export const SettingsPageV2: React.FC<{
             value={achievementVolume}
             max={100}
             actionLabel={t("test")}
-            onAction={onTestOverlayAchievement}
+            onAction={achievementNotificationsEnabled ? onTestOverlayAchievement : undefined}
             onHover={() => playSound("hover")}
             onChange={onAchievementVolumeChange}
             t={t}

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification } = require("electron");
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -94,13 +94,21 @@ let overlayWindow;
 let overlayReady = false;
 let overlayDisplayId = null;
 let overlayPanelOpen = false;
+let inGameOverlayActive = false;
 let overlayPanelState = {
   language: "pt-BR",
   friends: [],
   achievements: { unlocked: 0, available: 0, items: [], loading: false },
   currentGame: null,
   captures: [],
-  settings: { captureShortcut: "F8", achievementVolume: 22, achievementSoundTheme: "ps5" },
+  settings: {
+    captureShortcut: "F8",
+    achievementVolume: 22,
+    achievementSoundTheme: "ps5",
+    achievementNotificationsEnabled: true,
+    customAchievementNotifications: true,
+    achievementNotificationPosition: "top-right",
+  },
   chat: null,
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
@@ -113,11 +121,23 @@ const overlayEventCopy = {
   "it-IT": { enjoy: "Buon divertimento", active: "L’overlay è attivo mentre giochi.", playing: "Ora stai giocando a", open: "Apri senza uscire dal gioco", shortcut: "Usa il pulsante centrale del controller o Ctrl + Maiusc + O.", player: "Giocatore", now: "ora", friendPlaying: "Sta giocando ora a", request: "Ti ha inviato una richiesta di amicizia", accepted: "Ha accettato la tua richiesta di amicizia", firstKill: "Prima eliminazione", testAchievement: "Test visivo dell’overlay Checkpoint.", newMessage: "Nuovo messaggio", captureSaved: "Cattura salvata" },
 };
 const getOverlayEventCopy = () => overlayEventCopy[overlayPanelState.language] || overlayEventCopy["pt-BR"];
+const nativeAchievementFallbackCopy = {
+  "pt-BR": "Conquista desbloqueada",
+  "en-US": "Achievement unlocked",
+  "es-ES": "Logro desbloqueado",
+  "fr-FR": "Succès déverrouillé",
+  "de-DE": "Erfolg freigeschaltet",
+  "it-IT": "Obiettivo sbloccato",
+};
 let captureShortcut = "F8";
 let achievementVolume = 22;
 let achievementSoundTheme = "ps5";
+let achievementNotificationsEnabled = true;
+let customAchievementNotifications = true;
+let achievementNotificationPosition = "top-right";
 let recentCaptures = [];
 let captureInProgress = false;
+const activeNativeNotifications = new Set();
 const CAPTURE_HISTORY_LIMIT = 60;
 
 const normalizeCaptureShortcut = (value) => {
@@ -157,6 +177,9 @@ if (!hasSingleInstanceLock) {
 }
 
 Menu.setApplicationMenu(null);
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.checkpoint.launcher");
+}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const yieldToEventLoop = () => new Promise((resolve) => setImmediate(resolve));
@@ -637,7 +660,14 @@ const saveOverlaySettings = () => {
     fs.mkdirSync(path.dirname(overlaySettingsFile()), { recursive: true });
     fs.writeFileSync(
       overlaySettingsFile(),
-      JSON.stringify({ captureShortcut, achievementVolume, achievementSoundTheme }, null, 2),
+      JSON.stringify({
+        captureShortcut,
+        achievementVolume,
+        achievementSoundTheme,
+        achievementNotificationsEnabled,
+        customAchievementNotifications,
+        achievementNotificationPosition,
+      }, null, 2),
       "utf8",
     );
   } catch (error) {
@@ -824,7 +854,64 @@ const registerCaptureShortcut = (requestedShortcut) => {
   return true;
 };
 
+const activateInGameOverlay = () => {
+  inGameOverlayActive = true;
+  createOverlayWindow();
+  if (!overlayWindow || overlayWindow.isDestroyed()) return false;
+
+  // The shortcut is registered at startup, but registration can fail while
+  // another application temporarily owns it. Re-check it when a running game
+  // is detected so capture never depends on opening the overlay panel first.
+  if (!globalShortcut.isRegistered(captureShortcut) && !registerCaptureShortcut(captureShortcut)) {
+    console.warn(`[overlay] O atalho de captura ${captureShortcut} nao pode ser ativado para a sessao atual.`);
+  }
+
+  try {
+    syncOverlayBounds();
+    overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    overlayWindow.setAlwaysOnTop(true, "screen-saver");
+    overlayWindow.moveTop();
+    overlayWindow.showInactive();
+  } catch (error) {
+    console.warn("[overlay] Nao foi possivel ativar a janela para a sessao do jogo:", error);
+  }
+  return true;
+};
+
+const deactivateInGameOverlay = () => {
+  inGameOverlayActive = false;
+  if (overlayPanelOpen) setOverlayPanelOpen(false);
+};
+
+const applyAchievementNotificationSettings = (requestedSettings) => {
+  const supportedPositions = new Set(["top-left", "top-right", "bottom-left", "bottom-right"]);
+  achievementNotificationsEnabled = requestedSettings?.enabled !== false;
+  customAchievementNotifications = requestedSettings?.custom !== false;
+  achievementNotificationPosition = supportedPositions.has(requestedSettings?.position)
+    ? requestedSettings.position
+    : achievementNotificationPosition;
+  overlayPanelState = {
+    ...overlayPanelState,
+    settings: {
+      ...overlayPanelState.settings,
+      achievementNotificationsEnabled,
+      customAchievementNotifications,
+      achievementNotificationPosition,
+    },
+  };
+  saveOverlaySettings();
+  if (overlayReady && overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send("overlay:panel-state", overlayPanelState);
+  }
+  return {
+    enabled: achievementNotificationsEnabled,
+    custom: customAchievementNotifications,
+    position: achievementNotificationPosition,
+  };
+};
+
 registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
+  const previouslyHadRunningGame = Boolean(overlayPanelState.currentGame);
   const friends = Array.isArray(payload?.friends) ? payload.friends.slice(0, 30).map((friend) => ({
     id: String(friend?.id || "").slice(0, 128),
     name: String(friend?.name || "Jogador").slice(0, 80),
@@ -882,7 +969,14 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       monitoring: payload.currentGame.monitoring === "verified" ? "verified" : "unverified",
     } : null,
     captures: recentCaptures,
-    settings: { captureShortcut, achievementVolume, achievementSoundTheme },
+    settings: {
+      captureShortcut,
+      achievementVolume,
+      achievementSoundTheme,
+      achievementNotificationsEnabled,
+      customAchievementNotifications,
+      achievementNotificationPosition,
+    },
     chat: payload?.chat ? {
       friendId: String(payload.chat.friendId || "").slice(0, 128),
       friendName: String(payload.chat.friendName || "Amigo").slice(0, 80),
@@ -900,6 +994,12 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       achievements: Math.max(0, Number(payload?.profile?.achievements) || 0),
     },
   };
+  const hasRunningGame = Boolean(overlayPanelState.currentGame);
+  if (hasRunningGame && (!previouslyHadRunningGame || !inGameOverlayActive)) {
+    activateInGameOverlay();
+  } else if (!hasRunningGame && previouslyHadRunningGame) {
+    deactivateInGameOverlay();
+  }
   if (overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
 });
 
@@ -963,6 +1063,13 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
     if (ok && overlayPanelOpen) sendOverlayEvent("overlay:panel-state", overlayPanelState);
     return { ok, shortcut: captureShortcut };
   }
+  if (kind === "set-achievement-notifications") {
+    return applyAchievementNotificationSettings({
+      enabled: action?.enabled,
+      custom: action?.custom,
+      position: action?.position,
+    });
+  }
   if (["media-play-pause", "media-next", "media-previous"].includes(kind)) {
     const keyCode = kind === "media-play-pause" ? 179 : kind === "media-next" ? 176 : 177;
     execFile("powershell.exe", [
@@ -1002,6 +1109,47 @@ const playOverlaySound = (sound) => {
     volume: achievementVolume,
     theme: achievementSoundTheme,
   });
+};
+
+const showNativeAchievementNotification = (payload) => {
+  if (!Notification.isSupported()) {
+    console.warn("[overlay] Notificacoes nativas nao sao suportadas neste sistema.");
+    return false;
+  }
+  const achievement = payload?.achievement || {};
+  const notification = new Notification({
+    title: String(achievement.name || payload?.achievementId || getOverlayEventCopy().firstKill).slice(0, 160),
+    body: String(
+      achievement.description
+      || nativeAchievementFallbackCopy[overlayPanelState.language]
+      || nativeAchievementFallbackCopy["pt-BR"],
+    ).slice(0, 500),
+    icon: path.join(app.getAppPath(), "assets", "icon.png"),
+    silent: true,
+  });
+  activeNativeNotifications.add(notification);
+  notification.on("close", () => activeNativeNotifications.delete(notification));
+  notification.on("click", () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.show();
+    mainWindow.focus();
+  });
+  notification.show();
+  return true;
+};
+
+const dispatchAchievementNotification = (payload) => {
+  if (!achievementNotificationsEnabled) return false;
+  if (customAchievementNotifications) {
+    sendOverlayEvent("achievement:unlock", {
+      ...payload,
+      position: achievementNotificationPosition,
+    });
+  } else {
+    showNativeAchievementNotification(payload);
+  }
+  playOverlaySound("achievement-unlock");
+  return true;
 };
 
 const steamAppIdFromGameKey = (gameId) => {
@@ -1048,8 +1196,7 @@ const startAchievementBridge = async () => {
         };
       }
 
-      sendOverlayEvent("achievement:unlock", payload);
-      playOverlaySound("achievement-unlock");
+      dispatchAchievementNotification(payload);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("achievement:realtime-unlock", {
           gameId: payload.gameId,
@@ -2361,7 +2508,7 @@ registerSecureIpcHandler("overlay:test-welcome", async () => {
 registerSecureIpcHandler("overlay:test-achievement", async () => {
   const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
-  sendOverlayEvent("achievement:unlock", {
+  dispatchAchievementNotification({
     gameId: "checkpoint-lab",
     achievementId: "overlay-smoke-test",
     achievement: {
@@ -2373,7 +2520,6 @@ registerSecureIpcHandler("overlay:test-achievement", async () => {
     unlockedAt: new Date().toISOString(),
     duplicate: false,
   });
-  playOverlaySound("achievement-unlock");
 });
 
 registerSecureIpcHandler("overlay:set-achievement-volume", async (_event, requestedVolume) => {
@@ -2400,6 +2546,10 @@ registerSecureIpcHandler("overlay:set-achievement-sound-theme", async (_event, r
   return { theme: achievementSoundTheme };
 });
 
+registerSecureIpcHandler("overlay:set-achievement-notification-settings", async (_event, requestedSettings) => {
+  return applyAchievementNotificationSettings(requestedSettings);
+});
+
 registerSecureIpcHandler("overlay:toggle-panel", async () => {
   setOverlayPanelOpen(!overlayPanelOpen);
   return { open: overlayPanelOpen };
@@ -2408,6 +2558,7 @@ registerSecureIpcHandler("overlay:toggle-panel", async () => {
 registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
   const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
+  activateInGameOverlay();
   const gameTitle = String(payload?.gameTitle || "").trim();
   sendOverlayEvent("overlay:social", {
     kind: "game-start",
@@ -2699,6 +2850,11 @@ app.whenReady().then(async () => {
       if (["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"].includes(saved?.achievementSoundTheme)) {
         achievementSoundTheme = saved.achievementSoundTheme;
       }
+      achievementNotificationsEnabled = saved?.achievementNotificationsEnabled !== false;
+      customAchievementNotifications = saved?.customAchievementNotifications !== false;
+      if (["top-left", "top-right", "bottom-left", "bottom-right"].includes(saved?.achievementNotificationPosition)) {
+        achievementNotificationPosition = saved.achievementNotificationPosition;
+      }
     } catch {
       // Primeira execucao ou configuracao ainda nao criada.
     }
@@ -2706,7 +2862,14 @@ app.whenReady().then(async () => {
     overlayPanelState = {
       ...overlayPanelState,
       captures: recentCaptures,
-      settings: { captureShortcut, achievementVolume, achievementSoundTheme },
+      settings: {
+        captureShortcut,
+        achievementVolume,
+        achievementSoundTheme,
+        achievementNotificationsEnabled,
+        customAchievementNotifications,
+        achievementNotificationPosition,
+      },
     };
 
     const iconPath = path.join(app.getAppPath(), "assets", "icon.png");

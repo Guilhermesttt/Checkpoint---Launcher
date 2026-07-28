@@ -133,6 +133,15 @@ declare global {
       setAchievementSoundTheme: (
         theme: import("../context/PreferencesContext").SoundTheme,
       ) => Promise<{ theme: import("../context/PreferencesContext").SoundTheme }>;
+      setAchievementNotificationSettings: (settings: {
+        enabled: boolean;
+        custom: boolean;
+        position: import("../context/PreferencesContext").AchievementNotificationPosition;
+      }) => Promise<{
+        enabled: boolean;
+        custom: boolean;
+        position: import("../context/PreferencesContext").AchievementNotificationPosition;
+      }>;
       getVersion: () => Promise<string>;
       getUpdateState: () => Promise<{
         status: "idle" | "checking" | "available" | "not-available" | "downloading" | "downloaded" | "error";

@@ -10,12 +10,20 @@ export type LauncherLanguage =
   | "it-IT";
 export type SoundTheme = "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
 export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "cyberpunk";
+export type AchievementNotificationPosition =
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right";
 
 interface PreferencesContextValue {
   language: LauncherLanguage;
   effectsVolume: number;
   achievementVolume: number;
   notificationVolume: number;
+  achievementNotificationsEnabled: boolean;
+  customAchievementNotifications: boolean;
+  achievementNotificationPosition: AchievementNotificationPosition;
   musicVolume: number;
   soundTheme: SoundTheme;
   visualTheme: VisualTheme;
@@ -23,6 +31,9 @@ interface PreferencesContextValue {
   setEffectsVolume: (volume: number) => void;
   setAchievementVolume: (volume: number) => void;
   setNotificationVolume: (volume: number) => void;
+  setAchievementNotificationsEnabled: (enabled: boolean) => void;
+  setCustomAchievementNotifications: (custom: boolean) => void;
+  setAchievementNotificationPosition: (position: AchievementNotificationPosition) => void;
   setMusicVolume: (volume: number) => void;
   setSoundTheme: (theme: SoundTheme) => void;
   setVisualTheme: (theme: VisualTheme) => void;
@@ -765,15 +776,24 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [effectsVolume, setEffectsVolume] = useState(30);
   const [achievementVolume, setAchievementVolume] = useState(22);
   const [notificationVolume, setNotificationVolume] = useState(40);
+  const [achievementNotificationsEnabled, setAchievementNotificationsEnabled] = useState(true);
+  const [customAchievementNotifications, setCustomAchievementNotifications] = useState(true);
+  const [achievementNotificationPosition, setAchievementNotificationPosition] =
+    useState<AchievementNotificationPosition>("top-right");
   const [musicVolume, setMusicVolume] = useState(9);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
   const [openAtLogin, setOpenAtLoginState] = useState(false);
   const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
   const [closeOnLaunch, setCloseOnLaunch] = useState(true);
+  const [hydratedPreferencesUid, setHydratedPreferencesUid] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHydratedPreferencesUid(null);
+      return;
+    }
     const savedLanguage = localStorage.getItem(prefKey(user.uid, "language"));
     const savedEffectsVolumeRaw = localStorage.getItem(prefKey(user.uid, "effects_volume"));
     const savedAchievementVolumeRaw = localStorage.getItem(prefKey(user.uid, "achievement_volume"));
@@ -792,6 +812,15 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedOpenAtLogin = localStorage.getItem(prefKey(user.uid, "open_at_login"));
     const savedLowPerf = localStorage.getItem(prefKey(user.uid, "low_perf"));
     const savedCloseLaunch = localStorage.getItem(prefKey(user.uid, "close_launch"));
+    const savedAchievementNotifications = localStorage.getItem(
+      prefKey(user.uid, "achievement_notifications"),
+    );
+    const savedCustomAchievementNotifications = localStorage.getItem(
+      prefKey(user.uid, "custom_achievement_notifications"),
+    );
+    const savedAchievementNotificationPosition = localStorage.getItem(
+      prefKey(user.uid, "achievement_notification_position"),
+    );
 
     if (savedOpenAtLogin !== null) {
       const shouldOpenAtLogin = savedOpenAtLogin === "true";
@@ -804,6 +833,20 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     if (savedLowPerf !== null) setLowPerformanceMode(savedLowPerf === "true");
     if (savedCloseLaunch !== null) setCloseOnLaunch(savedCloseLaunch === "true");
+    if (savedAchievementNotifications !== null) {
+      setAchievementNotificationsEnabled(savedAchievementNotifications === "true");
+    }
+    if (savedCustomAchievementNotifications !== null) {
+      setCustomAchievementNotifications(savedCustomAchievementNotifications === "true");
+    }
+    if (
+      savedAchievementNotificationPosition === "top-left"
+      || savedAchievementNotificationPosition === "top-right"
+      || savedAchievementNotificationPosition === "bottom-left"
+      || savedAchievementNotificationPosition === "bottom-right"
+    ) {
+      setAchievementNotificationPosition(savedAchievementNotificationPosition);
+    }
 
     if (
       savedLanguage === "pt-BR" ||
@@ -838,10 +881,11 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     ) {
       setVisualTheme(savedVisualTheme);
     }
+    setHydratedPreferencesUid(user.uid);
   }, [user?.uid]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
     localStorage.setItem(prefKey(user.uid, "language"), language);
     localStorage.setItem(prefKey(user.uid, "effects_volume"), String(effectsVolume));
     localStorage.setItem(prefKey(user.uid, "achievement_volume"), String(achievementVolume));
@@ -852,7 +896,19 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(prefKey(user.uid, "open_at_login"), String(openAtLogin));
     localStorage.setItem(prefKey(user.uid, "low_perf"), String(lowPerformanceMode));
     localStorage.setItem(prefKey(user.uid, "close_launch"), String(closeOnLaunch));
-  }, [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, user?.uid, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch]);
+    localStorage.setItem(
+      prefKey(user.uid, "achievement_notifications"),
+      String(achievementNotificationsEnabled),
+    );
+    localStorage.setItem(
+      prefKey(user.uid, "custom_achievement_notifications"),
+      String(customAchievementNotifications),
+    );
+    localStorage.setItem(
+      prefKey(user.uid, "achievement_notification_position"),
+      achievementNotificationPosition,
+    );
+  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, musicVolume, notificationVolume, openAtLogin, soundTheme, user?.uid, visualTheme]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -868,12 +924,29 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [visualTheme, lowPerformanceMode]);
 
   useEffect(() => {
+    if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
     void window.electronAPI?.setAchievementVolume?.(achievementVolume).catch(console.error);
-  }, [achievementVolume]);
+  }, [achievementVolume, hydratedPreferencesUid, user?.uid]);
 
   useEffect(() => {
+    if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
     void window.electronAPI?.setAchievementSoundTheme?.(soundTheme).catch(console.error);
-  }, [soundTheme]);
+  }, [hydratedPreferencesUid, soundTheme, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
+    void window.electronAPI?.setAchievementNotificationSettings?.({
+      enabled: achievementNotificationsEnabled,
+      custom: customAchievementNotifications,
+      position: achievementNotificationPosition,
+    }).catch(console.error);
+  }, [
+    achievementNotificationPosition,
+    achievementNotificationsEnabled,
+    customAchievementNotifications,
+    hydratedPreferencesUid,
+    user?.uid,
+  ]);
 
   const value = useMemo<PreferencesContextValue>(
     () => ({
@@ -881,6 +954,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       effectsVolume,
       achievementVolume,
       notificationVolume,
+      achievementNotificationsEnabled,
+      customAchievementNotifications,
+      achievementNotificationPosition,
       musicVolume,
       soundTheme,
       visualTheme,
@@ -888,6 +964,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setEffectsVolume: (volume) => setEffectsVolume(clampVolume(volume)),
       setAchievementVolume: (volume) => setAchievementVolume(clampVolume(volume)),
       setNotificationVolume: (volume) => setNotificationVolume(clampVolume(volume)),
+      setAchievementNotificationsEnabled,
+      setCustomAchievementNotifications,
+      setAchievementNotificationPosition,
       setMusicVolume: (volume) => setMusicVolume(clampVolume(volume)),
       setSoundTheme,
       setVisualTheme,
@@ -913,7 +992,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       },
     }),
-    [achievementVolume, effectsVolume, notificationVolume, language, musicVolume, soundTheme, visualTheme, openAtLogin, lowPerformanceMode, closeOnLaunch],
+    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, customAchievementNotifications, effectsVolume, language, lowPerformanceMode, musicVolume, notificationVolume, openAtLogin, soundTheme, visualTheme],
   );
 
   return (

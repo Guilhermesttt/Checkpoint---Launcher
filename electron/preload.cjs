@@ -40,6 +40,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),
   setAchievementSoundTheme: (theme) => ipcRenderer.invoke("overlay:set-achievement-sound-theme", theme),
+  setAchievementNotificationSettings: (settings) =>
+    ipcRenderer.invoke("overlay:set-achievement-notification-settings", settings),
   toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
 

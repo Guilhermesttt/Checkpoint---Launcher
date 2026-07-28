@@ -160,6 +160,15 @@ describe("overlay de conquistas", () => {
     expect(overlaySource).toContain("37. Take Screenshot Psfx Take Screen.mp3");
   });
 
+  it("ativa a janela e reafirma o atalho assim que um jogo e detectado", () => {
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+
+    expect(mainSource).toContain("const activateInGameOverlay = () =>");
+    expect(mainSource).toContain("!globalShortcut.isRegistered(captureShortcut)");
+    expect(mainSource).toContain("if (hasRunningGame && (!previouslyHadRunningGame || !inGameOverlayActive))");
+    expect(mainSource).toContain("activateInGameOverlay();");
+  });
+
   it("mantem os toasts compactos mesmo em uma janela fullscreen", () => {
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
     const cardRule = html.match(/\.overlay-card\s*\{([\s\S]*?)\}/)?.[1] || "";
@@ -193,6 +202,27 @@ describe("overlay de conquistas", () => {
     expect(card?.querySelector(".achievement-title")?.textContent).toBe("Minha obra-prima");
     expect(card?.querySelector(".achievement-description")?.textContent).toBe("Obtenha a arma exclusiva.");
     expect(card?.querySelector("img")?.getAttribute("src")).toContain("re4-achievement.jpg");
+  });
+
+  it("aplica a posicao configurada ao toast de conquista", () => {
+    unlock({
+      gameId: "checkpoint-lab",
+      achievementId: "position-test",
+      position: "bottom-left",
+      achievement: { id: "position-test", name: "Posicao", description: "" },
+    });
+
+    expect(document.getElementById("achievement-stack")?.dataset.position).toBe("bottom-left");
+  });
+
+  it("encaminha conquistas para o overlay customizado ou para a notificacao nativa", () => {
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+
+    expect(mainSource).toContain("const dispatchAchievementNotification = (payload) =>");
+    expect(mainSource).toContain("if (!achievementNotificationsEnabled) return false");
+    expect(mainSource).toContain('sendOverlayEvent("achievement:unlock"');
+    expect(mainSource).toContain("showNativeAchievementNotification(payload)");
+    expect(mainSource).toContain("silent: true");
   });
 
   it("substitui uma imagem quebrada pelo trofeu", () => {

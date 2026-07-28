@@ -92,8 +92,42 @@ describe("launcher sound effects", () => {
     });
     const { result } = renderHook(() => useSoundEffects());
 
-    act(() => result.current.playSound("friendRequest"));
+    act(() => result.current.playSound("select"));
 
     expect(FakeAudio.played).toHaveLength(0);
+  });
+
+  it.each([
+    ["visible", false],
+    ["hidden", true],
+  ])("toca notificacoes com visibilityState=%s e hasFocus=%s", (visibilityState, hasFocus) => {
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.spyOn(document, "hasFocus").mockReturnValue(hasFocus);
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: visibilityState,
+    });
+    const { result } = renderHook(() => useSoundEffects(0.5, "ps5", 0.4));
+
+    act(() => result.current.playSound("friendRequest"));
+
+    expect(FakeAudio.played).toHaveLength(1);
+    expect(FakeAudio.played[0].volume).toBe(0.4);
+  });
+
+  it("nao interrompe uma notificacao quando a janela perde foco", () => {
+    vi.stubGlobal("Audio", FakeAudio);
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    const { result } = renderHook(() => useSoundEffects());
+
+    act(() => result.current.playSound("friendRequest"));
+    const notification = FakeAudio.played[0];
+    act(() => window.dispatchEvent(new Event("blur")));
+
+    expect(notification.pause).not.toHaveBeenCalled();
   });
 });

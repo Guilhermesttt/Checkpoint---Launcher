@@ -255,6 +255,14 @@ const soundThemes = {
 export type SoundEffectType = keyof (typeof soundThemes)["ps5"];
 
 const audioCache = new Map<string, HTMLAudioElement>();
+const notificationSoundTypes = new Set<SoundEffectType>([
+  "friendRequest",
+  "chatReceived",
+  "chatSent",
+]);
+
+const isNotificationSoundType = (type: SoundEffectType) =>
+  notificationSoundTypes.has(type);
 
 const preloadAudio = (path: string) => {
   if (audioCache.has(path)) return audioCache.get(path);
@@ -273,6 +281,7 @@ export const useSoundEffects = (
   const lastNavigateAtRef = useRef(0);
   const lastHoverAtRef = useRef(0);
   const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
+  const activeNotificationAudiosRef = useRef(new Set<HTMLAudioElement>());
   const sounds = soundThemes[theme] ?? soundThemes.ps5;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
@@ -280,33 +289,40 @@ export const useSoundEffects = (
     Array.from(new Set(Object.values(soundPaths))).forEach(preloadAudio);
   }, [soundPaths]);
 
-  const stopActiveSounds = useCallback(() => {
+  const stopActiveSounds = useCallback((includeNotifications = false) => {
     activeAudiosRef.current.forEach((audio) => {
+      if (!includeNotifications && activeNotificationAudiosRef.current.has(audio)) return;
       audio.pause();
       audio.currentTime = 0;
+      activeAudiosRef.current.delete(audio);
+      activeNotificationAudiosRef.current.delete(audio);
     });
-    activeAudiosRef.current.clear();
   }, []);
 
   useEffect(() => {
+    const stopInterfaceSounds = () => stopActiveSounds();
     const stopWhenInactive = () => {
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
-        stopActiveSounds();
+        stopInterfaceSounds();
       }
     };
 
-    window.addEventListener("blur", stopActiveSounds);
+    window.addEventListener("blur", stopInterfaceSounds);
     document.addEventListener("visibilitychange", stopWhenInactive);
     return () => {
-      window.removeEventListener("blur", stopActiveSounds);
+      window.removeEventListener("blur", stopInterfaceSounds);
       document.removeEventListener("visibilitychange", stopWhenInactive);
-      stopActiveSounds();
+      stopActiveSounds(true);
     };
   }, [stopActiveSounds]);
 
   const playSound = useCallback(
     (type: SoundEffectType) => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+      const isNotificationSound = isNotificationSoundType(type);
+      if (
+        !isNotificationSound
+        && (document.visibilityState !== "visible" || !document.hasFocus())
+      ) return;
 
       const now = performance.now();
       if (type === "navigate") {
@@ -324,15 +340,16 @@ export const useSoundEffects = (
       const audio = cachedAudio?.cloneNode(true) as HTMLAudioElement | undefined;
       if (!audio) return;
 
-      const isNotificationSound =
-        type === "friendRequest" || type === "chatReceived" || type === "chatSent";
       audio.volume = isNotificationSound ? notificationVolume : volume;
       activeAudiosRef.current.add(audio);
+      if (isNotificationSound) activeNotificationAudiosRef.current.add(audio);
       audio.addEventListener("ended", () => {
         activeAudiosRef.current.delete(audio);
+        activeNotificationAudiosRef.current.delete(audio);
       }, { once: true });
       audio.play().catch(() => {
         activeAudiosRef.current.delete(audio);
+        activeNotificationAudiosRef.current.delete(audio);
       });
     },
     [notificationVolume, soundPaths, volume],
