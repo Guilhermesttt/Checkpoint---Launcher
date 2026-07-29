@@ -1,80 +1,21 @@
-import {
-  limitToLast,
-  off,
-  onValue,
-  orderByChild,
-  push,
-  query,
-  ref,
-  remove,
-  serverTimestamp,
-  set,
-  update,
-} from "firebase/database";
-import {
-  deleteObject,
-  getDownloadURL,
-  ref as storageRef,
-  uploadBytes,
-} from "firebase/storage";
-import { auth, realtimeDb, storage } from "../../Firebase";
+import { supabase } from "./supabase";
 import type { ChatMessage } from "../types/domain";
 import { apiUrl } from "./api";
 
 const HISTORY_LIMIT = 50;
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
 const messageListeners = new Set<(message: ChatMessage) => void>();
-const typingListeners = new Set<(data: { senderId: string; typing: boolean }) => void>();
 const unreadListeners = new Set<(messages: ChatMessage[]) => void>();
 const unreadMessages: ChatMessage[] = [];
 
-const activeChatSubscriptions = new Map<string, number>();
-let connectedUserUid: string | null = null;
-let userChatsRef: ReturnType<typeof ref> | null = null;
-let seenInboxMessageIds = new Set<string>();
-let inboxInitialized = false;
-const openedChatIds = new Set<string>();
+const activeChatChannels = new Map<string, any>();
+const openedChatIds = new Map<string, string>();
 const openingChats = new Map<string, Promise<string>>();
 
 export const getChatId = (uid1: string, uid2: string) =>
   [uid1, uid2].sort().join("_");
-
-const emitUnread = () => {
-  unreadListeners.forEach((listener) => listener([...unreadMessages]));
-};
-
-const normalizeMessage = (
-  id: string,
-  value: Record<string, unknown>,
-): ChatMessage => {
-  let createdAtIso: string;
-  if (typeof value.createdAt === "number") {
-    createdAtIso = new Date(value.createdAt).toISOString();
-  } else if (typeof value.createdAt === "string" && value.createdAt) {
-    const parsed = Date.parse(value.createdAt);
-    createdAtIso = Number.isFinite(parsed) ? new Date(parsed).toISOString() : value.createdAt;
-  } else {
-    createdAtIso = new Date().toISOString();
-  }
-
-  return {
-    id,
-    chatId: String(value.chatId || ""),
-    senderId: String(value.senderId || ""),
-    receiverId: String(value.receiverId || ""),
-    text: String(value.text || ""),
-    createdAt: createdAtIso,
-    read: false,
-    attachmentName: value.attachmentName ? String(value.attachmentName) : undefined,
-    attachmentUrl: value.attachmentUrl ? String(value.attachmentUrl) : undefined,
-    attachmentType: value.attachmentType ? String(value.attachmentType) : undefined,
-    attachmentSize: typeof value.attachmentSize === "number"
-      ? value.attachmentSize
-      : undefined,
-    attachmentPath: value.attachmentPath ? String(value.attachmentPath) : undefined,
-  };
-};
 
 const messageTimestamp = (message: Pick<ChatMessage, "createdAt">) => {
   const timestamp = Date.parse(String(message.createdAt || ""));
@@ -87,96 +28,157 @@ export const compareChatMessages = (a: ChatMessage, b: ChatMessage) => {
   return String(a.id || "").localeCompare(String(b.id || ""));
 };
 
-const ensureChat = async (uid: string, friendUid: string) => {
-  const expectedChatId = getChatId(uid, friendUid);
-  if (openedChatIds.has(expectedChatId)) return expectedChatId;
-  const pending = openingChats.get(expectedChatId);
-  if (pending) return pending;
-  const request = (async () => {
-    const token = await auth.currentUser?.getIdToken();
-    if (!token || auth.currentUser?.uid !== uid) {
-      throw new Error("Sessao expirada. Entre novamente.");
-    }
-    const response = await fetch(apiUrl("/api/chat/open"), {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ friendUid }),
-    });
-    const payload = await response.json().catch(() => ({})) as {
-      chatId?: string;
-      error?: string;
-    };
-    if (!response.ok || !payload.chatId) {
-      throw new Error(payload.error || "Nao foi possivel abrir a conversa.");
-    }
-    openedChatIds.add(payload.chatId);
-    return payload.chatId;
-  })();
-  openingChats.set(expectedChatId, request);
-  try {
-    return await request;
-  } finally {
-    openingChats.delete(expectedChatId);
+const emitUnread = () => {
+  unreadListeners.forEach((listener) => listener([...unreadMessages]));
+};
+
+export const normalizeMessage = (
+  id: string,
+  value: Record<string, unknown>,
+): ChatMessage => {
+  let createdAtIso: string;
+  if (typeof value.createdAt === "number") {
+    createdAtIso = new Date(value.createdAt).toISOString();
+  } else if (typeof value.created_at === "string" && value.created_at) {
+    createdAtIso = value.created_at;
+  } else {
+    createdAtIso = new Date().toISOString();
   }
+
+  return {
+    id: id || String(value.id || ""),
+    chatId: String(value.chatId || value.chat_id || ""),
+    senderId: String(value.senderId || value.sender_id || ""),
+    receiverId: String(value.receiverId || value.receiver_id || ""),
+    text: String(value.text || ""),
+    createdAt: createdAtIso,
+    read: Boolean(value.read),
+    attachmentName: typeof value.attachmentName === "string" ? value.attachmentName : typeof value.attachment_name === "string" ? value.attachment_name : undefined,
+    attachmentUrl: typeof value.attachmentUrl === "string" ? value.attachmentUrl : typeof value.attachment_url === "string" ? value.attachment_url : undefined,
+    attachmentType: typeof value.attachmentType === "string" ? value.attachmentType : typeof value.attachment_type === "string" ? value.attachment_type : undefined,
+    attachmentSize: typeof value.attachmentSize === "number" ? value.attachmentSize : typeof value.attachment_size === "number" ? value.attachment_size : undefined,
+    attachmentPath: typeof value.attachmentPath === "string" ? value.attachmentPath : typeof value.attachment_path === "string" ? value.attachment_path : undefined,
+  };
+};
+
+const hydrateAttachmentUrl = async (message: ChatMessage): Promise<ChatMessage> => {
+  if (!message.attachmentPath) return message;
+  const { data, error } = await supabase.storage
+    .from("attachments")
+    .createSignedUrl(message.attachmentPath, 60 * 60);
+  return {
+    ...message,
+    attachmentUrl: error ? undefined : data.signedUrl,
+  };
+};
+
+export const ensureChatSession = async (
+  currentUid: string,
+  friendUid: string,
+): Promise<string> => {
+  const chatId = getChatId(currentUid, friendUid);
+  const openedChatId = openedChatIds.get(chatId);
+  if (openedChatId) return openedChatId;
+
+  const pending = openingChats.get(chatId);
+  if (pending) return pending;
+
+  const sessionPromise = (async () => {
+    try {
+      const session = (await supabase.auth.getSession()).data.session;
+      if (!session?.access_token || session.user.id !== currentUid) {
+        throw new Error("Sessao expirada. Entre novamente.");
+      }
+      const response = await fetch(apiUrl("/api/chat/open"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ friendUid }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        chatId?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.chatId) {
+        throw new Error(payload.error || "Erro ao abrir conversa.");
+      }
+      openedChatIds.set(chatId, payload.chatId);
+      return payload.chatId;
+    } finally {
+      openingChats.delete(chatId);
+    }
+  })();
+
+  openingChats.set(chatId, sessionPromise);
+  return sessionPromise;
 };
 
 export const establishChatConnection = async () => {
-  const uid = auth.currentUser?.uid;
-  if (!uid || connectedUserUid === uid) return;
-  closeChatConnection();
-  connectedUserUid = uid;
-  seenInboxMessageIds = new Set();
-  inboxInitialized = false;
-  userChatsRef = ref(realtimeDb, `userChats/${uid}`);
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.user) return;
+  const uid = session.user.id;
+  subscribeToActiveChats(uid);
+};
 
-  onValue(userChatsRef, (snapshot) => {
-    const chats = snapshot.val() as Record<string, {
-      lastMessageId?: string;
-      senderId?: string;
-      receiverId?: string;
-      text?: string;
-      updatedAt?: number;
-    }> | null;
-    if (!chats) {
-      inboxInitialized = true;
-      return;
-    }
-    if (!inboxInitialized) {
-      Object.values(chats).forEach((item) => {
-        const messageId = String(item.lastMessageId || "");
-        if (messageId) seenInboxMessageIds.add(messageId);
-      });
-      inboxInitialized = true;
-      return;
-    }
-    Object.entries(chats).forEach(([chatId, item]) => {
-      const messageId = String(item.lastMessageId || "");
-      if (!messageId || seenInboxMessageIds.has(messageId)) return;
-      seenInboxMessageIds.add(messageId);
-      if (item.senderId !== uid) {
-        const message = normalizeMessage(messageId, { ...item, chatId });
-        if (
-          !activeChatSubscriptions.has(message.senderId)
-          && !unreadMessages.some((candidate) => candidate.id === message.id)
-        ) {
+export const subscribeToActiveChats = (uid: string) => {
+  const channelKey = `unread_${uid}`;
+  if (activeChatChannels.has(channelKey)) {
+    return () => undefined;
+  }
+
+  void supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("receiver_id", uid)
+    .eq("read", false)
+    .order("created_at", { ascending: true })
+    .limit(100)
+    .then(async ({ data }) => {
+      const messages = await Promise.all(
+        (data || []).map((item) =>
+          hydrateAttachmentUrl(normalizeMessage(String(item.id), item as any)),
+        ),
+      );
+      messages.forEach((message) => {
+        if (!unreadMessages.some((current) => current.id === message.id)) {
           unreadMessages.push(message);
+        }
+      });
+      emitUnread();
+    });
+
+  const channel = supabase
+    .channel(`user_chats_${uid}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "chat_messages", filter: `receiver_id=eq.${uid}` },
+      async (payload) => {
+        const msg = await hydrateAttachmentUrl(
+          normalizeMessage(String(payload.new.id), payload.new as any),
+        );
+        if (!unreadMessages.some((m) => m.id === msg.id)) {
+          unreadMessages.push(msg);
           emitUnread();
         }
-        messageListeners.forEach((listener) => listener(message));
+        messageListeners.forEach((listener) => listener(msg));
       }
-    });
-  });
+    )
+    .subscribe();
+  activeChatChannels.set(channelKey, channel);
+
+  return () => {
+    supabase.removeChannel(channel);
+    activeChatChannels.delete(channelKey);
+  };
 };
 
 export const closeChatConnection = () => {
-  if (userChatsRef) off(userChatsRef);
-  userChatsRef = null;
-  connectedUserUid = null;
-  inboxInitialized = false;
-  activeChatSubscriptions.clear();
+  activeChatChannels.forEach((channel) => {
+    supabase.removeChannel(channel);
+  });
+  activeChatChannels.clear();
   unreadMessages.splice(0, unreadMessages.length);
   openedChatIds.clear();
   openingChats.clear();
@@ -191,54 +193,35 @@ export const sendChatMessage = async (
     "attachmentName" | "attachmentUrl" | "attachmentType" | "attachmentSize" | "attachmentPath"
   >,
 ): Promise<ChatMessage> => {
-  const senderId = auth.currentUser?.uid;
+  const session = (await supabase.auth.getSession()).data.session;
+  const senderId = session?.user?.id;
   const receiverId = String(receiverUid || "").trim();
   const text = String(rawText || "").trim();
   if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
   if (!receiverId || receiverId === senderId) throw new Error("Destinatario invalido.");
-  if ((!text && !attachment?.attachmentUrl) || text.length > 2_000) {
+  if ((!text && !attachment?.attachmentPath) || text.length > 2_000) {
     throw new Error("Mensagem invalida.");
   }
 
-  const chatId = await ensureChat(senderId, receiverId);
-  const messageRef = push(ref(realtimeDb, `chats/${chatId}/messages`));
-  const messageId = messageRef.key;
-  if (!messageId) throw new Error("Nao foi possivel gerar a mensagem.");
-  const createdAt = Date.now();
-  const messageData = {
-    chatId,
-    senderId,
-    receiverId,
+  const chatId = await ensureChatSession(senderId, receiverId);
+  const newMsg = {
+    chat_id: chatId,
+    sender_id: senderId,
+    receiver_id: receiverId,
     text,
-    ...(attachment?.attachmentUrl ? {
-      attachmentName: String(attachment.attachmentName || "imagem").slice(0, 160),
-      attachmentUrl: attachment.attachmentUrl,
-      attachmentType: String(attachment.attachmentType || "").slice(0, 80),
-      attachmentSize: Math.max(0, Number(attachment.attachmentSize) || 0),
-      attachmentPath: String(attachment.attachmentPath || "").slice(0, 500),
-    } : {}),
-    createdAt,
+    read: false,
+    attachment_name: attachment?.attachmentName || null,
+    attachment_url: attachment?.attachmentUrl || null,
+    attachment_type: attachment?.attachmentType || null,
+    attachment_size: attachment?.attachmentSize || null,
+    attachment_path: attachment?.attachmentPath || null,
+    created_at: new Date().toISOString(),
   };
-  await set(messageRef, messageData);
-  await update(ref(realtimeDb), {
-    [`userChats/${senderId}/${chatId}`]: {
-      friendUid: receiverId,
-      lastMessageId: messageId,
-      senderId,
-      receiverId,
-      text: text || "📷 Imagem",
-      updatedAt: createdAt,
-    },
-    [`userChats/${receiverId}/${chatId}`]: {
-      friendUid: senderId,
-      lastMessageId: messageId,
-      senderId,
-      receiverId,
-      text: text || "📷 Imagem",
-      updatedAt: createdAt,
-    },
-  });
-  return normalizeMessage(messageId, { ...messageData, createdAt });
+
+  const { data, error } = await supabase.from("chat_messages").insert(newMsg).select().single();
+  if (error || !data) throw new Error(error?.message || "Falha ao enviar mensagem.");
+
+  return hydrateAttachmentUrl(normalizeMessage(String(data.id), data as any));
 };
 
 export const sendChatImage = async (
@@ -246,64 +229,61 @@ export const sendChatImage = async (
   file: File,
   caption = "",
 ): Promise<ChatMessage> => {
-  const senderId = auth.currentUser?.uid;
+  const session = (await supabase.auth.getSession()).data.session;
+  const senderId = session?.user?.id;
   if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
   if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
     throw new Error("Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.");
   }
 
-  const chatId = await ensureChat(senderId, receiverUid);
-  const extension = file.type.split("/")[1]?.replace("jpeg", "jpg") || "img";
-  const uploadId = globalThis.crypto?.randomUUID?.()
-    || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  let attachmentPath = `chat-images/${senderId}/${chatId}/${uploadId}.${extension}`;
-  let imageRef = storageRef(storage, attachmentPath);
-  try {
-    await uploadBytes(imageRef, file, {
-      contentType: file.type,
-      customMetadata: { chatId, senderId },
-    });
-  } catch (error) {
-    const code = String((error as { code?: string })?.code || "");
-    const legacyCompatible =
-      code === "storage/unauthorized"
-      && file.size <= 5 * 1024 * 1024
-      && file.type !== "image/gif";
-    if (!legacyCompatible) throw error;
-    // Compatibilidade com clientes cuja regra de chat-images ainda não foi publicada.
-    attachmentPath = `profile-avatars/${senderId}/chat-${chatId}-${uploadId}.${extension}`;
-    imageRef = storageRef(storage, attachmentPath);
-    await uploadBytes(imageRef, file, { contentType: file.type });
+  const chatId = await ensureChatSession(senderId, receiverUid);
+  const ext = file.name.split(".").pop() || "png";
+  const path = `${chatId}/${Date.now()}_${crypto.randomUUID()}.${ext}`;
+
+  const { data, error } = await supabase.storage.from("attachments").upload(path, file);
+  if (error || !data) {
+    throw new Error(error?.message || "Falha ao enviar a imagem.");
   }
 
-  try {
-    const attachmentUrl = await getDownloadURL(imageRef);
-    return await sendChatMessage(receiverUid, caption.trim() || "📷 Imagem", {
-      attachmentName: file.name,
-      attachmentUrl,
-      attachmentType: file.type,
-      attachmentSize: file.size,
-      attachmentPath,
-    });
-  } catch (error) {
-    await deleteObject(imageRef).catch(() => undefined);
-    throw error;
-  }
+  return sendChatMessage(receiverUid, caption.trim() || "📷 Imagem", {
+    attachmentName: file.name,
+    attachmentType: file.type,
+    attachmentSize: file.size,
+    attachmentPath: data.path,
+  });
 };
 
 export const setChatTyping = async (friendUid: string, typing: boolean) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  const chatId = await ensureChat(uid, friendUid);
-  const typingRef = ref(realtimeDb, `chats/${chatId}/typing/${uid}`);
-  if (!typing) {
-    await remove(typingRef).catch(() => undefined);
-    return;
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.user) return;
+  const uid = session.user.id;
+  const chatId = await ensureChatSession(uid, friendUid);
+  const channelKey = `typing_send_${chatId}`;
+  let channel = activeChatChannels.get(channelKey);
+  if (!channel) {
+    channel = supabase.channel(`typing_${chatId}`);
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = window.setTimeout(
+        () => reject(new Error("Tempo limite ao conectar indicador de digitacao.")),
+        5_000,
+      );
+      channel.subscribe((status: string) => {
+        if (status === "SUBSCRIBED") {
+          window.clearTimeout(timeoutId);
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          window.clearTimeout(timeoutId);
+          reject(new Error("Falha no indicador de digitacao."));
+        }
+      });
+    });
+    activeChatChannels.set(channelKey, channel);
   }
-  await set(typingRef, {
-    active: true,
-    updatedAt: serverTimestamp(),
-  }).catch(() => undefined);
+  await channel.send({
+    type: "broadcast",
+    event: "typing",
+    payload: { senderId: uid, typing },
+  });
 };
 
 export const cleanupExpiredChatMessages = async (friendUid: string) => {
@@ -311,11 +291,17 @@ export const cleanupExpiredChatMessages = async (friendUid: string) => {
 };
 
 export const markMessagesAsRead = async (friendUid: string) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return;
-  const chatId = getChatId(uid, friendUid);
-  await set(ref(realtimeDb, `chats/${chatId}/reads/${uid}`), serverTimestamp())
-    .catch(() => undefined);
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.user) return;
+  const uid = session.user.id;
+  const chatId = await ensureChatSession(uid, friendUid);
+
+  await supabase
+    .from("chat_messages")
+    .update({ read: true })
+    .eq("chat_id", chatId)
+    .eq("receiver_id", uid);
+
   for (let index = unreadMessages.length - 1; index >= 0; index -= 1) {
     if (unreadMessages[index].senderId === friendUid) unreadMessages.splice(index, 1);
   }
@@ -326,53 +312,60 @@ export const subscribeToChatMessages = (
   friendUid: string,
   callback: (messages: ChatMessage[]) => void,
 ) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return () => undefined;
-  const chatId = getChatId(uid, friendUid);
-  const messagesQuery = query(
-    ref(realtimeDb, `chats/${chatId}/messages`),
-    orderByChild("createdAt"),
-    limitToLast(HISTORY_LIMIT),
-  );
-  const messages = new Map<string, ChatMessage>();
-  activeChatSubscriptions.set(
-    friendUid,
-    (activeChatSubscriptions.get(friendUid) || 0) + 1,
-  );
-  void establishChatConnection();
-
   let cancelled = false;
-  let unsubscribe: () => void = () => {};
-  void ensureChat(uid, friendUid).then(() => {
-    if (cancelled) return;
-    void markMessagesAsRead(friendUid);
-    unsubscribe = onValue(messagesQuery, (snapshot) => {
-      const value = snapshot.val() as Record<string, Record<string, unknown>> | null;
-      messages.clear();
-      Object.entries(value || {}).forEach(([messageId, rawMessage]) => {
-        const message = normalizeMessage(messageId, rawMessage);
-        if (message.id) messages.set(messageId, message);
-      });
-      callback([...messages.values()].sort(compareChatMessages));
-    });
-  }).catch((error) => console.error("Erro ao abrir conversa:", error));
+  let latestMessages: ChatMessage[] = [];
+  let activeKey = "";
 
-  const forwardMessage = (message: ChatMessage) => {
-    if (message.chatId !== chatId || !message.id || messages.has(message.id)) return;
-    messages.set(message.id, message);
-    callback([...messages.values()].sort(compareChatMessages));
-  };
-  messageListeners.add(forwardMessage);
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    if (!session?.user || cancelled) return;
+    const uid = session.user.id;
+    const chatId = await ensureChatSession(uid, friendUid);
+    if (cancelled) return;
+    activeKey = chatId;
+
+    supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("chat_id", chatId)
+      .order("created_at", { ascending: true })
+      .limit(HISTORY_LIMIT)
+      .then(async ({ data }) => {
+        if (data && !cancelled) {
+          latestMessages = await Promise.all(data.map((item) =>
+            hydrateAttachmentUrl(normalizeMessage(String(item.id), item as any)),
+          ));
+          callback([...latestMessages]);
+        }
+      });
+
+    const channel = supabase
+      .channel(`chat_${chatId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "chat_messages", filter: `chat_id=eq.${chatId}` },
+        async (payload) => {
+          const msg = await hydrateAttachmentUrl(
+            normalizeMessage(String(payload.new.id), payload.new as any),
+          );
+          if (cancelled) return;
+          if (!latestMessages.some((current) => current.id === msg.id)) {
+            latestMessages = [...latestMessages, msg].sort(compareChatMessages);
+            callback([...latestMessages]);
+          }
+          messageListeners.forEach((fn) => fn(msg));
+        }
+      )
+      .subscribe();
+
+    activeChatChannels.set(chatId, channel);
+  });
 
   return () => {
     cancelled = true;
-    unsubscribe();
-    messageListeners.delete(forwardMessage);
-    const remainingSubscriptions = (activeChatSubscriptions.get(friendUid) || 1) - 1;
-    if (remainingSubscriptions > 0) {
-      activeChatSubscriptions.set(friendUid, remainingSubscriptions);
-    } else {
-      activeChatSubscriptions.delete(friendUid);
+    const channel = activeChatChannels.get(activeKey);
+    if (channel) {
+      supabase.removeChannel(channel);
+      activeChatChannels.delete(activeKey);
     }
   };
 };
@@ -381,40 +374,32 @@ export const subscribeToFriendTyping = (
   friendUid: string,
   callback: (typing: boolean) => void,
 ) => {
-  const uid = auth.currentUser?.uid;
-  if (!uid) return () => undefined;
-  const chatId = getChatId(uid, friendUid);
-  const typingRef = ref(realtimeDb, `chats/${chatId}/typing/${friendUid}`);
   let cancelled = false;
-  let unsubscribe: () => void = () => {};
-  void ensureChat(uid, friendUid).then(() => {
+  let channelKey = "";
+  supabase.auth.getSession().then(async ({ data: { session } }) => {
+    if (!session?.user || cancelled) return;
+    const uid = session.user.id;
+    const chatId = await ensureChatSession(uid, friendUid);
     if (cancelled) return;
-    let lastTyping = false;
-    const emitTyping = (value: { active?: boolean; updatedAt?: number } | null) => {
-      const fresh = value?.updatedAt
-        ? Date.now() - Number(value.updatedAt) < 6_000
-        : false;
-      const typing = Boolean(value?.active && fresh);
-      if (typing === lastTyping) return;
-      lastTyping = typing;
-      callback(typing);
-      typingListeners.forEach((listener) => listener({ senderId: friendUid, typing }));
-    };
-    let latestValue: { active?: boolean; updatedAt?: number } | null = null;
-    unsubscribe = onValue(typingRef, (snapshot) => {
-      latestValue = snapshot.val() as { active?: boolean; updatedAt?: number } | null;
-      emitTyping(latestValue);
-    });
-    const freshnessTimer = window.setInterval(() => emitTyping(latestValue), 1_000);
-    const firebaseUnsubscribe = unsubscribe;
-    unsubscribe = () => {
-      window.clearInterval(freshnessTimer);
-      firebaseUnsubscribe();
-    };
-  }).catch(() => callback(false));
+    channelKey = `typing_receive_${chatId}`;
+    const channel = supabase
+      .channel(`typing_${chatId}`)
+      .on("broadcast", { event: "typing" }, (event) => {
+        if (event.payload?.senderId === friendUid) {
+          callback(Boolean(event.payload?.typing));
+        }
+      })
+      .subscribe();
+    activeChatChannels.set(channelKey, channel);
+  });
+
   return () => {
     cancelled = true;
-    unsubscribe();
+    const channel = activeChatChannels.get(channelKey);
+    if (channel) {
+      supabase.removeChannel(channel);
+      activeChatChannels.delete(channelKey);
+    }
   };
 };
 
@@ -426,4 +411,15 @@ export const subscribeToUnreadMessages = (
   return () => {
     unreadListeners.delete(callback);
   };
+};
+
+export const clearUnreadForFriend = (friendUid: string) => {
+  let changed = false;
+  for (let i = unreadMessages.length - 1; i >= 0; i -= 1) {
+    if (unreadMessages[i].senderId === friendUid) {
+      unreadMessages.splice(i, 1);
+      changed = true;
+    }
+  }
+  if (changed) emitUnread();
 };

@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   detectRunningGames: (executablePaths) =>
     ipcRenderer.invoke("launcher:detect-running-games", executablePaths),
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
+  onAccountAuthCallback: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("auth:account-callback", handler);
+    return () => ipcRenderer.removeListener("auth:account-callback", handler);
+  },
   setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
   copyToClipboard: (value) => ipcRenderer.invoke("system:copy-to-clipboard", value),
@@ -36,6 +41,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getLocalLibrarySummary: (uid) => ipcRenderer.invoke("library:get-summary", uid),
   markLocalLibrarySummarySynced: (uid, revision) =>
     ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
+  clearLocalSteamId: (uid) => ipcRenderer.invoke("library:clear-steam-id", uid),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),

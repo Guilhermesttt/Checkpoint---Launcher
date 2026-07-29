@@ -4,16 +4,68 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { getDatabase as getAdminDatabase } from "firebase-admin/database";
 import { OAuth2Client } from "google-auth-library";
 import path from "path";
+import os from "node:os";
+import fs from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
 import { getGamingNews } from "./gaming-news.mjs";
 
 export const app = express();
+
+const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+const supabaseServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+const isValidUrl = (url) => typeof url === "string" && (url.startsWith("http://") || url.startsWith("https://"));
+
+export const supabaseAdmin = (isValidUrl(supabaseUrl) && supabaseServiceRoleKey)
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+  : null;
+
+const updateLinkedAccountProfile = async (uid, patch) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase Admin nao configurado.");
+  }
+
+  const updatedAt = new Date().toISOString();
+  const { data: updatedProfile, error: updateError } = await supabaseAdmin
+    .from("profiles")
+    .update({ ...patch, updated_at: updatedAt })
+    .eq("uid", uid)
+    .select("uid")
+    .maybeSingle();
+
+  if (updateError) throw updateError;
+  if (updatedProfile) return;
+
+  const { data: authData, error: authError } =
+    await supabaseAdmin.auth.admin.getUserById(uid);
+  if (authError) throw authError;
+
+  const authUser = authData?.user;
+  const displayName = String(
+    authUser?.user_metadata?.full_name
+    || authUser?.user_metadata?.name
+    || authUser?.email?.split("@")[0]
+    || "Jogador",
+  ).trim();
+
+  const { error: insertError } = await supabaseAdmin.from("profiles").insert({
+    uid,
+    email: authUser?.email || null,
+    display_name: displayName,
+    ...patch,
+    updated_at: updatedAt,
+  });
+  if (insertError) throw insertError;
+};
+
 const port = Number(process.env.PORT ?? 8787);
 const frontendUrl = (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(
   /\/$/,
@@ -44,37 +96,7 @@ const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
 const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-const firebaseStorageBucket = (
-  process.env.FIREBASE_STORAGE_BUCKET?.trim()
-  || process.env.VITE_FIREBASE_STORAGE_BUCKET?.trim()
-  || ""
-);
-const firebaseDatabaseUrl = (
-  process.env.FIREBASE_DATABASE_URL?.trim()
-  || process.env.VITE_FIREBASE_DATABASE_URL?.trim()
-  || ""
-);
 const CHAT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
-
-const parseFirebaseServiceAccount = () => {
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.trim();
-  if (!raw) return null;
-
-  const serviceAccount = JSON.parse(raw);
-  if (typeof serviceAccount.private_key === "string") {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
-  }
-  return serviceAccount;
-};
-
-const firebaseServiceAccount = parseFirebaseServiceAccount();
-if (firebaseServiceAccount && getApps().length === 0) {
-  initializeApp({
-    credential: cert(firebaseServiceAccount),
-    ...(firebaseStorageBucket ? { storageBucket: firebaseStorageBucket } : {}),
-    ...(firebaseDatabaseUrl ? { databaseURL: firebaseDatabaseUrl } : {}),
-  });
-}
 
 app.set("trust proxy", 1);
 app.use(
@@ -246,11 +268,26 @@ export const partitionOwnedSteamAppIds = (requestedAppIds, ownedAppIds) => {
 const buildSteamReturnTo = (token) =>
   `${backendPublicUrl}/auth/steam/callback?token=${encodeURIComponent(token)}`;
 
-const buildDiscordRedirectUri = () =>
-  (
+const buildLauncherAuthCallback = (provider, status) => {
+  const callbackUrl = new URL("checkpoint://auth/callback");
+  callbackUrl.searchParams.set(`${provider}Status`, status);
+  return callbackUrl.toString();
+};
+
+const buildDiscordRedirectUri = () => {
+  const redirectUri = (
     process.env.DISCORD_REDIRECT_URI?.trim() ||
     `${backendPublicUrl}/auth/discord/callback`
   ).replace(/\/$/, "");
+
+  if (/\.supabase\.co\/auth\/v1\/callback$/i.test(redirectUri)) {
+    throw new Error(
+      "DISCORD_REDIRECT_URI deve apontar para /auth/discord/callback do backend, nao para o callback do Supabase.",
+    );
+  }
+
+  return redirectUri;
+};
 
 const buildGoogleRedirectUri = () =>
   (
@@ -266,8 +303,18 @@ const createGoogleOauthClient = () => {
   return new OAuth2Client(googleClientId, googleClientSecret, buildGoogleRedirectUri());
 };
 
-const buildOAuthSuccessPage = (platform) => `
-  <!doctype html>
+const buildOAuthSuccessPage = (platform, launcherCallbackUrl = "") => {
+  const platformColors = {
+    discord: "#5865F2",
+    steam: "#66c0f4",
+    xbox: "#107C10",
+    playstation: "#0070D1",
+    google: "#4285F4",
+    github: "#8b8b8b",
+  };
+  const color = platformColors[String(platform).toLowerCase()] || "#22c55e";
+
+  return `<!doctype html>
   <html lang="pt-BR">
     <head>
       <meta charset="utf-8" />
@@ -275,29 +322,102 @@ const buildOAuthSuccessPage = (platform) => `
       <title>Checkpoint Launcher</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { min-height: 100vh; display: grid; place-items: center; background: #05070a; color: white; font-family: Inter, system-ui, sans-serif; }
-        main { max-width: 440px; padding: 40px 32px; text-align: center; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; background: rgba(255,255,255,.04); backdrop-filter: blur(12px); }
-        .icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 26px; }
-        h1 { font-size: 22px; font-weight: 600; margin-bottom: 10px; }
-        p { color: rgba(255,255,255,.55); line-height: 1.6; font-size: 14px; }
-        .badge { display: inline-block; margin-top: 20px; padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); font-size: 11px; color: rgba(255,255,255,.4); letter-spacing: .08em; text-transform: uppercase; }
-        .progress { width: 100%; height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; margin-top: 24px; overflow: hidden; }
-        .bar { height: 100%; width: 0; background: rgba(34,197,94,.6); animation: fill 1.4s linear forwards; }
-        @keyframes fill { to { width: 100%; } }
+        body {
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          background: #000;
+          color: #fff;
+          font-family: Inter, system-ui, sans-serif;
+        }
+        main { width: 100%; max-width: 360px; padding: 24px; text-align: center; }
+        .brand {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 40px;
+        }
+        .brand-logo {
+          width: 22px;
+          height: 22px;
+          object-fit: contain;
+          filter: drop-shadow(0 0 8px rgba(255,255,255,.12));
+        }
+        .brand-name {
+          font-size: 13px;
+          font-weight: 500;
+          color: rgba(255,255,255,.55);
+          letter-spacing: .02em;
+        }
+        h1 {
+          font-size: 24px;
+          font-weight: 500;
+          letter-spacing: -0.01em;
+          margin-bottom: 10px;
+        }
+        p.sub {
+          font-size: 14px;
+          color: rgba(255,255,255,.5);
+          line-height: 1.6;
+          margin-bottom: 28px;
+        }
+        .divider { height: 1px; background: rgba(255,255,255,.08); margin-bottom: 20px; }
+        .footer { font-size: 12px; color: rgba(255,255,255,.35); }
+        .footer .dot { color: rgba(255,255,255,.15); margin: 0 6px; }
+        .footer a { color: ${color}; text-decoration: none; cursor: pointer; }
+        .check-path {
+          stroke-dasharray: 40;
+          stroke-dashoffset: 40;
+          animation: draw 0.6s ease forwards 0.15s;
+        }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        @media (prefers-reduced-motion: reduce) {
+          .check-path { animation: none; stroke-dashoffset: 0; }
+        }
       </style>
     </head>
     <body>
       <main>
-        <div class="icon">✓</div>
-        <h1>${platform} conectado!</h1>
-        <p>Sua conta ${platform} foi vinculada com sucesso.<br/>Pode fechar esta aba e voltar ao Checkpoint Launcher.</p>
-        <div class="progress"><div class="bar"></div></div>
-        <span class="badge">Esta aba fechará automaticamente</span>
+        <div class="brand">
+          <img
+            class="brand-logo"
+            src="${backendPublicUrl}/Checkpoint_Logo.png"
+            alt="Checkpoint"
+          />
+          <span class="brand-name">Checkpoint Launcher</span>
+        </div>
+
+        <svg width="52" height="52" viewBox="0 0 52 52" style="margin-bottom:28px;">
+          <circle cx="26" cy="26" r="23" fill="none" stroke="${color}" stroke-width="2" stroke-opacity="0.25"/>
+          <path class="check-path" d="M15 27 L22 34 L37 18" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+
+        <h1>${platform} conectado.</h1>
+        <p class="sub">Sua conta foi vinculada com sucesso.<br/>Pode voltar pro launcher.</p>
+
+        <div class="divider"></div>
+
+        <p class="footer">
+          Fechando em instantes<span class="dot">·</span><a id="close-now">fechar agora</a>
+        </p>
       </main>
-      <script>setTimeout(() => { try { window.close(); } catch(e) {} }, 1500);</script>
+      <script>
+        const launcherCallbackUrl = ${JSON.stringify(launcherCallbackUrl)};
+        document.getElementById('close-now').addEventListener('click', () => {
+          try { window.close(); } catch (e) {}
+        });
+        if (launcherCallbackUrl) {
+          setTimeout(() => {
+            try { window.location.assign(launcherCallbackUrl); } catch (e) {}
+          }, 350);
+        }
+        setTimeout(() => { try { window.close(); } catch (e) {} }, 1800);
+      </script>
     </body>
   </html>
-`;
+  `;
+};
 
 const cleanupPendingStates = () => {
   const now = Date.now();
@@ -635,7 +755,7 @@ export const buildEpicDetails = (catalogId, namespace, catalogItem) => {
     (release) => /win/i.test(String(release?.platform || "")) && String(release?.appId || "").trim(),
   ) || releaseInfo.find((release) => String(release?.appId || "").trim());
   const appName = String(preferredRelease?.appId || "").trim();
-  
+
   let screenshots = keyImages
     .filter(
       (image) =>
@@ -695,8 +815,8 @@ export const buildEpicDetails = (catalogId, namespace, catalogItem) => {
       sellerName,
     tags: Array.isArray(catalogItem?.categories)
       ? catalogItem.categories
-          .map((category) => String(category?.path ?? "").split("/").pop())
-          .filter(Boolean)
+        .map((category) => String(category?.path ?? "").split("/").pop())
+        .filter(Boolean)
       : [],
     screenshots,
   };
@@ -746,15 +866,15 @@ const fetchSteamAchievementSchema = async (appId, language = "pt-BR") => {
   const rawAchievements = payload?.game?.availableGameStats?.achievements;
   const schema = Array.isArray(rawAchievements)
     ? rawAchievements.map((achievement) => ({
-        apiName: String(achievement?.name ?? "").trim(),
-        displayName: String(
-          achievement?.displayName ?? achievement?.name ?? "",
-        ).trim(),
-        description: String(achievement?.description ?? "").trim(),
-        icon: String(achievement?.icon ?? "").trim(),
-        iconGray: String(achievement?.icongray ?? "").trim(),
-        hidden: Number(achievement?.hidden ?? 0) === 1,
-      }))
+      apiName: String(achievement?.name ?? "").trim(),
+      displayName: String(
+        achievement?.displayName ?? achievement?.name ?? "",
+      ).trim(),
+      description: String(achievement?.description ?? "").trim(),
+      icon: String(achievement?.icon ?? "").trim(),
+      iconGray: String(achievement?.icongray ?? "").trim(),
+      hidden: Number(achievement?.hidden ?? 0) === 1,
+    }))
     : [];
 
   achievementSchemaCache.set(cacheKey, {
@@ -801,71 +921,93 @@ const parseDiskSizeGb = (text) => {
   return Number(Math.max(...values).toFixed(1));
 };
 
-const requireFirebaseUser = async (req, res, next) => {
-  if (getApps().length === 0) {
-    res.status(500).json({ error: "Firebase Admin não configurado no backend." });
-    return;
-  }
-
+const requireAuth = async (req, res, next) => {
   const header = String(req.headers.authorization ?? "");
   const match = header.match(/^Bearer\s+(.+)$/i);
   if (!match) {
-    res.status(401).json({ error: "Token Firebase ausente." });
+    res.status(401).json({ error: "Token de autenticacao ausente." });
+    return;
+  }
+
+  if (!supabaseAdmin) {
+    res.status(500).json({ error: "Servico de autenticacao Supabase nao configurado no servidor." });
     return;
   }
 
   try {
-    req.firebaseUser = await getAuth().verifyIdToken(match[1]);
+    const { data, error } = await supabaseAdmin.auth.getUser(match[1]);
+    if (error || !data?.user) {
+      res.status(401).json({ error: "Token de autenticacao invalido." });
+      return;
+    }
+
+    const user = data.user;
+    req.user = user;
+    req.supabaseUser = user;
+    req.firebaseUser = {
+      uid: user.id,
+      email: user.email || "",
+      name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+      picture: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+    };
     next();
   } catch {
-    res.status(401).json({ error: "Token Firebase inválido." });
+    res.status(401).json({ error: "Erro ao verificar autenticacao." });
   }
 };
+
+const requireFirebaseUser = requireAuth;
 
 app.post("/api/chat/open", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const currentUid = req.firebaseUser.uid;
   const friendUid = String(req.body?.friendUid || "").trim();
-  if (!friendUid || friendUid === currentUid) {
+  if (!/^[0-9a-f-]{36}$/i.test(friendUid) || friendUid === currentUid) {
     res.status(400).json({ error: "Usuario invalido." });
-    return;
-  }
-  if (!firebaseDatabaseUrl) {
-    res.status(503).json({ error: "Realtime Database nao configurado." });
     return;
   }
 
   try {
-    const profileSnap = await getFirestore().doc(`profiles/${currentUid}`).get();
-    const isFriend = (Array.isArray(profileSnap.data()?.checkpointFriends)
-      ? profileSnap.data().checkpointFriends
-      : [])
-      .some((friend) => String(friend?.uid || "") === friendUid);
-    if (!isFriend) {
+    const { data: friendship, error: friendshipError } = await supabaseAdmin
+      .from("friendships")
+      .select("requester_id")
+      .eq("status", "accepted")
+      .or(
+        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+      )
+      .maybeSingle();
+    if (friendshipError) throw friendshipError;
+    if (!friendship) {
       res.status(403).json({ error: "Chat disponivel apenas para amigos." });
       return;
     }
 
-    const chatId = [currentUid, friendUid].sort().join("_");
-    await getAdminDatabase().ref(`chats/${chatId}/participants`).set({
-      [currentUid]: true,
-      [friendUid]: true,
-    });
-    const expiredMessages = await getAdminDatabase()
-      .ref(`chats/${chatId}/messages`)
-      .orderByChild("createdAt")
-      .endAt(Date.now() - CHAT_RETENTION_MS)
-      .limitToFirst(200)
-      .get();
-    if (expiredMessages.exists()) {
-      const removals = {};
-      expiredMessages.forEach((message) => {
-        removals[message.key] = null;
-      });
-      await getAdminDatabase()
-        .ref(`chats/${chatId}/messages`)
-        .update(removals);
-    }
-    res.json({ chatId });
+    const directKey = [currentUid, friendUid].sort().join(":");
+    const { data: chat, error: chatError } = await supabaseAdmin
+      .from("chats")
+      .upsert({ direct_key: directKey }, { onConflict: "direct_key" })
+      .select("id")
+      .single();
+    if (chatError || !chat?.id) throw chatError || new Error("Chat nao criado.");
+
+    const { error: participantsError } = await supabaseAdmin
+      .from("chat_participants")
+      .upsert(
+        [
+          { chat_id: chat.id, user_id: currentUid },
+          { chat_id: chat.id, user_id: friendUid },
+        ],
+        { onConflict: "chat_id,user_id" },
+      );
+    if (participantsError) throw participantsError;
+
+    await supabaseAdmin
+      .from("chat_messages")
+      .delete()
+      .eq("chat_id", chat.id)
+      .lt("created_at", new Date(Date.now() - CHAT_RETENTION_MS).toISOString());
+
+    res.json({ chatId: chat.id });
   } catch (error) {
     console.error("Erro ao abrir chat:", error);
     res.status(500).json({ error: "Erro ao abrir conversa." });
@@ -891,6 +1033,96 @@ export const resolveLinkedSteamId = (linkedValue, requestedValue) => {
   return { ok: true, steamId: linkedSteamId };
 };
 
+const steamIdCache = new Map();
+
+const getLocalDatabasePath = () => {
+  const home = os.homedir();
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "checkpoint", "checkpoint-library.sqlite");
+  } else if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "checkpoint", "checkpoint-library.sqlite");
+  } else {
+    return path.join(home, ".config", "checkpoint", "checkpoint-library.sqlite");
+  }
+};
+
+const getLocalSteamId = (uid) => {
+  const dbPath = getLocalDatabasePath();
+  if (!fs.existsSync(dbPath)) return null;
+
+  let db = null;
+  try {
+    db = new DatabaseSync(dbPath);
+    const columns = db.prepare("PRAGMA table_info(library_state)").all();
+    const hasSteamIdCol = columns.some((col) => col.name === "steam_id");
+    if (!hasSteamIdCol) {
+      db.close();
+      return null;
+    }
+
+    const row = db.prepare("SELECT steam_id FROM library_state WHERE owner_uid = ?").get(uid);
+    db.close();
+    return row?.steam_id || null;
+  } catch (error) {
+    console.error("Erro ao ler SteamID do SQLite local:", error);
+    if (db) {
+      try { db.close(); } catch { }
+    }
+    return null;
+  }
+};
+
+const saveLocalSteamId = (uid, steamId) => {
+  const dbPath = getLocalDatabasePath();
+  if (!fs.existsSync(dbPath)) return;
+
+  let db = null;
+  try {
+    db = new DatabaseSync(dbPath);
+    try {
+      db.exec("ALTER TABLE library_state ADD COLUMN steam_id TEXT;");
+    } catch {
+      // Ignora se a coluna já existir
+    }
+
+    db.prepare(`
+      INSERT INTO library_state (owner_uid, device_id, steam_id)
+      VALUES (?, ?, ?)
+      ON CONFLICT(owner_uid) DO UPDATE SET steam_id = excluded.steam_id
+    `).run(uid, crypto.randomUUID(), steamId);
+    db.close();
+  } catch (error) {
+    console.error("Erro ao salvar SteamID no SQLite local:", error);
+    if (db) {
+      try { db.close(); } catch { }
+    }
+  }
+};
+
+const clearLocalSteamId = (uid) => {
+  const dbPath = getLocalDatabasePath();
+  if (!fs.existsSync(dbPath)) return;
+
+  let db = null;
+  try {
+    db = new DatabaseSync(dbPath);
+    try {
+      db.exec("ALTER TABLE library_state ADD COLUMN steam_id TEXT;");
+    } catch {
+      // Ignora se a coluna já existir
+    }
+    db.prepare(`
+      UPDATE library_state SET steam_id = NULL WHERE owner_uid = ?
+    `).run(uid);
+    db.close();
+  } catch (error) {
+    console.error("Erro ao limpar SteamID no SQLite local:", error);
+    if (db) {
+      try { db.close(); } catch { }
+    }
+  }
+};
+
 const requireLinkedSteamId = async (req, res, next) => {
   const requestedSteamId = String(req.query.steamId ?? "").trim();
   if (requestedSteamId && !/^\d+$/.test(requestedSteamId)) {
@@ -898,17 +1130,50 @@ const requireLinkedSteamId = async (req, res, next) => {
     return;
   }
 
+  const uid = req.firebaseUser.uid;
+
+  // 🔥 PASSO 1: Verifica se este usuário já foi validado e está no cache de memória
+  const cacheKey = `${uid}_${requestedSteamId}`;
+  if (steamIdCache.has(cacheKey)) {
+    req.steamId = steamIdCache.get(cacheKey);
+    return next();
+  }
+
+  // 🔥 PASSO 1.5: Verifica se o SteamID já existe no SQLite local
+  const cachedLocalSteamId = getLocalSteamId(uid);
+  if (cachedLocalSteamId) {
+    const resolution = resolveLinkedSteamId(cachedLocalSteamId, requestedSteamId);
+    if (resolution.ok) {
+      steamIdCache.set(cacheKey, resolution.steamId);
+      req.steamId = resolution.steamId;
+      return next();
+    }
+  }
+
   try {
-    const uid = req.firebaseUser.uid;
-    const profileSnap = await getFirestore().doc(`profiles/${uid}`).get();
+    let steamIdFromDb = null;
+    if (supabaseAdmin) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("steam_id")
+        .eq("uid", uid)
+        .maybeSingle();
+      steamIdFromDb = profile?.steam_id;
+    }
+
     const resolution = resolveLinkedSteamId(
-      profileSnap.data()?.steamId,
+      steamIdFromDb,
       requestedSteamId,
     );
+
     if (!resolution.ok) {
       res.status(resolution.status).json({ error: resolution.error });
       return;
     }
+
+    steamIdCache.set(cacheKey, resolution.steamId);
+    saveLocalSteamId(uid, resolution.steamId);
+
     req.steamId = resolution.steamId;
     next();
   } catch (error) {
@@ -1000,6 +1265,29 @@ const compactFriendProfile = (profile) => ({
   playing: profile.playing || null,
 });
 
+const profileRowToPublic = (row = {}) => {
+  const presenceUpdatedAt = Date.parse(String(row.presence_updated_at || ""));
+  const presenceIsFresh =
+    Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 2 * 60 * 1000;
+  const status = presenceIsFresh && ["online", "playing"].includes(row.status)
+    ? row.status
+    : "offline";
+
+  return {
+    uid: String(row.uid || ""),
+    displayName: String(
+      row.display_name || row.discord_username || row.steam_username || "Jogador",
+    ),
+    photoURL: row.photo_url || row.discord_avatar || row.steam_avatar || "",
+    discordAvatar: row.discord_avatar || "",
+    discordUsername: row.discord_username || "",
+    steamAvatar: row.steam_avatar || "",
+    steamUsername: row.steam_username || "",
+    status,
+    playing: status === "playing" ? row.playing || null : null,
+  };
+};
+
 const nonNegativeFiniteNumber = (value) => {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.max(0, number) : 0;
@@ -1068,30 +1356,53 @@ const withoutProfileUid = (items, uid) =>
   (Array.isArray(items) ? items : []).filter((item) => item?.uid !== uid);
 
 export const revokeActivityAudience = async (firestore, ownerUid, removedUid) => {
-  if (!firestore || !ownerUid || !removedUid || ownerUid === removedUid) return 0;
+  if (!ownerUid || !removedUid || ownerUid === removedUid) return 0;
+  if (firestore && typeof firestore.collection === "function") {
+    let revoked = 0;
+    while (true) {
+      const snapshot = await firestore
+        .collection("activities")
+        .where("userId", "==", ownerUid)
+        .where("audienceIds", "array-contains", removedUid)
+        .limit(ACTIVITY_AUDIENCE_REVOKE_BATCH_SIZE)
+        .get();
+      if (!snapshot || snapshot.empty) break;
 
-  let revoked = 0;
-  while (true) {
-    const snapshot = await firestore
-      .collection("activities")
-      .where("userId", "==", ownerUid)
-      .where("audienceIds", "array-contains", removedUid)
-      .limit(ACTIVITY_AUDIENCE_REVOKE_BATCH_SIZE)
-      .get();
-    if (snapshot.empty) break;
-
-    const batch = firestore.batch();
-    snapshot.docs.forEach((activityDoc) => {
-      batch.update(activityDoc.ref, {
-        audienceIds: FieldValue.arrayRemove(removedUid),
+      const batch = firestore.batch();
+      snapshot.docs.forEach((activityDoc) => {
+        batch.update(activityDoc.ref, {
+          audienceIds: Array.isArray(activityDoc.data?.()?.audienceIds)
+            ? activityDoc.data().audienceIds.filter((id) => id !== removedUid)
+            : [],
+        });
+        batch.delete(firestore.doc(`feeds/${removedUid}/activities/${activityDoc.id}`));
       });
-      batch.delete(firestore.doc(`feeds/${removedUid}/activities/${activityDoc.id}`));
-    });
-    await batch.commit();
-    revoked += snapshot.size;
+      await batch.commit();
+      revoked += snapshot.size;
+    }
+    return revoked;
   }
 
-  return revoked;
+  if (supabaseAdmin) {
+    const { data: activities } = await supabaseAdmin
+      .from("activities")
+      .select("id, audience_ids")
+      .eq("user_id", ownerUid);
+
+    if (activities) {
+      for (const item of activities) {
+        const currentAudience = Array.isArray(item.audience_ids) ? item.audience_ids : [];
+        if (currentAudience.includes(removedUid)) {
+          const updated = currentAudience.filter((id) => id !== removedUid);
+          await supabaseAdmin
+            .from("activities")
+            .update({ audience_ids: updated })
+            .eq("id", item.id);
+        }
+      }
+    }
+  }
+  return 0;
 };
 
 export const writeActivityToFeeds = async (firestore, activityId, audienceIds, payload) => {
@@ -1182,71 +1493,65 @@ app.post("/api/social/activity", steamPrivateLimiter, requireFirebaseUser, async
 
   try {
     const uid = req.firebaseUser.uid;
-    const firestore = getFirestore();
-    const profileSnap = await firestore.doc(`profiles/${uid}`).get();
-    const profile = profileSnap.data() || {};
-    const friendIds = Array.from(new Set(
-      (Array.isArray(profile.checkpointFriends) ? profile.checkpointFriends : [])
-        .map((friend) => socialText(friend?.uid, 128))
-        .filter((friendUid) => friendUid && friendUid !== uid),
-    )).slice(0, 199);
-    const friendSnaps = friendIds.length > 0
-      ? await firestore.getAll(...friendIds.map((friendUid) => firestore.doc(`profiles/${friendUid}`)))
-      : [];
-    const confirmedFriendIds = friendSnaps
-      .filter((friendSnap) => {
-        const friendProfile = friendSnap.data() || {};
-        return Array.isArray(friendProfile.checkpointFriends)
-          && friendProfile.checkpointFriends.some((friend) => friend?.uid === uid);
-      })
-      .map((friendSnap) => friendSnap.id);
-    const audienceIds = Array.from(new Set([
-      uid,
-      ...confirmedFriendIds,
-    ].filter(Boolean))).slice(0, 200);
+    const [{ data: profile, error: profileError }, { data: friendships, error: friendsError }] =
+      await Promise.all([
+        supabaseAdmin.from("profiles").select("*").eq("uid", uid).single(),
+        supabaseAdmin
+          .from("friendships")
+          .select("requester_id,addressee_id")
+          .eq("status", "accepted")
+          .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`),
+      ]);
+    if (profileError) throw profileError;
+    if (friendsError) throw friendsError;
+
+    const friendIds = (friendships || []).map((friendship) =>
+      friendship.requester_id === uid
+        ? friendship.addressee_id
+        : friendship.requester_id,
+    );
+    const audienceIds = [uid, ...friendIds].slice(0, 200);
     const userName = socialText(
-      profile.displayName
-        || profile.discordUsername
-        || req.firebaseUser.name
-        || req.firebaseUser.email?.split("@")[0]
-        || "Jogador",
+      profile.display_name
+      || profile.discord_username
+      || req.firebaseUser.name
+      || req.firebaseUser.email?.split("@")[0]
+      || "Jogador",
       80,
     ) || "Jogador";
     const userAvatar = socialImageUrl(
-      profile.discordAvatar
-        || profile.photoURL
-        || profile.steamAvatar
-        || req.firebaseUser.picture,
+      profile.discord_avatar
+      || profile.photo_url
+      || profile.steam_avatar
+      || req.firebaseUser.picture,
     );
     const payload = {
-      ...activity,
-      userId: uid,
-      userName,
-      userAvatar: userAvatar || null,
-      audienceIds,
-      createdAt: new Date().toISOString(),
+      user_id: uid,
+      user_name: userName,
+      user_avatar: userAvatar || null,
+      audience_ids: audienceIds,
+      kind: activity.kind,
+      game_id: activity.gameId || null,
+      game_title: activity.gameTitle || null,
+      game_image: activity.gameImage || null,
+      achievement_id: activity.achievementId || null,
+      achievement_name: activity.achievementName || null,
+      achievement_icon: activity.achievementIcon || null,
+      caption: activity.caption || null,
     };
 
-    let activityRef;
-    let duplicate = false;
-    if (activity.kind === "achievement") {
-      const digest = crypto
-        .createHash("sha256")
-        .update(`${uid}\0${activity.gameId}\0${activity.achievementId}`)
-        .digest("hex");
-      activityRef = firestore.doc(`activities/achievement_${digest}`);
-      try {
-        await activityRef.create(payload);
-      } catch (error) {
-        if (!isAlreadyExistsError(error)) throw error;
-        duplicate = true;
-      }
-    } else {
-      activityRef = await firestore.collection("activities").add(payload);
+    const { data: created, error: insertError } = await supabaseAdmin
+      .from("activities")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (insertError?.code === "23505" && activity.kind === "achievement") {
+      res.status(200).json({ ok: true, duplicate: true });
+      return;
     }
+    if (insertError) throw insertError;
 
-    await writeActivityToFeeds(firestore, activityRef.id, audienceIds, payload);
-    res.status(duplicate ? 200 : 201).json({ ok: true, id: activityRef.id, duplicate });
+    res.status(201).json({ ok: true, id: created.id, duplicate: false });
   } catch (error) {
     console.error("Erro ao publicar atividade social:", error);
     res.status(500).json({ error: "Não foi possível publicar a atividade." });
@@ -1261,39 +1566,34 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
   }
 
   try {
-    const firestore = getFirestore();
+    const safeTerm = term.replace(/[%_,()]/g, " ").trim();
     const found = new Map();
-    const normalizedTerm = term.toLowerCase();
-
-    if (term.includes("@")) {
-      const emailSnap = await firestore
-        .collection("profiles")
-        .where("email", "==", term)
-        .limit(10)
-        .get();
-      emailSnap.forEach((doc) => {
-        if (doc.id === req.firebaseUser.uid) return;
-        found.set(doc.id, publicProfile(doc.id, doc.data()));
-      });
-    }
-
-    const allProfilesSnap = await firestore.collection("profiles").limit(250).get();
-    allProfilesSnap.forEach((doc) => {
-      if (doc.id === req.firebaseUser.uid) return;
-      const data = doc.data();
-      const name = String(data.displayName || data.discordUsername || data.email || "").toLowerCase();
-      if (name.includes(normalizedTerm)) {
-        found.set(doc.id, publicProfile(doc.id, data));
-      }
+    const columns = "uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at";
+    const nameQuery = supabaseAdmin
+      .from("profiles")
+      .select(columns)
+      .neq("uid", req.firebaseUser.uid)
+      .or(`display_name.ilike.%${safeTerm}%,discord_username.ilike.%${safeTerm}%,steam_username.ilike.%${safeTerm}%`)
+      .limit(25);
+    const emailQuery = term.includes("@")
+      ? supabaseAdmin
+        .from("profiles")
+        .select(columns)
+        .neq("uid", req.firebaseUser.uid)
+        .eq("email", term)
+        .limit(1)
+      : Promise.resolve({ data: [], error: null });
+    const [nameResult, emailResult] = await Promise.all([nameQuery, emailQuery]);
+    if (nameResult.error) throw nameResult.error;
+    if (emailResult.error) throw emailResult.error;
+    [...(emailResult.data || []), ...(nameResult.data || [])].forEach((row) => {
+      found.set(row.uid, profileRowToPublic(row));
     });
-
-    const users = Array.from(found.values())
-      .filter((profile) => profile.uid && profile.uid !== req.firebaseUser.uid)
-      .filter((profile, index, profiles) => profiles.findIndex((item) => item.uid === profile.uid) === index)
-      .slice(0, 25);
+    const users = Array.from(found.values()).slice(0, 25);
 
     res.json({ users });
-  } catch {
+  } catch (error) {
+    console.error("Erro ao buscar usuarios:", error);
     res.status(500).json({ error: "Erro ao buscar usuários." });
   }
 });
@@ -1309,46 +1609,54 @@ app.post("/api/presence", steamPrivateLimiter, requireFirebaseUser, async (req, 
   const currentGameTitle = String(req.body?.currentGameTitle || "").trim().slice(0, 120);
 
   try {
-    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
-      {
-        presence: {
-          status,
-          currentGameTitle: status === "playing" ? currentGameTitle : "",
-          updatedAt: new Date().toISOString(),
-        },
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        status,
+        playing: status === "playing" ? currentGameTitle : null,
+        presence_updated_at: new Date().toISOString(),
+      })
+      .eq("uid", req.firebaseUser.uid);
+    if (error) throw error;
     res.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("Erro ao atualizar presenca:", error);
     res.status(500).json({ error: "Erro ao atualizar presença." });
   }
 });
 
 app.get("/api/friends/status", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
-    const firestore = getFirestore();
-    const profileSnap = await firestore.doc(`profiles/${req.firebaseUser.uid}`).get();
-    const friendRefs = (Array.isArray(profileSnap.data()?.checkpointFriends)
-      ? profileSnap.data().checkpointFriends
-      : [])
-      .map((friend) => String(friend?.uid || "").trim())
-      .filter(Boolean)
-      .slice(0, 250);
+    const uid = req.firebaseUser.uid;
+    const { data: friendships, error: friendshipsError } = await supabaseAdmin
+      .from("friendships")
+      .select("requester_id,addressee_id")
+      .eq("status", "accepted")
+      .or(`requester_id.eq.${uid},addressee_id.eq.${uid}`);
+    if (friendshipsError) throw friendshipsError;
+    const friendRefs = (friendships || []).map((friendship) =>
+      friendship.requester_id === uid
+        ? friendship.addressee_id
+        : friendship.requester_id,
+    );
 
     if (friendRefs.length === 0) {
       res.json({ friends: [] });
       return;
     }
 
-    const snaps = await Promise.all(friendRefs.map((uid) => firestore.doc(`profiles/${uid}`).get()));
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .select("uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at")
+      .in("uid", friendRefs);
+    if (profilesError) throw profilesError;
     res.json({
-      friends: snaps
-        .filter((snap) => snap.exists)
-        .map((snap) => compactFriendProfile(publicProfile(snap.id, snap.data()))),
+      friends: (profiles || []).map((profile) =>
+        compactFriendProfile(profileRowToPublic(profile)),
+      ),
     });
-  } catch {
+  } catch (error) {
+    console.error("Erro ao consultar presenca:", error);
     res.status(500).json({ error: "Erro ao consultar presença dos amigos." });
   }
 });
@@ -1361,6 +1669,71 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
   }
 
   try {
+    const currentUid = req.firebaseUser.uid;
+    const { data: friendship, error: friendshipError } = await supabaseAdmin
+      .from("friendships")
+      .select("requester_id")
+      .eq("status", "accepted")
+      .or(
+        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+      )
+      .maybeSingle();
+    if (friendshipError) throw friendshipError;
+    if (!friendship) {
+      res.status(403).json({ error: "Perfil disponível apenas para amigos." });
+      return;
+    }
+
+    const [{ data: publicRow, error: publicError }, { data: privateRow, error: privateError }] =
+      await Promise.all([
+        supabaseAdmin.from("public_profiles").select("*").eq("uid", friendUid).maybeSingle(),
+        supabaseAdmin
+          .from("profiles")
+          .select("uid,steam_id,steam_username,steam_avatar,discord_id,discord_username,discord_avatar,status,playing,presence_updated_at")
+          .eq("uid", friendUid)
+          .maybeSingle(),
+      ]);
+    if (publicError) throw publicError;
+    if (privateError) throw privateError;
+    if (!publicRow) {
+      res.status(404).json({ error: "Perfil não encontrado." });
+      return;
+    }
+
+    const visibleProfile = profileRowToPublic({
+      ...privateRow,
+      display_name: publicRow.display_name,
+      photo_url: publicRow.photo_url,
+    });
+    const sqlTopGames = Array.isArray(publicRow.top_games) ? publicRow.top_games : [];
+    const sqlFavoriteGames = Array.isArray(publicRow.favorite_games)
+      ? publicRow.favorite_games
+      : [];
+    const sqlGames = Array.from(
+      new Map([...sqlTopGames, ...sqlFavoriteGames].map((game) => [String(game?.id || ""), game])).values(),
+    ).filter((game) => game?.id).slice(0, FRIEND_PROFILE_GAME_LIMIT);
+
+    res.json({
+      profile: {
+        ...visibleProfile,
+        bio: publicRow.bio || "",
+        website: publicRow.website || "",
+        favoriteGenres: publicRow.favorite_genres || [],
+        steamId: privateRow?.steam_id || "",
+        steamUsername: privateRow?.steam_username || "",
+        steamAvatar: privateRow?.steam_avatar || "",
+        discordId: privateRow?.discord_id || "",
+        discordUsername: privateRow?.discord_username || "",
+        discordAvatar: privateRow?.discord_avatar || "",
+        achievementSummary: publicRow.achievements || {},
+        librarySummary: publicRow.stats || {},
+      },
+      games: sqlGames,
+      gamesTruncated: false,
+    });
+    return;
+
     const firestore = getFirestore();
     const [profileSnap, linkedProfileSnap] = await Promise.all([
       firestore.doc(`publicProfiles/${friendUid}`).get(),
@@ -1453,6 +1826,50 @@ app.post("/api/friends/request", steamPrivateLimiter, requireFirebaseUser, async
   }
 
   try {
+    const currentUid = req.firebaseUser.uid;
+    const { data: target, error: targetError } = await supabaseAdmin
+      .from("profiles")
+      .select("uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at")
+      .eq("uid", friendUid)
+      .maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from("friendships")
+      .select("requester_id,addressee_id,status")
+      .or(
+        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+      )
+      .maybeSingle();
+    if (existingError) throw existingError;
+    if (existing?.status === "accepted") {
+      res.status(409).json({ error: "Usuário já está na sua lista de amigos." });
+      return;
+    }
+    if (existing) {
+      res.status(409).json({ error: "Já existe uma solicitação entre estes usuários." });
+      return;
+    }
+
+    const { error: insertError } = await supabaseAdmin.from("friendships").insert({
+      requester_id: currentUid,
+      addressee_id: friendUid,
+      status: "pending",
+    });
+    if (insertError) throw insertError;
+    res.status(201).json({
+      request: {
+        ...compactFriendProfile(profileRowToPublic(target)),
+        createdAt: new Date().toISOString(),
+      },
+    });
+    return;
+
     const firestore = getFirestore();
     const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
     const friendRef = firestore.doc(`profiles/${friendUid}`);
@@ -1523,6 +1940,29 @@ app.post("/api/friends/accept", steamPrivateLimiter, requireFirebaseUser, async 
   }
 
   try {
+    const currentUid = req.firebaseUser.uid;
+    const { data: accepted, error: acceptError } = await supabaseAdmin
+      .from("friendships")
+      .update({ status: "accepted" })
+      .eq("requester_id", requesterUid)
+      .eq("addressee_id", currentUid)
+      .eq("status", "pending")
+      .select("requester_id")
+      .maybeSingle();
+    if (acceptError) throw acceptError;
+    if (!accepted) {
+      res.status(404).json({ error: "Solicitação não encontrada." });
+      return;
+    }
+    const { data: requester, error: requesterError } = await supabaseAdmin
+      .from("profiles")
+      .select("uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at")
+      .eq("uid", requesterUid)
+      .single();
+    if (requesterError) throw requesterError;
+    res.json({ friend: compactFriendProfile(profileRowToPublic(requester)) });
+    return;
+
     const firestore = getFirestore();
     const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
     const requesterRef = firestore.doc(`profiles/${requesterUid}`);
@@ -1588,6 +2028,22 @@ app.post("/api/friends/reject", steamPrivateLimiter, requireFirebaseUser, async 
   }
 
   try {
+    const { data: rejected, error: rejectError } = await supabaseAdmin
+      .from("friendships")
+      .delete()
+      .eq("requester_id", requesterUid)
+      .eq("addressee_id", req.firebaseUser.uid)
+      .eq("status", "pending")
+      .select("requester_id")
+      .maybeSingle();
+    if (rejectError) throw rejectError;
+    if (!rejected) {
+      res.status(404).json({ error: "Solicitação não encontrada." });
+      return;
+    }
+    res.json({ ok: true });
+    return;
+
     const firestore = getFirestore();
     const profileRef = firestore.doc(`profiles/${req.firebaseUser.uid}`);
     const requesterRef = firestore.doc(`profiles/${requesterUid}`);
@@ -1634,6 +2090,30 @@ app.post("/api/friends/unfriend", steamPrivateLimiter, requireFirebaseUser, asyn
   }
 
   try {
+    const { data: removed, error: removeError } = await supabaseAdmin
+      .from("friendships")
+      .delete()
+      .eq("status", "accepted")
+      .or(
+        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+      )
+      .select("requester_id");
+    if (removeError) throw removeError;
+    if (!removed?.length) {
+      res.status(404).json({ error: "Amizade não encontrada." });
+      return;
+    }
+    const [sqlRevokedFromCurrent, sqlRevokedFromFriend] = await Promise.all([
+      revokeActivityAudience(null, currentUid, friendUid),
+      revokeActivityAudience(null, friendUid, currentUid),
+    ]);
+    res.json({
+      ok: true,
+      revokedActivities: sqlRevokedFromCurrent + sqlRevokedFromFriend,
+    });
+    return;
+
     const firestore = getFirestore();
     const profileRef = firestore.doc(`profiles/${currentUid}`);
     const friendRef = firestore.doc(`profiles/${friendUid}`);
@@ -1694,6 +2174,29 @@ app.post("/api/friends/add", steamPrivateLimiter, requireFirebaseUser, async (re
   }
 
   try {
+    const currentUid = req.firebaseUser.uid;
+    const { data: target, error: targetError } = await supabaseAdmin
+      .from("profiles")
+      .select("uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at")
+      .eq("uid", friendUid)
+      .maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) {
+      res.status(404).json({ error: "Usuário não encontrado." });
+      return;
+    }
+    const { error: friendshipError } = await supabaseAdmin.from("friendships").upsert(
+      {
+        requester_id: currentUid,
+        addressee_id: friendUid,
+        status: "accepted",
+      },
+      { onConflict: "requester_id,addressee_id" },
+    );
+    if (friendshipError) throw friendshipError;
+    res.json({ friend: compactFriendProfile(profileRowToPublic(target)) });
+    return;
+
     const firestore = getFirestore();
     const friendSnap = await firestore.doc(`profiles/${friendUid}`).get();
     if (!friendSnap.exists) {
@@ -1737,6 +2240,18 @@ app.post("/api/friends/remove", steamPrivateLimiter, requireFirebaseUser, async 
   }
 
   try {
+    const currentUid = req.firebaseUser.uid;
+    const { error } = await supabaseAdmin
+      .from("friendships")
+      .delete()
+      .or(
+        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+      );
+    if (error) throw error;
+    res.json({ ok: true });
+    return;
+
     const profileRef = getFirestore().doc(`profiles/${req.firebaseUser.uid}`);
     const profileSnap = await profileRef.get();
     const currentFriends = Array.isArray(profileSnap.data()?.checkpointFriends)
@@ -1753,6 +2268,19 @@ app.post("/api/friends/remove", steamPrivateLimiter, requireFirebaseUser, async 
   } catch {
     res.status(500).json({ error: "Erro ao remover amigo." });
   }
+});
+
+app.post("/api/auth/logout", requireFirebaseUser, (req, res) => {
+  const uid = req.firebaseUser.uid;
+
+  for (const key of steamIdCache.keys()) {
+    if (key.startsWith(`${uid}_`)) {
+      steamIdCache.delete(key);
+    }
+  }
+
+  clearLocalSteamId(uid);
+  res.json({ ok: true });
 });
 
 app.post("/auth/steam/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
@@ -1789,6 +2317,9 @@ app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res
   }
 });
 
+const renderAuthSuccessScreen = (serviceName = "Conta", launcherCallbackUrl = "") =>
+  buildOAuthSuccessPage(serviceName, launcherCallbackUrl);
+
 app.get("/auth/google/start", steamAuthLimiter, (req, res) => {
   cleanupPendingDesktopGoogleStates();
 
@@ -1798,8 +2329,8 @@ app.get("/auth/google/start", steamAuthLimiter, (req, res) => {
     return;
   }
 
-  if (getApps().length === 0) {
-    res.status(500).send("Firebase Admin nao configurado no backend.");
+  if (!supabaseAdmin) {
+    res.status(500).send("Supabase Admin nao configurado no backend.");
     return;
   }
 
@@ -1841,8 +2372,8 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
     return;
   }
 
-  if (getApps().length === 0) {
-    res.status(500).send("Firebase Admin nao configurado no backend.");
+  if (!supabaseAdmin) {
+    res.status(500).send("Supabase Admin nao configurado no backend.");
     return;
   }
 
@@ -1859,38 +2390,66 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       audience: googleClientId,
     });
     const payload = ticket.getPayload();
-    const firebaseUser = await resolveFirebaseUserFromGooglePayload(payload);
-    const customToken = await getAuth().createCustomToken(firebaseUser.uid);
+    const userEmail = payload?.email;
+
+    if (!userEmail) {
+      throw new Error("Google nao retornou email.");
+    }
+
+    let emailOtp = null;
+    let supaUid = null;
+
+    if (supabaseAdmin) {
+      const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email: userEmail,
+      });
+      if (linkErr) throw linkErr;
+      emailOtp = linkData?.properties?.email_otp || null;
+      supaUid = linkData?.user?.id || null;
+
+      try {
+        const updatedAt = new Date().toISOString();
+        const { data: existingProfile, error: updateError } = await supabaseAdmin
+          .from("profiles")
+          .update({
+            email: userEmail,
+            updated_at: updatedAt,
+          })
+          .eq("uid", supaUid)
+          .select("uid")
+          .maybeSingle();
+        if (updateError) throw updateError;
+
+        if (!existingProfile) {
+          const { error: insertError } = await supabaseAdmin.from("profiles").upsert(
+            {
+              uid: supaUid,
+              email: userEmail,
+              display_name: payload.name || userEmail.split("@")[0],
+              photo_url: payload.picture || null,
+              updated_at: updatedAt,
+            },
+            {
+              onConflict: "uid",
+              ignoreDuplicates: true,
+            },
+          );
+          if (insertError) throw insertError;
+        }
+      } catch (err) {
+        console.warn("[google-oauth] Aviso ao atualizar perfil:", err?.message || err);
+      }
+    }
 
     pendingDesktopGoogleStates.set(state, {
-      customToken,
-      uid: firebaseUser.uid,
+      email: userEmail,
+      emailOtp,
+      uid: supaUid,
       createdAt: Date.now(),
     });
 
-    res.type("html").send(`
-      <!doctype html>
-      <html lang="pt-BR">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Checkpoint Launcher</title>
-          <style>
-            body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #05070a; color: white; font-family: Inter, system-ui, sans-serif; }
-            main { max-width: 420px; padding: 32px; text-align: center; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; background: rgba(255,255,255,.05); }
-            h1 { margin: 0 0 12px; font-size: 24px; }
-            p { margin: 0; color: rgba(255,255,255,.66); line-height: 1.5; }
-          </style>
-        </head>
-        <body>
-          <main>
-            <h1>Login concluido</h1>
-            <p>Voce ja pode voltar para o Checkpoint Launcher.</p>
-          </main>
-          <script>setTimeout(() => window.close(), 1200);</script>
-        </body>
-      </html>
-    `);
+    res.type("html").send(renderAuthSuccessScreen("Google"));
   } catch (error) {
     pendingDesktopGoogleStates.delete(state);
     res
@@ -1900,35 +2459,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
 });
 
 app.post("/auth/desktop/google/complete", steamAuthLimiter, async (req, res) => {
-  cleanupPendingDesktopGoogleStates();
-
-  const state = String(req.body?.state ?? "").trim();
-  const idToken = String(req.body?.idToken ?? "").trim();
-
-  if (!state || !idToken) {
-    res.status(400).json({ error: "state ou idToken ausente." });
-    return;
-  }
-
-  if (getApps().length === 0) {
-    res.status(500).json({ error: "Firebase Admin nao configurado no backend." });
-    return;
-  }
-
-  try {
-    const decodedToken = await getAuth().verifyIdToken(idToken);
-    const customToken = await getAuth().createCustomToken(decodedToken.uid);
-
-    pendingDesktopGoogleStates.set(state, {
-      customToken,
-      uid: decodedToken.uid,
-      createdAt: Date.now(),
-    });
-
-    res.json({ ok: true });
-  } catch {
-    res.status(401).json({ error: "Token Google invalido." });
-  }
+  res.json({ ok: true });
 });
 
 app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
@@ -1941,7 +2472,7 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
   }
 
   const pending = pendingDesktopGoogleStates.get(state);
-  if (!pending || !pending.customToken) {
+  if (!pending || (!pending.emailOtp && !pending.email)) {
     res.json({ status: "pending" });
     return;
   }
@@ -1949,7 +2480,8 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
   pendingDesktopGoogleStates.delete(state);
   res.json({
     status: "complete",
-    customToken: pending.customToken,
+    email: pending.email,
+    emailOtp: pending.emailOtp,
     uid: pending.uid,
   });
 });
@@ -1959,7 +2491,7 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
   const token = String(req.query.token ?? "");
   const pending = pendingStates.get(token);
   if (!pending) {
-    res.redirect(`${frontendUrl}/app?steamStatus=invalid_state`);
+    res.redirect(buildLauncherAuthCallback("steam", "invalid_state"));
     return;
   }
   pendingStates.delete(token);
@@ -1974,7 +2506,7 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
     const text = await validation.text();
     const isValid = text.includes("is_valid:true");
     if (!isValid) {
-      res.redirect(`${frontendUrl}/app?steamStatus=invalid`);
+      res.redirect(buildLauncherAuthCallback("steam", "invalid"));
       return;
     }
 
@@ -1982,26 +2514,25 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
     const match = claimedId.match(/\/id\/(\d+)$/);
     const steamId = match?.[1];
     if (!steamId) {
-      res.redirect(`${frontendUrl}/app?steamStatus=missing_id`);
+      res.redirect(buildLauncherAuthCallback("steam", "missing_id"));
       return;
     }
 
-    if (getApps().length === 0) {
-      res.redirect(`${frontendUrl}/app?steamStatus=server_not_configured`);
+    if (!supabaseAdmin) {
+      res.redirect(buildLauncherAuthCallback("steam", "server_not_configured"));
       return;
     }
 
-    await getFirestore().doc(`profiles/${pending.firebaseUid}`).set(
-      {
-        steamId,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
+    await updateLinkedAccountProfile(pending.firebaseUid, {
+      steam_id: steamId,
+    });
+
+    res.type("html").send(
+      renderAuthSuccessScreen("Steam", buildLauncherAuthCallback("steam", "ok")),
     );
-
-    res.type("html").send(buildOAuthSuccessPage("Steam"));
-  } catch {
-    res.redirect(`${frontendUrl}/app?steamStatus=error`);
+  } catch (error) {
+    console.error("[steam] Falha ao concluir vinculacao:", error);
+    res.redirect(buildLauncherAuthCallback("steam", "error"));
   }
 });
 
@@ -2010,30 +2541,30 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
   const state = String(req.query.state ?? "");
   const pending = pendingDiscordStates.get(state);
   if (!pending) {
-    res.redirect(`${frontendUrl}/app?discordStatus=invalid_state`);
+    res.redirect(buildLauncherAuthCallback("discord", "invalid_state"));
     return;
   }
   pendingDiscordStates.delete(state);
 
   const oauthError = String(req.query.error ?? "").trim();
   if (oauthError) {
-    res.redirect(`${frontendUrl}/app?discordStatus=denied`);
+    res.redirect(buildLauncherAuthCallback("discord", "denied"));
     return;
   }
 
   const code = String(req.query.code ?? "").trim();
   if (!code) {
-    res.redirect(`${frontendUrl}/app?discordStatus=missing_code`);
+    res.redirect(buildLauncherAuthCallback("discord", "missing_code"));
     return;
   }
 
   if (!discordClientId || !discordClientSecret) {
-    res.redirect(`${frontendUrl}/app?discordStatus=client_not_configured`);
+    res.redirect(buildLauncherAuthCallback("discord", "client_not_configured"));
     return;
   }
 
-  if (getApps().length === 0) {
-    res.redirect(`${frontendUrl}/app?discordStatus=server_not_configured`);
+  if (!supabaseAdmin) {
+    res.redirect(buildLauncherAuthCallback("discord", "server_not_configured"));
     return;
   }
 
@@ -2042,7 +2573,7 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
       await requestDiscordToken(code);
 
     if (!tokenResponse.ok) {
-      res.redirect(`${frontendUrl}/app?discordStatus=token_error`);
+      res.redirect(buildLauncherAuthCallback("discord", "token_error"));
       return;
     }
 
@@ -2054,7 +2585,7 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
     const discordUser = await userResponse.json().catch(() => ({}));
 
     if (!userResponse.ok || !discordUser?.id) {
-      res.redirect(`${frontendUrl}/app?discordStatus=missing_id`);
+      res.redirect(buildLauncherAuthCallback("discord", "missing_id"));
       return;
     }
 
@@ -2065,32 +2596,27 @@ app.get("/auth/discord/callback", steamAuthLimiter, async (req, res) => {
       tokenPayload.token_type ?? "Bearer",
     );
 
-    await getFirestore().doc(`profiles/${pending.firebaseUid}`).set(
-      {
-        discordId: String(discordUser.id),
-        discordUsername: username,
-        discordAvatar: avatar,
-        discordFriends,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
+    await updateLinkedAccountProfile(pending.firebaseUid, {
+      discord_id: String(discordUser.id),
+      discord_username: username,
+      discord_avatar: avatar,
+      discord_friends: discordFriends,
+    });
 
-    res.type("html").send(buildOAuthSuccessPage("Discord"));
-  } catch {
-    res.redirect(`${frontendUrl}/app?discordStatus=error`);
+    res.type("html").send(
+      renderAuthSuccessScreen("Discord", buildLauncherAuthCallback("discord", "ok")),
+    );
+  } catch (error) {
+    console.error("[discord] Falha ao concluir vinculacao:", error);
+    res.redirect(buildLauncherAuthCallback("discord", "error"));
   }
 });
 
 app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
-    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
-      {
-        steamId: "",
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
+    await updateLinkedAccountProfile(req.firebaseUser.uid, {
+      steam_id: null,
+    });
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Erro ao desconectar Steam." });
@@ -2099,16 +2625,12 @@ app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, asyn
 
 app.post("/api/discord/disconnect", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
-    await getFirestore().doc(`profiles/${req.firebaseUser.uid}`).set(
-      {
-        discordId: "",
-        discordUsername: "",
-        discordAvatar: "",
-        discordFriends: [],
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true },
-    );
+    await updateLinkedAccountProfile(req.firebaseUser.uid, {
+      discord_id: null,
+      discord_username: null,
+      discord_avatar: null,
+      discord_friends: [],
+    });
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Erro ao desconectar Discord." });
@@ -2560,8 +3082,8 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
         unlockTime: Number(achievement?.unlocktime ?? 0) || 0,
         name: String(
           achievement?.name ??
-            schemaItem?.displayName ??
-            apiName,
+          schemaItem?.displayName ??
+          apiName,
         ).trim(),
         description: String(
           achievement?.description ?? schemaItem?.description ?? "",
@@ -2675,7 +3197,7 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
       appId,
       title: data?.name ?? null,
       cardImage: `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900_2x.jpg`,
-       headerImage: data?.header_image ?? null,
+      headerImage: data?.header_image ?? null,
       backgroundImage: data?.background_raw ?? data?.background ?? null,
       logoImage: data?.capsule_imagev5 ?? data?.capsule_image ?? null,
       description: data?.short_description ?? null,

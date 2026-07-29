@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification } = require("electron");
+
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -167,6 +168,7 @@ let startupErrorShown = false;
 let isQuitting = false;
 let tray = null;
 let localGameLibrary = null;
+let pendingAccountAuthCallback = null;
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -179,6 +181,16 @@ if (!hasSingleInstanceLock) {
 Menu.setApplicationMenu(null);
 if (process.platform === "win32") {
   app.setAppUserModelId("com.checkpoint.launcher");
+}
+
+if (!IS_SMOKE_TEST) {
+  if (!app.isPackaged) {
+    app.setAsDefaultProtocolClient("checkpoint", process.execPath, [
+      path.resolve(app.getAppPath()),
+    ]);
+  } else {
+    app.setAsDefaultProtocolClient("checkpoint");
+  }
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -203,6 +215,49 @@ const appendStartupLog = (message, error) => {
   console.error(content.trimEnd());
 };
 
+const parseAccountAuthCallback = (rawUrl) => {
+  try {
+    const callbackUrl = new URL(String(rawUrl || ""));
+    if (callbackUrl.protocol !== "checkpoint:" || callbackUrl.hostname !== "auth") {
+      return null;
+    }
+    if (callbackUrl.pathname.replace(/\/$/, "") !== "/callback") {
+      return null;
+    }
+
+    const steamStatus = callbackUrl.searchParams.get("steamStatus");
+    const discordStatus = callbackUrl.searchParams.get("discordStatus");
+    if (!steamStatus && !discordStatus) return null;
+
+    return {
+      ...(steamStatus ? { steamStatus: steamStatus.slice(0, 40) } : {}),
+      ...(discordStatus ? { discordStatus: discordStatus.slice(0, 40) } : {}),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const findAccountAuthCallback = (args) =>
+  (Array.isArray(args) ? args : [])
+    .map(parseAccountAuthCallback)
+    .find(Boolean) || null;
+
+const deliverAccountAuthCallback = (payload) => {
+  if (!payload) return;
+  pendingAccountAuthCallback = payload;
+
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+
+  if (!mainWindow.webContents.isLoading()) {
+    mainWindow.webContents.send("auth:account-callback", payload);
+    pendingAccountAuthCallback = null;
+  }
+};
+
 const isLocalAppUrl = (rawUrl) => {
   try {
     const url = new URL(rawUrl);
@@ -225,7 +280,7 @@ const registerSecureIpcHandler = createSecureIpcRegistrar({
 const isExternalProtocol = (rawUrl) => {
   try {
     const protocol = new URL(rawUrl).protocol;
-    return protocol === "steam:" || protocol === "com.epicgames.launcher:";
+    return protocol === "steam:" || protocol === "com.epicgames.launcher:" || protocol === "checkpoint:";
   } catch {
     return false;
   }
@@ -377,7 +432,7 @@ const createWindow = async () => {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      backgroundThrottling: false,
+      backgroundThrottling: true,
     },
   });
 
@@ -411,6 +466,12 @@ const createWindow = async () => {
       `Renderer process exited (${details.reason}).`,
       details.exitCode ? new Error(`exitCode=${details.exitCode}`) : undefined,
     );
+  });
+  mainWindow.webContents.on("did-finish-load", () => {
+    if (pendingAccountAuthCallback) {
+      mainWindow.webContents.send("auth:account-callback", pendingAccountAuthCallback);
+      pendingAccountAuthCallback = null;
+    }
   });
 
   mainWindow.webContents.on("before-input-event", (event, input) => {
@@ -562,22 +623,18 @@ const createOverlayWindow = () => {
 
   overlayReady = false;
   overlayWindow = new BrowserWindow({
-    x: 0,
-    y: 0,
-    width: 800,
-    height: 600,
-    show: false,
     frame: false,
     transparent: true,
+    alwaysOnTop: true,
+    fullscreen: true,
+    skipTaskbar: true,
     resizable: false,
     movable: false,
     minimizable: false,
     maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
     focusable: false,
     hasShadow: false,
-    alwaysOnTop: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "overlay-preload.cjs"),
       contextIsolation: true,
@@ -588,9 +645,9 @@ const createOverlayWindow = () => {
     },
   });
 
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlayWindow.setAlwaysOnTop(true, "screen-saver");
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   syncOverlayBounds();
   const createdOverlayWindow = overlayWindow;
   createdOverlayWindow.loadFile(path.join(__dirname, "overlay.html"));
@@ -641,15 +698,20 @@ const setOverlayPanelOpen = (open) => {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   overlayPanelOpen = Boolean(open);
   overlayWindow.setFocusable(overlayPanelOpen);
-  overlayWindow.setIgnoreMouseEvents(!overlayPanelOpen, { forward: !overlayPanelOpen });
+
+  if (overlayPanelOpen) {
+    overlayWindow.setIgnoreMouseEvents(false);
+    overlayWindow.show();
+    overlayWindow.focus();
+  } else {
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    overlayWindow.blur();
+  }
+
   sendOverlayEvent("overlay:panel-visibility", {
     open: overlayPanelOpen,
     state: overlayPanelState,
   });
-  if (overlayPanelOpen) {
-    overlayWindow.show();
-    overlayWindow.focus();
-  }
 };
 
 const overlaySettingsFile = () => path.join(app.getPath("userData"), "overlay-settings.json");
@@ -1032,6 +1094,8 @@ registerSecureIpcHandler("library:get-summary", async (_event, uid) =>
   getLocalGameLibrary().getSummary(uid));
 registerSecureIpcHandler("library:mark-summary-synced", async (_event, uid, revision) =>
   getLocalGameLibrary().markSummarySynced(uid, revision));
+registerSecureIpcHandler("library:clear-steam-id", async (_event, uid) =>
+  getLocalGameLibrary().clearSteamId(uid));
 
 ipcMain.handle("overlay:panel-action", async (event, action) => {
   if (!overlayWindow || event.sender !== overlayWindow.webContents) {
@@ -2307,22 +2371,52 @@ const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
   if (_processSnapshotCache.pending) return _processSnapshotCache.pending;
 
   const pending = new Promise((resolve, reject) => {
-    execFile("powershell.exe", [
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      PROCESS_SNAPSHOT_COMMAND,
-    ], { windowsHide: true, maxBuffer: 4 * 1024 * 1024 }, (error, stdout = "") => {
-      if (error) {
-        reject(error);
-        return;
+    execFile(
+      "wmic.exe",
+      ["process", "get", "ProcessId,ParentProcessId,Name,ExecutablePath", "/FORMAT:CSV"],
+      { windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      (error, stdout = "") => {
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        try {
+          const lines = stdout.split(/\r?\n/).filter((line) => line.trim());
+          const processes = [];
+
+          if (lines.length > 1) {
+            const header = lines[0].split(",");
+            const pathIdx = header.findIndex((h) => h.toLowerCase().includes("executablepath"));
+            const nameIdx = header.findIndex((h) => h.toLowerCase().includes("name"));
+            const parentIdx = header.findIndex((h) => h.toLowerCase().includes("parentprocessid"));
+            const pidIdx = header.findIndex((h) => h.toLowerCase().includes("processid"));
+
+            for (let i = 1; i < lines.length; i++) {
+              const cols = lines[i].split(",");
+              if (cols.length < header.length) continue;
+
+              const pid = parseInt(cols[pidIdx], 10);
+              const parentPid = parseInt(cols[parentIdx], 10);
+              const name = (cols[nameIdx] || "").trim().toLowerCase();
+              const execPath = (cols[pathIdx] || "").trim();
+
+              if (pid > 0 && name) {
+                processes.push({
+                  pid,
+                  parentPid: Number.isInteger(parentPid) ? parentPid : 0,
+                  name,
+                  executablePath: execPath ? path.normalize(execPath).toLowerCase() : "",
+                });
+              }
+            }
+          }
+          resolve(processes);
+        } catch (parseError) {
+          reject(parseError);
+        }
       }
-      try {
-        resolve(parseProcessSnapshot(stdout));
-      } catch (parseError) {
-        reject(parseError);
-      }
-    });
+    );
   });
 
   _processSnapshotCache.pending = pending;
@@ -2330,7 +2424,7 @@ const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
     const processes = await pending;
     _processSnapshotCache = {
       processes,
-      expiresAt: Date.now() + 1500,
+      expiresAt: Date.now() + 2500,
       pending: null,
     };
     return processes;
@@ -2904,6 +2998,7 @@ app.whenReady().then(async () => {
     await startAchievementBridge();
     await migrateKnownAchievementProgress();
     await createWindow();
+    deliverAccountAuthCallback(findAccountAuthCallback(process.argv));
     void ensureEpicStoreSearchWindow().catch((error) => {
       console.warn("[epic-store] Nao foi possivel preaquecer a busca:", error?.message || error);
     });
@@ -2913,12 +3008,18 @@ app.whenReady().then(async () => {
   }
 });
 
-app.on("second-instance", () => {
+app.on("second-instance", (_event, commandLine) => {
+  deliverAccountAuthCallback(findAccountAuthCallback(commandLine));
   if (!mainWindow) return;
   if (mainWindow.isMinimized()) {
     mainWindow.restore();
   }
   mainWindow.focus();
+});
+
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  deliverAccountAuthCallback(parseAccountAuthCallback(url));
 });
 
 app.on("activate", () => {

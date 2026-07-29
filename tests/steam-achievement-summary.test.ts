@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  getIdToken: vi.fn(async () => "firebase-test-token"),
-}));
-
-vi.mock("../Firebase", () => ({
-  auth: { currentUser: { getIdToken: mocks.getIdToken } },
-  db: {},
+vi.mock("../src/services/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { access_token: "supa-token" } },
+      }),
+    },
+  },
 }));
 
 import { fetchSteamAchievementSummary } from "../src/services/steam";
@@ -14,7 +15,6 @@ import { fetchSteamAchievementSummary } from "../src/services/steam";
 describe("fetchSteamAchievementSummary", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    mocks.getIdToken.mockClear();
   });
 
   it("divide bibliotecas grandes em lotes de no máximo 250 jogos", async () => {

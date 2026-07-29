@@ -21,7 +21,7 @@ interface UseAccountConnectionsProps {
   resolvedSteamId?: string | null;
   playSound: (type: SoundEffectType) => void;
   notify: (msg: string, type: "success" | "error" | "info") => void;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<any>;
   setIsLoading: (val: boolean) => void;
   setSelectedIndex: (val: number) => void;
   onLibraryChanged?: () => Promise<void> | void;
@@ -95,7 +95,27 @@ export function useAccountConnections({
         if (window.electronAPI?.openExternalUrl) {
           await window.electronAPI.openExternalUrl(url);
           notify("Navegador aberto! Conecte sua conta Steam e volte ao app.", "info");
-          setSteamConnecting(false);
+
+          // Polling automático para atualizar o perfil e detectar a conexão Steam
+          let attempts = 0;
+          const maxAttempts = 40; // 40 * 1.5s = 60s max timeout
+
+          const checkSteam = async () => {
+            attempts++;
+            const prof = await refreshProfile();
+            if (prof?.steamId || attempts >= maxAttempts) {
+              clearInterval(intervalId);
+              window.removeEventListener("focus", onFocus);
+              setSteamConnecting(false);
+            }
+          };
+
+          const onFocus = () => {
+            void checkSteam();
+          };
+
+          const intervalId = setInterval(checkSteam, 1500);
+          window.addEventListener("focus", onFocus);
         } else {
           window.location.href = url;
         }
@@ -122,7 +142,27 @@ export function useAccountConnections({
         if (window.electronAPI?.openExternalUrl) {
           await window.electronAPI.openExternalUrl(url);
           notify("Navegador aberto! Conecte sua conta Discord e volte ao app.", "info");
-          setDiscordConnecting(false);
+
+          // Polling automático para atualizar o perfil e detectar a conexão Discord
+          let attempts = 0;
+          const maxAttempts = 40;
+
+          const checkDiscord = async () => {
+            attempts++;
+            const prof = await refreshProfile();
+            if (prof?.discordId || attempts >= maxAttempts) {
+              clearInterval(intervalId);
+              window.removeEventListener("focus", onFocus);
+              setDiscordConnecting(false);
+            }
+          };
+
+          const onFocus = () => {
+            void checkDiscord();
+          };
+
+          const intervalId = setInterval(checkDiscord, 1500);
+          window.addEventListener("focus", onFocus);
         } else {
           window.location.href = url;
         }

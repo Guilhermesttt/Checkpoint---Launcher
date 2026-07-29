@@ -1,13 +1,12 @@
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "../../Firebase";
+import { supabase } from "./supabase";
 import type { Game, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
 
 const getAuthHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error("Sessao expirada. Entre novamente.");
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.access_token) throw new Error("Sessao expirada. Entre novamente.");
   return {
-    Authorization: `Bearer ${token}`,
+    Authorization: `Bearer ${session.access_token}`,
     "Content-Type": "application/json",
   };
 };
@@ -83,48 +82,19 @@ export const updateCheckpointPresence = async (
   status: "online" | "playing" | "offline",
   currentGameTitle?: string,
 ) => {
-  const currentUid = auth.currentUser?.uid;
-  if (!currentUid) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.user) {
     throw new Error("Sessao expirada. Entre novamente.");
   }
 
-  const now = new Date().toISOString();
-  const profileRef = doc(db, "profiles", currentUid);
-
-  const firestoreWrite = setDoc(
-    profileRef,
-    {
-      presence: {
-        status,
-        currentGameTitle: status === "playing" ? String(currentGameTitle || "").trim().slice(0, 120) : "",
-        updatedAt: now,
-      },
-      updatedAt: now,
-    },
-    { merge: true },
-  );
-
-  const backendWrite = (async () => {
-    const response = await fetch(apiUrl("/api/presence"), {
-      method: "POST",
-      headers: await getAuthHeaders(),
-      body: JSON.stringify({ status, currentGameTitle }),
-    });
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    if (!response.ok) {
-      throw new Error(payload.error || "Erro ao atualizar presenca.");
-    }
-  })();
-
-  const [firestoreResult, backendResult] = await Promise.allSettled([
-    firestoreWrite,
-    backendWrite,
-  ]);
-
-  if (firestoreResult.status === "rejected" && backendResult.status === "rejected") {
-    throw firestoreResult.reason instanceof Error
-      ? firestoreResult.reason
-      : new Error("Erro ao atualizar presenca.");
+  const response = await fetch(apiUrl("/api/presence"), {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ status, currentGameTitle }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) {
+    throw new Error(payload.error || "Erro ao atualizar presenca.");
   }
 };
 

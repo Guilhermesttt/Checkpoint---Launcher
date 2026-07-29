@@ -1,7 +1,7 @@
 {
   "name": "checkpoint",
   "private": true,
-  "version": "2.0.9",
+  "version": "3.0.0",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
@@ -20,8 +20,9 @@
     "test:watch": "vitest",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "test:coverage": "vitest run --coverage",
-    "test:rules": "firebase emulators:exec --only firestore --project checkpoint-rules-test \"vitest run --config vitest.rules.config.ts\"",
-    "test:ci": "npm run test:typecheck && npm run test && npm run test:rules",
+    "test:ci": "npm run test:typecheck && npm run test",
+    "db:push": "npx supabase db push",
+    "db:lint": "npx supabase db lint --linked --level warning",
     "audit:ci": "npm audit --omit=dev --audit-level=high",
     "release:verify": "node scripts/verify-release.cjs",
     "release:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installer.ps1",
@@ -35,6 +36,14 @@
   "build": {
     "appId": "com.checkpoint.launcher",
     "productName": "Checkpoint Launcher",
+    "protocols": [
+      {
+        "name": "Checkpoint Launcher",
+        "schemes": [
+          "checkpoint"
+        ]
+      }
+    ],
     "artifactName": "Checkpoint-Launcher-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
@@ -108,12 +117,12 @@
     }
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "electron-updater": "^6.8.9",
     "express": "^5.1.0",
     "express-rate-limit": "^8.5.2",
-    "firebase-admin": "^14.1.0",
     "google-auth-library": "^10.9.0",
     "helmet": "^8.2.0"
   },
@@ -121,7 +130,6 @@
     "@emnapi/core": "1.10.0",
     "@emnapi/runtime": "1.10.0",
     "@eslint/js": "^9.39.4",
-    "@firebase/rules-unit-testing": "^5.0.1",
     "@fortawesome/fontawesome-svg-core": "7.3.0",
     "@fortawesome/free-brands-svg-icons": "7.3.0",
     "@fortawesome/react-fontawesome": "3.3.1",
@@ -182,7 +190,6 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "fast-average-color": "^9.5.2",
-    "firebase": "^12.12.0",
     "firebase-tools": "^15.23.0",
     "framer-motion": "^12.38.0",
     "geist": "^1.7.0",

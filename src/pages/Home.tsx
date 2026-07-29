@@ -15,15 +15,6 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  collection,
-  getDocs,
-  query,
-  setDoc,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "../../Firebase";
 import DynamicBackground from "../components/DynamicBackground";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
@@ -41,6 +32,7 @@ import { useNotification } from "../components/NotificationCenter";
 import ModalShell from "../components/ui/ModalShell";
 import { ProfileDropdown } from "../components/ui/ProfileDropdown";
 import { useAuth } from "../auth/AuthProvider";
+import { supabase } from "../services/supabase";
 // Correção 1: Importando Game, UserProfile e SocialFriend no mesmo lugar
 import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/domain";
 import { useImagePreloader } from "../hooks/useImagePreloader";
@@ -80,11 +72,7 @@ import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
-import {
-  profileDocRef,
-  userDocRef,
-  userGameDocRef,
-} from "../services/firestorePaths";
+
 import {
   deleteLibraryGame,
   importFirestoreLibraryIntoLocal,
@@ -540,48 +528,32 @@ const Home: React.FC = () => {
   }, [user?.uid]);
 
   useEffect(() => {
-    const migrate = async () => {
-      if (!user?.uid || userProfile?.gamesMigratedAt) return;
-      try {
-        const snap = await getDocs(
-          query(collection(db, "games"), where("ownerUid", "==", user.uid)),
-        );
-        const batch = writeBatch(db);
-        if (!snap.empty) {
-          snap.docs.forEach((d) => {
-            const rest = { ...d.data() };
-            delete rest.ownerUid;
-            batch.set(userGameDocRef(user.uid, d.id), rest, { merge: true });
-            batch.delete(d.ref);
-          });
-          batch.set(
-            userDocRef(user.uid),
-            { migratedAt: new Date().toISOString() },
-            { merge: true },
-          );
-        }
-        batch.set(
-          profileDocRef(user.uid),
-          { gamesMigratedAt: new Date().toISOString() },
-          { merge: true },
-        );
-        await batch.commit();
-      } catch (e) {
-        if ((e as { code?: string })?.code === "permission-denied")
-          await setDoc(
-            profileDocRef(user.uid),
-            {
-              gamesMigratedAt: new Date().toISOString(),
-              migrationSkippedReason: "legacy_games_permission_denied",
-            },
-            { merge: true },
-          );
-      } finally {
-        await refreshProfile();
-      }
-    };
-    void migrate();
-  }, [refreshProfile, user?.uid, userProfile?.gamesMigratedAt]);
+    if (!user?.uid) return;
+
+    if (!didInitConnectionRefs.current) {
+      previousSteamIdRef.current = resolvedSteamId;
+      previousDiscordIdRef.current = resolvedDiscordId;
+      didInitConnectionRefs.current = true;
+      return;
+    }
+
+    if (!previousSteamIdRef.current && resolvedSteamId) {
+      previousSteamIdRef.current = resolvedSteamId;
+      notify("Conta Steam vinculada com sucesso!", "success");
+      playSound("select");
+      void handleSyncSteam();
+    } else {
+      previousSteamIdRef.current = resolvedSteamId;
+    }
+
+    if (!previousDiscordIdRef.current && resolvedDiscordId) {
+      previousDiscordIdRef.current = resolvedDiscordId;
+      notify("Conta Discord vinculada com sucesso!", "success");
+      playSound("select");
+    } else {
+      previousDiscordIdRef.current = resolvedDiscordId;
+    }
+  }, [resolvedSteamId, resolvedDiscordId, user?.uid, notify, playSound, handleSyncSteam]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -598,7 +570,7 @@ const Home: React.FC = () => {
         invalid_state: "Estado inválido.",
         invalid: "Falha na validação OpenID.",
         missing_id: "Steam ID não retornado.",
-        server_not_configured: "Backend Firebase Admin não configurado.",
+        server_not_configured: "Backend Supabase Admin não configurado.",
         error: "Erro inesperado.",
       };
       notify(
@@ -617,7 +589,7 @@ const Home: React.FC = () => {
         missing_code: "Código de retorno do Discord não recebido.",
         missing_id: "Conta Discord não retornou identificador.",
         client_not_configured: "Credenciais do Discord não configuradas no backend.",
-        server_not_configured: "Backend Firebase Admin não configurado.",
+        server_not_configured: "Backend Supabase Admin não configurado.",
         token_error: "O Discord recusou a troca do código de autenticação.",
         error: "Erro inesperado.",
       };
@@ -629,6 +601,35 @@ const Home: React.FC = () => {
 
     window.history.replaceState({}, document.title, window.location.pathname);
   }, [notify, refreshProfile, user?.uid]);
+
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.onAccountAuthCallback?.((payload) => {
+      if (payload.steamStatus) {
+        setSteamConnecting(false);
+        if (payload.steamStatus === "ok") {
+          void refreshProfile();
+        } else {
+          notify(`Não foi possível conectar com a Steam (${payload.steamStatus}).`, "error");
+        }
+      }
+
+      if (payload.discordStatus) {
+        setDiscordConnecting(false);
+        if (payload.discordStatus === "ok") {
+          void refreshProfile();
+        } else {
+          notify(`Não foi possível conectar com o Discord (${payload.discordStatus}).`, "error");
+        }
+      }
+    });
+
+    return () => unsubscribe?.();
+  }, [
+    notify,
+    refreshProfile,
+    setDiscordConnecting,
+    setSteamConnecting,
+  ]);
 
   const {
     displayGames,
@@ -1771,11 +1772,9 @@ const Home: React.FC = () => {
                       "1",
                     );
                     setOnboardingCompleted(true);
-                    await setDoc(
-                      profileDocRef(user.uid),
-                      { onboardingCompletedAt: new Date().toISOString() },
-                      { merge: true },
-                    );
+                    await supabase.from("profiles").update({
+                      onboarding_completed_at: new Date().toISOString(),
+                    }).eq("uid", user.uid);
                     await refreshProfile();
                   }}
                   playSound={playSound}

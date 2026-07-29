@@ -1,29 +1,44 @@
-import {
-  addDoc,
-  deleteDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { supabase } from "./supabase";
 import type { Game, UserProfile } from "../types/domain";
-import {
-  publicProfileDocRef,
-  userGameDocRef,
-  userGamesCollectionRef,
-} from "./firestorePaths";
 
 const sorted = (games: Game[]) =>
   [...games].sort((a, b) => a.title.localeCompare(b.title));
+
+const toCloudGameRow = (uid: string, game: Game) => ({
+  id: game.id,
+  user_id: uid,
+  title: game.title,
+  launcher_type: game.launcherType || "local",
+  hours_played: game.hoursPlayed || 0,
+  steam_app_id: game.steamAppId || null,
+  epic_catalog_id: game.epicCatalogId || null,
+  is_favorite: Boolean(game.isFavorite),
+  data: game,
+  updated_at: new Date().toISOString(),
+});
+
+const fromCloudGameRow = (row: Record<string, any>): Game => ({
+  ...(row.data || {}),
+  id: String(row.id),
+  title: String(row.data?.title || row.title || "Jogo"),
+  launcherType: row.data?.launcherType || row.launcher_type || "local",
+  hoursPlayed: Number(row.data?.hoursPlayed ?? row.hours_played ?? 0),
+  steamAppId: row.data?.steamAppId || row.steam_app_id || undefined,
+  epicCatalogId: row.data?.epicCatalogId || row.epic_catalog_id || undefined,
+  isFavorite: Boolean(row.data?.isFavorite ?? row.is_favorite),
+});
 
 export const listLibraryGames = async (uid: string): Promise<Game[]> => {
   if (window.electronAPI?.listLocalGames) {
     return sorted(await window.electronAPI.listLocalGames(uid));
   }
-  const snapshot = await getDocs(userGamesCollectionRef(uid));
-  return sorted(snapshot.docs.map((item) => ({
-    id: item.id,
-    ...item.data(),
-  }) as Game));
+  const { data, error } = await supabase
+    .from("user_games")
+    .select("*")
+    .eq("user_id", uid);
+
+  if (error || !data) return [];
+  return sorted(data.map((row) => fromCloudGameRow(row as Record<string, any>)));
 };
 
 export const createLibraryGame = async (
@@ -33,8 +48,11 @@ export const createLibraryGame = async (
   if (window.electronAPI?.createLocalGame) {
     return window.electronAPI.createLocalGame(uid, game);
   }
-  const ref = await addDoc(userGamesCollectionRef(uid), game);
-  return { ...game, id: ref.id } as Game;
+  const id = game.id || crypto.randomUUID();
+  const newGame = { ...game, id } as Game;
+  const { error } = await supabase.from("user_games").insert(toCloudGameRow(uid, newGame));
+  if (error) throw error;
+  return newGame;
 };
 
 export const updateLibraryGame = async (
@@ -45,15 +63,29 @@ export const updateLibraryGame = async (
   if (window.electronAPI?.updateLocalGame) {
     return window.electronAPI.updateLocalGame(uid, gameId, patch);
   }
-  await updateDoc(userGameDocRef(uid, gameId), patch);
-  return null;
+  const { data: current, error: readError } = await supabase
+    .from("user_games")
+    .select("*")
+    .eq("id", gameId)
+    .eq("user_id", uid)
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) return null;
+  const updated = { ...fromCloudGameRow(current), ...patch, id: gameId };
+  const { error } = await supabase
+    .from("user_games")
+    .update(toCloudGameRow(uid, updated))
+    .eq("id", gameId)
+    .eq("user_id", uid);
+  if (error) throw error;
+  return updated;
 };
 
 export const deleteLibraryGame = async (uid: string, gameId: string) => {
   if (window.electronAPI?.deleteLocalGame) {
     return window.electronAPI.deleteLocalGame(uid, gameId);
   }
-  await deleteDoc(userGameDocRef(uid, gameId));
+  await supabase.from("user_games").delete().eq("id", gameId).eq("user_id", uid);
   return true;
 };
 
@@ -64,12 +96,13 @@ export const deleteLibraryGamesByLauncher = async (
   if (window.electronAPI?.deleteLocalGamesByLauncher) {
     return window.electronAPI.deleteLocalGamesByLauncher(uid, launcherType);
   }
-  const snapshot = await getDocs(userGamesCollectionRef(uid));
-  const matches = snapshot.docs.filter(
-    (item) => item.data().launcherType === launcherType,
-  );
-  await Promise.all(matches.map((item) => deleteDoc(item.ref)));
-  return matches.length;
+  const { data } = await supabase
+    .from("user_games")
+    .delete()
+    .eq("user_id", uid)
+    .eq("launcher_type", launcherType)
+    .select();
+  return data?.length || 0;
 };
 
 export const recordLibrarySession = async (
@@ -85,8 +118,11 @@ export const bulkUpsertLibraryGames = async (uid: string, games: Game[]) => {
   if (window.electronAPI?.bulkUpsertLocalGames) {
     return window.electronAPI.bulkUpsertLocalGames(uid, games);
   }
-  await Promise.all(games.map((game) =>
-    setDoc(userGameDocRef(uid, game.id), game, { merge: true })));
+  const items = games.map((game) => toCloudGameRow(uid, game));
+  const { error } = await supabase.from("user_games").upsert(items, {
+    onConflict: "user_id,id",
+  });
+  if (error) throw error;
   return games;
 };
 
@@ -100,11 +136,13 @@ export const importFirestoreLibraryIntoLocal = async (uid: string) => {
   ) {
     return { imported: 0, alreadyImported: true };
   }
-  const snapshot = await getDocs(userGamesCollectionRef(uid));
-  const games = snapshot.docs.map((item) => ({
-    id: item.id,
-    ...item.data(),
-  }) as Game);
+  const { data } = await supabase
+    .from("user_games")
+    .select("*")
+    .eq("user_id", uid);
+  const games = (data || []).map((row) =>
+    fromCloudGameRow(row as Record<string, any>),
+  );
   return window.electronAPI.importLegacyGames(uid, games);
 };
 
@@ -137,14 +175,13 @@ export const syncPublicLibrarySummary = async (
     && localStorage.getItem(fingerprintKey) === profileFingerprint
   ) return false;
 
-  await setDoc(publicProfileDocRef(uid), {
-    schemaVersion: summary.schemaVersion,
+  const { error } = await supabase.from("public_profiles").upsert({
     uid,
-    displayName: profile?.displayName || "Jogador",
-    photoURL,
+    display_name: profile?.displayName || "Jogador",
+    photo_url: photoURL,
     bio: profile?.bio || "",
     website: profile?.website || "",
-    favoriteGenres: profile?.favoriteGenres || [],
+    favorite_genres: profile?.favoriteGenres || [],
     stats: summary.stats,
     platforms: {
       ...summary.platforms,
@@ -158,11 +195,12 @@ export const syncPublicLibrarySummary = async (
       discordAvatar: profile?.discordAvatar || "",
     },
     achievements: summary.achievements,
-    topGames: summary.topGames,
-    favoriteGames: summary.favoriteGames,
+    top_games: summary.topGames,
+    favorite_games: summary.favoriteGames,
     revision: summary.revision,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "uid" });
+  if (error) throw error;
 
   await window.electronAPI.markLocalLibrarySummarySynced(
     uid,

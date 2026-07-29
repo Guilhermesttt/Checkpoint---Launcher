@@ -1,14 +1,7 @@
-import {
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { auth } from "../../Firebase";
+import { supabase } from "./supabase";
 import { apiUrl } from "./api";
 import type { Game, SteamOwnedGame } from "../types/domain";
 import type { LauncherLanguage } from "../context/PreferencesContext";
-import {
-  profileDocRef,
-} from "./firestorePaths";
 import {
   bulkUpsertLibraryGames,
   listLibraryGames,
@@ -47,17 +40,12 @@ export interface SteamCurrentGameResult {
   visibilityState: number;
 }
 
-const buildSteamAssets = (appid: number) => ({
-  image: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_hero.jpg`,
-  cardImage: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900_2x.jpg`,
-});
-
 const getAuthHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.access_token) {
     throw new Error("Sessão expirada. Entre novamente para sincronizar a Steam.");
   }
-  return { Authorization: `Bearer ${token}` };
+  return { Authorization: `Bearer ${session.access_token}` };
 };
 
 export const getSteamLinkUrl = async () => {
@@ -66,7 +54,8 @@ export const getSteamLinkUrl = async () => {
     headers: await getAuthHeaders(),
   });
   if (!response.ok) {
-    throw new Error("Nao foi possivel iniciar a conexao com a Steam.");
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || "Nao foi possivel iniciar a conexao com a Steam.");
   }
   const payload = (await response.json()) as { url?: string };
   if (!payload.url) {
@@ -427,6 +416,11 @@ export const syncSteamLibraryToLocal = async (
     const existingDocId = appIdToDocId.get(appIdStr);
     const id = existingDocId || `${uid}_steam_${owned.appid}`;
 
+const buildSteamAssets = (appid: number) => ({
+  image: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_hero.jpg`,
+  cardImage: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900_2x.jpg`,
+});
+
     const assets = buildSteamAssets(owned.appid);
     const details = detailsCache.get(appIdStr);
     const coverImage = details?.cardImage || assets.cardImage;
@@ -481,24 +475,12 @@ export const syncSteamLibraryToLocal = async (
 
   await bulkUpsertLibraryGames(uid, writes);
 
-  try {
-    await setDoc(
-      profileDocRef(uid),
-      {
-        lastSteamSyncAt: serverTimestamp(),
-        steamAchievementSync: {
-          requested: achievementSummaryResult.requested,
-          resolved: achievementSummaryResult.resolved,
-          failed: achievementSummaryResult.failedAppIds.length,
-          failedAppIds: achievementSummaryResult.failedAppIds.slice(0, 100),
-          updatedAt: new Date().toISOString(),
-        },
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
-  } catch (err) {
-    console.error("Erro ao atualizar perfil:", err);
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ last_steam_sync_at: new Date().toISOString() })
+    .eq("uid", uid);
+  if (profileError) {
+    console.error("Erro ao atualizar perfil:", profileError);
   }
 
   return payload.games.length;

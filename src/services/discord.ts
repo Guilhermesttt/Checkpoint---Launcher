@@ -1,12 +1,12 @@
-import { auth } from "../../Firebase";
+import { supabase } from "./supabase";
 import { apiUrl } from "./api";
 
 const getAuthHeaders = async () => {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.access_token) {
     throw new Error("Sessao expirada. Entre novamente para conectar o Discord.");
   }
-  return { Authorization: `Bearer ${token}` };
+  return { Authorization: `Bearer ${session.access_token}` };
 };
 
 export const getDiscordLinkUrl = async (): Promise<string> => {

@@ -91,14 +91,14 @@ const GameCard: React.FC<GameCardProps> = ({
     if (isSteam) {
       return {
         label: "Steam",
-        color: "#67b676",
-        border: "rgba(103,182,118,0.35)",
-        background: "rgba(20, 24, 20, 0.6)",
+        color: "#66C0F4",
+        border: "rgba(102,192,244,0.4)",
+        background: "rgba(27,40,56,0.78)",
         icon: (
           <FontAwesomeIcon
             icon={faSteam}
             className="h-2.5 w-2.5"
-            style={{ color: "#67b676" }}
+            style={{ color: "#66C0F4" }}
           />
         ),
       };
@@ -170,8 +170,8 @@ const GameCard: React.FC<GameCardProps> = ({
       >
         <div
           className={`relative h-full w-full overflow-hidden rounded-2xl bg-[#08080c] transition-all duration-400 ease-out transform group-hover:scale-[1.02] ${visuallyActive
-              ? "shadow-[0_24px_56px_rgba(0,0,0,0.85),0_0_32px_rgba(255,255,255,0.15)] ring-2 ring-white/30"
-              : "shadow-[0_8px_32px_rgba(0,0,0,0.5)] ring-1 ring-white/10 group-hover:shadow-[0_16px_48px_rgba(0,0,0,0.7),0_0_24px_var(--launcher-accent-soft,rgba(255,255,255,0.15))] group-hover:ring-white/20"
+            ? "shadow-[0_24px_56px_rgba(0,0,0,0.85),0_0_32px_rgba(255,255,255,0.15)] ring-2 ring-white/30"
+            : "shadow-[0_8px_32px_rgba(0,0,0,0.5)] ring-1 ring-white/10 group-hover:shadow-[0_16px_48px_rgba(0,0,0,0.7),0_0_24px_var(--launcher-accent-soft,rgba(255,255,255,0.15))] group-hover:ring-white/20"
             }`}
           style={
             visuallyActive
@@ -211,8 +211,8 @@ const GameCard: React.FC<GameCardProps> = ({
               src={image}
               alt={title}
               className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !noAnimation
-                  ? "scale-110 duration-[12000ms]"
-                  : "scale-100 duration-500"
+                ? "scale-110 duration-[12000ms]"
+                : "scale-100 duration-500"
                 }`}
               loading="lazy"
               decoding="async"

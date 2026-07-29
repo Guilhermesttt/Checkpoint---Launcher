@@ -1,8 +1,5 @@
-import { updateProfile } from "firebase/auth";
-import { serverTimestamp, setDoc } from "firebase/firestore";
-import { auth } from "../../Firebase";
+import { supabase } from "./supabase";
 import type { EditableProfile } from "../types/domain";
-import { profileDocRef, publicProfileDocRef } from "./firestorePaths";
 
 export const PROFILE_LIMITS = {
   displayName: 50,
@@ -49,28 +46,28 @@ export const saveCurrentUserProfile = async ({
 }: {
   profile: EditableProfile;
 }) => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Faça login novamente para editar o perfil.");
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.user) throw new Error("Faça login novamente para editar o perfil.");
 
+  const uid = session.user.id;
   const normalized = normalizeEditableProfile(profile);
   const photoURL = profile.photoURL || "";
 
-  await Promise.all([
-    updateProfile(user, {
-      displayName: normalized.displayName,
-    }),
-    setDoc(profileDocRef(user.uid), {
-      ...normalized,
-      photoURL: photoURL || null,
-      updatedAt: serverTimestamp(),
-    }, { merge: true }),
-    setDoc(publicProfileDocRef(user.uid), {
-      uid: user.uid,
-      ...normalized,
-      photoURL: photoURL || null,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true }),
-  ]);
+  const payload = {
+    display_name: normalized.displayName,
+    bio: normalized.bio,
+    location: normalized.location,
+    pronouns: normalized.pronouns,
+    website: normalized.website,
+    favorite_genres: normalized.favoriteGenres,
+    photo_url: photoURL || null,
+  };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("uid", uid);
+  if (error) throw error;
 
   return { ...normalized, photoURL };
 };

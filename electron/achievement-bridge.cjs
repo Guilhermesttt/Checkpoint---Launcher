@@ -20,7 +20,7 @@ const sanitizeId = (value, label) => {
     throw new Error(`${label} ausente.`);
   }
 
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+  if (!/^[a-zA-Z0-9 ._\-:{}[\]()%#@!]+$/.test(id)) {
     throw new Error(`${label} invalido.`);
   }
 

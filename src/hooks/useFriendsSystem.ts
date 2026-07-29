@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { User } from "firebase/auth";
+import type { AuthUser } from "../auth/AuthProvider";
 import type {
   CheckpointFriendRequest,
   Game,
@@ -34,7 +34,7 @@ export function buildLocalFriendProfile(friend: SocialFriend): { profile: UserPr
 }
 
 interface UseFriendsSystemProps {
-  user: User | null;
+  user: AuthUser | null;
   userProfile: UserProfile | null;
   playSound: (t: SoundEffectType) => void;
   notify: (msg: string, type: 'success' | 'error' | 'info') => void;

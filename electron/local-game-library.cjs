@@ -86,7 +86,8 @@ const createLocalGameLibrary = (userDataPath) => {
       summary_dirty INTEGER NOT NULL DEFAULT 1,
       legacy_imported_at TEXT,
       summary_synced_at TEXT,
-      device_id TEXT NOT NULL
+      device_id TEXT NOT NULL,
+      steam_id TEXT
     );
 
     CREATE TABLE IF NOT EXISTS game_sessions (
@@ -98,6 +99,12 @@ const createLocalGameLibrary = (userDataPath) => {
       duration_minutes INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  try {
+    db.exec("ALTER TABLE library_state ADD COLUMN steam_id TEXT;");
+  } catch (err) {
+    // Column already exists
+  }
 
   const ensureState = (uid) => {
     db.prepare(`
@@ -386,6 +393,15 @@ const createLocalGameLibrary = (userDataPath) => {
     `).run(Number(revision) || 0, new Date().toISOString(), uid);
   };
 
+  const clearSteamId = (rawUid) => {
+    const uid = asUid(rawUid);
+    db.prepare(`
+      UPDATE library_state
+      SET steam_id = NULL
+      WHERE owner_uid = ?
+    `).run(uid);
+  };
+
   const close = () => db.close();
 
   return {
@@ -401,6 +417,7 @@ const createLocalGameLibrary = (userDataPath) => {
     needsLegacyImport,
     getSummary,
     markSummarySynced,
+    clearSteamId,
     close,
   };
 };

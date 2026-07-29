@@ -1,12 +1,4 @@
-import {
-  collection,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  type Unsubscribe,
-} from "firebase/firestore";
-import { auth, db } from "../../Firebase";
+import { supabase } from "./supabase";
 import type { SocialActivity, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
 
@@ -14,26 +6,23 @@ type ActivityInput = Omit<SocialActivity, "id" | "userId" | "userName" | "userAv
   dedupeKey?: string;
 };
 
-const activityCollection = (viewerId: string) =>
-  collection(db, "feeds", viewerId, "activities");
-
 export const publishSocialActivity = async (
   uid: string,
   _profile: UserProfile | null | undefined,
   input: ActivityInput,
 ) => {
-  const currentUser = auth.currentUser;
-  if (!currentUser || currentUser.uid !== uid) {
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!session?.access_token || session.user.id !== uid) {
     throw new Error("Sessão expirada. Entre novamente para publicar no feed.");
   }
 
-  const token = await currentUser.getIdToken();
   const activity = { ...input };
   delete activity.dedupeKey;
+
   const response = await fetch(apiUrl("/api/social/activity"), {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session.access_token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(activity),
@@ -54,21 +43,76 @@ export const publishSocialActivity = async (
 export const subscribeSocialFeed = (
   viewerId: string,
   onChange: (activities: SocialActivity[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe => {
+  _onError?: (error: Error) => void,
+) => {
+  void _onError;
   if (!viewerId) {
     onChange([]);
     return () => undefined;
   }
 
-  return onSnapshot(
-    query(activityCollection(viewerId), orderBy("createdAt", "desc"), limit(60)),
-    (snapshot) => {
-      onChange(snapshot.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      } as SocialActivity)));
-    },
-    (error) => onError?.(error),
-  );
+  supabase
+    .from("activities")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(60)
+    .then(({ data }) => {
+      if (data) {
+        onChange(data.map((item) => ({
+          id: String(item.id),
+          userId: item.user_id,
+          userName: item.user_name,
+          userAvatar: item.user_avatar,
+          kind: item.kind,
+          gameId: item.game_id,
+          gameTitle: item.game_title,
+          gameImage: item.game_image,
+          achievementId: item.achievement_id,
+          achievementName: item.achievement_name,
+          achievementIcon: item.achievement_icon,
+          caption: item.caption,
+          audienceIds: item.audience_ids || [],
+          createdAt: item.created_at,
+        })));
+      }
+    });
+
+  const channel = supabase
+    .channel("activities_feed")
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "activities" },
+      () => {
+        supabase
+          .from("activities")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(60)
+          .then(({ data }) => {
+            if (data) {
+              onChange(data.map((item) => ({
+                id: String(item.id),
+                userId: item.user_id,
+                userName: item.user_name,
+                userAvatar: item.user_avatar,
+                kind: item.kind,
+                gameId: item.game_id,
+                gameTitle: item.game_title,
+                gameImage: item.game_image,
+                achievementId: item.achievement_id,
+                achievementName: item.achievement_name,
+                achievementIcon: item.achievement_icon,
+                caption: item.caption,
+                audienceIds: item.audience_ids || [],
+                createdAt: item.created_at,
+              })));
+            }
+          });
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };

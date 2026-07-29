@@ -65,6 +65,9 @@ declare global {
       isExecutableRunning: (executablePath: string) => Promise<boolean>;
       detectRunningGames: (executablePaths: string[]) => Promise<string[]>;
       startGoogleBrowserAuth: () => Promise<{ state: string }>;
+      onAccountAuthCallback: (
+        callback: (payload: { steamStatus?: string; discordStatus?: string }) => void,
+      ) => () => void;
       openExternalUrl: (url: string) => Promise<void>;
       copyToClipboard: (value: string) => Promise<{ ok: boolean }>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
