@@ -10,6 +10,20 @@ const migration = readFileSync(
   ),
   "utf8",
 );
+const fifoMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260730120000_chat_messages_fifo.sql",
+  ),
+  "utf8",
+);
+const retentionMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260730130000_chat_retention.sql",
+  ),
+  "utf8",
+);
 
 describe("contrato da migration Supabase", () => {
   it("versiona o grafo social e o chat normalizado", () => {
@@ -41,5 +55,16 @@ describe("contrato da migration Supabase", () => {
     expect(migration).toContain("function public.handle_new_auth_user()");
     expect(migration).toContain("trigger on_auth_user_created");
     expect(migration).toContain("display_name set not null");
+  });
+
+  it("ordena o chat por uma sequencia FIFO gerada no banco", () => {
+    expect(fifoMigration).toContain("chat_messages_sequence_id_seq");
+    expect(fifoMigration).toContain("sequence_id");
+    expect(fifoMigration).toContain("chat_messages_chat_sequence_idx");
+  });
+
+  it("indexa a data usada para limpar mensagens expiradas", () => {
+    expect(retentionMigration).toContain("chat_messages_retention_idx");
+    expect(retentionMigration).toContain("created_at asc");
   });
 });

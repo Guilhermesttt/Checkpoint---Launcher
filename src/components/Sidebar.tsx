@@ -14,6 +14,7 @@ import {
   Users,
   Newspaper,
   Laptop,
+  Puzzle,
 } from "lucide-react";
 import {
   GamepadIcon as AnimatedGamepadIcon,
@@ -94,6 +95,7 @@ export const CATEGORIES = [
   { id: "FAVORITES", label: "Favoritos", Icon: Star, AnimatedIcon: AnimatedStarIcon },
   { id: "FRIENDS", label: "Amigos", Icon: Users, AnimatedIcon: AnimatedUsersIcon },
   { id: "FEED", label: "Radar", Icon: Newspaper, AnimatedIcon: AnimatedRadioIcon },
+  { id: "MODS", label: "Mods", Icon: Puzzle },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },
   { id: "LOCAL", label: "Local", Icon: Laptop, AnimatedIcon: AnimatedLaptopIcon },
@@ -112,18 +114,22 @@ export const CATEGORIES = [
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "FRIENDS", "FEED", "STEAM", "EPIC", "LOCAL", "PROFILE"].includes(id),
+  ["ALL", "FAVORITES", "STEAM", "EPIC", "LOCAL", "FRIENDS", "FEED", "MODS", "PROFILE"].includes(id),
 );
 
-// A navegação da sidebar não é uma lista plana — são três grupos com naturezas
-// diferentes (filtros de biblioteca, plataformas de origem, conta). Antes isso
-// não aparecia visualmente: os 8 itens ficavam soltos em sequência. Agora cada
-// grupo tem seu próprio cluster + divisor curto entre eles, e um rótulo lido só
-// por leitor de tela (a régua tem 96px, não cabe texto visível sem apertar os
-// ícones).
+// A navegação da sidebar não é uma lista plana — são clusters com naturezas
+// diferentes (filtros de biblioteca, plataformas de origem, comunidade, extras,
+// conta). Antes "Jogos" misturava filtro (Todos/Favoritos) com origem
+// (Steam/Epic/Local) num grupo só, o que deixava a régua confusa. Agora cada
+// natureza tem seu próprio cluster, ordenados por frequência de uso (filtros e
+// plataformas primeiro, mods/conta por último, perto de Ajustes) + um rótulo
+// lido só por leitor de tela (a régua tem 96px, não cabe texto visível sem
+// apertar os ícones).
 const NAV_GROUPS: { key: string; ariaLabel: string; ids: string[] }[] = [
-  { key: "library", ariaLabel: "Biblioteca", ids: ["ALL", "FAVORITES", "FRIENDS", "FEED"] },
+  { key: "filters", ariaLabel: "Filtros", ids: ["ALL", "FAVORITES"] },
   { key: "platforms", ariaLabel: "Plataformas", ids: ["STEAM", "EPIC", "LOCAL"] },
+  { key: "community", ariaLabel: "Comunidade", ids: ["FRIENDS", "FEED"] },
+  { key: "mods", ariaLabel: "Mods", ids: ["MODS"] },
   { key: "account", ariaLabel: "Conta", ids: ["PROFILE"] },
 ];
 
@@ -220,79 +226,79 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
               : "none",
           }}
         >
-      {hasNotifications && (
-        <>
-          <motion.span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 rounded-xl border"
-            style={{ borderColor: "rgb(var(--launcher-accent) / 0.5)" }}
-            animate={reducedMotion ? { opacity: 0.55 } : {
-              opacity: [0.25, 0.7, 0.25],
-              boxShadow: [
-                "0 0 0 0 rgb(var(--launcher-accent) / 0)",
-                "0 0 18px 2px rgb(var(--launcher-accent) / 0.32)",
-                "0 0 0 0 rgb(var(--launcher-accent) / 0)",
-              ],
-            }}
-            transition={reducedMotion ? { duration: 0 } : {
-              duration: 1.8,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-          <motion.span
-            key={`sidebar-notification-${notificationCount}`}
-            className="absolute right-1 top-1 z-20 flex min-h-4 min-w-4 items-center justify-center rounded-full border border-black/50 bg-white px-1 text-[8px] font-black leading-none text-black shadow-[0_0_12px_rgba(255,255,255,0.55)]"
-            initial={reducedMotion ? false : { scale: 0.4, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 480, damping: 22 }}
+          {hasNotifications && (
+            <>
+              <motion.span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-xl border"
+                style={{ borderColor: "rgb(var(--launcher-accent) / 0.5)" }}
+                animate={reducedMotion ? { opacity: 0.55 } : {
+                  opacity: [0.25, 0.7, 0.25],
+                  boxShadow: [
+                    "0 0 0 0 rgb(var(--launcher-accent) / 0)",
+                    "0 0 18px 2px rgb(var(--launcher-accent) / 0.32)",
+                    "0 0 0 0 rgb(var(--launcher-accent) / 0)",
+                  ],
+                }}
+                transition={reducedMotion ? { duration: 0 } : {
+                  duration: 1.8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              <motion.span
+                key={`sidebar-notification-${notificationCount}`}
+                className="absolute right-1 top-1 z-20 flex min-h-4 min-w-4 items-center justify-center rounded-full border border-black/50 bg-white px-1 text-[8px] font-black leading-none text-black shadow-[0_0_12px_rgba(255,255,255,0.55)]"
+                initial={reducedMotion ? false : { scale: 0.4, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 480, damping: 22 }}
+              >
+                {notificationCount > 99 ? "99+" : notificationCount}
+              </motion.span>
+            </>
+          )}
+
+          {/* Indicador de item ativo */}
+          {active && (
+            <motion.div
+              layoutId="sb-active"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full shadow-[0_0_8px_rgb(var(--launcher-accent))]"
+              style={{ background: "rgb(var(--launcher-accent))" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            />
+          )}
+
+          {/* Ícone com feedback de hover + clique */}
+          <motion.div
+            whileTap={{ scale: 0.88 }}
+            className={`transform transition-transform duration-300 ${AnimatedIcon ? "" : "group-hover:scale-110"} ${rotateOnHover && !AnimatedIcon ? "group-hover:rotate-45" : ""
+              }`}
           >
-            {notificationCount > 99 ? "99+" : notificationCount}
-          </motion.span>
-        </>
-      )}
+            {AnimatedIcon ? (
+              <AnimatedIcon
+                ref={animatedIconRef}
+                size={18}
+                duration={1}
+                className="h-[18px] w-[18px] transition-colors duration-300"
+                style={iconStyle}
+              />
+            ) : (
+              <Icon
+                className="w-[18px] h-[18px] transition-colors duration-300"
+                style={iconStyle}
+              />
+            )}
+          </motion.div>
 
-      {/* Indicador de item ativo */}
-      {active && (
-        <motion.div
-          layoutId="sb-active"
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-r-full shadow-[0_0_8px_rgb(var(--launcher-accent))]"
-          style={{ background: "rgb(var(--launcher-accent))" }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
-
-      {/* Ícone com feedback de hover + clique */}
-      <motion.div
-        whileTap={{ scale: 0.88 }}
-        className={`transform transition-transform duration-300 ${AnimatedIcon ? "" : "group-hover:scale-110"} ${rotateOnHover && !AnimatedIcon ? "group-hover:rotate-45" : ""
-          }`}
-      >
-        {AnimatedIcon ? (
-          <AnimatedIcon
-            ref={animatedIconRef}
-            size={18}
-            duration={1}
-            className="h-[18px] w-[18px] transition-colors duration-300"
-            style={iconStyle}
-          />
-        ) : (
-          <Icon
-            className="w-[18px] h-[18px] transition-colors duration-300"
-            style={iconStyle}
-          />
-        )}
-      </motion.div>
-
-      {/* Rótulo */}
-      <span
-        className="text-[9px] font-bold uppercase tracking-[0.08em] leading-none transition-colors duration-300"
-        style={{
-          color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.3)",
-        }}
-      >
-        {label}
-      </span>
+          {/* Rótulo */}
+          <span
+            className="text-[9px] font-bold uppercase tracking-[0.08em] leading-none transition-colors duration-300"
+            style={{
+              color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.3)",
+            }}
+          >
+            {label}
+          </span>
 
         </motion.button>
       </TooltipTrigger>
@@ -332,8 +338,16 @@ const Sidebar: React.FC<SidebarProps> = ({
     FAVORITES: { "pt-BR": "Favoritos", "en-US": "Favorites", "es-ES": "Favoritos", "fr-FR": "Favoris", "de-DE": "Favoriten", "it-IT": "Preferiti" }[language],
     FRIENDS: { "pt-BR": "Amigos", "en-US": "Friends", "es-ES": "Amigos", "fr-FR": "Amis", "de-DE": "Freunde", "it-IT": "Amici" }[language],
     FEED: { "pt-BR": "Radar", "en-US": "Radar", "es-ES": "Radar", "fr-FR": "Radar", "de-DE": "Radar", "it-IT": "Radar" }[language],
+    MODS: "Mods",
     LOCAL: { "pt-BR": "Local", "en-US": "Local", "es-ES": "Local", "fr-FR": "Local", "de-DE": "Lokal", "it-IT": "Locale" }[language],
     PROFILE: { "pt-BR": "Perfil", "en-US": "Profile", "es-ES": "Perfil", "fr-FR": "Profil", "de-DE": "Profil", "it-IT": "Profilo" }[language],
+  };
+  const groupLabels: Record<string, string> = {
+    filters: { "pt-BR": "Filtros", "en-US": "Filters", "es-ES": "Filtros", "fr-FR": "Filtres", "de-DE": "Filter", "it-IT": "Filtri" }[language],
+    platforms: { "pt-BR": "Plataformas", "en-US": "Platforms", "es-ES": "Plataformas", "fr-FR": "Plateformes", "de-DE": "Plattformen", "it-IT": "Piattaforme" }[language],
+    community: { "pt-BR": "Social", "en-US": "Social", "es-ES": "Social", "fr-FR": "Social", "de-DE": "Sozial", "it-IT": "Social" }[language],
+    mods: "Mods",
+    account: { "pt-BR": "Conta", "en-US": "Account", "es-ES": "Cuenta", "fr-FR": "Compte", "de-DE": "Konto", "it-IT": "Account" }[language],
   };
 
   const handleSelect = (id: string) => {
@@ -386,32 +400,48 @@ const Sidebar: React.FC<SidebarProps> = ({
           aria-label="Navegação principal"
           className="flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto overscroll-contain px-3 no-scrollbar"
         >
-          {NAV_GROUPS.map((group, groupIndex) => (
-            <React.Fragment key={group.key}>
-              {groupIndex > 0 && <GroupDivider />}
-              <div role="group" aria-label={group.ariaLabel} className="flex w-full flex-col gap-1.5">
-                {group.ids.map((id) => {
-                  const category = SIDEBAR_CATEGORIES.find((item) => item.id === id);
-                  if (!category) return null;
-                  return (
-                    <SidebarButton
-                      key={category.id === "FRIENDS"
-                        ? `${category.id}-${notificationCount}`
-                        : category.id}
-                      id={category.id}
-                      label={sidebarLabels[category.id] || category.label}
-                      Icon={category.Icon}
-                      AnimatedIcon={category.AnimatedIcon}
-                      active={activeCategory === category.id}
-                      onClick={() => handleSelect(category.id)}
-                      notificationCount={category.id === "FRIENDS" ? notificationCount : 0}
-                      reducedMotion={Boolean(prefersReducedMotion)}
-                    />
-                  );
-                })}
-              </div>
-            </React.Fragment>
-          ))}
+          {NAV_GROUPS.map((group, groupIndex) => {
+            // Grupo com um único item cujo rótulo já repete o rótulo do
+            // próprio grupo (ex.: grupo "Mods" com o item "Mods") não precisa
+            // do header — ele só duplicaria o texto que já aparece no botão.
+            const soleId = group.ids.length === 1 ? group.ids[0] : null;
+            const soleLabel = soleId ? sidebarLabels[soleId] : null;
+            const showGroupLabel = !(
+              soleLabel && soleLabel.toUpperCase() === groupLabels[group.key]?.toUpperCase()
+            );
+
+            return (
+              <React.Fragment key={group.key}>
+                {groupIndex > 0 && <GroupDivider />}
+                <div role="group" aria-label={group.ariaLabel} className="flex w-full flex-col gap-1.5">
+                  {showGroupLabel && (
+                    <span className="mb-0.5 text-center text-[7px] font-black uppercase tracking-[0.16em] text-white/20">
+                      {groupLabels[group.key]}
+                    </span>
+                  )}
+                  {group.ids.map((id) => {
+                    const category = SIDEBAR_CATEGORIES.find((item) => item.id === id);
+                    if (!category) return null;
+                    return (
+                      <SidebarButton
+                        key={category.id === "FRIENDS"
+                          ? `${category.id}-${notificationCount}`
+                          : category.id}
+                        id={category.id}
+                        label={sidebarLabels[category.id] || category.label}
+                        Icon={category.Icon}
+                        AnimatedIcon={category.AnimatedIcon}
+                        active={activeCategory === category.id}
+                        onClick={() => handleSelect(category.id)}
+                        notificationCount={category.id === "FRIENDS" ? notificationCount : 0}
+                        reducedMotion={Boolean(prefersReducedMotion)}
+                      />
+                    );
+                  })}
+                </div>
+              </React.Fragment>
+            );
+          })}
         </nav>
 
         <div className="w-10 h-px mt-auto mb-3 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />

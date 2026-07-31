@@ -671,10 +671,25 @@ const createOverlayWindow = () => {
   return overlayWindow;
 };
 
+const revealOverlayForToast = () => {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  try {
+    overlayWindow.setAlwaysOnTop(true, "screen-saver");
+    overlayWindow.moveTop();
+    overlayWindow.showInactive();
+  } catch (error) {
+    console.warn("[overlay] Nao foi possivel reafirmar a ordem da janela:", error);
+  }
+};
+
 const sendOverlayEvent = (channel, payload) => {
   createOverlayWindow();
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     throw new Error("Overlay indisponivel.");
+  }
+
+  if (channel === "overlay:social" || channel === "achievement:unlock") {
+    revealOverlayForToast();
   }
 
   if (!overlayReady || overlayWindow.webContents.isLoadingMainFrame()) {
@@ -1110,6 +1125,28 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
     setOverlayPanelOpen(false);
     return;
   }
+  if (kind === "set-toast-interactive") {
+    if (!overlayPanelOpen && overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.setIgnoreMouseEvents(!Boolean(action?.interactive), { forward: true });
+    }
+    return { ok: true };
+  }
+  if (kind === "open-launcher-chat" || kind === "open-launcher-friends") {
+    const payload = { kind };
+    if (kind === "open-launcher-chat") {
+      payload.friendId = String(action?.friendId || "").slice(0, 128);
+    }
+    if (overlayWindow && !overlayWindow.isDestroyed() && !overlayPanelOpen) {
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send("overlay:panel-action", payload);
+    }
+    return { ok: true };
+  }
   if (kind === "capture-screen") {
     return runCapture();
   }
@@ -1454,12 +1491,14 @@ registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) 
   const senderName = String(payload?.senderName || "").trim() || copy.player;
   const messageText = String(payload?.messageText || "").trim() || copy.newMessage;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
+  const friendId = String(payload?.friendId || "").trim().slice(0, 128);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-message",
     title: senderName,
     description: messageText,
     avatarUrl: avatarUrl || overlayIconUrl(),
+    friendId,
   });
 });
 
@@ -2688,12 +2727,14 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
   const copy = getOverlayEventCopy();
   const playerName = String(payload?.playerName || "").trim() || copy.player;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
+  const friendId = String(payload?.friendId || "").trim().slice(0, 128);
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-request",
     title: playerName,
     description: copy.request,
     avatarUrl: avatarUrl || overlayIconUrl(),
+    friendId,
   });
 });
 

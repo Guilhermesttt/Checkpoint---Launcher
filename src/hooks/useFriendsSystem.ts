@@ -107,6 +107,7 @@ export function useFriendsSystem({
               senderName,
               messageText: msg.text,
               avatarUrl,
+              friendId: `cp-friend:${msg.senderId}`,
             });
             playSound("friendRequest");
           }
@@ -271,6 +272,7 @@ export function useFriendsSystem({
       void window.electronAPI?.showFriendRequestOverlay({
         playerName: freshRequest.displayName,
         avatarUrl: freshRequest.photoURL || null,
+        friendId: `cp-friend:${freshRequest.uid}`,
       });
     }
 

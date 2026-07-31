@@ -90,6 +90,7 @@ const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
 const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
 const GamingRadarPage = React.lazy(() => import("../components/GamingRadarPage"));
+const ModsPage = React.lazy(() => import("./ModsPage"));
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
@@ -210,6 +211,7 @@ const Home: React.FC = () => {
   const previousSteamIdRef = useRef<string | undefined>(undefined);
   const previousDiscordIdRef = useRef<string | undefined>(undefined);
   const didInitConnectionRefs = useRef(false);
+  const lastOverlayWelcomeGameRef = useRef<string | null>(null);
 
   const { notify } = useNotification();
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
@@ -508,6 +510,7 @@ const Home: React.FC = () => {
       const title = detail?.title?.trim();
       if (!title) return;
 
+      lastOverlayWelcomeGameRef.current = title;
       markCurrentPresence(title, detail?.executablePath || null);
       void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
     };
@@ -515,6 +518,18 @@ const Home: React.FC = () => {
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
   }, [markCurrentPresence]);
+
+  useEffect(() => {
+    if (!currentPresenceGame) {
+      lastOverlayWelcomeGameRef.current = null;
+      return;
+    }
+    if (lastOverlayWelcomeGameRef.current === currentPresenceGame) return;
+    lastOverlayWelcomeGameRef.current = currentPresenceGame;
+    void window.electronAPI?.showGameStartOverlay({
+      gameTitle: currentPresenceGame,
+    });
+  }, [currentPresenceGame]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -708,7 +723,7 @@ const Home: React.FC = () => {
     [playSound],
   );
 
-  const isSystemCategory = ["FRIENDS", "FEED", "SETTINGS", "PROFILE", "DEALS"].includes(activeCategory);
+  const isSystemCategory = ["FRIENDS", "FEED", "MODS", "SETTINGS", "PROFILE", "DEALS"].includes(activeCategory);
 
   const { moveSystemFocus, adjustFocusedRange } = useGamepadFocusNavigation({
     playSound,
@@ -1235,6 +1250,17 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (!window.electronAPI?.onOverlayPanelAction) return;
     return window.electronAPI.onOverlayPanelAction((action) => {
+      if (action.kind === "open-launcher-chat" || action.kind === "open-launcher-friends") {
+        setActiveCategory("FRIENDS");
+        setIsDetailOpen(false);
+        if (action.kind === "open-launcher-chat" && action.friendId) {
+          const friend = socialFriends.find((candidate) => candidate.id === action.friendId);
+          if (friend?.id.startsWith("cp-friend:")) {
+            setActiveChatFriend(friend);
+          }
+        }
+        return;
+      }
       if (action.kind === "select-chat") {
         const friend = socialFriends.find((candidate) => candidate.id === action.friendId);
         if (friend?.id.startsWith("cp-friend:")) {
@@ -1732,6 +1758,12 @@ const Home: React.FC = () => {
             }>
               <GamingRadarPage />
             </React.Suspense>
+          ) : activeCategory === "MODS" ? (
+            <React.Suspense fallback={
+              <div className="flex flex-1 items-center justify-center text-white/40">Carregando gerenciador de mods...</div>
+            }>
+              <ModsPage uid={user?.uid || "local"} games={games} />
+            </React.Suspense>
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
               <div className="flex items-center justify-center flex-1">
@@ -1819,22 +1851,35 @@ const Home: React.FC = () => {
                         {currentGame?.title}
                       </h1>
                       <div className="mt-2.5 flex items-center gap-4 flex-wrap">
-                        {currentGame?.launcherType === "steam" && (
+                        {(currentGame?.launcherType === "steam" || currentGame?.source === "steam") ? (
                           <span
                             className="flex items-center gap-1.5 text-[11px] font-bold"
-                            style={{ color: "rgba(103,182,118,0.82)" }}
+                            style={{ color: "#66C0F4" }}
                           >
-                            <SteamBrandIcon className="w-3 h-3" /> {t("viaSteam")}
+                            <SteamBrandIcon className="w-3 h-3 text-[#66C0F4]" /> {t("viaSteam")}
+                          </span>
+                        ) : (currentGame?.launcherType === "epic" || currentGame?.source === "epic") ? (
+                          <span
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-white/90"
+                          >
+                            <EpicBrandIcon className="w-3 h-3 text-white" /> Via Epic
+                          </span>
+                        ) : (
+                          <span
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-white/70"
+                          >
+                            <Gamepad2 className="w-3 h-3 text-emerald-400" /> Via Local
                           </span>
                         )}
-                        {currentGame?.hoursPlayed != null && (
+
+                        {currentGame && (
                           <span
-                            className="text-[11px] font-semibold"
-                            style={{ color: "rgba(255,255,255,0.3)" }}
+                            className="text-[11px] font-semibold text-white/40"
                           >
                             {formatPlayedHours(getGamePlayedHours(currentGame))}h jogadas
                           </span>
                         )}
+
                         {currentGame?.isFavorite && (
                           <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400/75">
                             <Star className="w-3 h-3 fill-current" /> {t("favorite")}

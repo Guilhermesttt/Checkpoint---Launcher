@@ -178,6 +178,53 @@ describe("overlay de conquistas", () => {
     expect(cardRule).toContain("aspect-ratio: 447 / 157");
   });
 
+  it("inicia a animacao somente depois que o toast entrou no DOM", () => {
+    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+
+    expect(html).toContain(".overlay-card.is-entering");
+    expect(html).toContain("const startCardAnimation = (card) =>");
+    expect(html).toContain("requestAnimationFrame(() => card.classList.add(\"is-entering\"))");
+    expect(html).toContain("achievementStack.appendChild(card);\n      startCardAnimation(card);");
+    expect(html).toContain("socialStack.appendChild(card);\n      startCardAnimation(card);");
+    expect(html).toContain('localStorage.setItem("checkpoint-overlay-animations", "true")');
+  });
+
+  it("torna mensagens e pedidos clicaveis sem bloquear o jogo fora do card", () => {
+    panelAction.mockClear();
+    social({
+      kind: "friend-message",
+      title: "Mileide",
+      description: "Bora jogar?",
+      friendId: "cp-friend:friend-1",
+    });
+
+    const messageCard = document.querySelector<HTMLElement>(".kind-friend-message");
+    messageCard?.dispatchEvent(new MouseEvent("mouseenter"));
+    expect(panelAction).toHaveBeenCalledWith({
+      kind: "set-toast-interactive",
+      interactive: true,
+    });
+    messageCard?.click();
+    expect(panelAction).toHaveBeenCalledWith({
+      kind: "open-launcher-chat",
+      friendId: "cp-friend:friend-1",
+    });
+
+    social({
+      kind: "friend-request",
+      title: "Novo jogador",
+      friendId: "cp-friend:friend-2",
+    });
+    document.querySelector<HTMLElement>(".kind-friend-request")?.click();
+    expect(panelAction).toHaveBeenCalledWith({ kind: "open-launcher-friends" });
+
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+    const homeSource = fs.readFileSync(path.resolve("src/pages/Home.tsx"), "utf8");
+    expect(mainSource).toContain('kind === "set-toast-interactive"');
+    expect(mainSource).toContain('kind === "open-launcher-chat" || kind === "open-launcher-friends"');
+    expect(homeSource).toContain("setActiveChatFriend(friend)");
+  });
+
   it("usa no overlay um logo incluido no pacote do Electron", () => {
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
     const parsed = new DOMParser().parseFromString(html, "text/html");
@@ -223,6 +270,17 @@ describe("overlay de conquistas", () => {
     expect(mainSource).toContain('sendOverlayEvent("achievement:unlock"');
     expect(mainSource).toContain("showNativeAchievementNotification(payload)");
     expect(mainSource).toContain("silent: true");
+  });
+
+  it("torna toasts visiveis enquanto o estado do jogo esta sendo reconstruido", () => {
+    const mainSource = fs.readFileSync(path.resolve("electron/main.cjs"), "utf8");
+    const homeSource = fs.readFileSync(path.resolve("src/pages/Home.tsx"), "utf8");
+
+    expect(mainSource).toContain("const revealOverlayForToast = () =>");
+    expect(mainSource).toContain('channel === "overlay:social"');
+    expect(mainSource).toContain('channel === "achievement:unlock"');
+    expect(homeSource).toContain("lastOverlayWelcomeGameRef");
+    expect(homeSource).toContain("gameTitle: currentPresenceGame");
   });
 
   it("substitui uma imagem quebrada pelo trofeu", () => {

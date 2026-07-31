@@ -127,12 +127,33 @@
       opacity: 0;
       --ctx-color: var(--color-game-start);
       --entry-x: -18px;
+    }
+
+    .overlay-card.is-entering {
       animation: overlay-in 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
       animation-delay: var(--stagger, 0ms);
     }
 
     .overlay-card.is-leaving {
       animation: overlay-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    }
+
+    .overlay-card.is-clickable {
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .overlay-card.is-clickable:hover .overlay-shell {
+      border-color: rgba(var(--ctx-color), 0.55);
+      box-shadow:
+        0 22px 54px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(var(--ctx-color), 0.3),
+        inset 0 1px rgba(255, 255, 255, 0.16);
+      transform: translateY(-2px) scale(1.015);
+    }
+
+    .overlay-card.is-clickable:active .overlay-shell {
+      transform: translateY(0) scale(0.985);
     }
 
     .achievement-card {
@@ -497,16 +518,15 @@
       box-shadow: 0 40px 100px rgba(0, 0, 0, 0.9), 0 0 80px rgba(var(--panel-accent), 0.1);
       overflow: hidden;
       color: white;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      transform: scale(0.98);
+      transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+      transform: scale(0.96) translateY(14px);
       opacity: 0;
     }
 
     #command-panel.is-open {
       display: grid;
       grid-template-columns: 88px 1fr 340px;
-      transform: scale(1);
-      opacity: 1;
+      animation: panel-pop-in 340ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     /* ---- Sidebar Esquerda ---- */
@@ -854,6 +874,7 @@
     .status-dot.online {
       background: #10b981;
       box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+      animation: pulse-online-glow 2.5s infinite ease-in-out;
     }
 
     /* Online Grid - Cards Verticais */
@@ -1162,15 +1183,36 @@
     }
 
     /* ---- Animations ---- */
+    @keyframes panel-pop-in {
+      0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(14px);
+        filter: blur(6px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+      }
+    }
+
     @keyframes overlay-in {
       0% {
         opacity: 0;
-        transform: translateX(var(--entry-x)) scale(0.97);
+        transform: translateX(var(--entry-x)) scale(0.93);
+        filter: blur(4px);
+      }
+
+      65% {
+        opacity: 1;
+        transform: translateX(calc(var(--entry-x) * -0.06)) scale(1.015);
+        filter: blur(0);
       }
 
       100% {
         opacity: 1;
         transform: translateX(0) scale(1);
+        filter: blur(0);
       }
     }
 
@@ -1178,11 +1220,13 @@
       from {
         opacity: 1;
         transform: translateX(0) scale(1);
+        filter: blur(0);
       }
 
       to {
         opacity: 0;
-        transform: translateX(var(--entry-x)) scale(0.98);
+        transform: translateX(var(--entry-x)) scale(0.95);
+        filter: blur(4px);
       }
     }
 
@@ -1209,17 +1253,27 @@
     @keyframes fade-in {
       from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(12px) scale(0.985);
+        filter: blur(4px);
       }
 
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes pulse-online-glow {
+      0%, 100% {
+        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+      }
+      50% {
+        box-shadow: 0 0 14px rgba(16, 185, 129, 0.9), 0 0 22px rgba(16, 185, 129, 0.4);
       }
     }
 
     @keyframes wave-hand {
-
       0%,
       55%,
       100% {
@@ -3289,6 +3343,17 @@
     const socialStack = document.getElementById("social-stack");
     const commandPanel = document.getElementById("command-panel");
     const checkpointIconUrl = new URL("../assets/icon.png", window.location.href).toString();
+    const overlayAnimationPreferenceVersion = "3";
+    if (
+      localStorage.getItem("checkpoint-overlay-animation-version")
+      !== overlayAnimationPreferenceVersion
+    ) {
+      localStorage.setItem("checkpoint-overlay-animations", "true");
+      localStorage.setItem(
+        "checkpoint-overlay-animation-version",
+        overlayAnimationPreferenceVersion,
+      );
+    }
     const overlayPreferences = {
       social: localStorage.getItem("checkpoint-overlay-social") !== "false",
       animations: localStorage.getItem("checkpoint-overlay-animations") !== "false",
@@ -3503,6 +3568,12 @@
 
     const scheduleRemoval = (node, duration = 4800) => {
       setTimeout(() => {
+        if (node.classList.contains("is-clickable")) {
+          window.achievementOverlay.panelAction({
+            kind: "set-toast-interactive",
+            interactive: false,
+          });
+        }
         node.classList.add("is-leaving");
         setTimeout(() => node.remove(), 350);
       }, duration);
@@ -3542,6 +3613,14 @@
     const applyStagger = (stack, card) => {
       const visibleSiblings = stack.querySelectorAll(".overlay-card:not(.is-leaving)").length;
       card.style.setProperty("--stagger", `${Math.min(visibleSiblings, 3) * 80}ms`);
+    };
+
+    const startCardAnimation = (card) => {
+      card.classList.remove("is-entering");
+      void card.offsetWidth;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => card.classList.add("is-entering"));
+      });
     };
 
     const limitOverlayStack = (stack, maxCards = 3) => {
@@ -3788,6 +3867,7 @@
       shell.appendChild(content);
       card.appendChild(shell);
       achievementStack.appendChild(card);
+      startCardAnimation(card);
       limitOverlayStack(achievementStack);
       scheduleRemoval(card, duration);
     };
@@ -3859,7 +3939,46 @@
       content.appendChild(createProgressBar());
       shell.appendChild(content);
       card.appendChild(shell);
+      if (payload.kind === "friend-message" || payload.kind === "friend-request") {
+        card.classList.add("is-clickable");
+        card.setAttribute(
+          "title",
+          payload.kind === "friend-message"
+            ? "Clique para abrir a conversa no Checkpoint"
+            : "Clique para ver pedidos de amizade",
+        );
+        card.addEventListener("mouseenter", () => {
+          window.achievementOverlay.panelAction({
+            kind: "set-toast-interactive",
+            interactive: true,
+          });
+        });
+        card.addEventListener("mouseleave", () => {
+          window.achievementOverlay.panelAction({
+            kind: "set-toast-interactive",
+            interactive: false,
+          });
+        });
+        card.addEventListener("click", () => {
+          window.achievementOverlay.panelAction({
+            kind: "set-toast-interactive",
+            interactive: false,
+          });
+          if (payload.kind === "friend-message") {
+            window.achievementOverlay.panelAction({
+              kind: "open-launcher-chat",
+              friendId: payload.friendId,
+            });
+          } else if (payload.kind === "friend-request") {
+            window.achievementOverlay.panelAction({
+              kind: "open-launcher-friends",
+            });
+          }
+        });
+      }
+
       socialStack.appendChild(card);
+      startCardAnimation(card);
       limitOverlayStack(socialStack);
       scheduleRemoval(card, duration);
     };

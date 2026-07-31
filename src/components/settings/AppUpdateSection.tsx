@@ -1,0 +1,130 @@
+import React from "react";
+import { Sparkles } from "lucide-react";
+import { usePreferences } from "../../context/PreferencesContext";
+import { useAppUpdater } from "../../hooks/useAppUpdater";
+
+const UPDATE_COPY = {
+  "pt-BR": ["Atualizaciones do Sistema", "Versão instalada atualmente", "Mantenha seu Checkpoint Launcher na versão mais recente.", "Buscando atualizações...", "Nova versão disponível para baixar.", "Você já está usando a versão mais recente.", "Baixando atualização", "Atualização pronta para instalar.", "Ambiente de desenvolvimento local.", "Erro", "Buscar Atualizações", "Baixar e Atualizar", "Reiniciar e Atualizar"],
+  "en-US": ["System Updates", "Currently installed version", "Keep Checkpoint Launcher up to date.", "Checking for updates...", "A new version is available to download.", "You already have the latest version.", "Downloading update", "Update ready to install.", "Local development environment.", "Error", "Check for Updates", "Download and Update", "Restart and Update"],
+  "es-ES": ["Actualizaciones del sistema", "Versión instalada", "Mantén Checkpoint Launcher actualizado.", "Buscando actualizaciones...", "Hay una nueva versión disponible.", "Ya tienes la última versión.", "Descargando actualización", "Actualización lista para instalar.", "Entorno de desarrollo local.", "Error", "Buscar actualizaciones", "Descargar y actualizar", "Reiniciar y actualizar"],
+  "fr-FR": ["Mises à jour système", "Version installée", "Gardez Checkpoint Launcher à jour.", "Recherche de mises à jour...", "Une nouvelle version est disponible.", "Vous utilisez déjà la dernière version.", "Téléchargement de la mise à jour", "Mise à jour prête à installer.", "Environnement de développement local.", "Erreur", "Rechercher des mises à jour", "Télécharger et mettre à jour", "Redémarrer et mettre à jour"],
+  "de-DE": ["Systemupdates", "Installierte Version", "Halte Checkpoint Launcher auf dem neuesten Stand.", "Suche nach Updates...", "Eine neue Version ist verfügbar.", "Du verwendest bereits die neueste Version.", "Update wird heruntergeladen", "Update ist installationsbereit.", "Lokale Entwicklungsumgebung.", "Fehler", "Nach Updates suchen", "Herunterladen und aktualisieren", "Neu starten und aktualisieren"],
+  "it-IT": ["Aggiornamenti di sistema", "Versione installata", "Mantieni Checkpoint Launcher aggiornato.", "Ricerca aggiornamenti...", "È disponibile una nova versione.", "Hai già la versione più recente.", "Download aggiornamento", "Aggiornamento pronto per l’installazione.", "Ambiente di sviluppo locale.", "Errore", "Cerca aggiornamenti", "Scarica e aggiorna", "Riavvia e aggiorna"],
+} as const;
+
+export const SettingsHeader: React.FC<{
+  icon: React.ReactNode;
+  title: React.ReactNode;
+  description: string;
+}> = React.memo(({ icon, title, description }) => (
+  <div className="mb-6 flex items-center gap-3">
+    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+      {icon}
+    </div>
+    <div>
+      <h2 className="text-lg font-bold text-white">{title}</h2>
+      <p className="text-xs text-white/40">{description}</p>
+    </div>
+  </div>
+));
+SettingsHeader.displayName = "SettingsHeader";
+
+export const AppUpdateSection: React.FC = React.memo(() => {
+  const { language } = usePreferences();
+  const updateCopy = UPDATE_COPY[language] || UPDATE_COPY["pt-BR"];
+
+  const {
+    currentVersion,
+    updateStatus,
+    downloadProgress,
+    errorMessage,
+    newVersionInfo,
+    checkForUpdates,
+    downloadUpdate,
+    installUpdate,
+  } = useAppUpdater();
+
+  return (
+    <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <SettingsHeader
+        icon={<Sparkles className="h-5 w-5 text-white/70" />}
+        title={updateCopy[0]}
+        description={`${updateCopy[1]}: v${currentVersion}`}
+      />
+      <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.05] bg-white/[0.03] p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            {updateStatus === "idle" && (
+              <p className="text-xs text-white/50">{updateCopy[2]}</p>
+            )}
+            {updateStatus === "checking" && (
+              <p className="flex items-center gap-2 text-xs text-amber-300">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" />
+                {updateCopy[3]}
+              </p>
+            )}
+            {updateStatus === "available" && (
+              <p className="text-xs text-emerald-400">
+                {updateCopy[4]} {newVersionInfo?.version ? `v${newVersionInfo.version}` : ""}
+              </p>
+            )}
+            {updateStatus === "not-available" && (
+              <p className="text-xs text-white/70">{updateCopy[5]}</p>
+            )}
+            {updateStatus === "downloading" && (
+              <div className="space-y-2">
+                <p className="text-xs text-sky-400">{updateCopy[6]}... {downloadProgress}%</p>
+                <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full bg-sky-400 transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                </div>
+              </div>
+            )}
+            {updateStatus === "downloaded" && (
+              <p className="text-xs text-emerald-400">{updateCopy[7]}</p>
+            )}
+            {updateStatus === "dev" && (
+              <p className="text-xs text-amber-300/80">{updateCopy[8]}</p>
+            )}
+            {updateStatus === "error" && (
+              <p className="text-xs text-red-400">{updateCopy[9]}: {errorMessage}</p>
+            )}
+          </div>
+
+          <div className="shrink-0">
+            {updateStatus === "idle" || updateStatus === "not-available" || updateStatus === "dev" || updateStatus === "error" ? (
+              <button
+                type="button"
+                onClick={checkForUpdates}
+                className="cursor-pointer rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase text-black transition-all hover:bg-white/90 active:scale-95"
+              >
+                {updateCopy[10]}
+              </button>
+            ) : null}
+
+            {updateStatus === "available" ? (
+              <button
+                type="button"
+                onClick={downloadUpdate}
+                className="cursor-pointer rounded-xl bg-sky-500 px-4 py-2 text-[10px] font-black uppercase text-white shadow-[0_0_15px_rgba(14,165,233,0.3)] transition-all hover:bg-sky-400 active:scale-95"
+              >
+                {updateCopy[11]}
+              </button>
+            ) : null}
+
+            {updateStatus === "downloaded" ? (
+              <button
+                type="button"
+                onClick={installUpdate}
+                className="cursor-pointer rounded-xl bg-emerald-500 px-4 py-2 text-[10px] font-black uppercase text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all hover:bg-emerald-400 active:scale-95"
+              >
+                {updateCopy[12]}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+});
+
+AppUpdateSection.displayName = "AppUpdateSection";

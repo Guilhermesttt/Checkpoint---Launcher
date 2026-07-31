@@ -1,0 +1,353 @@
+import React from "react";
+import { motion } from "framer-motion";
+import {
+  CheckCircle2,
+  Gamepad2,
+  PackageOpen,
+  Search,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import type { Game } from "../types/domain";
+import { usePreferences } from "../context/PreferencesContext";
+import { useSoundEffects } from "../hooks/useSoundEffects";
+import ModGameDetailPanel, {
+  type InstalledModEntry,
+} from "../components/mods/ModGameDetailPanel";
+
+interface ModsPageProps {
+  uid: string;
+  games: Game[];
+}
+
+const storageKeys = {
+  folders: (uid: string) => `checkpoint_mod_game_folders_${uid}`,
+  domains: (uid: string) => `checkpoint_mod_game_domains_${uid}`,
+  installed: (uid: string) => `checkpoint_installed_mods_${uid}`,
+};
+
+const readRecord = <T,>(key: string): Record<string, T> => {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "{}");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+};
+
+const normalizeTitle = (title: string) =>
+  title.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, " ").trim();
+
+const suggestedDomains: Array<[RegExp, string]> = [
+  [/skyrim.*special|skyrim se/, "skyrimspecialedition"],
+  [/skyrim/, "skyrim"],
+  [/fallout 4/, "fallout4"],
+  [/fallout new vegas/, "newvegas"],
+  [/cyberpunk 2077/, "cyberpunk2077"],
+  [/grand theft auto v|gta v/, "gta5"],
+  [/baldur s gate 3/, "baldursgate3"],
+  [/stardew valley/, "stardewvalley"],
+  [/witcher 3/, "witcher3"],
+  [/elden ring/, "eldenring"],
+  [/ready or not/, "readyornot"],
+  [/starfield/, "starfield"],
+  [/red dead redemption 2/, "reddeadredemption2"],
+  [/hogwarts legacy/, "hogwartslegacy"],
+];
+
+const suggestNexusDomain = (title: string) => {
+  const normalized = normalizeTitle(title);
+  return suggestedDomains.find(([pattern]) => pattern.test(normalized))?.[1] || "";
+};
+
+const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
+  const { effectsVolume, soundTheme, notificationVolume } = usePreferences();
+  const { playSound } = useSoundEffects(
+    effectsVolume / 100,
+    soundTheme,
+    notificationVolume / 100,
+  );
+
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [selectedGame, setSelectedGame] = React.useState<Game | null>(null);
+  const [gameFolders, setGameFolders] = React.useState<Record<string, string>>(
+    () => readRecord<string>(storageKeys.folders(uid)),
+  );
+  const [gameDomains, setGameDomains] = React.useState<Record<string, string>>(
+    () => readRecord<string>(storageKeys.domains(uid)),
+  );
+  const [installedByGame, setInstalledByGame] = React.useState<Record<string, InstalledModEntry[]>>(
+    () => readRecord<InstalledModEntry[]>(storageKeys.installed(uid)),
+  );
+
+  const filteredGames = React.useMemo(() => {
+    const query = searchTerm.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return games;
+    return games.filter((game) =>
+      [game.title, game.category, game.launcherType]
+        .join(" ")
+        .toLocaleLowerCase("pt-BR")
+        .includes(query));
+  }, [games, searchTerm]);
+
+  const chooseGameFolder = async (game: Game) => {
+    if (!window.electronAPI?.selectModGameDirectory) return;
+    const folder = await window.electronAPI.selectModGameDirectory(game.title);
+    if (!folder) return;
+    const next = { ...gameFolders, [game.id]: folder };
+    setGameFolders(next);
+    localStorage.setItem(storageKeys.folders(uid), JSON.stringify(next));
+  };
+
+  const saveGameDomain = (game: Game, domain: string) => {
+    const next = { ...gameDomains, [game.id]: domain };
+    setGameDomains(next);
+    localStorage.setItem(storageKeys.domains(uid), JSON.stringify(next));
+  };
+
+  const toggleInstalledMod = (game: Game, modId: string, enabled: boolean) => {
+    const nextForGame = (installedByGame[game.id] || []).map((mod) =>
+      mod.id === modId
+        ? {
+            ...mod,
+            enabled,
+            status: enabled ? "installed" : mod.status,
+          }
+        : mod);
+    const next = { ...installedByGame, [game.id]: nextForGame };
+    setInstalledByGame(next);
+    localStorage.setItem(storageKeys.installed(uid), JSON.stringify(next));
+  };
+
+  const recordDownloadedMod = React.useCallback((game: Game, mod: InstalledModEntry) => {
+    setInstalledByGame((current) => {
+      const currentForGame = current[game.id] || [];
+      const existing = currentForGame.find((entry) => entry.id === mod.id);
+      const mergedMod: InstalledModEntry = existing ? {
+        ...existing,
+        ...mod,
+        name: mod.name || existing.name,
+        author: mod.author === "Nexus Mods" ? existing.author || mod.author : mod.author,
+        pictureUrl: mod.pictureUrl || existing.pictureUrl,
+        version: mod.version || existing.version,
+        status: existing.status === "installed" && mod.status === "downloaded"
+          ? "installed"
+          : mod.status,
+        enabled: existing.status === "installed" && mod.status === "downloaded"
+          ? existing.enabled
+          : mod.enabled,
+      } : mod;
+      const nextForGame = [
+        mergedMod,
+        ...currentForGame.filter((entry) => entry.id !== mod.id),
+      ];
+      const next = { ...current, [game.id]: nextForGame };
+      localStorage.setItem(storageKeys.installed(uid), JSON.stringify(next));
+      return next;
+    });
+  }, [uid]);
+
+  const handleDownloadRecorded = React.useCallback((mod: InstalledModEntry) => {
+    if (selectedGame) recordDownloadedMod(selectedGame, mod);
+  }, [recordDownloadedMod, selectedGame]);
+
+  const configuredGames = games.filter((game) => Boolean(gameFolders[game.id])).length;
+  const installedCount = Object.values(installedByGame)
+    .flat()
+    .length;
+
+  return (
+    <>
+      <motion.main
+        data-system-page
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-10 pb-10 pt-4 thin-scrollbar"
+      >
+        <div className="mx-auto w-full max-w-6xl space-y-5">
+          <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-black/65 p-7 shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-60"
+              style={{
+                background:
+                  "radial-gradient(circle at 82% 15%, rgb(var(--launcher-accent) / 0.24), transparent 36%)",
+              }}
+            />
+            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-white/45">
+                  <PackageOpen className="h-3.5 w-3.5" />
+                  Biblioteca de mods
+                </div>
+                <h1 className="text-3xl font-black tracking-tight text-white">
+                  Escolha um jogo para modificar
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/42">
+                  Cada jogo possui seu próprio catálogo, pasta, mods instalados e controles.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <SummaryStat label="Jogos" value={games.length} />
+                <SummaryStat label="Configurados" value={configuredGames} />
+                <SummaryStat label="Mods" value={installedCount} />
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-[26px] border border-white/10 bg-black/60 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Gamepad2 className="h-4 w-4 text-white/45" />
+                  <h2 className="text-xs font-black uppercase tracking-[0.18em] text-white/65">
+                    Meus jogos
+                  </h2>
+                </div>
+                <p className="mt-1 text-[10px] text-white/25">
+                  Abra um card para explorar e gerenciar os mods daquele jogo.
+                </p>
+              </div>
+
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Buscar jogo"
+                  className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-white/25"
+                />
+              </div>
+            </div>
+
+            {filteredGames.length === 0 ? (
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 text-center">
+                <Gamepad2 className="mb-3 h-7 w-7 text-white/15" />
+                <p className="text-sm font-black text-white/50">
+                  {games.length ? "Nenhum jogo encontrado" : "Sua biblioteca está vazia"}
+                </p>
+                <p className="mt-1 text-xs text-white/25">
+                  {games.length ? "Tente outro nome." : "Adicione um jogo antes de configurar seus mods."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {filteredGames.map((game) => {
+                  const folder = gameFolders[game.id];
+                  const installed = installedByGame[game.id] || [];
+                  const activeMods = installed.filter((mod) => mod.enabled).length;
+                  const image = game.cardImage || game.image || game.backgroundImage;
+                  const domain = gameDomains[game.id] || suggestNexusDomain(game.title);
+
+                  return (
+                    <button
+                      key={game.id}
+                      type="button"
+                      onClick={() => {
+                        playSound("detailOpen");
+                        if (!gameDomains[game.id] && domain) {
+                          saveGameDomain(game, domain);
+                        }
+                        setSelectedGame(game);
+                      }}
+                      className="group overflow-hidden rounded-2xl border border-white/9 bg-white/[0.035] text-left shadow-[0_14px_40px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-white/22 hover:bg-white/[0.07]"
+                    >
+                      <div className="relative h-36 overflow-hidden bg-white/[0.04]">
+                        {image ? (
+                          <img
+                            src={image}
+                            alt=""
+                            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <Gamepad2 className="h-8 w-8 text-white/15" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-linear-to-t from-black via-black/15 to-transparent" />
+                        <div className="absolute left-3 top-3 flex gap-1.5">
+                          {folder && (
+                            <span className="flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-500/15 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-300">
+                              <CheckCircle2 className="h-3 w-3" /> Gerenciado
+                            </span>
+                          )}
+                          {!folder && (
+                            <span className="rounded-md border border-white/10 bg-black/55 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white/45">
+                              Configurar
+                            </span>
+                          )}
+                        </div>
+                        <div className="absolute bottom-3 left-3 right-3">
+                          <h3 className="line-clamp-2 text-base font-black leading-tight text-white">
+                            {game.title}
+                          </h3>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 p-3.5">
+                        <div>
+                          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-white/25">
+                            {game.launcherType || "local"}
+                          </p>
+                          <p className="mt-1 text-[10px] font-semibold text-white/40">
+                            {installed.length
+                              ? `${activeMods} de ${installed.length} mods ativos`
+                              : "Nenhum mod instalado"}
+                          </p>
+                        </div>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/30 transition group-hover:bg-white/10 group-hover:text-white">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="flex items-center gap-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] px-5 py-4">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-300/70" />
+            <div>
+              <p className="text-xs font-bold text-amber-100/65">Instalação segura em preparação</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-amber-100/30">
+                Downloads autenticados, backup de arquivos e resolução de conflitos entram após o Nexus SSO.
+              </p>
+            </div>
+          </section>
+        </div>
+      </motion.main>
+
+      <ModGameDetailPanel
+        key={selectedGame?.id || "closed"}
+        game={selectedGame}
+        isOpen={Boolean(selectedGame)}
+        gameFolder={selectedGame ? gameFolders[selectedGame.id] || "" : ""}
+        gameDomain={selectedGame
+          ? gameDomains[selectedGame.id] || suggestNexusDomain(selectedGame.title)
+          : ""}
+        installedMods={selectedGame ? installedByGame[selectedGame.id] || [] : []}
+        onClose={() => setSelectedGame(null)}
+        onChooseFolder={async () => {
+          if (selectedGame) await chooseGameFolder(selectedGame);
+        }}
+        onSaveDomain={(domain) => {
+          if (selectedGame) saveGameDomain(selectedGame, domain);
+        }}
+        onToggleMod={(modId, enabled) => {
+          if (selectedGame) toggleInstalledMod(selectedGame, modId, enabled);
+        }}
+        onDownloadRecorded={handleDownloadRecorded}
+      />
+    </>
+  );
+};
+
+const SummaryStat: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="min-w-24 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-right backdrop-blur-xl">
+    <p className="text-xl font-black text-white">{value}</p>
+    <p className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-white/25">{label}</p>
+  </div>
+);
+
+export default ModsPage;

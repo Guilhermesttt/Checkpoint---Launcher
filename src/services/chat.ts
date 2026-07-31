@@ -6,6 +6,12 @@ const HISTORY_LIMIT = 50;
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
+export const validateChatImage = (file: File) => {
+  if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
+    throw new Error("Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.");
+  }
+};
+
 const messageListeners = new Set<(message: ChatMessage) => void>();
 const unreadListeners = new Set<(messages: ChatMessage[]) => void>();
 const unreadMessages: ChatMessage[] = [];
@@ -23,12 +29,25 @@ const messageTimestamp = (message: Pick<ChatMessage, "createdAt">) => {
 };
 
 export const compareChatMessages = (a: ChatMessage, b: ChatMessage) => {
+  const firstSequence = Number(a.sequenceId);
+  const secondSequence = Number(b.sequenceId);
+  const firstHasSequence = Number.isSafeInteger(firstSequence) && firstSequence > 0;
+  const secondHasSequence = Number.isSafeInteger(secondSequence) && secondSequence > 0;
+
+  if (firstHasSequence && secondHasSequence && firstSequence !== secondSequence) {
+    return firstSequence - secondSequence;
+  }
+  // Mensagens otimistas ainda não possuem a sequência do banco e ficam depois
+  // de todas as mensagens já confirmadas.
+  if (firstHasSequence !== secondHasSequence) return firstHasSequence ? -1 : 1;
+
   const timeDifference = messageTimestamp(a) - messageTimestamp(b);
   if (timeDifference !== 0) return timeDifference;
   return String(a.id || "").localeCompare(String(b.id || ""));
 };
 
 const emitUnread = () => {
+  unreadMessages.sort(compareChatMessages);
   unreadListeners.forEach((listener) => listener([...unreadMessages]));
 };
 
@@ -48,6 +67,9 @@ export const normalizeMessage = (
   return {
     id: id || String(value.id || ""),
     chatId: String(value.chatId || value.chat_id || ""),
+    sequenceId: Number.isSafeInteger(Number(value.sequenceId ?? value.sequence_id))
+      ? Number(value.sequenceId ?? value.sequence_id)
+      : undefined,
     senderId: String(value.senderId || value.sender_id || ""),
     receiverId: String(value.receiverId || value.receiver_id || ""),
     text: String(value.text || ""),
@@ -133,7 +155,7 @@ export const subscribeToActiveChats = (uid: string) => {
     .select("*")
     .eq("receiver_id", uid)
     .eq("read", false)
-    .order("created_at", { ascending: true })
+    .order("sequence_id", { ascending: true })
     .limit(100)
     .then(async ({ data }) => {
       const messages = await Promise.all(
@@ -215,7 +237,6 @@ export const sendChatMessage = async (
     attachment_type: attachment?.attachmentType || null,
     attachment_size: attachment?.attachmentSize || null,
     attachment_path: attachment?.attachmentPath || null,
-    created_at: new Date().toISOString(),
   };
 
   const { data, error } = await supabase.from("chat_messages").insert(newMsg).select().single();
@@ -232,9 +253,7 @@ export const sendChatImage = async (
   const session = (await supabase.auth.getSession()).data.session;
   const senderId = session?.user?.id;
   if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
-  if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size <= 0 || file.size > MAX_IMAGE_SIZE) {
-    throw new Error("Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.");
-  }
+  validateChatImage(file);
 
   const chatId = await ensureChatSession(senderId, receiverUid);
   const ext = file.name.split(".").pop() || "png";
@@ -245,7 +264,7 @@ export const sendChatImage = async (
     throw new Error(error?.message || "Falha ao enviar a imagem.");
   }
 
-  return sendChatMessage(receiverUid, caption.trim() || "📷 Imagem", {
+  return sendChatMessage(receiverUid, caption.trim(), {
     attachmentName: file.name,
     attachmentType: file.type,
     attachmentSize: file.size,
@@ -327,13 +346,18 @@ export const subscribeToChatMessages = (
       .from("chat_messages")
       .select("*")
       .eq("chat_id", chatId)
-      .order("created_at", { ascending: true })
+      .order("sequence_id", { ascending: false })
       .limit(HISTORY_LIMIT)
       .then(async ({ data }) => {
         if (data && !cancelled) {
-          latestMessages = await Promise.all(data.map((item) =>
+          const historyMessages = await Promise.all(data.map((item) =>
             hydrateAttachmentUrl(normalizeMessage(String(item.id), item as any)),
           ));
+          const mergedById = new Map<string, ChatMessage>();
+          [...historyMessages, ...latestMessages].forEach((message) => {
+            if (message.id) mergedById.set(message.id, message);
+          });
+          latestMessages = Array.from(mergedById.values()).sort(compareChatMessages);
           callback([...latestMessages]);
         }
       });

@@ -4,15 +4,26 @@ import {
   app,
   buildEpicDetails,
   normalizeFriendAchievementAggregate,
+  normalizeNexusTrendingMods,
   normalizeSocialActivityInput,
+  normalizeSteamPlayerProfile,
   partitionOwnedSteamAppIds,
   projectFriendGame,
+  resolveChatRetentionDays,
   resolveLinkedSteamId,
   revokeActivityAudience,
   writeActivityToFeeds,
 } from "../server/index.mjs";
 
 describe("API publica", () => {
+  it("usa sete dias como retencao padrao do chat", () => {
+    expect(resolveChatRetentionDays(undefined)).toBe(7);
+    expect(resolveChatRetentionDays("7")).toBe(7);
+    expect(resolveChatRetentionDays("30")).toBe(30);
+    expect(resolveChatRetentionDays("0")).toBe(7);
+    expect(resolveChatRetentionDays("invalido")).toBe(7);
+  });
+
   it("responde ao health check com headers de seguranca", async () => {
     const response = await request(app).get("/health").expect(200);
     expect(response.body).toEqual({ ok: true });
@@ -121,6 +132,50 @@ describe("API publica", () => {
       status: 403,
     });
     expect(resolveLinkedSteamId("", undefined)).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("normaliza nome e avatar retornados pelo perfil Steam", () => {
+    expect(normalizeSteamPlayerProfile("76561198000000000", {
+      response: {
+        players: [{
+          steamid: "76561198000000000",
+          personaname: "Checkpoint Player",
+          avatarfull: "http://avatars.steamstatic.com/avatar.jpg",
+        }],
+      },
+    })).toEqual({
+      steam_id: "76561198000000000",
+      steam_username: "Checkpoint Player",
+      steam_avatar: "https://avatars.steamstatic.com/avatar.jpg",
+    });
+
+    expect(normalizeSteamPlayerProfile("76561198000000000", {
+      response: { players: [] },
+    })).toBeNull();
+  });
+
+  it("normaliza o feed público de mods da Nexus sem aceitar URLs inseguras", () => {
+    expect(normalizeNexusTrendingMods({
+      data: {
+        mods: [{
+          name: "Unofficial Patch",
+          author: "Mod Author",
+          summary: "Corrige problemas do jogo.",
+          picture_url: "https://staticdelivery.nexusmods.com/mod.jpg",
+          mod_page_url: "https://www.nexusmods.com/skyrimspecialedition/mods/1",
+        }, {
+          name: "URL inválida",
+          mod_page_url: "https://example.com/mods/2",
+        }],
+      },
+    })).toEqual([{
+      id: "https://www.nexusmods.com/skyrimspecialedition/mods/1",
+      name: "Unofficial Patch",
+      author: "Mod Author",
+      summary: "Corrige problemas do jogo.",
+      pictureUrl: "https://staticdelivery.nexusmods.com/mod.jpg",
+      modPageUrl: "https://www.nexusmods.com/skyrimspecialedition/mods/1",
+    }]);
   });
 
   it("processa no resumo apenas jogos presentes na biblioteca vinculada", () => {

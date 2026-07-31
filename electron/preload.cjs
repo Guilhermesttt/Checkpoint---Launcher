@@ -4,6 +4,32 @@ contextBridge.exposeInMainWorld("electronAPI", {
   launchExecutable: (executablePath, launchProfile, launchOptions) =>
     ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile, launchOptions),
   selectExecutable: () => ipcRenderer.invoke("launcher:select-executable"),
+  selectModGameDirectory: (gameTitle) =>
+    ipcRenderer.invoke("mods:select-game-directory", gameTitle),
+  getNexusStatus: () => ipcRenderer.invoke("nexus:get-status"),
+  connectNexusPersonalKey: (apiKey) =>
+    ipcRenderer.invoke("nexus:connect-personal-key", apiKey),
+  validateNexusConnection: () => ipcRenderer.invoke("nexus:validate-connection"),
+  disconnectNexus: () => ipcRenderer.invoke("nexus:disconnect"),
+  getNexusModCatalog: (request) =>
+    ipcRenderer.invoke("nexus:get-mod-catalog", request),
+  getNexusModDetails: (request) =>
+    ipcRenderer.invoke("nexus:get-mod-details", request),
+  getNexusModFiles: (request) =>
+    ipcRenderer.invoke("nexus:get-mod-files", request),
+  getNexusDownloadState: () =>
+    ipcRenderer.invoke("nexus:get-download-state"),
+  listNexusDownloadedFiles: (gameDomain) =>
+    ipcRenderer.invoke("nexus:list-downloaded-files", gameDomain),
+  prepareNexusFreeDownload: (request) =>
+    ipcRenderer.invoke("nexus:prepare-free-download", request),
+  openNexusDownloadLocation: () =>
+    ipcRenderer.invoke("nexus:open-download-location"),
+  onNexusDownloadState: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("nexus:download-state", handler);
+    return () => ipcRenderer.removeListener("nexus:download-state", handler);
+  },
   searchEpicStore: (query) =>
     ipcRenderer.invoke("launcher:search-epic-store", query),
   fetchEpicStoreDetails: (request) =>

@@ -9,6 +9,177 @@ declare global {
         launchOptions?: { hideLauncher?: boolean },
       ) => Promise<void>;
       selectExecutable: () => Promise<string | null>;
+      selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
+      getNexusStatus: () => Promise<{
+        connected: boolean;
+        encryptionAvailable: boolean;
+      }>;
+      connectNexusPersonalKey: (apiKey: string) => Promise<{
+        connected: boolean;
+        encryptionAvailable: boolean;
+        account: {
+          userId: number;
+          name: string;
+          profileUrl: string;
+          isPremium: boolean;
+          isSupporter: boolean;
+          rateLimit: {
+            dailyRemaining: number | null;
+            hourlyRemaining: number | null;
+          };
+        };
+      }>;
+      validateNexusConnection: () => Promise<{
+        connected: boolean;
+        encryptionAvailable: boolean;
+        account: {
+          userId: number;
+          name: string;
+          profileUrl: string;
+          isPremium: boolean;
+          isSupporter: boolean;
+          rateLimit: {
+            dailyRemaining: number | null;
+            hourlyRemaining: number | null;
+          };
+        } | null;
+      }>;
+      disconnectNexus: () => Promise<{
+        connected: boolean;
+        encryptionAvailable: boolean;
+      }>;
+      getNexusModCatalog: (request: {
+        gameDomain: string;
+      }) => Promise<{
+        mods: Array<{
+          id: string;
+          modId: string;
+          name: string;
+          author: string;
+          summary: string;
+          pictureUrl: string;
+          modPageUrl: string;
+          version: string;
+          downloads: number;
+          endorsements: number;
+          updatedAt: number | null;
+          feed: string;
+        }>;
+        scope: "recent-30-days" | "curated-feeds";
+        recentCandidateCount: number;
+        rateLimit: {
+          dailyRemaining: number | null;
+          hourlyRemaining: number | null;
+        };
+      }>;
+      getNexusModDetails: (request: {
+        gameDomain: string;
+        modId: string;
+      }) => Promise<{
+        mod: {
+          id: string;
+          modId: string;
+          name: string;
+          author: string;
+          summary: string;
+          pictureUrl: string;
+          modPageUrl: string;
+          version: string;
+          downloads: number;
+          endorsements: number;
+          updatedAt: number | null;
+          feed: string;
+        };
+        rateLimit: {
+          dailyRemaining: number | null;
+          hourlyRemaining: number | null;
+        };
+      }>;
+      getNexusModFiles: (request: {
+        gameDomain: string;
+        modId: string;
+      }) => Promise<{
+        files: Array<{
+          id: string;
+          name: string;
+          version: string;
+          category: string;
+          description: string;
+          sizeKb: number;
+          uploadedAt: number | null;
+          primary: boolean;
+        }>;
+        rateLimit: {
+          dailyRemaining: number | null;
+          hourlyRemaining: number | null;
+        };
+      }>;
+      getNexusDownloadState: () => Promise<{
+        id?: string;
+        status: "resolving" | "downloading" | "installing" | "completed" | "error";
+        gameDomain?: string;
+        modId?: string;
+        fileId?: string;
+        mirror?: string;
+        receivedBytes?: number;
+        totalBytes?: number;
+        filename?: string;
+        filePath?: string;
+        installed?: boolean;
+        installedFiles?: number;
+        backedUpFiles?: number;
+        manifestPath?: string;
+        installationError?: string;
+        modName?: string;
+        modAuthor?: string;
+        pictureUrl?: string;
+        version?: string;
+        error?: string;
+        updatedAt: number;
+      } | null>;
+      listNexusDownloadedFiles: (gameDomain: string) => Promise<Array<{
+        id: string;
+        gameDomain: string;
+        modId: string;
+        filename: string;
+        filePath: string;
+        bytes: number;
+        downloadedAt: number;
+      }>>;
+      prepareNexusFreeDownload: (request: {
+        gameDomain: string;
+        modId: string;
+        fileId: string;
+        gameFolder: string;
+        modName: string;
+        modAuthor: string;
+        pictureUrl: string;
+        version: string;
+      }) => Promise<{ prepared: boolean; autoInstall: boolean; expiresAt: number }>;
+      openNexusDownloadLocation: () => Promise<boolean>;
+      onNexusDownloadState: (callback: (state: {
+        id?: string;
+        status: "resolving" | "downloading" | "installing" | "completed" | "error";
+        gameDomain?: string;
+        modId?: string;
+        fileId?: string;
+        mirror?: string;
+        receivedBytes?: number;
+        totalBytes?: number;
+        filename?: string;
+        filePath?: string;
+        installed?: boolean;
+        installedFiles?: number;
+        backedUpFiles?: number;
+        manifestPath?: string;
+        installationError?: string;
+        modName?: string;
+        modAuthor?: string;
+        pictureUrl?: string;
+        version?: string;
+        error?: string;
+        updatedAt: number;
+      }) => void) => () => void;
       searchEpicStore: (query: string) => Promise<Array<{
         id: string;
         catalogId: string;
@@ -171,6 +342,7 @@ declare global {
       showFriendRequestOverlay: (payload: {
         playerName: string;
         avatarUrl?: string | null;
+        friendId?: string;
       }) => Promise<void>;
       showFriendAcceptedOverlay: (payload: {
         playerName: string;
@@ -252,6 +424,7 @@ declare global {
         senderName: string;
         messageText: string;
         avatarUrl?: string;
+        friendId?: string;
       }) => Promise<void>;
       updateOverlayPanel: (payload: {
         language?: import("../context/PreferencesContext").LauncherLanguage;
@@ -308,6 +481,8 @@ declare global {
         | { kind: "send-message"; text: string }
         | { kind: "send-image"; name: string; type: string; data: Uint8Array }
         | { kind: "set-typing"; typing: boolean }
+        | { kind: "open-launcher-chat"; friendId: string }
+        | { kind: "open-launcher-friends" }
       ) => void) => () => void;
 
       // ─ Real-time achievement push events (main → renderer) ─────────────────

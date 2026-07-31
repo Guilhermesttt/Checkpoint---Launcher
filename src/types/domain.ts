@@ -154,6 +154,7 @@ export interface SteamOwnedGame {
 export interface ChatMessage {
   id?: string;
   chatId?: string;
+  sequenceId?: number;
   senderId: string;
   receiverId?: string;
   text: string;

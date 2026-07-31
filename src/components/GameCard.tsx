@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Star } from "lucide-react";
+import { Gamepad2, Play, Star } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
 import {
@@ -123,7 +123,13 @@ const GameCard: React.FC<GameCardProps> = ({
       };
     }
 
-    return null;
+    return {
+      label: "Local",
+      color: "#a7f3d0",
+      border: "rgba(52,211,153,0.3)",
+      background: "rgba(6,78,59,0.6)",
+      icon: <Gamepad2 className="h-2.5 w-2.5 text-emerald-400" />,
+    };
   }, [isEpic, isSteam]);
 
   const hasImageError = failedImageSrc === image;

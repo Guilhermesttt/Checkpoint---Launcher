@@ -96,7 +96,79 @@ const discordClientSecret = process.env.DISCORD_CLIENT_SECRET?.trim();
 const discordOauthScope = process.env.DISCORD_OAUTH_SCOPE?.trim() || "identify";
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-const CHAT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const resolveChatRetentionDays = (value) => {
+  const parsed = Math.floor(Number(value));
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= 365 ? parsed : 7;
+};
+const CHAT_RETENTION_DAYS = resolveChatRetentionDays(process.env.CHAT_RETENTION_DAYS);
+const CHAT_RETENTION_MS = CHAT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const CHAT_CLEANUP_BATCH_SIZE = 200;
+const CHAT_CLEANUP_MAX_BATCHES = 10;
+const CHAT_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let chatCleanupTail = Promise.resolve();
+
+const runChatRetentionCleanup = async ({
+  chatId = "",
+  now = Date.now(),
+} = {}) => {
+  if (!supabaseAdmin) return { deletedMessages: 0, deletedAttachments: 0 };
+
+  const cutoff = new Date(now - CHAT_RETENTION_MS).toISOString();
+  let deletedMessages = 0;
+  let deletedAttachments = 0;
+
+  for (let batch = 0; batch < CHAT_CLEANUP_MAX_BATCHES; batch += 1) {
+    let query = supabaseAdmin
+      .from("chat_messages")
+      .select("id,attachment_path")
+      .lt("created_at", cutoff)
+      .order("created_at", { ascending: true })
+      .limit(CHAT_CLEANUP_BATCH_SIZE);
+    if (chatId) query = query.eq("chat_id", chatId);
+
+    const { data: expiredMessages, error: selectError } = await query;
+    if (selectError) throw selectError;
+    if (!expiredMessages?.length) break;
+
+    const attachmentPaths = [...new Set(expiredMessages
+      .map((message) => String(message.attachment_path || "").trim())
+      .filter(Boolean))];
+    let attachmentsRemoved = true;
+    if (attachmentPaths.length > 0) {
+      const { error: storageError } = await supabaseAdmin.storage
+        .from("attachments")
+        .remove(attachmentPaths);
+      if (storageError) {
+        attachmentsRemoved = false;
+        console.error("Falha ao limpar anexos expirados do chat:", storageError.message);
+      } else {
+        deletedAttachments += attachmentPaths.length;
+      }
+    }
+
+    const deletableIds = expiredMessages
+      .filter((message) => attachmentsRemoved || !message.attachment_path)
+      .map((message) => message.id);
+    if (deletableIds.length > 0) {
+      const { error: deleteError } = await supabaseAdmin
+        .from("chat_messages")
+        .delete()
+        .in("id", deletableIds);
+      if (deleteError) throw deleteError;
+      deletedMessages += deletableIds.length;
+    }
+
+    if (!attachmentsRemoved || expiredMessages.length < CHAT_CLEANUP_BATCH_SIZE) break;
+  }
+
+  return { deletedMessages, deletedAttachments };
+};
+
+export const cleanupExpiredChatData = (options = {}) => {
+  const queuedCleanup = chatCleanupTail.then(() => runChatRetentionCleanup(options));
+  chatCleanupTail = queuedCleanup.catch(() => undefined);
+  return queuedCleanup;
+};
 
 app.set("trust proxy", 1);
 app.use(
@@ -205,6 +277,43 @@ const fetchSteamWithTimeout = async (url, options = {}, timeoutMs = STEAM_API_TI
   } finally {
     clearTimeout(timeout);
   }
+};
+
+export const normalizeSteamPlayerProfile = (steamId, payload) => {
+  const normalizedSteamId = String(steamId || "").trim();
+  const player = Array.isArray(payload?.response?.players)
+    ? payload.response.players.find(
+      (candidate) => String(candidate?.steamid || "").trim() === normalizedSteamId,
+    )
+    : null;
+  if (!player) return null;
+
+  const username = String(player.personaname || "").trim().slice(0, 80);
+  const rawAvatar = String(
+    player.avatarfull || player.avatarmedium || player.avatar || "",
+  ).trim();
+  const avatar = rawAvatar.replace(/^http:\/\//i, "https://");
+
+  return {
+    steam_id: normalizedSteamId,
+    steam_username: username || null,
+    steam_avatar: /^https:\/\//i.test(avatar) ? avatar : null,
+  };
+};
+
+const fetchSteamPlayerProfile = async (steamId) => {
+  if (!steamApiKey) return null;
+
+  const url = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/");
+  url.searchParams.set("key", steamApiKey);
+  url.searchParams.set("steamids", steamId);
+  url.searchParams.set("format", "json");
+
+  const response = await fetchSteamWithTimeout(url.toString());
+  if (!response.ok) {
+    throw new Error(`Falha ao consultar perfil Steam (status ${response.status}).`);
+  }
+  return normalizeSteamPlayerProfile(steamId, await response.json());
 };
 
 const normalizeSteamAppIds = (values) => Array.from(new Set(
@@ -1001,11 +1110,7 @@ app.post("/api/chat/open", steamPrivateLimiter, requireFirebaseUser, async (req,
       );
     if (participantsError) throw participantsError;
 
-    await supabaseAdmin
-      .from("chat_messages")
-      .delete()
-      .eq("chat_id", chat.id)
-      .lt("created_at", new Date(Date.now() - CHAT_RETENTION_MS).toISOString());
+    await cleanupExpiredChatData({ chatId: chat.id });
 
     res.json({ chatId: chat.id });
   } catch (error) {
@@ -1243,6 +1348,61 @@ app.get("/api/proxy/image", steamPublicLimiter, async (req, res) => {
     return res.send(Buffer.from(buf));
   } catch {
     return res.status(502).end();
+  }
+});
+
+export const normalizeNexusTrendingMods = (payload) => {
+  const mods = Array.isArray(payload?.data?.mods) ? payload.data.mods : [];
+  return mods.slice(0, 12).map((mod, index) => {
+    const modPageUrl = String(mod?.mod_page_url || "").trim();
+    const pictureUrl = String(mod?.picture_url || "").trim();
+    return {
+      id: modPageUrl || `nexus-trending-${index}`,
+      name: String(mod?.name || "Mod sem nome").trim().slice(0, 160),
+      author: String(mod?.author || "").trim().slice(0, 100),
+      summary: String(mod?.summary || "").trim().slice(0, 800),
+      pictureUrl: /^https:\/\//i.test(pictureUrl) ? pictureUrl : "",
+      modPageUrl: /^https:\/\/(?:www\.)?nexusmods\.com\//i.test(modPageUrl)
+        ? modPageUrl
+        : "",
+    };
+  }).filter((mod) => mod.name && mod.modPageUrl);
+};
+
+app.get("/api/nexus/games/:gameDomain/trending-mods", steamPublicLimiter, async (req, res) => {
+  const gameDomain = String(req.params.gameDomain || "").trim().toLowerCase();
+  if (!/^[a-z0-9-]{2,80}$/.test(gameDomain)) {
+    res.status(400).json({ error: "Dominio Nexus invalido." });
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.nexusmods.com/v3/games/${encodeURIComponent(gameDomain)}/trending-mods`,
+      {
+        headers: {
+          Accept: "application/json",
+          "Application-Name": "Checkpoint Launcher",
+          "Application-Version": "3.0.0",
+        },
+        signal: AbortSignal.timeout(12_000),
+      },
+    );
+    if (response.status === 404) {
+      res.status(404).json({ error: "Jogo nao encontrado no Nexus Mods." });
+      return;
+    }
+    if (!response.ok) {
+      res.status(502).json({ error: `Nexus Mods respondeu com status ${response.status}.` });
+      return;
+    }
+    res.json({ mods: normalizeNexusTrendingMods(await response.json()) });
+  } catch (error) {
+    res.status(error?.name === "TimeoutError" ? 504 : 502).json({
+      error: error?.name === "TimeoutError"
+        ? "A Nexus Mods demorou demais para responder."
+        : "Nao foi possivel consultar a Nexus Mods.",
+    });
   }
 });
 
@@ -2523,9 +2683,14 @@ app.get("/auth/steam/callback", steamAuthLimiter, async (req, res) => {
       return;
     }
 
-    await updateLinkedAccountProfile(pending.firebaseUid, {
-      steam_id: steamId,
+    const steamProfile = await fetchSteamPlayerProfile(steamId).catch((error) => {
+      console.warn("[steam] Perfil publico indisponivel durante a vinculacao:", error?.message || error);
+      return null;
     });
+    await updateLinkedAccountProfile(
+      pending.firebaseUid,
+      steamProfile || { steam_id: steamId },
+    );
 
     res.type("html").send(
       renderAuthSuccessScreen("Steam", buildLauncherAuthCallback("steam", "ok")),
@@ -2616,6 +2781,8 @@ app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, asyn
   try {
     await updateLinkedAccountProfile(req.firebaseUser.uid, {
       steam_id: null,
+      steam_username: null,
+      steam_avatar: null,
     });
     res.json({ ok: true });
   } catch {
@@ -2679,6 +2846,14 @@ app.get("/api/steam/library", steamPrivateLimiter, requireFirebaseUser, requireL
       return;
     }
     cacheOwnedSteamAppIds(steamId, games);
+
+    const steamProfile = await fetchSteamPlayerProfile(steamId).catch((error) => {
+      console.warn("[steam] Nao foi possivel atualizar nome/avatar:", error?.message || error);
+      return null;
+    });
+    if (steamProfile) {
+      await updateLinkedAccountProfile(req.firebaseUser.uid, steamProfile);
+    }
 
     res.json({
       steamId,
@@ -3237,9 +3412,31 @@ app.get("/{*path}", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/index.html"));
 });
 
-export const startServer = () => app.listen(port, () => {
-  console.log(`Backend ativo em http://localhost:${port}`);
-});
+export const startServer = () => {
+  const server = app.listen(port, () => {
+    console.log(`Backend ativo em http://localhost:${port}`);
+    void cleanupExpiredChatData()
+      .then(({ deletedMessages, deletedAttachments }) => {
+        if (deletedMessages > 0 || deletedAttachments > 0) {
+          console.log(
+            `[chat-retention] Removidas ${deletedMessages} mensagens e ${deletedAttachments} imagens expiradas.`,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("[chat-retention] Falha na limpeza inicial:", error);
+      });
+  });
+
+  const cleanupTimer = setInterval(() => {
+    void cleanupExpiredChatData().catch((error) => {
+      console.error("[chat-retention] Falha na limpeza periodica:", error);
+    });
+  }, CHAT_CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref();
+
+  return server;
+};
 
 if (process.env.NODE_ENV !== "test") {
   startServer();
