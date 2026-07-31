@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage } = require("electron");
 
 const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
@@ -25,6 +25,18 @@ const {
 } = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
+const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
+const {
+  getNexusDownloadLinks,
+  getNexusModCatalog,
+  getNexusModDetails,
+  getNexusModFiles,
+  normalizeGameDomain,
+  normalizeModId,
+  validateNexusApiKey,
+} = require("./nexus-api.cjs");
+const { downloadNexusFile, parseNxmUrl } = require("./nexus-download-manager.cjs");
+const { installCyberpunkZip } = require("./cyberpunk-mod-installer.cjs");
 const {
   detectEmulator,
   parseAchievementState,
@@ -169,6 +181,10 @@ let isQuitting = false;
 let tray = null;
 let localGameLibrary = null;
 let pendingAccountAuthCallback = null;
+let nexusCredentialStore = null;
+let pendingNexusDownload = null;
+let nexusDownloadState = null;
+let nexusDownloadInProgress = false;
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -184,12 +200,14 @@ if (process.platform === "win32") {
 }
 
 if (!IS_SMOKE_TEST) {
-  if (!app.isPackaged) {
-    app.setAsDefaultProtocolClient("checkpoint", process.execPath, [
-      path.resolve(app.getAppPath()),
-    ]);
-  } else {
-    app.setAsDefaultProtocolClient("checkpoint");
+  for (const protocol of ["checkpoint", "nxm"]) {
+    if (!app.isPackaged) {
+      app.setAsDefaultProtocolClient(protocol, process.execPath, [
+        path.resolve(app.getAppPath()),
+      ]);
+    } else {
+      app.setAsDefaultProtocolClient(protocol);
+    }
   }
 }
 
@@ -275,6 +293,327 @@ const registerSecureIpcHandler = createSecureIpcRegistrar({
   ipcMain,
   isAllowedUrl: isLocalAppUrl,
   getExpectedWebContents: () => mainWindow?.webContents ?? null,
+});
+
+const NEXUS_DOWNLOAD_REQUEST_TTL_MS = 15 * 60 * 1000;
+
+const getNexusCredentialStore = () => {
+  if (!nexusCredentialStore) {
+    nexusCredentialStore = createNexusCredentialStore({
+      userDataPath: app.getPath("userData"),
+      safeStorage,
+    });
+  }
+  return nexusCredentialStore;
+};
+
+const getNexusApiKey = () => {
+  const apiKey = getNexusCredentialStore().read();
+  if (!apiKey) {
+    throw new Error("Conecte uma chave pessoal Nexus antes de continuar.");
+  }
+  return apiKey;
+};
+
+const getNexusDownloadRoot = () =>
+  path.join(app.getPath("downloads"), "Checkpoint", "Nexus Mods");
+
+const publishNexusDownloadState = (patch) => {
+  nexusDownloadState = {
+    ...(nexusDownloadState || {}),
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("nexus:download-state", nexusDownloadState);
+  }
+  return nexusDownloadState;
+};
+
+const findNxmUrl = (args) =>
+  (Array.isArray(args) ? args : [])
+    .find((arg) => typeof arg === "string" && /^nxm:\/\//i.test(arg)) || null;
+
+const handleNexusDownloadUrl = async (rawUrl) => {
+  if (!rawUrl) return false;
+  let parsed;
+  try {
+    parsed = parseNxmUrl(rawUrl);
+  } catch (error) {
+    publishNexusDownloadState({
+      status: "error",
+      error: error instanceof Error ? error.message : "O link NXM recebido e invalido.",
+    });
+    return false;
+  }
+
+  const pending = pendingNexusDownload;
+  if (
+    !pending
+    || pending.expiresAt < Date.now()
+    || pending.gameDomain !== parsed.gameDomain
+    || pending.modId !== parsed.modId
+    || pending.fileId !== parsed.fileId
+  ) {
+    publishNexusDownloadState({
+      status: "error",
+      gameDomain: parsed.gameDomain,
+      modId: parsed.modId,
+      fileId: parsed.fileId,
+      error: "Este download nao foi iniciado pelo Checkpoint ou a solicitacao expirou.",
+    });
+    return false;
+  }
+  if (Number(parsed.expires) * 1000 <= Date.now()) {
+    publishNexusDownloadState({
+      status: "error",
+      gameDomain: parsed.gameDomain,
+      modId: parsed.modId,
+      fileId: parsed.fileId,
+      error: "A autorizacao temporaria de download da Nexus expirou.",
+    });
+    return false;
+  }
+  if (nexusDownloadInProgress) {
+    publishNexusDownloadState({
+      status: "error",
+      error: "Aguarde o download Nexus atual terminar.",
+    });
+    return false;
+  }
+
+  pendingNexusDownload = null;
+  nexusDownloadInProgress = true;
+  const downloadId = crypto.randomUUID();
+  const baseState = {
+    id: downloadId,
+    gameDomain: parsed.gameDomain,
+    modId: parsed.modId,
+    fileId: parsed.fileId,
+    modName: pending.modName,
+    modAuthor: pending.modAuthor,
+    pictureUrl: pending.pictureUrl,
+    version: pending.version,
+  };
+  publishNexusDownloadState({
+    ...baseState,
+    status: "resolving",
+    error: "",
+    receivedBytes: 0,
+    totalBytes: 0,
+  });
+
+  try {
+    const links = await getNexusDownloadLinks({
+      apiKey: getNexusApiKey(),
+      appVersion: app.getVersion(),
+      ...parsed,
+    });
+    const mirror = links.mirrors[0];
+    if (!mirror) {
+      throw new Error("A Nexus nao retornou um servidor de download disponivel.");
+    }
+    publishNexusDownloadState({
+      ...baseState,
+      status: "downloading",
+      mirror: mirror.name,
+    });
+
+    const downloaded = await downloadNexusFile({
+      uri: mirror.uri,
+      destinationRoot: getNexusDownloadRoot(),
+      gameDomain: parsed.gameDomain,
+      modId: parsed.modId,
+      fileId: parsed.fileId,
+      onProgress: ({ receivedBytes, totalBytes }) => {
+        publishNexusDownloadState({
+          ...baseState,
+          status: "downloading",
+          mirror: mirror.name,
+          receivedBytes,
+          totalBytes,
+        });
+      },
+    });
+
+    let installation = null;
+    let installationError = "";
+    if (
+      pending.autoInstall
+      && path.extname(downloaded.filePath).toLowerCase() === ".zip"
+    ) {
+      publishNexusDownloadState({
+        ...baseState,
+        ...downloaded,
+        status: "installing",
+      });
+      try {
+        installation = await installCyberpunkZip({
+          archivePath: downloaded.filePath,
+          gameRoot: pending.gameFolder,
+          backupRoot: path.join(app.getPath("userData"), "nexus-backups"),
+          manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+          modId: parsed.modId,
+          fileId: parsed.fileId,
+          modName: pending.modName,
+        });
+      } catch (error) {
+        installationError = error instanceof Error
+          ? error.message
+          : "A instalacao automatica falhou.";
+      }
+    }
+
+    publishNexusDownloadState({
+      ...baseState,
+      ...downloaded,
+      ...(installation || {}),
+      status: "completed",
+      installed: Boolean(installation),
+      installationError,
+      error: "",
+    });
+    return true;
+  } catch (error) {
+    publishNexusDownloadState({
+      ...baseState,
+      status: "error",
+      error: error instanceof Error ? error.message : "O download Nexus falhou.",
+    });
+    return false;
+  } finally {
+    nexusDownloadInProgress = false;
+  }
+};
+
+registerSecureIpcHandler("nexus:get-status", () =>
+  getNexusCredentialStore().getStatus());
+
+registerSecureIpcHandler("nexus:connect-personal-key", async (_event, apiKey) => {
+  const account = await validateNexusApiKey({
+    apiKey,
+    appVersion: app.getVersion(),
+  });
+  getNexusCredentialStore().save(apiKey);
+  return {
+    ...getNexusCredentialStore().getStatus(),
+    account,
+  };
+});
+
+registerSecureIpcHandler("nexus:validate-connection", async () => {
+  const store = getNexusCredentialStore();
+  const apiKey = store.read();
+  if (!apiKey) return { ...store.getStatus(), account: null };
+  const account = await validateNexusApiKey({
+    apiKey,
+    appVersion: app.getVersion(),
+  });
+  return { ...store.getStatus(), account };
+});
+
+registerSecureIpcHandler("nexus:disconnect", () => {
+  getNexusCredentialStore().clear();
+  pendingNexusDownload = null;
+  return getNexusCredentialStore().getStatus();
+});
+
+registerSecureIpcHandler("nexus:get-mod-catalog", async (_event, request) =>
+  getNexusModCatalog({
+    apiKey: getNexusApiKey(),
+    appVersion: app.getVersion(),
+    gameDomain: request?.gameDomain,
+  }));
+
+registerSecureIpcHandler("nexus:get-mod-details", async (_event, request) =>
+  getNexusModDetails({
+    apiKey: getNexusApiKey(),
+    appVersion: app.getVersion(),
+    gameDomain: request?.gameDomain,
+    modId: request?.modId,
+  }));
+
+registerSecureIpcHandler("nexus:get-mod-files", async (_event, request) =>
+  getNexusModFiles({
+    apiKey: getNexusApiKey(),
+    appVersion: app.getVersion(),
+    gameDomain: request?.gameDomain,
+    modId: request?.modId,
+  }));
+
+registerSecureIpcHandler("nexus:get-download-state", () => nexusDownloadState);
+
+registerSecureIpcHandler("nexus:list-downloaded-files", async (_event, rawGameDomain) => {
+  const gameDomain = normalizeGameDomain(rawGameDomain);
+  const gameRoot = path.join(getNexusDownloadRoot(), gameDomain);
+  const modDirectories = await fs.promises.readdir(gameRoot, { withFileTypes: true })
+    .catch((error) => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    });
+  const downloads = [];
+  for (const modDirectory of modDirectories) {
+    if (!modDirectory.isDirectory()) continue;
+    let modId;
+    try {
+      modId = normalizeModId(modDirectory.name);
+    } catch {
+      continue;
+    }
+    const modRoot = path.join(gameRoot, modId);
+    const files = await fs.promises.readdir(modRoot, { withFileTypes: true });
+    for (const file of files) {
+      if (!file.isFile() || file.name.endsWith(".part")) continue;
+      const filePath = path.join(modRoot, file.name);
+      const stats = await fs.promises.stat(filePath);
+      downloads.push({
+        id: `${gameDomain}:${modId}`,
+        gameDomain,
+        modId,
+        filename: file.name,
+        filePath,
+        bytes: stats.size,
+        downloadedAt: stats.mtimeMs,
+      });
+    }
+  }
+  return downloads.sort((left, right) => right.downloadedAt - left.downloadedAt);
+});
+
+registerSecureIpcHandler("nexus:prepare-free-download", (_event, request) => {
+  const gameDomain = normalizeGameDomain(request?.gameDomain);
+  const modId = normalizeModId(request?.modId);
+  const fileId = normalizeModId(request?.fileId);
+  getNexusApiKey();
+  const expiresAt = Date.now() + NEXUS_DOWNLOAD_REQUEST_TTL_MS;
+  pendingNexusDownload = {
+    gameDomain,
+    modId,
+    fileId,
+    gameFolder: String(request?.gameFolder || "").slice(0, 2048),
+    modName: String(request?.modName || "").slice(0, 240),
+    modAuthor: String(request?.modAuthor || "").slice(0, 120),
+    pictureUrl: /^https:\/\//i.test(String(request?.pictureUrl || ""))
+      ? String(request.pictureUrl).slice(0, 2048)
+      : "",
+    version: String(request?.version || "").slice(0, 80),
+    autoInstall: gameDomain === "cyberpunk2077" && Boolean(request?.gameFolder),
+    expiresAt,
+  };
+  return {
+    prepared: true,
+    autoInstall: pendingNexusDownload.autoInstall,
+    expiresAt,
+  };
+});
+
+registerSecureIpcHandler("nexus:open-download-location", () => {
+  if (nexusDownloadState?.filePath && fs.existsSync(nexusDownloadState.filePath)) {
+    shell.showItemInFolder(nexusDownloadState.filePath);
+    return true;
+  }
+  void shell.openPath(getNexusDownloadRoot());
+  return true;
 });
 
 const isExternalProtocol = (rawUrl) => {
@@ -2866,6 +3205,26 @@ let updaterState = {
   error: "",
 };
 
+const formatUpdaterError = (error) => {
+  const rawMessage = String(error?.message || error || "");
+  if (
+    /\b404\b/.test(rawMessage)
+    && /github\.com\/Guilhermesttt\/Checkpoint---Launcher\/releases/i.test(rawMessage)
+  ) {
+    return [
+      "Nao foi possivel acessar os releases do Checkpoint no GitHub.",
+      "O repositorio esta privado ou nao possui uma release publica com latest.yml.",
+    ].join(" ");
+  }
+  if (/401|bad credentials|authentication token/i.test(rawMessage)) {
+    return "O servidor de atualizacoes recusou a autenticacao.";
+  }
+  const firstLine = rawMessage.split(/\r?\n/, 1)[0]
+    .replace(/\b(?:authorization|cookie|set-cookie)\b\s*[:=][^,}]+/gi, "$1: [oculto]")
+    .trim();
+  return firstLine.slice(0, 500) || "Erro desconhecido ao verificar atualizacoes.";
+};
+
 const sendUpdaterMessage = (message, data) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("update:message", message, data);
@@ -2892,7 +3251,7 @@ autoUpdater.on("update-not-available", (info) => {
 });
 
 autoUpdater.on("error", (err) => {
-  const message = err ? err.message : "Erro desconhecido";
+  const message = formatUpdaterError(err);
   updaterState = { ...updaterState, status: "error", error: message };
   sendUpdaterMessage("error", message);
 });
@@ -2924,7 +3283,7 @@ registerSecureIpcHandler("update:check-for-updates", async () => {
     return result;
   } catch (error) {
     console.error("[auto-updater] Erro ao checar atualizações:", error);
-    throw error;
+    throw new Error(formatUpdaterError(error));
   }
 });
 
@@ -3040,6 +3399,7 @@ app.whenReady().then(async () => {
     await migrateKnownAchievementProgress();
     await createWindow();
     deliverAccountAuthCallback(findAccountAuthCallback(process.argv));
+    void handleNexusDownloadUrl(findNxmUrl(process.argv));
     void ensureEpicStoreSearchWindow().catch((error) => {
       console.warn("[epic-store] Nao foi possivel preaquecer a busca:", error?.message || error);
     });
@@ -3051,6 +3411,7 @@ app.whenReady().then(async () => {
 
 app.on("second-instance", (_event, commandLine) => {
   deliverAccountAuthCallback(findAccountAuthCallback(commandLine));
+  void handleNexusDownloadUrl(findNxmUrl(commandLine));
   if (!mainWindow) return;
   if (mainWindow.isMinimized()) {
     mainWindow.restore();
@@ -3060,7 +3421,11 @@ app.on("second-instance", (_event, commandLine) => {
 
 app.on("open-url", (event, url) => {
   event.preventDefault();
-  deliverAccountAuthCallback(parseAccountAuthCallback(url));
+  if (/^nxm:\/\//i.test(String(url || ""))) {
+    void handleNexusDownloadUrl(url);
+  } else {
+    deliverAccountAuthCallback(parseAccountAuthCallback(url));
+  }
 });
 
 app.on("activate", () => {
