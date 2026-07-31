@@ -28,6 +28,17 @@ interface UserProfilePageProps {
   onNotify?: (message: string, type?: "success" | "error" | "info") => void;
 }
 
+type LegacyGameFields = {
+  minutesPlayed?: number;
+  imageUrl?: string;
+};
+
+type LegacyLibrarySummaryFields = {
+  steamGameCount?: number;
+  epicGameCount?: number;
+  localGameCount?: number;
+};
+
 const profileCopy = {
   "pt-BR": {
     connected: "Conectado", disconnected: "Não conectado", player: "Jogador",
@@ -241,10 +252,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const email = userProfile?.email || user?.email || "";
 
   const normalizedGames = useMemo(() => {
-    return (games || []).map((game: any) => {
+    return (games || []).map((game) => {
+      const legacyGame = game as Game & LegacyGameFields;
       const minutes = Math.max(
         0,
-        Number(game.minutesPlayed) || 0,
+        Number(legacyGame.minutesPlayed) || 0,
         Number(game.steamPlaytimeMinutes) || 0,
         Number(game.locallyTrackedMinutes) || 0,
         Math.round((Number(game.hoursPlayed) || 0) * 60),
@@ -253,8 +265,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
         ...game,
         hoursPlayed: minutes / 60,
         isFavorite: Boolean(game.isFavorite),
-        cardImage: game.cardImage || game.imageUrl || game.image,
-        image: game.image || game.imageUrl || game.cardImage,
+        cardImage: game.cardImage || legacyGame.imageUrl || game.image,
+        image: game.image || legacyGame.imageUrl || game.cardImage,
       } as Game;
     });
   }, [games]);
@@ -268,25 +280,28 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     const storedAchievementSummary = userProfile?.achievementSummary;
     const hasCanonicalSummary = Boolean(
       storedAchievementSummary?.updatedAt
-      || storedAchievementSummary?.total != null
+      || storedAchievementSummary?.available != null
       || storedAchievementSummary?.unlocked != null
     );
     const totalAchievements = hasCanonicalSummary
       ? Number(storedAchievementSummary?.unlocked || 0)
       : achievementTotals.unlocked;
     const totalPossible = hasCanonicalSummary
-      ? Math.max(Number(storedAchievementSummary?.available ?? storedAchievementSummary?.total ?? 0), totalAchievements)
+      ? Math.max(Number(storedAchievementSummary?.available ?? 0), totalAchievements)
       : achievementTotals.available;
+    const legacyLibrarySummary = userProfile?.librarySummary as
+      | (UserProfile["librarySummary"] & LegacyLibrarySummaryFields)
+      | undefined;
     const favorites = userProfile?.librarySummary?.favorites
       ?? normalizedGames.filter((game) => game.isFavorite).length;
     const steamGames = userProfile?.librarySummary?.steamGames
-      ?? (userProfile?.librarySummary as any)?.steamGameCount
+      ?? legacyLibrarySummary?.steamGameCount
       ?? normalizedGames.filter((game) => game.launcherType === "steam").length;
     const epicGames = userProfile?.librarySummary?.epicGames
-      ?? (userProfile?.librarySummary as any)?.epicGameCount
+      ?? legacyLibrarySummary?.epicGameCount
       ?? normalizedGames.filter((game) => game.launcherType === "epic").length;
     const localGames = userProfile?.librarySummary?.localGames
-      ?? (userProfile?.librarySummary as any)?.localGameCount
+      ?? legacyLibrarySummary?.localGameCount
       ?? normalizedGames.filter((game) => !game.launcherType || game.launcherType === "local").length;
     const totalGames = userProfile?.librarySummary?.games ?? normalizedGames.length;
     return { totalGames, totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
