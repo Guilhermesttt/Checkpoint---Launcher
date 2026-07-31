@@ -240,42 +240,72 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const displayName = userProfile?.displayName || user?.email?.split("@")[0] || copy.player;
   const email = userProfile?.email || user?.email || "";
 
+  const normalizedGames = useMemo(() => {
+    return (games || []).map((game: any) => {
+      const minutes = Math.max(
+        0,
+        Number(game.minutesPlayed) || 0,
+        Number(game.steamPlaytimeMinutes) || 0,
+        Number(game.locallyTrackedMinutes) || 0,
+        Math.round((Number(game.hoursPlayed) || 0) * 60),
+      );
+      return {
+        ...game,
+        hoursPlayed: minutes / 60,
+        isFavorite: Boolean(game.isFavorite),
+        cardImage: game.cardImage || game.imageUrl || game.image,
+        image: game.image || game.imageUrl || game.cardImage,
+      } as Game;
+    });
+  }, [games]);
+
   const stats = useMemo(() => {
     const totalMinutes = userProfile?.librarySummary
       ? Math.max(0, Math.round(Number(userProfile.librarySummary.minutesPlayed) || 0))
-      : calculateTotalPlayedMinutes(games);
+      : calculateTotalPlayedMinutes(normalizedGames);
     const totalHours = totalMinutes / 60;
-    const achievementTotals = calculateAchievementTotals(games);
+    const achievementTotals = calculateAchievementTotals(normalizedGames);
     const storedAchievementSummary = userProfile?.achievementSummary;
-    const hasCanonicalSummary = Boolean(storedAchievementSummary?.updatedAt);
+    const hasCanonicalSummary = Boolean(
+      storedAchievementSummary?.updatedAt
+      || storedAchievementSummary?.total != null
+      || storedAchievementSummary?.unlocked != null
+    );
     const totalAchievements = hasCanonicalSummary
       ? Number(storedAchievementSummary?.unlocked || 0)
       : achievementTotals.unlocked;
     const totalPossible = hasCanonicalSummary
-      ? Math.max(Number(storedAchievementSummary?.available || 0), totalAchievements)
+      ? Math.max(Number(storedAchievementSummary?.available ?? storedAchievementSummary?.total ?? 0), totalAchievements)
       : achievementTotals.available;
     const favorites = userProfile?.librarySummary?.favorites
-      ?? games.filter((game) => game.isFavorite).length;
+      ?? normalizedGames.filter((game) => game.isFavorite).length;
     const steamGames = userProfile?.librarySummary?.steamGames
-      ?? games.filter((game) => game.launcherType === "steam").length;
+      ?? (userProfile?.librarySummary as any)?.steamGameCount
+      ?? normalizedGames.filter((game) => game.launcherType === "steam").length;
     const epicGames = userProfile?.librarySummary?.epicGames
-      ?? games.filter((game) => game.launcherType === "epic").length;
+      ?? (userProfile?.librarySummary as any)?.epicGameCount
+      ?? normalizedGames.filter((game) => game.launcherType === "epic").length;
     const localGames = userProfile?.librarySummary?.localGames
-      ?? games.filter((game) => !game.launcherType || game.launcherType === "local").length;
-    const totalGames = userProfile?.librarySummary?.games ?? games.length;
+      ?? (userProfile?.librarySummary as any)?.localGameCount
+      ?? normalizedGames.filter((game) => !game.launcherType || game.launcherType === "local").length;
+    const totalGames = userProfile?.librarySummary?.games ?? normalizedGames.length;
     return { totalGames, totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
-  }, [games, userProfile]);
+  }, [normalizedGames, userProfile]);
 
   const topGames = useMemo(
     () =>
-      [...games]
+      [...normalizedGames]
         .filter((game) => getGamePlayedHours(game) > 0)
         .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a))
         .slice(0, 5),
-    [games],
+    [normalizedGames],
   );
 
-  const favoriteGames = useMemo(() => games.filter((game) => game.isFavorite).slice(0, 6), [games]);
+  const favoriteGames = useMemo(
+    () => normalizedGames.filter((game) => game.isFavorite).slice(0, 6),
+    [normalizedGames],
+  );
+
   const achievementPercent =
     stats.totalPossible > 0 ? Math.round((stats.totalAchievements / stats.totalPossible) * 100) : 0;
   const maxHours = Math.max(topGames[0] ? getGamePlayedHours(topGames[0]) : 1, 1);

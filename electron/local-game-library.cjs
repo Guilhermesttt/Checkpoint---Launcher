@@ -347,6 +347,7 @@ const createLocalGameLibrary = (userDataPath) => {
         Math.max(0, Math.round((Number(game.hoursPlayed) || 0) * 60)),
       ),
       imageUrl: safeImageUrl(game.cardImage || game.image),
+      isFavorite: Boolean(game.isFavorite),
     });
     const topGames = [...games]
       .sort((a, b) => compactGame(b).minutesPlayed - compactGame(a).minutesPlayed)

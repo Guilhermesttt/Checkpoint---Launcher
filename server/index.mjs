@@ -1871,7 +1871,12 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
       ? publicRow.favorite_games
       : [];
     const sqlGames = Array.from(
-      new Map([...sqlTopGames, ...sqlFavoriteGames].map((game) => [String(game?.id || ""), game])).values(),
+      new Map(
+        [
+          ...sqlTopGames.map((game) => ({ ...game, isFavorite: Boolean(game?.isFavorite) })),
+          ...sqlFavoriteGames.map((game) => ({ ...game, isFavorite: true })),
+        ].map((game) => [String(game?.id || ""), game]),
+      ).values(),
     ).filter((game) => game?.id).slice(0, FRIEND_PROFILE_GAME_LIMIT);
 
     res.json({
@@ -1887,7 +1892,13 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
         discordUsername: privateRow?.discord_username || "",
         discordAvatar: privateRow?.discord_avatar || "",
         achievementSummary: publicRow.achievements || {},
-        librarySummary: publicRow.stats || {},
+        librarySummary: {
+          ...(publicRow.stats || {}),
+          ...(publicRow.platforms || {}),
+          steamGames: publicRow.platforms?.steamGameCount ?? publicRow.stats?.steamGames ?? 0,
+          epicGames: publicRow.platforms?.epicGameCount ?? publicRow.stats?.epicGames ?? 0,
+          localGames: publicRow.platforms?.localGameCount ?? publicRow.stats?.localGames ?? 0,
+        },
       },
       games: sqlGames,
       gamesTruncated: false,

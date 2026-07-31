@@ -8,6 +8,7 @@ const safeNonNegativeNumber = (value: unknown) => {
 export const getGamePlayedMinutes = (game: Game) => Math.max(
   Math.round(safeNonNegativeNumber(game.steamPlaytimeMinutes)),
   Math.round(safeNonNegativeNumber(game.locallyTrackedMinutes)),
+  Math.round(safeNonNegativeNumber((game as any).minutesPlayed)),
   Math.round(safeNonNegativeNumber(game.hoursPlayed) * 60),
 );
 
