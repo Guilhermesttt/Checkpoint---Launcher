@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import "../electron/overlay-video.js";
 
-require("../electron/overlay-video.js");
 const { createOverlayVideoLayer, appendOverlayVideoLayer } = (window as typeof window & {
   CheckpointOverlayVideo: {
   createOverlayVideoLayer: (
