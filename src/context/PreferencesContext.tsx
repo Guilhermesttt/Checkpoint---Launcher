@@ -43,6 +43,13 @@ interface PreferencesContextValue {
   setLowPerformanceMode: (value: boolean) => void;
   closeOnLaunch: boolean;
   setCloseOnLaunch: (value: boolean) => void;
+  minimizeToTrayOnClose: boolean;
+  setMinimizeToTrayOnClose: (value: boolean) => void;
+  restoreLastScreen: boolean;
+  setRestoreLastScreen: (value: boolean) => void;
+  confirmBeforeExit: boolean;
+  setConfirmBeforeExit: (value: boolean) => void;
+  preferencesHydrated: boolean;
   t: (key: TranslationKey) => string;
 }
 
@@ -768,6 +775,23 @@ const clampVolume = (value: number) =>
 
 const prefKey = (uid: string, key: string) => `checkpoint_${key}_${uid}`;
 
+const readPreference = (uid: string, key: string) => {
+  try {
+    return localStorage.getItem(prefKey(uid, key));
+  } catch (error) {
+    console.warn(`[preferences] Falha ao ler ${key}.`, error);
+    return null;
+  }
+};
+
+const writePreference = (uid: string, key: string, value: string) => {
+  try {
+    localStorage.setItem(prefKey(uid, key), value);
+  } catch (error) {
+    console.warn(`[preferences] Falha ao salvar ${key}.`, error);
+  }
+};
+
 export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -786,6 +810,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [openAtLogin, setOpenAtLoginState] = useState(false);
   const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
   const [closeOnLaunch, setCloseOnLaunch] = useState(true);
+  const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true);
+  const [restoreLastScreen, setRestoreLastScreen] = useState(false);
+  const [confirmBeforeExit, setConfirmBeforeExit] = useState(true);
   const [hydratedPreferencesUid, setHydratedPreferencesUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -794,11 +821,11 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setHydratedPreferencesUid(null);
       return;
     }
-    const savedLanguage = localStorage.getItem(prefKey(user.uid, "language"));
-    const savedEffectsVolumeRaw = localStorage.getItem(prefKey(user.uid, "effects_volume"));
-    const savedAchievementVolumeRaw = localStorage.getItem(prefKey(user.uid, "achievement_volume"));
-    const savedNotificationVolumeRaw = localStorage.getItem(prefKey(user.uid, "notification_volume"));
-    const savedMusicVolumeRaw = localStorage.getItem(prefKey(user.uid, "music_volume"));
+    const savedLanguage = readPreference(user.uid, "language");
+    const savedEffectsVolumeRaw = readPreference(user.uid, "effects_volume");
+    const savedAchievementVolumeRaw = readPreference(user.uid, "achievement_volume");
+    const savedNotificationVolumeRaw = readPreference(user.uid, "notification_volume");
+    const savedMusicVolumeRaw = readPreference(user.uid, "music_volume");
     const savedEffectsVolume =
       savedEffectsVolumeRaw == null ? null : Number(savedEffectsVolumeRaw);
     const savedAchievementVolume =
@@ -807,20 +834,17 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       savedNotificationVolumeRaw == null ? null : Number(savedNotificationVolumeRaw);
     const savedMusicVolume =
       savedMusicVolumeRaw == null ? null : Number(savedMusicVolumeRaw);
-    const savedSoundTheme = localStorage.getItem(prefKey(user.uid, "sound_theme"));
-    const savedVisualTheme = localStorage.getItem(prefKey(user.uid, "visual_theme"));
-    const savedOpenAtLogin = localStorage.getItem(prefKey(user.uid, "open_at_login"));
-    const savedLowPerf = localStorage.getItem(prefKey(user.uid, "low_perf"));
-    const savedCloseLaunch = localStorage.getItem(prefKey(user.uid, "close_launch"));
-    const savedAchievementNotifications = localStorage.getItem(
-      prefKey(user.uid, "achievement_notifications"),
-    );
-    const savedCustomAchievementNotifications = localStorage.getItem(
-      prefKey(user.uid, "custom_achievement_notifications"),
-    );
-    const savedAchievementNotificationPosition = localStorage.getItem(
-      prefKey(user.uid, "achievement_notification_position"),
-    );
+    const savedSoundTheme = readPreference(user.uid, "sound_theme");
+    const savedVisualTheme = readPreference(user.uid, "visual_theme");
+    const savedOpenAtLogin = readPreference(user.uid, "open_at_login");
+    const savedLowPerf = readPreference(user.uid, "low_perf");
+    const savedCloseLaunch = readPreference(user.uid, "close_launch");
+    const savedMinimizeToTray = readPreference(user.uid, "minimize_to_tray");
+    const savedRestoreLastScreen = readPreference(user.uid, "restore_last_screen");
+    const savedConfirmBeforeExit = readPreference(user.uid, "confirm_before_exit");
+    const savedAchievementNotifications = readPreference(user.uid, "achievement_notifications");
+    const savedCustomAchievementNotifications = readPreference(user.uid, "custom_achievement_notifications");
+    const savedAchievementNotificationPosition = readPreference(user.uid, "achievement_notification_position");
 
     if (savedOpenAtLogin !== null) {
       const shouldOpenAtLogin = savedOpenAtLogin === "true";
@@ -833,6 +857,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     if (savedLowPerf !== null) setLowPerformanceMode(savedLowPerf === "true");
     if (savedCloseLaunch !== null) setCloseOnLaunch(savedCloseLaunch === "true");
+    if (savedMinimizeToTray !== null) setMinimizeToTrayOnClose(savedMinimizeToTray === "true");
+    if (savedRestoreLastScreen !== null) setRestoreLastScreen(savedRestoreLastScreen === "true");
+    if (savedConfirmBeforeExit !== null) setConfirmBeforeExit(savedConfirmBeforeExit === "true");
     if (savedAchievementNotifications !== null) {
       setAchievementNotificationsEnabled(savedAchievementNotifications === "true");
     }
@@ -886,29 +913,23 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
-    localStorage.setItem(prefKey(user.uid, "language"), language);
-    localStorage.setItem(prefKey(user.uid, "effects_volume"), String(effectsVolume));
-    localStorage.setItem(prefKey(user.uid, "achievement_volume"), String(achievementVolume));
-    localStorage.setItem(prefKey(user.uid, "notification_volume"), String(notificationVolume));
-    localStorage.setItem(prefKey(user.uid, "music_volume"), String(musicVolume));
-    localStorage.setItem(prefKey(user.uid, "sound_theme"), soundTheme);
-    localStorage.setItem(prefKey(user.uid, "visual_theme"), visualTheme);
-    localStorage.setItem(prefKey(user.uid, "open_at_login"), String(openAtLogin));
-    localStorage.setItem(prefKey(user.uid, "low_perf"), String(lowPerformanceMode));
-    localStorage.setItem(prefKey(user.uid, "close_launch"), String(closeOnLaunch));
-    localStorage.setItem(
-      prefKey(user.uid, "achievement_notifications"),
-      String(achievementNotificationsEnabled),
-    );
-    localStorage.setItem(
-      prefKey(user.uid, "custom_achievement_notifications"),
-      String(customAchievementNotifications),
-    );
-    localStorage.setItem(
-      prefKey(user.uid, "achievement_notification_position"),
-      achievementNotificationPosition,
-    );
-  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, musicVolume, notificationVolume, openAtLogin, soundTheme, user?.uid, visualTheme]);
+    writePreference(user.uid, "language", language);
+    writePreference(user.uid, "effects_volume", String(effectsVolume));
+    writePreference(user.uid, "achievement_volume", String(achievementVolume));
+    writePreference(user.uid, "notification_volume", String(notificationVolume));
+    writePreference(user.uid, "music_volume", String(musicVolume));
+    writePreference(user.uid, "sound_theme", soundTheme);
+    writePreference(user.uid, "visual_theme", visualTheme);
+    writePreference(user.uid, "open_at_login", String(openAtLogin));
+    writePreference(user.uid, "low_perf", String(lowPerformanceMode));
+    writePreference(user.uid, "close_launch", String(closeOnLaunch));
+    writePreference(user.uid, "minimize_to_tray", String(minimizeToTrayOnClose));
+    writePreference(user.uid, "restore_last_screen", String(restoreLastScreen));
+    writePreference(user.uid, "confirm_before_exit", String(confirmBeforeExit));
+    writePreference(user.uid, "achievement_notifications", String(achievementNotificationsEnabled));
+    writePreference(user.uid, "custom_achievement_notifications", String(customAchievementNotifications));
+    writePreference(user.uid, "achievement_notification_position", achievementNotificationPosition);
+  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -981,6 +1002,13 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setLowPerformanceMode,
       closeOnLaunch,
       setCloseOnLaunch,
+      minimizeToTrayOnClose,
+      setMinimizeToTrayOnClose,
+      restoreLastScreen,
+      setRestoreLastScreen,
+      confirmBeforeExit,
+      setConfirmBeforeExit,
+      preferencesHydrated: hydratedPreferencesUid === user?.uid,
       t: (key) => {
         if (language === "pt-BR" || language === "en-US" || language === "es-ES") {
           return translations[language][key] ?? translations["pt-BR"][key];
@@ -992,7 +1020,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       },
     }),
-    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, customAchievementNotifications, effectsVolume, language, lowPerformanceMode, musicVolume, notificationVolume, openAtLogin, soundTheme, visualTheme],
+    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme],
   );
 
   return (
