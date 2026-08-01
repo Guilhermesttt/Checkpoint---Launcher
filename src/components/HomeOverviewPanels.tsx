@@ -42,7 +42,7 @@ export const HomeOverviewPanels = React.memo(function HomeOverviewPanels({
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="pointer-events-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 w-64 shadow-2xl flex items-center gap-3"
+          className="pointer-events-auto rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-3 w-64 shadow-2xl flex items-center gap-3"
         >
           <Users2 className="h-4 w-4 text-white/50 shrink-0" />
           <div className="flex-1 min-w-0">

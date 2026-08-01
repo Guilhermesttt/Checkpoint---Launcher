@@ -158,7 +158,7 @@ const GameCard: React.FC<GameCardProps> = ({
       {/* Glow externo quando ativo */}
       {visuallyActive && (
         <PGlow
-          className="absolute inset-0 rounded-2xl"
+          className="absolute inset-0 rounded-3xl"
           style={{ transform: "translateY(8px) scale(0.95)", zIndex: 0 }}
           color="var(--launcher-accent-soft, rgba(255,255,255,0.15))"
           size="100%"
@@ -175,8 +175,8 @@ const GameCard: React.FC<GameCardProps> = ({
         isActive={visuallyActive}
       >
         <div
-          className={`relative h-full w-full overflow-hidden rounded-2xl bg-[#08080c] transition-all duration-400 ease-out transform group-hover:scale-[1.02] ${visuallyActive
-            ? "shadow-[0_24px_56px_rgba(0,0,0,0.85),0_0_32px_rgba(255,255,255,0.15)] ring-2 ring-white/30"
+          className={`relative h-full w-full overflow-hidden rounded-3xl bg-[#08080c] transition-all duration-400 ease-out transform group-hover:scale-[1.02] ${visuallyActive
+            ? "shadow-[0_24px_56px_rgba(0,0,0,0.85),0_0_32px_rgba(255,255,255,0.15)] ring-2"
             : "shadow-[0_8px_32px_rgba(0,0,0,0.5)] ring-1 ring-white/10 group-hover:shadow-[0_16px_48px_rgba(0,0,0,0.7),0_0_24px_var(--launcher-accent-soft,rgba(255,255,255,0.15))] group-hover:ring-white/20"
             }`}
           style={
@@ -190,7 +190,7 @@ const GameCard: React.FC<GameCardProps> = ({
         >
           {/* Borda interna premium */}
           <div
-            className="pointer-events-none absolute inset-0 z-[1] rounded-2xl"
+            className="pointer-events-none absolute inset-0 z-[1] rounded-3xl"
             style={{
               padding: 1,
               background: visuallyActive
@@ -327,7 +327,7 @@ const GameCard: React.FC<GameCardProps> = ({
               }`}
             style={{ transform: "translateZ(30px)" }}
           >
-            <p className="mb-1 text-[8.5px] font-bold uppercase tracking-[0.25em] text-white/50 flex items-center gap-1.5">
+            <p className="mb-1 text-[8.5px] font-semibold uppercase tracking-[0.22em] text-white/50 flex items-center gap-1.5 font-body">
               Iniciar
               {visuallyActive && (
                 <span className="relative flex h-1.5 w-1.5">
@@ -336,7 +336,7 @@ const GameCard: React.FC<GameCardProps> = ({
                 </span>
               )}
             </p>
-            <h3 className="line-clamp-2 text-[13px] font-black leading-snug text-white tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+            <h3 className="line-clamp-2 text-[13px] font-display font-black leading-snug text-white tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               {title}
             </h3>
           </div>

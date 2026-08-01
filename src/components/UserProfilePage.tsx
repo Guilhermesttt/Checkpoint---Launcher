@@ -184,7 +184,7 @@ const PlatformCard: React.FC<{
   disconnectedLabel: string;
 }> = ({ name, connected, username, avatar, icon, connectedLabel, disconnectedLabel }) => (
   <div
-    className={`flex items-center gap-3 rounded-2xl border p-3 ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
+    className={`flex items-center gap-3 rounded-3xl border p-3 ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
       }`}
   >
     <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75">
@@ -205,7 +205,7 @@ const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: React.Re
   label,
   value,
 }) => (
-  <div className="flex min-h-[90px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.045] px-5">
+  <div className="flex min-h-[90px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-white/[0.045] px-5">
     <div className="mb-2 text-white/36">{icon}</div>
     <div className="text-xl font-black text-white tabular-nums">{value}</div>
     <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-white/32">{label}</div>
@@ -218,7 +218,7 @@ const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React
   children,
   className = "",
 }) => (
-  <section className={`rounded-[26px] border border-white/10 bg-black/55 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.45)] ${className}`}>
+  <section className={`rounded-3xl border border-white/10 bg-black/55 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.45)] ${className}`}>
     <div className="mb-4 flex items-center gap-2">
       {icon && <span className="text-white/40">{icon}</span>}
       <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">{title}</p>
@@ -353,7 +353,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
         }}
       />
       <div className="relative mx-auto max-w-6xl space-y-5">
-        <section className="rounded-[28px] border border-white/10 bg-black/70 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+        <section className="rounded-3xl border border-white/10 bg-black/70 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 items-center gap-5">
               <ProfileAvatar profile={userProfile} firebasePhotoURL={user?.photoURL} displayName={displayName} />
@@ -568,7 +568,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                       type="button"
                       onClick={() => onOpenGame?.(game)}
                       disabled={!onOpenGame}
-                      className="w-[82px] shrink-0 rounded-2xl p-1 text-left transition-colors hover:bg-white/[0.07] disabled:cursor-default disabled:hover:bg-transparent"
+                      className="w-[82px] shrink-0 rounded-3xl p-1 text-left transition-colors hover:bg-white/[0.07] disabled:cursor-default disabled:hover:bg-transparent"
                     >
                       <div className="h-[90px] w-[74px] overflow-hidden rounded-xl bg-white/8">
                         {(game.cardImage || game.image) && (

@@ -128,7 +128,7 @@ export const SettingsChoice: React.FC<{
     type="button"
     onClick={onClick}
     onMouseEnter={onHover}
-    className="relative cursor-pointer overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 hover:scale-[1.03] hover:border-white/30 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] active:scale-[0.98]"
+    className="relative cursor-pointer overflow-hidden rounded-3xl border p-4 text-left transition-all duration-200 hover:scale-[1.03] hover:border-white/30 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] active:scale-[0.98]"
     style={{
       background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.04)",
       borderColor: active
@@ -147,7 +147,7 @@ export const SettingsChoice: React.FC<{
     </span>
     {active && (
       <span
-        className="pointer-events-none absolute inset-0 rounded-2xl"
+        className="pointer-events-none absolute inset-0 rounded-3xl"
         style={{
           boxShadow:
             "inset 0 0 0 1px rgb(var(--launcher-accent) / 0.28), 0 0 28px rgb(var(--launcher-accent) / 0.16)",
@@ -172,7 +172,7 @@ export const VolumeSettingsCard: React.FC<{
   onChange: (volume: number) => void;
   t: TranslationFn;
 }> = React.memo(({ title, description, value, max, actionLabel, onAction, onHover, onChange, t }) => (
-  <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+  <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
     <SettingsHeader
       icon={<Volume2 className="h-5 w-5 text-white/70" />}
       title={title}
@@ -331,7 +331,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
 
   return (
     <SystemPageShell eyebrow={t("system")} title={t("settings")}>
-      <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <section className="mb-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
         <SettingsHeader
           icon={<Globe className="h-5 w-5 text-white/70" />}
           title={t("connectedAccounts")}
@@ -435,14 +435,14 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
         </div>
       </section>
 
-      <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <section className="mb-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
         <SettingsHeader
           icon={<Gamepad2 className="h-5 w-5 text-white/70" />}
           title={controllerCopy[0]}
           description="Status da navegacao e da iluminacao do controle conectado."
         />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
-          <div className="flex min-w-0 items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">
+          <div className="flex min-w-0 items-center gap-4 rounded-3xl border border-white/[0.07] bg-white/[0.035] p-4">
             <div
               className={`h-3 w-3 shrink-0 rounded-full ${
                 isGamepadConnected
@@ -507,7 +507,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
       </section>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
           <SettingsHeader
             icon={<Languages className="h-5 w-5 text-white/70" />}
             title={t("language")}
@@ -527,7 +527,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
           <SettingsHeader
             icon={<Settings className="h-5 w-5 text-white/70" />}
             title={t("themes")}
@@ -551,7 +551,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
           <SettingsHeader
             icon={<Bell className="h-5 w-5 text-white/70" />}
             title={achievementNotificationCopy.title}
@@ -658,7 +658,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
         />
       </div>
 
-      <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <section className="mt-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
         <SettingsHeader
           icon={<Zap className="h-5 w-5 text-white/70" />}
           title={t("performance")}
@@ -691,7 +691,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
         </div>
       </section>
 
-      <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+      <section className="mt-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
         <SettingsHeader
           icon={<Sparkles className="h-5 w-5 text-white/70" />}
           title="Overlay Lab"

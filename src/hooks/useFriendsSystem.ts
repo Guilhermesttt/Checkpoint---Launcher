@@ -101,6 +101,11 @@ export function useFriendsSystem({
           const senderFriend = socialFriends.find((f) => f.id === `cp-friend:${msg.senderId}`);
           const senderName = senderFriend?.name || "Amigo";
           const avatarUrl = senderFriend?.avatar || "";
+          const isImage = Boolean(
+            msg.attachmentType?.toLowerCase().startsWith("image/")
+            || msg.attachmentUrl
+            || msg.attachmentPath,
+          );
 
           if (activeChatFriend?.id !== `cp-friend:${msg.senderId}`) {
             void window.electronAPI?.showFriendMessageOverlay({
@@ -108,6 +113,7 @@ export function useFriendsSystem({
               messageText: msg.text,
               avatarUrl,
               friendId: `cp-friend:${msg.senderId}`,
+              contentKind: isImage ? "image" : "text",
             });
             playSound("friendRequest");
           }

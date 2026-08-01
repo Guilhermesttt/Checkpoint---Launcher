@@ -292,7 +292,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
 
           {/* Rótulo */}
           <span
-            className="text-[9px] font-bold uppercase tracking-[0.08em] leading-none transition-colors duration-300"
+            className="text-[9px] font-bold uppercase tracking-[0.1em] leading-none transition-colors duration-300 font-body"
             style={{
               color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.3)",
             }}
@@ -320,7 +320,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
 const GroupDivider: React.FC = () => (
   <div
     aria-hidden="true"
-    className="w-6 h-px my-1.5 self-center shrink-0 bg-white/[0.06]"
+    className="w-6 h-px my-1.5 self-center shrink-0 bg-white/[0.09]"
   />
 );
 
@@ -360,17 +360,16 @@ const Sidebar: React.FC<SidebarProps> = ({
       initial={{ x: -80, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed left-0 top-0 bottom-0 z-50 flex flex-col"
-      style={{ width: 96 }}
+      className="fixed left-3 top-3 bottom-3 z-50 flex flex-col pointer-events-none"
+      style={{ width: 84 }}
     >
       <div
-        className="flex-1 flex flex-col items-center py-6 gap-2 min-h-0"
+        className="pointer-events-auto flex-1 flex flex-col items-center py-5 gap-2 min-h-0 rounded-3xl border border-white/10"
         style={{
-          background: "rgba(6, 6, 10, 0.65)",
-          boxShadow: "12px 0 40px rgba(0,0,0,0.4), inset -1px 0 rgba(255,255,255,0.03)",
+          background: "rgba(6, 6, 8, 0.82)",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
           backdropFilter: "blur(48px)",
           WebkitBackdropFilter: "blur(48px)",
-          borderRight: "1px solid rgba(255,255,255,0.04)",
         }}
       >
         <div className="relative mb-4 flex flex-col items-center shrink-0 group cursor-pointer">
@@ -415,7 +414,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {groupIndex > 0 && <GroupDivider />}
                 <div role="group" aria-label={group.ariaLabel} className="flex w-full flex-col gap-1.5">
                   {showGroupLabel && (
-                    <span className="mb-0.5 text-center text-[7px] font-black uppercase tracking-[0.16em] text-white/20">
+                    <span className="mb-0.5 text-center text-[7px] font-bold uppercase tracking-[0.18em] text-white/20 font-body">
                       {groupLabels[group.key]}
                     </span>
                   )}

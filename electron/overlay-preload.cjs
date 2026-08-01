@@ -39,5 +39,10 @@ contextBridge.exposeInMainWorld("achievementOverlay", {
     ipcRenderer.on("overlay:panel-state", listener);
     return () => ipcRenderer.removeListener("overlay:panel-state", listener);
   },
+  onPanelCommand: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("overlay:panel-command", listener);
+    return () => ipcRenderer.removeListener("overlay:panel-command", listener);
+  },
   panelAction: (action) => ipcRenderer.invoke("overlay:panel-action", action),
 });

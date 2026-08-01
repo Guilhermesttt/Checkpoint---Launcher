@@ -12,7 +12,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
   const noFx = reducedEffects || low;
 
   return (
-    <div className="fixed inset-0 z-0 bg-[#050507] overflow-hidden pointer-events-none">
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" style={{ background: "var(--background)" }}>
       <PVideoBackground
         src="/PinDown.io_@sebasoler__1776538674.mp4"
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vh] h-[100vw] rotate-90 object-cover"
@@ -34,8 +34,17 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
         />
       </AnimatePresence>
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[#050507] via-[#050507]/40 to-transparent opacity-95" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#050507]/60 via-transparent to-transparent opacity-80" />
+      {/* Base gradients using CSS variable for unified dark background */}
+      <div className="absolute inset-0 opacity-95" style={{ background: "linear-gradient(to top, var(--background) 0%, color-mix(in srgb, var(--background) 40%, transparent) 50%, transparent 100%)" }} />
+      <div className="absolute inset-0 opacity-80" style={{ background: "linear-gradient(to right, color-mix(in srgb, var(--background) 60%, transparent) 0%, transparent 50%)" }} />
+
+      {/* Edge vignette for screen-in-a-dark-room feel */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
 
       <PGlow
         className="absolute inset-0 w-full h-full"

@@ -752,7 +752,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     <PackageOpen className="h-3.5 w-3.5" />
                     Nexus Mods
                   </div>
-                  <h1 className="truncate text-2xl font-black tracking-tight text-white sm:text-3xl">{game.title}</h1>
+                  <h1 className="truncate text-2xl font-display font-black tracking-tight text-white sm:text-3xl">{game.title}</h1>
                 </div>
               </div>
 

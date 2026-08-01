@@ -128,8 +128,8 @@ let overlayPanelState = {
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
 const overlayEventCopy = {
-  "pt-BR": { enjoy: "Divirta-se", active: "O overlay está ativo enquanto você joga.", playing: "Você está jogando agora", open: "Abra sem sair do jogo", shortcut: "Use o botão central do controle ou Ctrl + Shift + O.", player: "Jogador", now: "agora", friendPlaying: "Está jogando agora", request: "Enviou um pedido de amizade", accepted: "Aceitou seu pedido de amizade", firstKill: "Primeiro Abate", testAchievement: "Teste visual do overlay do Checkpoint.", newMessage: "Nova mensagem", captureSaved: "Captura salva" },
-  "en-US": { enjoy: "Have fun", active: "The overlay is active while you play.", playing: "You are now playing", open: "Open without leaving the game", shortcut: "Use the controller’s center button or Ctrl + Shift + O.", player: "Player", now: "now", friendPlaying: "Is now playing", request: "Sent you a friend request", accepted: "Accepted your friend request", firstKill: "First Kill", testAchievement: "Checkpoint overlay visual test.", newMessage: "New message", captureSaved: "Capture saved" },
+  "pt-BR": { enjoy: "Divirta-se", active: "O overlay está ativo enquanto você joga.", playing: "Você está jogando agora", open: "Abra sem sair do jogo", shortcut: "Use o botão central do controle ou Ctrl + Shift + O.", player: "Jogador", now: "agora", friendPlaying: "Está jogando agora", request: "Enviou um pedido de amizade", accepted: "Aceitou seu pedido de amizade", firstKill: "Primeiro Abate", testAchievement: "Teste visual do overlay do Checkpoint.", newMessage: "Nova mensagem", newImage: "Nova imagem", imageMessage: "Enviou uma nova imagem", captureSaved: "Captura salva" },
+  "en-US": { enjoy: "Have fun", active: "The overlay is active while you play.", playing: "You are now playing", open: "Open without leaving the game", shortcut: "Use the controller’s center button or Ctrl + Shift + O.", player: "Player", now: "now", friendPlaying: "Is now playing", request: "Sent you a friend request", accepted: "Accepted your friend request", firstKill: "First Kill", testAchievement: "Checkpoint overlay visual test.", newMessage: "New message", newImage: "New image", imageMessage: "Sent a new image", captureSaved: "Capture saved" },
   "es-ES": { enjoy: "Diviértete", active: "El overlay está activo mientras juegas.", playing: "Ahora estás jugando a", open: "Ábrelo sin salir del juego", shortcut: "Usa el botón central del mando o Ctrl + Shift + O.", player: "Jugador", now: "ahora", friendPlaying: "Está jugando ahora a", request: "Te envió una solicitud de amistad", accepted: "Aceptó tu solicitud de amistad", firstKill: "Primera baja", testAchievement: "Prueba visual del overlay de Checkpoint.", newMessage: "Nuevo mensaje", captureSaved: "Captura guardada" },
   "fr-FR": { enjoy: "Amusez-vous", active: "L’overlay est actif pendant que vous jouez.", playing: "Vous jouez maintenant à", open: "Ouvrez-le sans quitter le jeu", shortcut: "Utilisez le bouton central de la manette ou Ctrl + Shift + O.", player: "Joueur", now: "maintenant", friendPlaying: "Joue maintenant à", request: "Vous a envoyé une demande d’ami", accepted: "A accepté votre demande d’ami", firstKill: "Première élimination", testAchievement: "Test visuel de l’overlay Checkpoint.", newMessage: "Nouveau message", captureSaved: "Capture enregistrée" },
   "de-DE": { enjoy: "Viel Spaß", active: "Das Overlay ist während des Spielens aktiv.", playing: "Du spielst jetzt", open: "Öffnen, ohne das Spiel zu verlassen", shortcut: "Verwende die mittlere Controllertaste oder Strg + Umschalt + O.", player: "Spieler", now: "jetzt", friendPlaying: "Spielt jetzt", request: "Hat dir eine Freundschaftsanfrage gesendet", accepted: "Hat deine Freundschaftsanfrage angenommen", firstKill: "Erster Abschuss", testAchievement: "Visueller Test des Checkpoint-Overlays.", newMessage: "Neue Nachricht", captureSaved: "Aufnahme gespeichert" },
@@ -1654,6 +1654,15 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
     if (kind === "open-launcher-chat") {
       payload.friendId = String(action?.friendId || "").slice(0, 128);
     }
+    if (kind === "open-launcher-chat" && inGameOverlayActive && payload.friendId) {
+      setOverlayPanelOpen(true);
+      mainWindow?.webContents.send("overlay:panel-action", {
+        kind: "select-chat",
+        friendId: payload.friendId,
+      });
+      sendOverlayEvent("overlay:panel-command", { kind: "open-chat" });
+      return { ok: true, target: "in-game-chat" };
+    }
     if (overlayWindow && !overlayWindow.isDestroyed() && !overlayPanelOpen) {
       overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     }
@@ -1663,7 +1672,7 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       mainWindow.focus();
       mainWindow.webContents.send("overlay:panel-action", payload);
     }
-    return { ok: true };
+    return { ok: true, target: kind === "open-launcher-chat" ? "launcher-chat" : "launcher-friends" };
   }
   if (kind === "capture-screen") {
     return runCapture();
@@ -2007,7 +2016,18 @@ registerSecureIpcHandler("achievement:unlock", async (_event, gameId, achievemen
 registerSecureIpcHandler("overlay:show-friend-message", async (_event, payload) => {
   const copy = getOverlayEventCopy();
   const senderName = String(payload?.senderName || "").trim() || copy.player;
-  const messageText = String(payload?.messageText || "").trim() || copy.newMessage;
+  const contentKind = payload?.contentKind === "image" ? "image" : "text";
+  const imageMessage = {
+    "pt-BR": "Enviou uma nova imagem",
+    "en-US": "Sent a new image",
+    "es-ES": "Envió una nueva imagen",
+    "fr-FR": "A envoyé une nouvelle image",
+    "de-DE": "Hat ein neues Bild gesendet",
+    "it-IT": "Ha inviato una nuova immagine",
+  }[overlayPanelState.language] || "Enviou uma nova imagem";
+  const messageText = contentKind === "image"
+    ? imageMessage
+    : String(payload?.messageText || "").trim() || copy.newMessage;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
   const friendId = String(payload?.friendId || "").trim().slice(0, 128);
 
@@ -3282,6 +3302,7 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
     description: copy.request,
     avatarUrl: avatarUrl || overlayIconUrl(),
     friendId,
+    contentKind,
   });
 });
 

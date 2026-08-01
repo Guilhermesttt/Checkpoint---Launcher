@@ -467,6 +467,7 @@ declare global {
         messageText: string;
         avatarUrl?: string;
         friendId?: string;
+        contentKind?: "text" | "image";
       }) => Promise<void>;
       updateOverlayPanel: (payload: {
         language?: import("../context/PreferencesContext").LauncherLanguage;

@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: oklch(0.06 0.008 260);
-  --foreground: oklch(0.94 0.005 90);
-  --muted: oklch(0.12 0.008 260);
-  --muted-foreground: oklch(0.55 0.015 90);
-  --border: oklch(0.18 0.008 260);
-  --launcher-accent: 255 255 255;
-  --launcher-accent-soft: rgba(255, 255, 255, 0.22);
-  --launcher-tint: rgba(255, 255, 255, 0.09);
+  --background: #060608;
+  --foreground: #E5E5E5;
+  --muted: #171717;
+  --muted-foreground: #8A8A8A;
+  --border: #262626;
+  --launcher-accent: 229 229 229;
+  --launcher-accent-soft: rgba(229, 229, 229, 0.18);
+  --launcher-tint: rgba(229, 229, 229, 0.06);
 }
 
 html[data-launcher-theme="playstation"] {
@@ -66,7 +66,8 @@ html[data-launcher-theme="sunset"] {
 }
 
 @theme inline {
-  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -76,6 +77,9 @@ html[data-launcher-theme="sunset"] {
 
 .font-display {
   font-family: var(--font-display);
+}
+.font-body {
+  font-family: var(--font-body);
 }
 .text-stroke {
   -webkit-text-stroke: 1.5px currentColor;
@@ -116,12 +120,24 @@ html[data-launcher-theme="sunset"] {
     overflow-x: hidden;
   }
   body {
-    @apply bg-[#050507] m-0 p-0 antialiased;
-    font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    @apply bg-background text-foreground m-0 p-0 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    color: white;
     overflow-x: hidden;
+  }
+
+  /* Subtle film-grain noise layer — evokes console/CRT nostalgia */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.028;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 180px 180px;
   }
 
   button:not(:disabled),
@@ -173,15 +189,15 @@ html[data-launcher-theme="sunset"] {
     background: transparent;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
     border-radius: 4px;
   }
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.35);
   }
   .thin-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   }
 
   .add-game-scrollbar {
@@ -232,7 +248,7 @@ html[data-launcher-theme="sunset"] {
       rgba(255, 255, 255, 0.18) 0%,
       rgba(255, 255, 255, 0.08) 100%
     );
-    border: 2px solid rgba(5, 5, 7, 0.92);
+    border: 2px solid rgba(13, 13, 15, 0.92);
     border-radius: 9999px;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.16),
@@ -471,5 +487,10 @@ body.low-performance * {
 body.low-performance [class*="blob"],
 body.low-performance [class*="particle"],
 body.low-performance [class*="sparkle"] {
+  display: none !important;
+}
+
+/* Disable grain overlay in low-performance mode */
+body.low-performance::before {
   display: none !important;
 }

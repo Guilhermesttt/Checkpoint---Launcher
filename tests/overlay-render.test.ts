@@ -211,6 +211,18 @@ describe("overlay de conquistas", () => {
     });
 
     social({
+      kind: "friend-message",
+      title: "Mileide",
+      description: "Enviou uma nova imagem",
+      contentKind: "image",
+      friendId: "cp-friend:friend-1",
+    });
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>(".kind-friend-message .social-badge"))
+        .at(-1)?.textContent,
+    ).toBe("Nova imagem");
+
+    social({
       kind: "friend-request",
       title: "Novo jogador",
       friendId: "cp-friend:friend-2",
@@ -222,6 +234,9 @@ describe("overlay de conquistas", () => {
     const homeSource = fs.readFileSync(path.resolve("src/pages/Home.tsx"), "utf8");
     expect(mainSource).toContain('kind === "set-toast-interactive"');
     expect(mainSource).toContain('kind === "open-launcher-chat" || kind === "open-launcher-friends"');
+    expect(mainSource).toContain('kind === "open-launcher-chat" && inGameOverlayActive');
+    expect(mainSource).toContain('sendOverlayEvent("overlay:panel-command", { kind: "open-chat" })');
+    expect(mainSource).toContain('payload?.contentKind === "image"');
     expect(homeSource).toContain("setActiveChatFriend(friend)");
   });
 

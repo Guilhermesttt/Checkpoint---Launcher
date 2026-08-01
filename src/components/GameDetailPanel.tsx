@@ -1284,7 +1284,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-100 flex bg-[#050507]"
+          className="fixed inset-0 z-100 flex"
+          style={{ background: "var(--background)" }}
         >
           <div className="fixed bottom-6 right-8 z-50 pointer-events-none">
             <InputHints hints={[
@@ -1312,8 +1313,8 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               loading="eager"
               decoding="async"
             />
-            <div className="absolute inset-0 bg-linear-to-r from-[#050507] via-[#050507]/80 to-transparent" />
-            <div className="absolute inset-0 bg-linear-to-t from-[#050507] via-transparent to-[#050507]/40" />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, var(--background) 0%, color-mix(in srgb, var(--background) 80%, transparent) 50%, transparent 100%)" }} />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to top, var(--background) 0%, transparent 40%, color-mix(in srgb, var(--background) 40%, transparent) 100%)" }} />
           </motion.div>
 
           <div className="relative z-10 grid w-full h-full grid-cols-[minmax(560px,720px)_1fr] gap-8">
@@ -1406,7 +1407,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     className="max-h-24 max-w-[520px] object-contain object-left mb-7 drop-shadow-2xl"
                   />
                 ) : (
-                  <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white mb-7 leading-[0.95]">
+                  <h1 className="text-5xl md:text-6xl font-display font-black tracking-tight text-white mb-7 leading-[0.95]" style={{ letterSpacing: "-0.01em" }}>
                     {game.title}
                   </h1>
                 )}
@@ -1503,7 +1504,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               setCurrentGalleryIndex(0);
                               playSound("select");
                             }}
-                            className="rounded-xl overflow-hidden ring-1 ring-white/10 relative group cursor-pointer h-[220px]"
+                            className="rounded-3xl overflow-hidden ring-1 ring-white/10 relative group cursor-pointer h-[220px]"
                           >
                             <img
                               src={game.screenshots[game.screenshots.length - 1]}
@@ -1511,16 +1512,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity duration-500 group-hover:scale-105 will-change-transform"
                             />
                             <div className="absolute inset-0 bg-linear-to-t from-[#050507]/90 via-transparent to-transparent flex items-end p-4 opacity-100 group-hover:opacity-0 transition-opacity duration-300">
-                              <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                              <span className="text-xs font-bold text-white uppercase tracking-widest flex items-center gap-2 font-body">
                                 <Camera className="w-3 h-3" /> {copy.viewGallery} (
                                 {game.screenshots.length})
                               </span>
                             </div>
                           </div>
                         ) : (
-                          <div className="rounded-xl premium-glass flex flex-col items-center justify-center gap-2 text-white/30 h-[220px]">
+                          <div className="rounded-3xl premium-glass flex flex-col items-center justify-center gap-2 text-white/30 h-[220px]">
                             <Camera className="w-6 h-6 opacity-50" />
-                            <span className="text-[10px] uppercase tracking-widest font-bold">
+                            <span className="text-[10px] uppercase tracking-widest font-bold font-body">
                               {copy.noScreenshot}
                             </span>
                           </div>
@@ -1823,7 +1824,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           {copy.verify}
                         </button>
                       </div>
-                      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                      <div className="mb-4 rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                         <div className="mb-4 flex items-center justify-between">
                           <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/70">
@@ -1950,7 +1951,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col justify-end items-end p-8 pl-0"
             >
-              <div className="w-[260px] rounded-[28px] overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
+              <div className="w-[260px] rounded-3xl overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
                 <div className="aspect-3/4 bg-white/5">
                   <img
                     src={coverImage}
@@ -1961,10 +1962,10 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   />
                 </div>
                 <div className="p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35 mb-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/35 mb-1 font-body">
                     {copy.platform}
                   </p>
-                  <p className="text-sm font-semibold text-white/80">
+                  <p className="text-sm font-semibold text-white/80 font-body">
                     {platformLabel}
                   </p>
                 </div>
@@ -1977,7 +1978,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   onClick={handleLaunch}
                   disabled={isLaunching}
                   aria-label={isLaunching ? t("launching") : t("play")}
-                  className="rounded-2xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500"
+                  className="rounded-3xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500 font-display"
                   style={{
                     background: "var(--game-color, #ffffff)",
                     boxShadow: "0 8px 32px var(--game-color, transparent)",
@@ -2186,7 +2187,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       transition={{ delay: 0.5 }}
                       className="text-center"
                     >
-                      <h2 className="text-4xl font-light tracking-[0.2em] text-white/90 uppercase mb-4">
+                      <h2 className="text-4xl font-display font-light tracking-[0.2em] text-white/90 uppercase mb-4">
                         {game.title}
                       </h2>
                       <div className="flex items-center justify-center gap-3">
@@ -2315,10 +2316,10 @@ const StatItem: React.FC<{
   isEmpty?: boolean;
 }> = ({ icon, label, value, isEmpty }) => (
   <div
-    className={`rounded-2xl border p-4 min-h-[94px] flex flex-col justify-between backdrop-blur-xl ${isEmpty ? "border-zinc-800/50 bg-zinc-900/20" : "border-zinc-800 bg-zinc-900/40"
+    className={`rounded-3xl border p-4 min-h-[94px] flex flex-col justify-between backdrop-blur-xl ${isEmpty ? "border-zinc-800/50 bg-zinc-900/20" : "border-zinc-800 bg-zinc-900/40"
       }`}
   >
-    <div className="flex items-center gap-2 text-white/40">
+    <div className="flex items-center gap-2 text-white/40 font-body">
       {icon}
       <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
         {label}
@@ -2342,7 +2343,7 @@ const AchievementStat: React.FC<{
   const isEmpty = total <= 0;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-xl p-4 min-h-[94px] flex flex-col justify-between col-span-2">
+    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-xl p-4 min-h-[94px] flex flex-col justify-between col-span-2">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2 text-white/40">
           <Trophy className="w-4 h-4" />

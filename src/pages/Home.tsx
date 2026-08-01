@@ -1426,7 +1426,7 @@ const Home: React.FC = () => {
 
       {/* Hero Section Gradient */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-[#050507] via-[#050507]/70 to-transparent"
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-background via-background/70 to-transparent"
         style={{ left: 96 }}
       />
 
@@ -1483,8 +1483,8 @@ const Home: React.FC = () => {
           <div className="flex items-center gap-5">
             <div className="flex items-center gap-2">
               <span
-                className="text-[9.5px] font-black uppercase tracking-[0.32em]"
-                style={{ color: "rgba(255,255,255,0.18)" }}
+                className="text-[9.5px] font-black uppercase tracking-[0.45em] font-body"
+                style={{ color: "rgba(255,255,255,0.22)" }}
               >
                 Checkpoint
               </span>
@@ -1549,8 +1549,8 @@ const Home: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.18 }}
-                className="text-[9.5px] font-black uppercase tracking-[0.32em]"
-                style={{ color: "rgba(255,255,255,0.42)" }}
+                className="text-[9.5px] font-black uppercase tracking-[0.32em] font-body"
+                style={{ color: "rgba(255,255,255,0.50)" }}
               >
                 {activeCategory === "SETTINGS"
                   ? t("settings")
@@ -1839,34 +1839,35 @@ const Home: React.FC = () => {
                         /{displayGames.length}
                       </p>
                       <h1
-                        className="tracking-wide font-black uppercase text-6xl text-white leading-none"
+                        className="tracking-tight font-display font-black uppercase text-6xl text-white leading-none"
                         style={{
                           textShadow: "0 8px 48px rgba(0,0,0,0.85)",
                           maxWidth: "75vw",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
+                          letterSpacing: "-0.01em",
                         }}
                       >
                         {currentGame?.title}
                       </h1>
-                      <div className="mt-2.5 flex items-center gap-4 flex-wrap">
+                      <div className="mt-2.5 flex items-center gap-4 flex-wrap font-body">
                         {(currentGame?.launcherType === "steam" || currentGame?.source === "steam") ? (
                           <span
-                            className="flex items-center gap-1.5 text-[11px] font-bold"
+                            className="flex items-center gap-1.5 text-[11px] font-semibold"
                             style={{ color: "#66C0F4" }}
                           >
                             <SteamBrandIcon className="w-3 h-3 text-[#66C0F4]" /> {t("viaSteam")}
                           </span>
                         ) : (currentGame?.launcherType === "epic" || currentGame?.source === "epic") ? (
                           <span
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-white/90"
+                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90"
                           >
                             <EpicBrandIcon className="w-3 h-3 text-white" /> Via Epic
                           </span>
                         ) : (
                           <span
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-white/70"
+                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/70"
                           >
                             <Gamepad2 className="w-3 h-3 text-emerald-400" /> Via Local
                           </span>
@@ -1874,14 +1875,14 @@ const Home: React.FC = () => {
 
                         {currentGame && (
                           <span
-                            className="text-[11px] font-semibold text-white/40"
+                            className="text-[11px] font-medium text-white/40"
                           >
                             {formatPlayedHours(getGamePlayedHours(currentGame))}h jogadas
                           </span>
                         )}
 
                         {currentGame?.isFavorite && (
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-amber-400/75">
+                          <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-400/75">
                             <Star className="w-3 h-3 fill-current" /> {t("favorite")}
                           </span>
                         )}
@@ -1891,7 +1892,7 @@ const Home: React.FC = () => {
                     <button
                       onClick={() => currentGame && openDetails(currentGame)}
                       onMouseEnter={() => playSound("hover")}
-                      className="relative shrink-0 flex items-center gap-3 overflow-hidden rounded-full px-7 py-3 font-black text-[12px] tracking-wider uppercase transition-all duration-500 group"
+                      className="relative shrink-0 flex items-center gap-3 overflow-hidden rounded-2xl px-7 py-3 font-black text-[12px] tracking-wider uppercase transition-all duration-500 group font-display"
                       style={{
                         background: "var(--game-color, rgba(255,255,255,1))",
                         color: "var(--game-text-color, #08080f)",
@@ -1969,11 +1970,11 @@ const Home: React.FC = () => {
             left: 96,
             right: 0,
             background:
-              "linear-gradient(to top, rgba(4,4,8,0.9) 0%, transparent 100%)",
+              "linear-gradient(to top, var(--background) 0%, transparent 100%)",
           }}
         >
           <p
-            className="text-[9px] font-black uppercase tracking-[0.28em]"
+            className="text-[9px] font-semibold uppercase tracking-[0.28em] font-body"
             style={{ color: "rgba(255,255,255,0.16)" }}
           >
             {displayGames.length} {displayGames.length === 1 ? "jogo" : "jogos"}
