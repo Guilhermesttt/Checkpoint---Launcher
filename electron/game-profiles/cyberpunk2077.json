@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "gameDomain": "cyberpunk2077",
+  "displayName": "Cyberpunk 2077",
+  "executable": "bin/x64/Cyberpunk2077.exe",
+  "rootFolders": [
+    "archive",
+    "bin",
+    "engine",
+    "mods",
+    "r6",
+    "red4ext",
+    "tools",
+    "cyber_engine_tweaks",
+    "plugins",
+    "reshade-shaders"
+  ],
+  "rootFiles": [
+    "dinput8.dll",
+    "dxgi.dll",
+    "version.dll",
+    "winmm.dll",
+    "global.ini"
+  ],
+  "routingRules": [
+    {
+      "name": "Raw Archive Auto-Redirect",
+      "condition": {
+        "extension": ".archive",
+        "rootRelative": true
+      },
+      "targetPath": "archive/pc/mod/{filename}"
+    }
+  ]
+}

@@ -382,6 +382,12 @@ html[data-launcher-theme="sunset"] {
     will-change: transform;
   }
 
+  .mod-list-item {
+    content-visibility: auto;
+    contain: layout paint style;
+    contain-intrinsic-size: auto 88px;
+  }
+
   .console-accent {
     background: linear-gradient(90deg,
       rgba(59, 130, 246, 0.8),

@@ -156,7 +156,49 @@ declare global {
         pictureUrl: string;
         version: string;
       }) => Promise<{ prepared: boolean; autoInstall: boolean; expiresAt: number }>;
-      openNexusDownloadLocation: () => Promise<boolean>;
+      installNexusDownloadedMod: (request: {
+        gameDomain: string;
+        modId: string;
+        fileId?: string;
+        filePath: string;
+        gameFolder: string;
+        modName: string;
+      }) => Promise<{
+        id?: string;
+        status: "resolving" | "downloading" | "installing" | "completed" | "error";
+        gameDomain?: string;
+        modId?: string;
+        fileId?: string;
+        filename?: string;
+        filePath?: string;
+        installed?: boolean;
+        installedFiles?: number;
+        backedUpFiles?: number;
+        manifestPath?: string;
+        installationError?: string;
+        modName?: string;
+        error?: string;
+        updatedAt: number;
+      }>;
+      adoptNexusInstalledMod: (request: {
+        gameDomain: string;
+        modId: string;
+        fileId?: string;
+        filePath: string;
+        gameFolder: string;
+        modName: string;
+      }) => Promise<{
+        adopted: boolean;
+        installedFiles: number;
+        backedUpFiles: number;
+        manifestPath: string;
+      }>;
+      removeNexusInstalledMod: (request: {
+        manifestPath?: string;
+        filePath?: string;
+        removeArchive: boolean;
+      }) => Promise<{ removedFromGame: boolean; archiveRemoved: boolean }>;
+      openNexusDownloadLocation: (gameDomain?: string) => Promise<boolean>;
       onNexusDownloadState: (callback: (state: {
         id?: string;
         status: "resolving" | "downloading" | "installing" | "completed" | "error";

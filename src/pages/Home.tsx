@@ -2004,6 +2004,10 @@ const Home: React.FC = () => {
           playSound={playSound}
           onLibraryChanged={refreshLibrary}
           onGameHydrated={setSelectedGame}
+          onOpenMods={() => {
+            setIsDetailOpen(false);
+            setActiveCategory("MODS");
+          }}
         />
       </React.Suspense>
 

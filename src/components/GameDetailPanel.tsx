@@ -1,7 +1,7 @@
 import React from "react";
 import DOMPurify from "dompurify";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Play, Clock, CalendarClock, Trophy, Camera, Trash2 } from "lucide-react";
+import { X, Play, Clock, CalendarClock, Trophy, Camera, Trash2, PackageOpen } from "lucide-react";
 import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
 import type { Game, GameLaunchProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
@@ -33,6 +33,16 @@ interface GameDetailPanelProps {
   playSound: (type: SoundEffectType) => void;
   onLibraryChanged?: () => Promise<void> | void;
   onGameHydrated?: (game: Game) => void;
+  onOpenMods?: () => void;
+}
+
+interface GamePanelMod {
+  id: string;
+  name: string;
+  pictureUrl?: string;
+  enabled: boolean;
+  status?: "downloaded" | "installed";
+  manifestPath?: string;
 }
 
 const MIN_LAUNCH_SCREEN_MS = 1200;
@@ -53,6 +63,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   playSound,
   onLibraryChanged,
   onGameHydrated,
+  onOpenMods,
 }) => {
   const { user, userProfile } = useAuth();
   const { t, language, closeOnLaunch } = usePreferences();
@@ -81,6 +92,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     height: number;
   }>>([]);
   const [isSavingLaunchProfile, setIsSavingLaunchProfile] = React.useState(false);
+  const [gameMods, setGameMods] = React.useState<GamePanelMod[]>([]);
   const hydratedEpicGamesRef = React.useRef(new Set<string>());
   const hydratedSteamGamesRef = React.useRef(new Set<string>());
 
@@ -192,6 +204,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "CONQUISTAS",
       tabAbout: "SOBRE",
       tabManage: "GERENCIAR",
+      tabMods: "MODS",
       steamLabel: "Steam",
       epicLabel: "Epic Games",
       localLabel: "PC Local",
@@ -280,6 +293,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "ACHIEVEMENTS",
       tabAbout: "ABOUT",
       tabManage: "MANAGE",
+      tabMods: "MODS",
       steamLabel: "Steam",
       epicLabel: "Epic Games",
       localLabel: "Local PC",
@@ -368,6 +382,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "LOGROS",
       tabAbout: "ACERCA DE",
       tabManage: "GESTIONAR",
+      tabMods: "MODS",
       steamLabel: "Steam",
       epicLabel: "Epic Games",
       localLabel: "PC Local",
@@ -459,6 +474,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "SUCCÈS",
       tabAbout: "À PROPOS",
       tabManage: "GÉRER",
+      tabMods: "MODS",
       localLabel: "PC local",
       library: "Bibliothèque",
       timePlayed: "TEMPS DE JEU",
@@ -517,6 +533,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "ERFOLGE",
       tabAbout: "ÜBER DAS SPIEL",
       tabManage: "VERWALTEN",
+      tabMods: "MODS",
       localLabel: "Lokaler PC",
       library: "Bibliothek",
       timePlayed: "SPIELZEIT",
@@ -575,6 +592,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       tabAchievements: "OBIETTIVI",
       tabAbout: "INFORMAZIONI",
       tabManage: "GESTISCI",
+      tabMods: "MODS",
       localLabel: "PC locale",
       library: "Libreria",
       timePlayed: "TEMPO DI GIOCO",
@@ -696,7 +714,37 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
   const launchRef = React.useRef<() => void>(() => { });
 
-  const TABS = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabManage];
+  const TABS = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabMods, copy.tabManage];
+  const activeManagedMods = gameMods.filter((mod) => mod.enabled && mod.manifestPath).length;
+  const modsPanelCopy = detailLanguage === "pt-BR"
+    ? {
+        title: "Mods deste jogo",
+        summary: `${activeManagedMods} ativos de ${gameMods.length}`,
+        empty: "Nenhum mod foi associado a este jogo.",
+        manage: "Gerenciar mods",
+        active: "Ativo",
+        downloaded: "Baixado",
+        verify: "Verificação necessária",
+      }
+    : detailLanguage === "es-ES"
+      ? {
+          title: "Mods de este juego",
+          summary: `${activeManagedMods} activos de ${gameMods.length}`,
+          empty: "No hay mods asociados a este juego.",
+          manage: "Gestionar mods",
+          active: "Activo",
+          downloaded: "Descargado",
+          verify: "Verificación necesaria",
+        }
+      : {
+          title: "Mods for this game",
+          summary: `${activeManagedMods} active of ${gameMods.length}`,
+          empty: "No mods are associated with this game.",
+          manage: "Manage mods",
+          active: "Active",
+          downloaded: "Downloaded",
+          verify: "Verification required",
+        };
 
   useGamepadNavigation({
     onClose: () => {
@@ -753,6 +801,34 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     setIsDeleting(false);
     setLaunchProfile(game?.launchProfile || {});
   }, [copy.tabPlay, game?.id, game?.launchProfile]);
+
+  React.useEffect(() => {
+    if (!isOpen || !game?.id) {
+      setGameMods([]);
+      return;
+    }
+    const loadGameMods = () => {
+      try {
+        const uid = user?.uid || "local";
+        const stored = JSON.parse(
+          localStorage.getItem(`checkpoint_installed_mods_${uid}`) || "{}",
+        );
+        const items = stored && typeof stored === "object" && !Array.isArray(stored)
+          ? stored[game.id]
+          : [];
+        setGameMods(Array.isArray(items) ? items : []);
+      } catch {
+        setGameMods([]);
+      }
+    };
+    loadGameMods();
+    window.addEventListener("focus", loadGameMods);
+    window.addEventListener("storage", loadGameMods);
+    return () => {
+      window.removeEventListener("focus", loadGameMods);
+      window.removeEventListener("storage", loadGameMods);
+    };
+  }, [game?.id, isOpen, user?.uid]);
 
   React.useEffect(() => {
     if (!isOpen || !window.electronAPI?.getDisplays) return;
@@ -1286,6 +1362,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   }}
                 />
                 <NavTab
+                  label={copy.tabMods}
+                  active={activeTab === copy.tabMods}
+                  onClick={() => {
+                    setActiveTab(copy.tabMods);
+                    playSound("navigate");
+                  }}
+                />
+                <NavTab
                   label={copy.tabManage}
                   active={activeTab === copy.tabManage}
                   onClick={() => {
@@ -1632,6 +1716,81 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                           </div>
                         )}
                       </div>
+                    </motion.div>
+                  )}
+
+                  {activeTab === copy.tabMods && (
+                    <motion.div
+                      key="mods-content"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="max-w-3xl"
+                    >
+                      <div className="mb-5 flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-white/55">
+                            <PackageOpen className="h-4 w-4" /> {modsPanelCopy.title}
+                          </h3>
+                          <p className="mt-2 text-xs text-white/35">{modsPanelCopy.summary}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound("select");
+                            onOpenMods?.();
+                          }}
+                          className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white/60 transition hover:bg-white/10 hover:text-white"
+                        >
+                          {modsPanelCopy.manage}
+                        </button>
+                      </div>
+
+                      {gameMods.length === 0 ? (
+                        <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/[0.025] text-center">
+                          <PackageOpen className="mb-3 h-8 w-8 text-white/15" />
+                          <p className="text-sm font-semibold text-white/40">{modsPanelCopy.empty}</p>
+                        </div>
+                      ) : (
+                        <div className="grid gap-3 pb-8">
+                          {gameMods.map((mod) => {
+                            const isManagedActive = mod.enabled && Boolean(mod.manifestPath);
+                            const needsVerification = mod.enabled && !mod.manifestPath;
+                            return (
+                              <div
+                                key={mod.id}
+                                className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3"
+                              >
+                                <div className="h-14 w-20 shrink-0 overflow-hidden rounded-xl bg-white/[0.04]">
+                                  {mod.pictureUrl ? (
+                                    <img src={mod.pictureUrl} alt="" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <div className="flex h-full items-center justify-center">
+                                      <PackageOpen className="h-5 w-5 text-white/15" />
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="min-w-0 flex-1 truncate text-sm font-bold text-white/75">
+                                  {mod.name}
+                                </p>
+                                <span className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wider ${
+                                  isManagedActive
+                                    ? "border-emerald-400/15 bg-emerald-400/[0.06] text-emerald-300/75"
+                                    : needsVerification
+                                      ? "border-amber-400/15 bg-amber-400/[0.06] text-amber-300/70"
+                                      : "border-sky-400/15 bg-sky-400/[0.06] text-sky-300/65"
+                                }`}>
+                                  {isManagedActive
+                                    ? modsPanelCopy.active
+                                    : needsVerification
+                                      ? modsPanelCopy.verify
+                                      : modsPanelCopy.downloaded}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </motion.div>
                   )}
 

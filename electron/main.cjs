@@ -36,7 +36,9 @@ const {
   validateNexusApiKey,
 } = require("./nexus-api.cjs");
 const { downloadNexusFile, parseNxmUrl } = require("./nexus-download-manager.cjs");
-const { installCyberpunkZip } = require("./cyberpunk-mod-installer.cjs");
+const { assertAllowedArchive } = require("./nexus-installation-manager.cjs");
+const { selectModGameDirectory } = require("./mod-game-directory.cjs");
+const { runModOperation, shutdownModOperationWorker } = require("./mod-operation-runner.cjs");
 const {
   detectEmulator,
   parseAchievementState,
@@ -316,7 +318,78 @@ const getNexusApiKey = () => {
 };
 
 const getNexusDownloadRoot = () =>
+  path.join(app.getPath("documents"), "Checkpoint", "Mods");
+const getLegacyNexusDownloadRoot = () =>
   path.join(app.getPath("downloads"), "Checkpoint", "Nexus Mods");
+const getAllowedNexusDownloadRoots = () => [
+  getNexusDownloadRoot(),
+  getLegacyNexusDownloadRoot(),
+];
+
+let nexusDownloadMigrationPromise = null;
+const pathExists = async (targetPath) => Boolean(
+  await fs.promises.stat(targetPath).catch(() => null),
+);
+const ensureNexusDownloadRoot = async () => {
+  if (nexusDownloadMigrationPromise) return nexusDownloadMigrationPromise;
+  nexusDownloadMigrationPromise = (async () => {
+    const destination = getNexusDownloadRoot();
+    const legacy = getLegacyNexusDownloadRoot();
+    const migrationMarker = path.join(destination, ".legacy-downloads-imported");
+    await fs.promises.mkdir(destination, { recursive: true });
+    const [migrationComplete, legacyExists] = await Promise.all([
+      pathExists(migrationMarker),
+      pathExists(legacy),
+    ]);
+    if (migrationComplete || !legacyExists) return destination;
+    try {
+      await fs.promises.cp(legacy, destination, {
+        recursive: true,
+        force: false,
+        errorOnExist: false,
+      });
+      await fs.promises.writeFile(migrationMarker, new Date().toISOString(), "utf8");
+    } catch (error) {
+      console.warn("[nexus] Nao foi possivel importar os downloads antigos:", error);
+    }
+    return destination;
+  })();
+  return nexusDownloadMigrationPromise;
+};
+
+const installSupportedNexusZip = async ({
+  gameDomain,
+  archivePath,
+  gameFolder,
+  modId,
+  fileId,
+  modName,
+}) => {
+  return runModOperation("install", {
+    gameDomain,
+    archivePath,
+    gameRoot: gameFolder,
+    backupRoot: path.join(app.getPath("userData"), "nexus-backups"),
+    manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+    modId,
+    fileId,
+    modName,
+  });
+};
+
+const activeModOperations = new Set();
+const runExclusiveModOperation = async (operationKey, operation) => {
+  const key = String(operationKey || "");
+  if (activeModOperations.has(key)) {
+    throw new Error("Ja existe uma operacao em andamento para este mod.");
+  }
+  activeModOperations.add(key);
+  try {
+    return await operation();
+  } finally {
+    activeModOperations.delete(key);
+  }
+};
 
 const publishNexusDownloadState = (patch) => {
   nexusDownloadState = {
@@ -404,6 +477,7 @@ const handleNexusDownloadUrl = async (rawUrl) => {
   });
 
   try {
+    await ensureNexusDownloadRoot();
     const links = await getNexusDownloadLinks({
       apiKey: getNexusApiKey(),
       appVersion: app.getVersion(),
@@ -419,6 +493,7 @@ const handleNexusDownloadUrl = async (rawUrl) => {
       mirror: mirror.name,
     });
 
+    let lastProgressPublishedAt = 0;
     const downloaded = await downloadNexusFile({
       uri: mirror.uri,
       destinationRoot: getNexusDownloadRoot(),
@@ -426,6 +501,9 @@ const handleNexusDownloadUrl = async (rawUrl) => {
       modId: parsed.modId,
       fileId: parsed.fileId,
       onProgress: ({ receivedBytes, totalBytes }) => {
+        const now = Date.now();
+        if (receivedBytes < totalBytes && now - lastProgressPublishedAt < 80) return;
+        lastProgressPublishedAt = now;
         publishNexusDownloadState({
           ...baseState,
           status: "downloading",
@@ -448,15 +526,17 @@ const handleNexusDownloadUrl = async (rawUrl) => {
         status: "installing",
       });
       try {
-        installation = await installCyberpunkZip({
+        installation = await runExclusiveModOperation(
+          `${parsed.gameDomain}:${parsed.modId}`,
+          () => installSupportedNexusZip({
+          gameDomain: parsed.gameDomain,
           archivePath: downloaded.filePath,
-          gameRoot: pending.gameFolder,
-          backupRoot: path.join(app.getPath("userData"), "nexus-backups"),
-          manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+          gameFolder: pending.gameFolder,
           modId: parsed.modId,
           fileId: parsed.fileId,
           modName: pending.modName,
-        });
+          }),
+        );
       } catch (error) {
         installationError = error instanceof Error
           ? error.message
@@ -544,6 +624,7 @@ registerSecureIpcHandler("nexus:get-mod-files", async (_event, request) =>
 registerSecureIpcHandler("nexus:get-download-state", () => nexusDownloadState);
 
 registerSecureIpcHandler("nexus:list-downloaded-files", async (_event, rawGameDomain) => {
+  await ensureNexusDownloadRoot();
   const gameDomain = normalizeGameDomain(rawGameDomain);
   const gameRoot = path.join(getNexusDownloadRoot(), gameDomain);
   const modDirectories = await fs.promises.readdir(gameRoot, { withFileTypes: true })
@@ -597,7 +678,7 @@ registerSecureIpcHandler("nexus:prepare-free-download", (_event, request) => {
       ? String(request.pictureUrl).slice(0, 2048)
       : "",
     version: String(request?.version || "").slice(0, 80),
-    autoInstall: gameDomain === "cyberpunk2077" && Boolean(request?.gameFolder),
+    autoInstall: Boolean(request?.gameFolder),
     expiresAt,
   };
   return {
@@ -607,12 +688,107 @@ registerSecureIpcHandler("nexus:prepare-free-download", (_event, request) => {
   };
 });
 
-registerSecureIpcHandler("nexus:open-download-location", () => {
+registerSecureIpcHandler("nexus:install-downloaded-mod", async (_event, request) => {
+  const gameDomain = normalizeGameDomain(request?.gameDomain);
+  const modId = normalizeModId(request?.modId);
+  const fileId = normalizeModId(request?.fileId || request?.modId);
+  const archivePath = assertAllowedArchive(
+    request?.filePath,
+    getAllowedNexusDownloadRoots(),
+  );
+  const baseState = {
+    id: crypto.randomUUID(),
+    gameDomain,
+    modId,
+    fileId,
+    filename: path.basename(archivePath),
+    filePath: archivePath,
+    modName: String(request?.modName || "").slice(0, 240),
+    error: "",
+  };
+  publishNexusDownloadState({ ...baseState, status: "installing" });
+  try {
+    const installation = await runExclusiveModOperation(
+      `${gameDomain}:${modId}`,
+      () => installSupportedNexusZip({
+      gameDomain,
+      archivePath,
+      gameFolder: String(request?.gameFolder || "").slice(0, 2048),
+      modId,
+      fileId,
+      modName: baseState.modName,
+      }),
+    );
+    return publishNexusDownloadState({
+      ...baseState,
+      ...installation,
+      status: "completed",
+      installed: true,
+      installationError: "",
+    });
+  } catch (error) {
+    publishNexusDownloadState({
+      ...baseState,
+      status: "error",
+      installed: false,
+      error: error instanceof Error ? error.message : "A instalacao do mod falhou.",
+    });
+    throw error;
+  }
+});
+
+registerSecureIpcHandler("nexus:adopt-installed-mod", async (_event, request) => {
+  const gameDomain = normalizeGameDomain(request?.gameDomain);
+  const modId = normalizeModId(request?.modId);
+  const fileId = normalizeModId(request?.fileId || request?.modId);
+  const archivePath = assertAllowedArchive(
+    request?.filePath,
+    getAllowedNexusDownloadRoots(),
+  );
+  return runExclusiveModOperation(`${gameDomain}:${modId}`, () => runModOperation("adopt", {
+    archivePath,
+    gameRoot: String(request?.gameFolder || "").slice(0, 2048),
+    manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+    gameDomain,
+    modId,
+    fileId,
+    modName: String(request?.modName || "").slice(0, 240),
+  }));
+});
+
+registerSecureIpcHandler("nexus:remove-installed-mod", async (_event, request) => {
+  await ensureNexusDownloadRoot();
+  const manifestPath = String(request?.manifestPath || "");
+  const archivePath = String(request?.filePath || "");
+  return runExclusiveModOperation(manifestPath || archivePath, () => runModOperation("uninstall", {
+    manifestPath,
+    archivePath,
+    removeArchive: Boolean(request?.removeArchive),
+    installationsRoot: path.join(app.getPath("userData"), "nexus-installations"),
+    backupRoot: path.join(app.getPath("userData"), "nexus-backups"),
+    downloadRoots: getAllowedNexusDownloadRoots(),
+  }));
+});
+
+registerSecureIpcHandler("nexus:open-download-location", async (_event, rawGameDomain) => {
+  await ensureNexusDownloadRoot();
+  if (rawGameDomain) {
+    const gameDownloadDirectory = path.join(
+      getNexusDownloadRoot(),
+      normalizeGameDomain(rawGameDomain),
+    );
+    await fs.promises.mkdir(gameDownloadDirectory, { recursive: true });
+    const openError = await shell.openPath(gameDownloadDirectory);
+    if (openError) throw new Error(`Nao foi possivel abrir a pasta de mods: ${openError}`);
+    return true;
+  }
   if (nexusDownloadState?.filePath && fs.existsSync(nexusDownloadState.filePath)) {
     shell.showItemInFolder(nexusDownloadState.filePath);
     return true;
   }
-  void shell.openPath(getNexusDownloadRoot());
+  await fs.promises.mkdir(getNexusDownloadRoot(), { recursive: true });
+  const openError = await shell.openPath(getNexusDownloadRoot());
+  if (openError) throw new Error(`Nao foi possivel abrir a pasta de mods: ${openError}`);
   return true;
 });
 
@@ -772,6 +948,9 @@ const createWindow = async () => {
       webSecurity: true,
       allowRunningInsecureContent: false,
       backgroundThrottling: true,
+      spellcheck: false,
+      navigateOnDragDrop: false,
+      v8CacheOptions: "code",
     },
   });
 
@@ -2072,12 +2251,33 @@ registerSecureIpcHandler("launcher:select-executable", async () => {
   return selectedPath;
 });
 
+registerSecureIpcHandler("mods:select-game-directory", async (_event, gameTitle) =>
+  selectModGameDirectory({
+    dialog,
+    parentWindow: mainWindow,
+    gameTitle,
+  }));
+
 const epicStoreSearchCache = new Map();
 const epicStoreDetailsCache = new Map();
 let epicStoreSearchWindow = null;
 let epicStoreReadyPromise = null;
+let epicStoreIdleTimer = null;
+
+const scheduleEpicStoreWindowShutdown = () => {
+  if (epicStoreIdleTimer) clearTimeout(epicStoreIdleTimer);
+  epicStoreIdleTimer = setTimeout(() => {
+    epicStoreIdleTimer = null;
+    if (epicStoreSearchWindow && !epicStoreSearchWindow.isDestroyed()) {
+      epicStoreSearchWindow.destroy();
+    }
+  }, 30_000);
+  epicStoreIdleTimer.unref?.();
+};
 
 const ensureEpicStoreSearchWindow = async () => {
+  if (epicStoreIdleTimer) clearTimeout(epicStoreIdleTimer);
+  epicStoreIdleTimer = null;
   if (
     epicStoreSearchWindow
     && !epicStoreSearchWindow.isDestroyed()
@@ -2095,7 +2295,8 @@ const ensureEpicStoreSearchWindow = async () => {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      backgroundThrottling: false,
+      backgroundThrottling: true,
+      spellcheck: false,
       partition: "persist:epic-store-search",
     },
   });
@@ -2180,6 +2381,7 @@ const searchEpicGamesStore = async (rawQuery) => {
   if (epicStoreSearchCache.size > 50) {
     epicStoreSearchCache.delete(epicStoreSearchCache.keys().next().value);
   }
+  scheduleEpicStoreWindowShutdown();
   return items;
 };
 
@@ -2734,13 +2936,9 @@ const getRunningProcessNames = async () => {
   return names;
 };
 
-const PROCESS_SNAPSHOT_COMMAND = [
-  "$ErrorActionPreference = 'Stop'",
-  "$items = Get-CimInstance Win32_Process | ForEach-Object { [PSCustomObject]@{ pid = [int]$_.ProcessId; parentPid = [int]$_.ParentProcessId; name = [string]$_.Name; executablePath = [string]$_.ExecutablePath } }",
-  "$items | ConvertTo-Json -Compress",
-].join("; ");
-
 let _processSnapshotCache = { processes: [], expiresAt: 0, pending: null };
+let _wmicAvailability = "unknown";
+let _processSnapshotFallbackLogged = false;
 
 const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
   if (!forceRefresh && Date.now() < _processSnapshotCache.expiresAt) {
@@ -2755,6 +2953,7 @@ const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
       { windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
       (error, stdout = "") => {
         if (error) {
+          if (error.code === "ENOENT") _wmicAvailability = "unavailable";
           reject(error);
           return;
         }
@@ -2789,6 +2988,7 @@ const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
               }
             }
           }
+          _wmicAvailability = "available";
           resolve(processes);
         } catch (parseError) {
           reject(parseError);
@@ -2813,13 +3013,7 @@ const getRunningProcesses = async ({ forceRefresh = false } = {}) => {
 };
 
 const getProcessSnapshotWithFallback = async ({ forceRefresh = false } = {}) => {
-  try {
-    return await getRunningProcesses({ forceRefresh });
-  } catch (error) {
-    console.warn(
-      "[launcher] Snapshot detalhado de processos indisponivel; usando tasklist:",
-      error instanceof Error ? error.message : error,
-    );
+  const getFallbackSnapshot = async () => {
     const runningNames = await getRunningProcessNames().catch(() => new Set());
     return Array.from(runningNames, (name) => ({
       pid: 0,
@@ -2827,6 +3021,20 @@ const getProcessSnapshotWithFallback = async ({ forceRefresh = false } = {}) => 
       name,
       executablePath: "",
     }));
+  };
+
+  // WMIC foi removido das versoes atuais do Windows. Depois do primeiro ENOENT,
+  // nao tentamos mais criar um processo que sabemos nao existir.
+  if (_wmicAvailability === "unavailable") return getFallbackSnapshot();
+
+  try {
+    return await getRunningProcesses({ forceRefresh });
+  } catch (error) {
+    if (!_processSnapshotFallbackLogged) {
+      _processSnapshotFallbackLogged = true;
+      console.info("[launcher] WMIC indisponivel; monitoramento usando tasklist nesta sessao.");
+    }
+    return getFallbackSnapshot();
   }
 };
 
@@ -3387,7 +3595,6 @@ app.whenReady().then(async () => {
       console.warn("Não foi possível inicializar a System Tray:", e);
     }
 
-    createOverlayWindow();
     globalShortcut.register("CommandOrControl+Shift+O", () => setOverlayPanelOpen(!overlayPanelOpen));
     if (!registerCaptureShortcut(captureShortcut)) {
       console.warn(`[overlay] O atalho de captura ${captureShortcut} ja esta em uso.`);
@@ -3400,9 +3607,6 @@ app.whenReady().then(async () => {
     await createWindow();
     deliverAccountAuthCallback(findAccountAuthCallback(process.argv));
     void handleNexusDownloadUrl(findNxmUrl(process.argv));
-    void ensureEpicStoreSearchWindow().catch((error) => {
-      console.warn("[epic-store] Nao foi possivel preaquecer a busca:", error?.message || error);
-    });
   } catch (error) {
     showFatalStartupError(error);
     app.quit();
@@ -3430,7 +3634,6 @@ app.on("open-url", (event, url) => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    createOverlayWindow();
     createWindow();
   }
 });
@@ -3448,6 +3651,7 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  void shutdownModOperationWorker();
   if (localGameLibrary) {
     try {
       localGameLibrary.close();

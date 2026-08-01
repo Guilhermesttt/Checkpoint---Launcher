@@ -1,6 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Download,
@@ -17,10 +18,12 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import type { Game } from "../../types/domain";
 import {
+  adoptNexusInstalledMod,
   connectNexusPersonalKey,
   disconnectNexus,
   fetchAuthenticatedNexusCatalog,
@@ -29,10 +32,12 @@ import {
   fetchNexusTrendingMods,
   getNexusDownloadState,
   getNexusConnection,
+  installNexusDownloadedMod,
   listNexusDownloadedFiles,
   onNexusDownloadState,
   openNexusDownloadLocation,
   prepareNexusFreeDownload,
+  removeNexusInstalledMod,
   validateNexusConnection,
   type NexusConnection,
   type NexusDownloadState,
@@ -54,6 +59,7 @@ export interface InstalledModEntry {
   nexusFileId?: string;
   filePath?: string;
   installationError?: string;
+  manifestPath?: string;
 }
 
 interface ModGameDetailPanelProps {
@@ -66,13 +72,15 @@ interface ModGameDetailPanelProps {
   onChooseFolder: () => Promise<void>;
   onSaveDomain: (domain: string) => void;
   onToggleMod: (modId: string, enabled: boolean) => void;
+  onRemoveMod: (modId: string) => void;
   onDownloadRecorded: (mod: InstalledModEntry) => void;
 }
 
-type PanelTab = "discover" | "installed" | "setup";
+type PanelTab = "discover" | "installed" | "downloads" | "setup";
 type CatalogSort = "featured" | "recent" | "downloads" | "endorsements" | "name";
 
 const CATALOG_PAGE_SIZE = 30;
+const AUTO_INSTALL_DOMAINS = new Set(["cyberpunk2077", "residentevilrequiem"]);
 
 const formatBytes = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) return "0 MB";
@@ -114,6 +122,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
   onChooseFolder,
   onSaveDomain,
   onToggleMod,
+  onRemoveMod,
   onDownloadRecorded,
 }) => {
   const { effectsVolume, soundTheme, notificationVolume } = usePreferences();
@@ -149,7 +158,13 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
   const [filesError, setFilesError] = React.useState("");
   const [urlImportLoading, setUrlImportLoading] = React.useState(false);
   const [urlImportError, setUrlImportError] = React.useState("");
+  const [folderActionError, setFolderActionError] = React.useState("");
+  const [folderActionBusy, setFolderActionBusy] = React.useState(false);
+  const [modActionIds, setModActionIds] = React.useState<Set<string>>(() => new Set());
+  const [optimisticModStates, setOptimisticModStates] = React.useState<Record<string, boolean>>({});
+  const [installedActionError, setInstalledActionError] = React.useState("");
   const [downloadState, setDownloadState] = React.useState<NexusDownloadState | null>(null);
+  const [downloadHistory, setDownloadHistory] = React.useState<NexusDownloadState[]>([]);
   const [awaitingFileId, setAwaitingFileId] = React.useState("");
   const [downloadedFileIds, setDownloadedFileIds] = React.useState<Set<string>>(
     () => new Set(),
@@ -252,6 +267,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       nexusFileId: downloadState.fileId,
       filePath: downloadState.filePath,
       installationError: downloadState.installationError,
+      manifestPath: downloadState.manifestPath,
     });
   }, [downloadState, gameDomain, modFiles, onDownloadRecorded, selectedMod]);
 
@@ -300,6 +316,17 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
         && sessionStorage.getItem("checkpoint_hidden_nexus_download_notice") === noticeKey
       ) return;
       setDownloadState(state);
+      setDownloadHistory((prev) => {
+        const index = prev.findIndex(
+          (item) => item.id === state.id || (item.fileId && item.fileId === state.fileId && item.gameDomain === state.gameDomain),
+        );
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = state;
+          return updated;
+        }
+        return [state, ...prev];
+      });
       if (state.status === "completed" && state.fileId) {
         setDownloadedFileIds((current) => new Set(current).add(state.fileId as string));
       }
@@ -383,6 +410,155 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
     }
   };
 
+  const openDownloadedModsFolder = async () => {
+    setFolderActionError("");
+    setFolderActionBusy(true);
+    try {
+      await openNexusDownloadLocation(gameDomain || undefined);
+    } catch (folderError) {
+      setFolderActionError(
+        folderError instanceof Error
+          ? folderError.message
+          : "Não foi possível abrir a pasta dos mods baixados.",
+      );
+    } finally {
+      setFolderActionBusy(false);
+    }
+  };
+
+  const getInstalledModId = (mod: InstalledModEntry) =>
+    mod.id.match(/:([1-9][0-9]*)$/)?.[1] || "";
+
+  const adoptExistingMod = async (mod: InstalledModEntry, modId: string) => {
+    if (
+      gameDomain !== "residentevilrequiem"
+      || !gameFolder
+      || !mod.filePath
+      || !/\.zip$/i.test(mod.filePath)
+    ) {
+      throw new Error(
+        "Este formato não pode ser vinculado automaticamente. Remova-o manualmente.",
+      );
+    }
+    const adoption = await adoptNexusInstalledMod({
+      gameDomain,
+      modId,
+      fileId: mod.nexusFileId || modId,
+      filePath: mod.filePath,
+      gameFolder,
+      modName: mod.name,
+    });
+    return adoption.manifestPath;
+  };
+
+  const changeInstalledModState = async (mod: InstalledModEntry, enabled: boolean) => {
+    if (modActionIds.has(mod.id)) return;
+    setInstalledActionError("");
+    const modId = getInstalledModId(mod);
+    if (!modId) {
+      setInstalledActionError("Não foi possível identificar este mod.");
+      return;
+    }
+    if (enabled && (!AUTO_INSTALL_DOMAINS.has(gameDomain) || !mod.filePath)) {
+      setInstalledActionError("Este formato ainda exige instalação manual.");
+      return;
+    }
+    if (enabled && !gameFolder) {
+      setInstalledActionError("Configure primeiro a pasta raiz do jogo.");
+      return;
+    }
+    setOptimisticModStates((current) => ({ ...current, [mod.id]: enabled }));
+    setModActionIds((current) => new Set(current).add(mod.id));
+    try {
+      if (enabled) {
+        const result = await installNexusDownloadedMod({
+          gameDomain,
+          modId,
+          fileId: mod.nexusFileId || modId,
+          filePath: mod.filePath || "",
+          gameFolder,
+          modName: mod.name,
+        });
+        onDownloadRecorded({
+          ...mod,
+          enabled: true,
+          status: "installed",
+          manifestPath: result.manifestPath,
+          installationError: "",
+        });
+      } else {
+        const manifestPath = mod.manifestPath || await adoptExistingMod(mod, modId);
+        if (manifestPath) {
+          await removeNexusInstalledMod({
+            manifestPath,
+            filePath: mod.filePath,
+            removeArchive: false,
+          });
+        }
+        onToggleMod(mod.id, false);
+      }
+    } catch (actionError) {
+      setInstalledActionError(
+        actionError instanceof Error ? actionError.message : "A operação com o mod falhou.",
+      );
+    } finally {
+      setOptimisticModStates((current) => {
+        const next = { ...current };
+        delete next[mod.id];
+        return next;
+      });
+      setModActionIds((current) => {
+        const next = new Set(current);
+        next.delete(mod.id);
+        return next;
+      });
+    }
+  };
+
+  const removeInstalledMod = async (mod: InstalledModEntry) => {
+    if (modActionIds.has(mod.id)) return;
+    setInstalledActionError("");
+    if (!window.confirm(`Remover ${mod.name} do jogo e apagar o arquivo baixado?`)) return;
+    if (!mod.manifestPath && !mod.filePath) {
+      setInstalledActionError("Nenhum arquivo gerenciado foi encontrado para este mod.");
+      return;
+    }
+
+    setModActionIds((current) => new Set(current).add(mod.id));
+    try {
+      const modId = getInstalledModId(mod);
+      const manifestPath = mod.enabled && !mod.manifestPath
+        ? await adoptExistingMod(mod, modId)
+        : mod.manifestPath;
+      await removeNexusInstalledMod({
+        manifestPath,
+        filePath: mod.filePath,
+        removeArchive: true,
+      });
+      onRemoveMod(mod.id);
+    } catch (actionError) {
+      setInstalledActionError(
+        actionError instanceof Error ? actionError.message : "Não foi possível remover o mod.",
+      );
+    } finally {
+      setModActionIds((current) => {
+        const next = new Set(current);
+        next.delete(mod.id);
+        return next;
+      });
+    }
+  };
+
+  const handleClearCompletedDownloads = () => {
+    playSound("select");
+    setDownloadHistory((prev) => prev.filter((item) => item.status !== "completed"));
+  };
+
+  const handleRemoveDownloadCard = (id: string) => {
+    playSound("select");
+    setDownloadHistory((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const selectMod = (mod: NexusModSummary) => {
     setSelectedMod(mod);
     setModFiles([]);
@@ -458,9 +634,9 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       setFilesError("O identificador deste mod não pôde ser reconhecido.");
       return;
     }
-    if (gameDomain === "cyberpunk2077" && !gameFolder) {
+    if (AUTO_INSTALL_DOMAINS.has(gameDomain) && !gameFolder) {
       setFilesError(
-        "Selecione primeiro a pasta raiz do Cyberpunk 2077 na aba Configurar.",
+        "Selecione primeiro a pasta raiz do jogo na aba Configurar.",
       );
       return;
     }
@@ -584,6 +760,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                 {([
                   ["discover", "Descobrir", Sparkles],
                   ["installed", `Meus mods ${installedMods.length ? `(${installedMods.length})` : ""}`, PackageOpen],
+                  ["downloads", `Downloads ${downloadHistory.length ? `(${downloadHistory.length})` : ""}`, Download],
                   ["setup", "Configurar", Settings2],
                 ] as const).map(([id, label, Icon]) => (
                   <button
@@ -1001,7 +1178,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                         ? "Instalado"
                                         : isDownloaded
                                           ? "Baixado"
-                                          : gameDomain === "cyberpunk2077"
+                                          : AUTO_INSTALL_DOMAINS.has(gameDomain)
                                         ? "Instalar grátis"
                                         : "Baixar grátis"}
                                     </button>
@@ -1039,10 +1216,39 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                           <h2 className="mt-2 text-2xl font-black text-white">Meus mods</h2>
                           <p className="mt-1 text-xs text-white/35">Acompanhe downloads e gerencie os mods já instalados.</p>
                         </div>
-                        <span className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-bold text-white/35">
-                          {installedMods.filter((mod) => mod.enabled).length} ativos
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playSound("select");
+                              void openDownloadedModsFolder();
+                            }}
+                            disabled={folderActionBusy}
+                            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white/55 transition hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-50"
+                          >
+                            {folderActionBusy
+                              ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                              : <FolderOpen className="h-3.5 w-3.5" />}
+                            Abrir pasta dos mods
+                          </button>
+                          <span className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-bold text-white/35">
+                            {installedMods.filter((mod) =>
+                              (optimisticModStates[mod.id] ?? mod.enabled)).length} ativos
+                          </span>
+                        </div>
                       </div>
+
+                      {folderActionError && (
+                        <p className="mb-4 rounded-xl border border-red-400/15 bg-red-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-red-200/65">
+                          {folderActionError}
+                        </p>
+                      )}
+
+                      {installedActionError && (
+                        <p className="mb-4 rounded-xl border border-red-400/15 bg-red-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-red-200/65">
+                          {installedActionError}
+                        </p>
+                      )}
 
                       {installedMods.length === 0 ? (
                         <EmptyCatalog
@@ -1052,10 +1258,13 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                         />
                       ) : (
                         <div className="space-y-3">
-                          {installedMods.map((mod) => (
-                            <div key={mod.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:flex-nowrap sm:gap-4">
+                          {installedMods.map((mod) => {
+                            const displayedEnabled = optimisticModStates[mod.id] ?? mod.enabled;
+                            const isBusy = modActionIds.has(mod.id);
+                            return (
+                            <div key={mod.id} className="mod-list-item flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:flex-nowrap sm:gap-4">
                               <div className="h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-white/[0.04]">
-                                {mod.pictureUrl && <img src={mod.pictureUrl} alt="" className="h-full w-full object-cover" />}
+                                {mod.pictureUrl && <img src={mod.pictureUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <h3 className="truncate text-sm font-black text-white/80">{mod.name}</h3>
@@ -1065,29 +1274,217 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                               </div>
                               <div className="ml-auto flex items-center gap-3">
                                 <span className={`text-[9px] font-black uppercase tracking-wider ${
-                                  mod.enabled
+                                  displayedEnabled && mod.manifestPath
                                     ? "text-emerald-400"
+                                    : displayedEnabled
+                                      ? "text-amber-300/70"
                                     : mod.status === "downloaded"
                                       ? "text-sky-300/70"
                                       : "text-white/25"
                                 }`}>
-                                  {mod.enabled
-                                    ? "Ativo"
+                                  {isBusy
+                                    ? displayedEnabled ? "Ativando..." : "Desativando..."
+                                    : displayedEnabled
+                                    ? mod.manifestPath ? "Ativo" : "Verificação necessária"
                                     : mod.status === "downloaded"
                                       ? "Baixado"
                                       : "Desativado"}
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => void removeInstalledMod(mod)}
+                                  disabled={isBusy}
+                                  aria-label={`Remover ${mod.name}`}
+                                  title="Remover do jogo e apagar o download"
+                                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/10 bg-red-400/[0.04] text-red-200/35 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-200 disabled:cursor-wait disabled:opacity-40"
+                                >
+                                  {isBusy
+                                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                                    : <Trash2 className="h-4 w-4" />}
+                                </button>
                                 <Switch
-                                  checked={mod.enabled}
-                                  onCheckedChange={(enabled) => onToggleMod(mod.id, enabled)}
-                                  aria-label={`${mod.enabled ? "Desativar" : "Ativar"} ${mod.name}`}
+                                  checked={displayedEnabled}
+                                  onCheckedChange={(enabled) => void changeInstalledModState(mod, enabled)}
+                                  disabled={isBusy || (
+                                    displayedEnabled
+                                      ? !mod.manifestPath && !(
+                                        gameDomain === "residentevilrequiem"
+                                        && Boolean(gameFolder)
+                                        && /\.zip$/i.test(mod.filePath || "")
+                                      )
+                                      : !mod.filePath || !AUTO_INSTALL_DOMAINS.has(gameDomain)
+                                  )}
+                                  title={displayedEnabled && !mod.manifestPath
+                                    ? "O Checkpoint verificará os arquivos antes de vincular este mod"
+                                    : undefined}
+                                  aria-label={`${displayedEnabled ? "Desativar" : "Ativar"} ${mod.name}`}
                                 />
                               </div>
                             </div>
-                          ))}
+                          );})}
                         </div>
                       )}
                     </div>
+                  </motion.section>
+                )}
+
+                {activeTab === "downloads" && (
+                  <motion.section
+                    key="downloads"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="flex h-full min-h-0 flex-col overflow-y-auto p-4 thin-scrollbar sm:p-6"
+                  >
+                    <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                      <div>
+                        <h2 className="flex items-center gap-2.5 text-lg font-black tracking-tight text-white sm:text-xl">
+                          <Download className="h-5 w-5 text-sky-400" />
+                          Gerenciador de Downloads
+                        </h2>
+                        <p className="mt-0.5 text-xs text-white/40">
+                          Acompanhe em tempo real os downloads e instalações de mods acionados na Nexus.
+                        </p>
+                      </div>
+
+                      {downloadHistory.some((item) => item.status === "completed") && (
+                        <button
+                          type="button"
+                          onClick={handleClearCompletedDownloads}
+                          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-[10px] font-black uppercase tracking-wider text-white/70 transition hover:bg-white/10 hover:text-white"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                          Limpar Concluídos
+                        </button>
+                      )}
+                    </div>
+
+                    {downloadHistory.length === 0 ? (
+                      <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+                        <Download className="mb-3 h-10 w-10 text-white/15" />
+                        <p className="text-sm font-black text-white/60">Nenhum download registrado</p>
+                        <p className="mt-1 max-w-sm text-xs leading-relaxed text-white/30">
+                          Ao iniciar um download na Nexus Mods, o progresso e o status de instalação aparecerão aqui automaticamente.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {downloadHistory.map((item) => {
+                          const isDownloading = item.status === "downloading" || item.status === "resolving";
+                          const isInstalling = item.status === "installing";
+                          const isCompleted = item.status === "completed";
+                          const isError = item.status === "error";
+
+                          const total = item.totalBytes || 0;
+                          const received = item.receivedBytes || 0;
+                          const percent = total > 0 ? Math.min(100, Math.round((received / total) * 100)) : 0;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="group relative flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-xl transition hover:border-white/20 hover:bg-white/[0.05] sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                                  {item.pictureUrl ? (
+                                    <img src={item.pictureUrl} alt="" className="h-full w-full object-cover" />
+                                  ) : (
+                                    <PackageOpen className="h-5 w-5 text-white/30" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="truncate text-sm font-black text-white">
+                                      {item.modName || `Mod #${item.modId}`}
+                                    </h3>
+                                    {item.version && (
+                                      <span className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] font-mono text-white/50">
+                                        v{item.version}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="mt-0.5 text-xs text-white/40">
+                                    {item.modAuthor ? `por ${item.modAuthor}` : `ID: ${item.modId}`}
+                                  </p>
+
+                                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    {item.status === "resolving" && (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
+                                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                        Obtendo servidor...
+                                      </span>
+                                    )}
+
+                                    {item.status === "downloading" && (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
+                                        <Download className="h-3.5 w-3.5 animate-bounce" />
+                                        Baixando ({percent}%) • {formatBytes(received)} / {formatBytes(total)}
+                                      </span>
+                                    )}
+
+                                    {isInstalling && (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                        Instalando mod...
+                                      </span>
+                                    )}
+
+                                    {isCompleted && (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        {item.installed ? "Instalado com sucesso" : "Download concluído"}
+                                      </span>
+                                    )}
+
+                                    {isError && (
+                                      <span className="flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                                        <AlertCircle className="h-3.5 w-3.5" />
+                                        {item.error || item.installationError || "Falha no download"}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {isDownloading && (
+                                    <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                                      <div
+                                        className="h-full bg-linear-to-r from-sky-500 to-indigo-500 transition-all duration-300"
+                                        style={{ width: `${percent}%` }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-center">
+                                {item.filePath && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void openNexusDownloadLocation(item.gameDomain || gameDomain)}
+                                    title="Abrir pasta do arquivo"
+                                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/50 transition hover:bg-white/10 hover:text-white"
+                                  >
+                                    <FolderOpen className="h-4 w-4" />
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (item.id) handleRemoveDownloadCard(item.id);
+                                  }}
+                                  title="Remover do histórico"
+                                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/50 transition hover:bg-red-500/20 hover:text-red-400"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </motion.section>
                 )}
 

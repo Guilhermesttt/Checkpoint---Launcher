@@ -35,6 +35,22 @@ const readRecord = <T,>(key: string): Record<string, T> => {
   }
 };
 
+const normalizeInstalledMods = (
+  record: Record<string, InstalledModEntry[]>,
+): Record<string, InstalledModEntry[]> => Object.fromEntries(
+  Object.entries(record).map(([gameId, mods]) => [
+    gameId,
+    (Array.isArray(mods) ? mods : []).map((mod) => {
+      // Versoes antigas marcavam o download como ativo mesmo sem um manifesto.
+      // Nesse caso o Checkpoint so pode confirmar que o pacote foi baixado.
+      if (mod.enabled && !mod.manifestPath) {
+        return { ...mod, enabled: false, status: "downloaded" as const };
+      }
+      return mod;
+    }),
+  ]),
+);
+
 const normalizeTitle = (title: string) =>
   title.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g, " ").trim();
 
@@ -77,8 +93,12 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     () => readRecord<string>(storageKeys.domains(uid)),
   );
   const [installedByGame, setInstalledByGame] = React.useState<Record<string, InstalledModEntry[]>>(
-    () => readRecord<InstalledModEntry[]>(storageKeys.installed(uid)),
+    () => normalizeInstalledMods(readRecord<InstalledModEntry[]>(storageKeys.installed(uid))),
   );
+
+  React.useEffect(() => {
+    localStorage.setItem(storageKeys.installed(uid), JSON.stringify(installedByGame));
+  }, [installedByGame, uid]);
 
   const filteredGames = React.useMemo(() => {
     const query = searchTerm.trim().toLocaleLowerCase("pt-BR");
@@ -106,15 +126,25 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
   };
 
   const toggleInstalledMod = (game: Game, modId: string, enabled: boolean) => {
-    const nextForGame = (installedByGame[game.id] || []).map((mod) =>
+    const nextForGame: InstalledModEntry[] = (installedByGame[game.id] || []).map((mod) =>
       mod.id === modId
         ? {
             ...mod,
             enabled,
-            status: enabled ? "installed" : mod.status,
+            status: enabled ? "installed" : "downloaded",
+            ...(!enabled ? { manifestPath: undefined } : {}),
           }
         : mod);
     const next = { ...installedByGame, [game.id]: nextForGame };
+    setInstalledByGame(next);
+    localStorage.setItem(storageKeys.installed(uid), JSON.stringify(next));
+  };
+
+  const removeInstalledMod = (game: Game, modId: string) => {
+    const next = {
+      ...installedByGame,
+      [game.id]: (installedByGame[game.id] || []).filter((mod) => mod.id !== modId),
+    };
     setInstalledByGame(next);
     localStorage.setItem(storageKeys.installed(uid), JSON.stringify(next));
   };
@@ -309,9 +339,10 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
           <section className="flex items-center gap-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] px-5 py-4">
             <ShieldCheck className="h-5 w-5 shrink-0 text-amber-300/70" />
             <div>
-              <p className="text-xs font-bold text-amber-100/65">Instalação segura em preparação</p>
+              <p className="text-xs font-bold text-amber-100/65">Instalação de mods</p>
               <p className="mt-0.5 text-[10px] leading-relaxed text-amber-100/30">
-                Downloads autenticados, backup de arquivos e resolução de conflitos entram após o Nexus SSO.
+                ZIPs reconhecidos do Cyberpunk 2077 e Resident Evil Requiem são instalados automaticamente
+                com backup. Formatos desconhecidos permanecem disponíveis para instalação manual.
               </p>
             </div>
           </section>
@@ -336,6 +367,9 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
         }}
         onToggleMod={(modId, enabled) => {
           if (selectedGame) toggleInstalledMod(selectedGame, modId, enabled);
+        }}
+        onRemoveMod={(modId) => {
+          if (selectedGame) removeInstalledMod(selectedGame, modId);
         }}
         onDownloadRecorded={handleDownloadRecorded}
       />

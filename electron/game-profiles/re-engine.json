@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "gameDomain": "re-engine",
+  "displayName": "RE Engine Games",
+  "aliases": [
+    "residentevilrequiem",
+    "residentevil4",
+    "residentevil2",
+    "residentevil3",
+    "residentevil7",
+    "residentevilvillage",
+    "dmc5",
+    "mhrise",
+    "dragonsdogma2"
+  ],
+  "rootFolders": [
+    "natives",
+    "reframework",
+    "autorun",
+    "reshade-shaders",
+    "mods",
+    "plugins",
+    "scripts"
+  ],
+  "rootFiles": [
+    "dinput8.dll",
+    "dxgi.dll",
+    "opengl32.dll",
+    "openvr_api.dll",
+    "xinput1_3.dll",
+    "xinput1_4.dll",
+    "bink2w64.dll",
+    "sl.dlss.dll",
+    "sl.fsr3.dll",
+    "sl.common.dll"
+  ],
+  "routingRules": []
+}

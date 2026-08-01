@@ -142,8 +142,35 @@ export const prepareNexusFreeDownload = async (request: {
 }): Promise<{ prepared: boolean; autoInstall: boolean; expiresAt: number }> =>
   requireNexusDesktopBridge().prepareNexusFreeDownload(request);
 
-export const openNexusDownloadLocation = async (): Promise<boolean> =>
-  requireNexusDesktopBridge().openNexusDownloadLocation();
+export const installNexusDownloadedMod = async (request: {
+  gameDomain: string;
+  modId: string;
+  fileId?: string;
+  filePath: string;
+  gameFolder: string;
+  modName: string;
+}): Promise<NexusDownloadState> =>
+  requireNexusDesktopBridge().installNexusDownloadedMod(request);
+
+export const adoptNexusInstalledMod = async (request: {
+  gameDomain: string;
+  modId: string;
+  fileId?: string;
+  filePath: string;
+  gameFolder: string;
+  modName: string;
+}): Promise<{ installedFiles: number; backedUpFiles: number; manifestPath: string }> =>
+  requireNexusDesktopBridge().adoptNexusInstalledMod(request);
+
+export const removeNexusInstalledMod = async (request: {
+  manifestPath?: string;
+  filePath?: string;
+  removeArchive: boolean;
+}): Promise<{ removedFromGame: boolean; archiveRemoved: boolean }> =>
+  requireNexusDesktopBridge().removeNexusInstalledMod(request);
+
+export const openNexusDownloadLocation = async (gameDomain?: string): Promise<boolean> =>
+  requireNexusDesktopBridge().openNexusDownloadLocation(gameDomain);
 
 export const onNexusDownloadState = (
   callback: (state: NexusDownloadState) => void,

@@ -23,8 +23,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("nexus:list-downloaded-files", gameDomain),
   prepareNexusFreeDownload: (request) =>
     ipcRenderer.invoke("nexus:prepare-free-download", request),
-  openNexusDownloadLocation: () =>
-    ipcRenderer.invoke("nexus:open-download-location"),
+  installNexusDownloadedMod: (request) =>
+    ipcRenderer.invoke("nexus:install-downloaded-mod", request),
+  adoptNexusInstalledMod: (request) =>
+    ipcRenderer.invoke("nexus:adopt-installed-mod", request),
+  removeNexusInstalledMod: (request) =>
+    ipcRenderer.invoke("nexus:remove-installed-mod", request),
+  openNexusDownloadLocation: (gameDomain) =>
+    ipcRenderer.invoke("nexus:open-download-location", gameDomain),
   onNexusDownloadState: (callback) => {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on("nexus:download-state", handler);
