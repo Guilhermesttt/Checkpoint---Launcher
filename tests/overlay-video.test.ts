@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 require("../electron/overlay-video.js");
 const { createOverlayVideoLayer, appendOverlayVideoLayer } = (window as typeof window & {
@@ -44,5 +46,18 @@ describe("videos decorativos dos overlays", () => {
 
     expect(shell.firstElementChild).toBe(layer);
     expect(shell.lastElementChild).toBe(content);
+  });
+
+  it("inclui os dois videos no pacote e fora da compactacao ASAR", () => {
+    const packageJson = JSON.parse(
+      readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
+    ) as { build: { files: string[]; asarUnpack: string[] } };
+    const videos = [
+      "src/assets/Kristina_Lane__pindown.io_1785615277.mp4",
+      "src/assets/Overlay_Background.mp4",
+    ];
+
+    expect(packageJson.build.files).toEqual(expect.arrayContaining(videos));
+    expect(packageJson.build.asarUnpack).toEqual(expect.arrayContaining(videos));
   });
 });

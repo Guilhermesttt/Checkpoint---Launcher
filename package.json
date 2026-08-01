@@ -98,10 +98,15 @@
       "src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_out_of_game_detail.wav",
       "src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_slider_down.wav",
       "src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_default_activation.wav",
+      "src/assets/Kristina_Lane__pindown.io_1785615277.mp4",
+      "src/assets/Overlay_Background.mp4",
       "package.json"
     ],
     "asar": true,
-    "asarUnpack": [],
+    "asarUnpack": [
+      "src/assets/Kristina_Lane__pindown.io_1785615277.mp4",
+      "src/assets/Overlay_Background.mp4"
+    ],
     "win": {
       "icon": "assets/icon.ico",
       "target": [
