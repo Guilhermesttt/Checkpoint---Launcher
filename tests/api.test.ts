@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   app,
   buildEpicDetails,
+  canViewDetailedProfile,
   normalizeFriendAchievementAggregate,
   normalizeNexusTrendingMods,
   normalizeSocialActivityInput,
   normalizeSteamPlayerProfile,
   partitionOwnedSteamAppIds,
   projectFriendGame,
+  projectSearchProfile,
   resolveChatRetentionDays,
   resolveLinkedSteamId,
   revokeActivityAudience,
@@ -16,6 +18,36 @@ import {
 } from "../server/index.mjs";
 
 describe("API publica", () => {
+  it.each([
+    ["public", false, false, true],
+    ["private", true, false, true],
+    ["private", false, true, true],
+    ["private", false, false, false],
+  ])(
+    "aplica a matriz de visibilidade do perfil",
+    (visibility, isSelf, isAcceptedFriend, expected) => {
+      expect(canViewDetailedProfile({ visibility, isSelf, isAcceptedFriend })).toBe(expected);
+    },
+  );
+
+  it("projeta somente identidade basica na busca de um perfil privado", () => {
+    expect(projectSearchProfile({
+      uid: "user-private",
+      display_name: "Jogador Privado",
+      photo_url: "https://img.example/avatar.png",
+      profile_visibility: "private",
+      status: "playing",
+      playing: "Portal 2",
+      discord_username: "segredo",
+      steam_username: "segredo-steam",
+    })).toEqual({
+      uid: "user-private",
+      displayName: "Jogador Privado",
+      photoURL: "https://img.example/avatar.png",
+      profileVisibility: "private",
+    });
+  });
+
   it("usa sete dias como retencao padrao do chat", () => {
     expect(resolveChatRetentionDays(undefined)).toBe(7);
     expect(resolveChatRetentionDays("7")).toBe(7);

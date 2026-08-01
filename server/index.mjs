@@ -1448,6 +1448,24 @@ const profileRowToPublic = (row = {}) => {
   };
 };
 
+export const canViewDetailedProfile = ({
+  visibility,
+  isSelf,
+  isAcceptedFriend,
+}) => visibility !== "private" || Boolean(isSelf) || Boolean(isAcceptedFriend);
+
+export const projectSearchProfile = (row = {}) => {
+  const profileVisibility = row.profile_visibility === "private" ? "private" : "public";
+  const identity = {
+    uid: String(row.uid || ""),
+    displayName: String(row.display_name || "Jogador"),
+    photoURL: row.photo_url || row.discord_avatar || row.steam_avatar || "",
+    profileVisibility,
+  };
+  if (profileVisibility === "private") return identity;
+  return { ...profileRowToPublic(row), profileVisibility };
+};
+
 const nonNegativeFiniteNumber = (value) => {
   const number = Number(value || 0);
   return Number.isFinite(number) ? Math.max(0, number) : 0;
@@ -1728,7 +1746,7 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
   try {
     const safeTerm = term.replace(/[%_,()]/g, " ").trim();
     const found = new Map();
-    const columns = "uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at";
+    const columns = "uid,display_name,photo_url,discord_username,discord_avatar,steam_username,steam_avatar,status,playing,presence_updated_at,profile_visibility";
     const nameQuery = supabaseAdmin
       .from("profiles")
       .select(columns)
@@ -1747,7 +1765,7 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
     if (nameResult.error) throw nameResult.error;
     if (emailResult.error) throw emailResult.error;
     [...(emailResult.data || []), ...(nameResult.data || [])].forEach((row) => {
-      found.set(row.uid, profileRowToPublic(row));
+      found.set(row.uid, projectSearchProfile(row));
     });
     const users = Array.from(found.values()).slice(0, 25);
 
@@ -1830,18 +1848,36 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
   try {
     const currentUid = req.firebaseUser.uid;
-    const { data: friendship, error: friendshipError } = await supabaseAdmin
-      .from("friendships")
-      .select("requester_id")
-      .eq("status", "accepted")
-      .or(
-        `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
-        + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
-      )
-      .maybeSingle();
+    const [friendshipResult, visibilityResult] = await Promise.all([
+      supabaseAdmin
+        .from("friendships")
+        .select("requester_id")
+        .eq("status", "accepted")
+        .or(
+          `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+          + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+        )
+        .maybeSingle(),
+      supabaseAdmin
+        .from("profiles")
+        .select("profile_visibility")
+        .eq("uid", friendUid)
+        .maybeSingle(),
+    ]);
+    const { data: friendship, error: friendshipError } = friendshipResult;
+    const { data: visibilityRow, error: visibilityError } = visibilityResult;
     if (friendshipError) throw friendshipError;
-    if (!friendship) {
-      res.status(403).json({ error: "Perfil disponível apenas para amigos." });
+    if (visibilityError) throw visibilityError;
+    if (!visibilityRow) {
+      res.status(404).json({ error: "Perfil não encontrado." });
+      return;
+    }
+    if (!canViewDetailedProfile({
+      visibility: visibilityRow.profile_visibility,
+      isSelf: currentUid === friendUid,
+      isAcceptedFriend: Boolean(friendship),
+    })) {
+      res.status(403).json({ error: "Perfil privado disponível apenas para amigos." });
       return;
     }
 
@@ -1882,6 +1918,7 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
     res.json({
       profile: {
         ...visibleProfile,
+        profileVisibility: visibilityRow.profile_visibility === "private" ? "private" : "public",
         bio: publicRow.bio || "",
         website: publicRow.website || "",
         favoriteGenres: publicRow.favorite_genres || [],
