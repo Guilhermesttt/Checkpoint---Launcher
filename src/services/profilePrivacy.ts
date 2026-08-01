@@ -15,10 +15,12 @@ export const saveProfileVisibility = async (
     throw new Error("Faça login novamente para alterar a privacidade.");
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .update({ profile_visibility: visibility })
-    .eq("uid", session.user.id);
+    .eq("uid", session.user.id)
+    .select("profile_visibility")
+    .single();
   if (error) throw error;
-  return visibility;
+  return normalizeProfileVisibility(data?.profile_visibility);
 };
