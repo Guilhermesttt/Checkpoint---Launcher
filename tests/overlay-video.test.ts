@@ -2,9 +2,14 @@
 import { describe, expect, it } from "vitest";
 
 require("../electron/overlay-video.js");
-const { createOverlayVideoLayer } = (window as typeof window & {
+const { createOverlayVideoLayer, appendOverlayVideoLayer } = (window as typeof window & {
   CheckpointOverlayVideo: {
   createOverlayVideoLayer: (
+    kind: "social" | "achievement",
+    documentRef?: Document,
+  ) => HTMLDivElement;
+  appendOverlayVideoLayer: (
+    shell: HTMLElement,
     kind: "social" | "achievement",
     documentRef?: Document,
   ) => HTMLDivElement;
@@ -27,5 +32,17 @@ describe("videos decorativos dos overlays", () => {
     expect(video?.getAttribute("src")).toContain(filename);
     expect(video?.classList.contains("is-rotated")).toBe(rotated);
     expect(layer).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("insere a camada antes do conteudo existente do card", () => {
+    const shell = document.createElement("div");
+    const content = document.createElement("div");
+    content.className = "overlay-content";
+    shell.append(content);
+
+    const layer = appendOverlayVideoLayer(shell, "social", document);
+
+    expect(shell.firstElementChild).toBe(layer);
+    expect(shell.lastElementChild).toBe(content);
   });
 });

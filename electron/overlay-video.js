@@ -32,5 +32,11 @@
     return layer;
   };
 
-  return { createOverlayVideoLayer };
+  const appendOverlayVideoLayer = (shell, kind, documentRef = document) => {
+    const layer = createOverlayVideoLayer(kind, documentRef);
+    shell.prepend(layer);
+    return layer;
+  };
+
+  return { createOverlayVideoLayer, appendOverlayVideoLayer };
 });
