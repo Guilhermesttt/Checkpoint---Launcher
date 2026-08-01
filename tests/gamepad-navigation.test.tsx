@@ -81,6 +81,10 @@ describe("navegacao por gamepad", () => {
     gamepads = [makeGamepad({ pressed: [0] })];
     runFrame();
     expect(screen.getByText("true:playstation:gamepad")).toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute("data-gamepad-navigation", "active");
+
+    act(() => window.dispatchEvent(new MouseEvent("mousemove")));
+    expect(document.documentElement).not.toHaveAttribute("data-gamepad-navigation");
   });
 
   it("entrega o botao somente para a camada de maior prioridade", () => {

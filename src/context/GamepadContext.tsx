@@ -305,6 +305,18 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [activeInputType]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isGamepadConnected && activeInputType === "gamepad") {
+      root.dataset.gamepadNavigation = "active";
+    } else {
+      delete root.dataset.gamepadNavigation;
+    }
+    return () => {
+      delete root.dataset.gamepadNavigation;
+    };
+  }, [activeInputType, isGamepadConnected]);
+
   return (
     <GamepadContext.Provider value={{ activeInputType, isGamepadConnected, gamepadFamily, connectedGamepadId }}>
       {children}
