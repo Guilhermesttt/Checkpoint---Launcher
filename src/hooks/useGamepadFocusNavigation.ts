@@ -1,7 +1,11 @@
 import { useCallback, useEffect } from "react";
 import type { SoundEffectType } from "./useSoundEffects";
-
-export type SpatialDirection = "up" | "down" | "left" | "right";
+import {
+  findDeclaredSpatialNeighbor,
+  rankSpatialCandidates,
+  type SpatialDirection,
+} from "../utils/spatialFocus";
+export type { SpatialDirection } from "../utils/spatialFocus";
 
 interface UseGamepadFocusNavigationProps {
   playSound: (t: SoundEffectType) => void;
@@ -69,45 +73,19 @@ export function useGamepadFocusNavigation({
 
       const currentElement = elements[currentIndex];
       const currentRect = currentElement.getBoundingClientRect();
-      const currentCenterX = currentRect.left + currentRect.width / 2;
-      const currentCenterY = currentRect.top + currentRect.height / 2;
-      const threshold = 8;
+      const root = document.querySelector<HTMLElement>("[data-system-page]");
+      const declaredNeighbor = root
+        ? findDeclaredSpatialNeighbor(root, currentElement, direction)
+        : null;
+      const rankedCandidates = rankSpatialCandidates(
+        currentRect,
+        elements
+          .filter((element) => element !== currentElement)
+          .map((element) => ({ id: element, rect: element.getBoundingClientRect() })),
+        direction,
+      );
 
-      const rankedCandidates = elements
-        .map((element, index) => {
-          if (index === currentIndex) return null;
-
-          const rect = element.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          const deltaX = centerX - currentCenterX;
-          const deltaY = centerY - currentCenterY;
-
-          const isInDirection =
-            direction === "left"
-              ? deltaX < -threshold
-              : direction === "right"
-              ? deltaX > threshold
-              : direction === "up"
-              ? deltaY < -threshold
-              : deltaY > threshold;
-
-          if (!isInDirection) return null;
-
-          const primaryDistance =
-            direction === "left" || direction === "right" ? Math.abs(deltaX) : Math.abs(deltaY);
-          const secondaryDistance =
-            direction === "left" || direction === "right" ? Math.abs(deltaY) : Math.abs(deltaX);
-
-          return {
-            element,
-            score: primaryDistance * 4 + secondaryDistance,
-          };
-        })
-        .filter((candidate): candidate is { element: HTMLElement; score: number } => Boolean(candidate))
-        .sort((a, b) => a.score - b.score);
-
-      const nextElement = rankedCandidates[0]?.element;
+      const nextElement = declaredNeighbor ?? rankedCandidates[0]?.id;
       if (!nextElement) return false;
 
       focusSystemElement(nextElement, currentElement);
