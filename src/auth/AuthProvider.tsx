@@ -28,6 +28,10 @@ const toProfile = (uid: string, data?: Record<string, any>): UserProfile => ({
   email: data?.email ?? null,
   displayName: data?.displayName ?? data?.display_name ?? null,
   photoURL: data?.photoURL ?? data?.photo_url ?? null,
+  profileVisibility:
+    data?.profileVisibility === "private" || data?.profile_visibility === "private"
+      ? "private"
+      : "public",
   bio: data?.bio,
   website: data?.website,
   favoriteGenres: data?.favoriteGenres ?? data?.favorite_genres,

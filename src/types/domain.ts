@@ -66,11 +66,14 @@ export interface SocialActivity {
   createdAt: string;
 }
 
+export type ProfileVisibility = "public" | "private";
+
 export interface UserProfile {
   uid: string;
   email?: string | null;
   displayName?: string | null;
   photoURL?: string | null;
+  profileVisibility?: ProfileVisibility;
   bio?: string;
   location?: string;
   pronouns?: string;

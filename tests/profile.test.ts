@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeEditableProfile, PROFILE_LIMITS } from "../src/services/profile";
+import { normalizeProfileVisibility } from "../src/services/profilePrivacy";
 
 describe("edição de perfil", () => {
   it("normaliza campos e limita gêneros públicos", () => {
@@ -29,5 +30,13 @@ describe("edição de perfil", () => {
     expect(() => normalizeEditableProfile({ ...base, website: "http://example.com" })).toThrow(/https/i);
     expect(() => normalizeEditableProfile({ ...base, displayName: "G" })).toThrow(/2 caracteres/i);
     expect(PROFILE_LIMITS.avatarBytes).toBe(5 * 1024 * 1024);
+  });
+});
+
+describe("privacidade do perfil", () => {
+  it("aceita somente visibilidade publica ou privada", () => {
+    expect(normalizeProfileVisibility("public")).toBe("public");
+    expect(normalizeProfileVisibility("private")).toBe("private");
+    expect(() => normalizeProfileVisibility("friends")).toThrow(/visibilidade/i);
   });
 });

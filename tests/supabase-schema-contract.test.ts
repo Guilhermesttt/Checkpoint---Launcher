@@ -24,6 +24,13 @@ const retentionMigration = readFileSync(
   ),
   "utf8",
 );
+const privacyMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260801090000_profile_visibility.sql",
+  ),
+  "utf8",
+);
 
 describe("contrato da migration Supabase", () => {
   it("versiona o grafo social e o chat normalizado", () => {
@@ -66,5 +73,10 @@ describe("contrato da migration Supabase", () => {
   it("indexa a data usada para limpar mensagens expiradas", () => {
     expect(retentionMigration).toContain("chat_messages_retention_idx");
     expect(retentionMigration).toContain("created_at asc");
+  });
+
+  it("adiciona visibilidade de perfil com padrao publico e valores restritos", () => {
+    expect(privacyMigration).toContain("profile_visibility text not null default 'public'");
+    expect(privacyMigration).toContain("profile_visibility in ('public', 'private')");
   });
 });
