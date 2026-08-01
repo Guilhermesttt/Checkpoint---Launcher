@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("auth:account-callback", handler);
   },
   setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
+  setWindowBehavior: (behavior) => ipcRenderer.invoke("system:set-window-behavior", behavior),
+  requestAppQuit: () => ipcRenderer.invoke("system:request-app-quit"),
+  confirmAppQuit: () => ipcRenderer.invoke("system:confirm-app-quit"),
+  onExitConfirmationRequested: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("system:exit-confirmation-requested", handler);
+    return () => ipcRenderer.removeListener("system:exit-confirmation-requested", handler);
+  },
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
   copyToClipboard: (value) => ipcRenderer.invoke("system:copy-to-clipboard", value),
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),

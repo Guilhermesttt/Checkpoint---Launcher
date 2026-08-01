@@ -25,6 +25,7 @@ const {
 } = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
+const { createWindowBehaviorController } = require("./window-behavior.cjs");
 const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
 const {
   getNexusDownloadLinks,
@@ -187,6 +188,26 @@ let nexusCredentialStore = null;
 let pendingNexusDownload = null;
 let nexusDownloadState = null;
 let nexusDownloadInProgress = false;
+
+const windowBehaviorController = createWindowBehaviorController({
+  hideWindow: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+  },
+  showWindow: () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  },
+  requestConfirmation: () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send("system:exit-confirmation-requested");
+  },
+  quitApp: () => {
+    isQuitting = true;
+    app.quit();
+  },
+});
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
@@ -1051,10 +1072,12 @@ const createWindow = async () => {
   });
 
   mainWindow.on("close", (event) => {
-    if (!isQuitting) {
+    const action = windowBehaviorController.handleWindowClose(isQuitting);
+    if (action !== "quit") {
       event.preventDefault();
-      mainWindow.hide();
+      return;
     }
+    isQuitting = true;
   });
 
   mainWindow.on("closed", () => {
@@ -2482,6 +2505,16 @@ registerSecureIpcHandler("system:set-open-at-login", async (_event, open) => {
   return { openAtLogin: shouldOpen, supported: true };
 });
 
+registerSecureIpcHandler("system:set-window-behavior", (_event, requested) =>
+  windowBehaviorController.setBehavior(requested));
+
+registerSecureIpcHandler("system:request-app-quit", () =>
+  windowBehaviorController.requestAppQuit());
+
+registerSecureIpcHandler("system:confirm-app-quit", () => {
+  windowBehaviorController.confirmAppQuit();
+});
+
 registerSecureIpcHandler("launcher:open-executable", async (
   _event,
   executablePath,
@@ -3601,7 +3634,7 @@ app.whenReady().then(async () => {
         tray = new Tray(iconPath);
         const contextMenu = Menu.buildFromTemplate([
           { label: "Abrir Checkpoint", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
-          { label: "Sair", click: () => { isQuitting = true; app.quit(); } }
+          { label: "Sair", click: () => { windowBehaviorController.requestAppQuit(); } }
         ]);
         tray.setToolTip("Checkpoint Launcher");
         tray.setContextMenu(contextMenu);

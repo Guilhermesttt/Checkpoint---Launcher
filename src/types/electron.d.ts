@@ -412,6 +412,16 @@ declare global {
         openAtLogin: boolean;
         supported: boolean;
       }>;
+      setWindowBehavior?: (behavior: {
+        minimizeToTray: boolean;
+        confirmBeforeExit: boolean;
+      }) => Promise<{
+        minimizeToTray: boolean;
+        confirmBeforeExit: boolean;
+      }>;
+      requestAppQuit?: () => Promise<{ confirmationRequired: boolean }>;
+      confirmAppQuit?: () => Promise<void>;
+      onExitConfirmationRequested?: (callback: () => void) => () => void;
       getEpicLocalAchievements: (request: {
         gameId: string;
         title: string;
