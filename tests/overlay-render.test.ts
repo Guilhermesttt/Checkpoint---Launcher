@@ -240,6 +240,20 @@ describe("overlay de conquistas", () => {
     expect(homeSource).toContain("setActiveChatFriend(friend)");
   });
 
+  it("identifica a troca de faixa do Spotify como tocando agora", () => {
+    social({
+      kind: "spotify-track",
+      title: "Rotten Apple",
+      description: "Alice in Chains",
+      avatarUrl: "https://i.scdn.co/image/album-cover",
+    });
+
+    const card = document.querySelector<HTMLElement>(".kind-spotify-track");
+    expect(card?.querySelector(".social-badge")?.textContent).toBe("Tocando agora");
+    expect(card?.querySelector(".social-title")?.textContent).toBe("Rotten Apple");
+    expect(card?.querySelector(".social-description")?.textContent).toBe("Alice in Chains");
+  });
+
   it("usa no overlay um logo incluido no pacote do Electron", () => {
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
     const parsed = new DOMParser().parseFromString(html, "text/html");
