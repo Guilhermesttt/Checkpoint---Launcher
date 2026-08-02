@@ -93,6 +93,7 @@ import { activateElementWithController } from "../utils/controllerTextInput";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
 import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
 import InputHints from "../components/ui/InputHints";
+import { resolveLibraryLoadingState, shouldShowLibraryFooter } from "../utils/libraryLoading";
 
 const AddGameModal = React.lazy(() => import("../components/AddGameModal"));
 const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel"));
@@ -182,6 +183,7 @@ const Home: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [isLoading, setIsLoading] = useState(true);
+  const loadedLibraryOwnerRef = useRef<string | null>(null);
   const [localLibraryReady, setLocalLibraryReady] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -322,13 +324,18 @@ const Home: React.FC = () => {
     if (!user?.uid) {
       setGames([]);
       setIsLoading(false);
+      loadedLibraryOwnerRef.current = null;
       return;
     }
-    setIsLoading(true);
+    const loadingState = resolveLibraryLoadingState(
+      loadedLibraryOwnerRef.current === user.uid,
+    );
+    if (loadingState.showSkeleton) setIsLoading(true);
     try {
       setGames(await listLibraryGames(user.uid));
+      loadedLibraryOwnerRef.current = user.uid;
     } finally {
-      setIsLoading(false);
+      if (loadingState.showSkeleton) setIsLoading(false);
     }
   }, [user?.uid]);
 
@@ -371,7 +378,6 @@ const Home: React.FC = () => {
     playSound,
     notify,
     refreshProfile,
-    setIsLoading,
     setSelectedIndex,
     onLibraryChanged: refreshLibrary,
     language: launcherLanguage,
@@ -500,11 +506,11 @@ const Home: React.FC = () => {
       return;
     }
 
-    if (!window.electronAPI?.importLegacyGames) {
+    if (!window.electronAPI?.importLegacyGames || !userProfile?.gamesMigratedAt) {
       setLocalLibraryReady(true);
     }
     void refreshLibrary();
-  }, [refreshLibrary, user?.uid]);
+  }, [refreshLibrary, user?.uid, userProfile?.gamesMigratedAt]);
 
   useEffect(() => {
     if (
@@ -2106,7 +2112,7 @@ const Home: React.FC = () => {
           )}
         </div>
 
-        <div
+        {shouldShowLibraryFooter(activeCategory) && <div
           className="fixed bottom-0 z-30 flex items-center justify-between px-8 py-3.5 pointer-events-none transition-[left] duration-300 ease-out"
           style={{
             left: isSidebarExpanded ? 272 : 96,
@@ -2133,7 +2139,7 @@ const Home: React.FC = () => {
             { button: "X", label: "Abrir" },
             { button: "CONTEXT", label: "Opções" }
           ]} />
-        </div>
+        </div>}
       </div>
 
       <React.Suspense fallback={null}>
@@ -2183,34 +2189,41 @@ const Home: React.FC = () => {
           playSound("back");
           setFriendProfileModal(null);
         }}
-        maxWidthClassName="max-w-6xl"
+        maxWidthClassName="max-w-[min(1440px,calc(100vw-48px))]"
+        containerClassName="p-6"
         zIndexClassName="z-[165]"
-        className="relative flex h-[min(90dvh,820px)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] p-0 shadow-2xl"
+        className="relative h-[calc(100dvh-48px)] max-h-none overflow-visible p-0"
       >
+        <div
+          data-friend-profile-surface
+          className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] shadow-2xl"
+        >
+          {friendProfileModal && (
+            <React.Suspense fallback={<div className="p-10 text-white/40">Carregando perfil...</div>}>
+              <UserProfilePage
+                userProfile={friendProfileModal.profile}
+                user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
+                games={friendProfileModal.games}
+                editable={false}
+                playSound={playSound as any}
+                language={launcherLanguage}
+                copyFriendDiscord
+                onNotify={notify}
+              />
+            </React.Suspense>
+          )}
+        </div>
         <button
           type="button"
+          aria-label="Fechar perfil do amigo"
           onClick={() => {
             playSound("back");
             setFriendProfileModal(null);
           }}
-          className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/60 text-white/60 hover:bg-white/10 hover:text-white"
+          className="absolute -right-3 -top-3 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-[#08080a] text-white/70 shadow-[0_12px_32px_rgba(0,0,0,0.6)] transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         >
           <X className="h-5 w-5" />
         </button>
-        {friendProfileModal && (
-          <React.Suspense fallback={<div className="p-10 text-white/40">Carregando perfil...</div>}>
-            <UserProfilePage
-              userProfile={friendProfileModal.profile}
-              user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
-              games={friendProfileModal.games}
-              editable={false}
-              playSound={playSound as any}
-              language={launcherLanguage}
-              copyFriendDiscord
-              onNotify={notify}
-            />
-          </React.Suspense>
-        )}
       </ModalShell>
 
       <ConfirmationModal

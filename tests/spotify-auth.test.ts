@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
 const {
+  SPOTIFY_SCOPES,
   createSpotifyAuthorizationRequest,
+  hasRequiredSpotifyScopes,
   isSpotifyCallbackUrl,
   normalizeSpotifyTokenPayload,
 } = require("../electron/spotify-auth.cjs");
@@ -44,5 +46,16 @@ describe("autenticacao Spotify", () => {
     expect(token.accessToken).toBe("access");
     expect(token.refreshToken).toBe("refresh-anterior");
     expect(token.expiresAt).toBe(3_601_000);
+  });
+
+  it("solicita e valida os escopos de playlists", () => {
+    expect(SPOTIFY_SCOPES).toEqual(expect.arrayContaining([
+      "playlist-read-private",
+      "playlist-read-collaborative",
+      "playlist-modify-public",
+      "playlist-modify-private",
+    ]));
+    expect(hasRequiredSpotifyScopes("streaming user-read-private")).toBe(false);
+    expect(hasRequiredSpotifyScopes(SPOTIFY_SCOPES.join(" "))).toBe(true);
   });
 });

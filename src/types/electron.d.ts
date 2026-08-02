@@ -283,6 +283,7 @@ declare global {
       ) => () => void;
       getSpotifyStatus: () => Promise<{
         connected: boolean;
+        requiresReauthorization: boolean;
         account: { id: string; displayName: string; imageUrl: string; product: string } | null;
       }>;
       connectSpotify: (clientId: string) => Promise<{

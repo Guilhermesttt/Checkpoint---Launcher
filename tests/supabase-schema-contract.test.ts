@@ -31,6 +31,13 @@ const privacyMigration = readFileSync(
   ),
   "utf8",
 );
+const profileControlsMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260802120000_profile_controls_permissions.sql",
+  ),
+  "utf8",
+);
 
 describe("contrato da migration Supabase", () => {
   it("versiona o grafo social e o chat normalizado", () => {
@@ -78,5 +85,16 @@ describe("contrato da migration Supabase", () => {
   it("adiciona visibilidade de perfil com padrao publico e valores restritos", () => {
     expect(privacyMigration).toContain("profile_visibility text not null default 'public'");
     expect(privacyMigration).toContain("profile_visibility in ('public', 'private')");
+  });
+
+  it("permite ao usuario criar, editar e alterar a privacidade do proprio perfil", () => {
+    expect(profileControlsMigration).toContain(
+      "add column if not exists profile_visibility text not null default 'public'",
+    );
+    expect(profileControlsMigration.indexOf("add column if not exists profile_visibility"))
+      .toBeLessThan(profileControlsMigration.indexOf("grant update (profile_visibility)"));
+    expect(profileControlsMigration).toContain("grant update (profile_visibility)");
+    expect(profileControlsMigration).toContain("grant insert (");
+    expect(profileControlsMigration).toContain("uid,");
   });
 });

@@ -14,6 +14,8 @@ import {
   LibraryBig,
   Upload,
 } from "lucide-react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSteam } from "@fortawesome/free-brands-svg-icons";
 import ModalShell from "./ui/ModalShell";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
@@ -1167,7 +1169,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
               <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
                 {([
                   { id: "local" as const, label: copy.local, icon: () => <HardDrive size={17} /> },
-                  { id: "steam" as const, label: copy.steam, icon: () => <Globe size={17} /> },
+                  { id: "steam" as const, label: copy.steam, icon: () => <FontAwesomeIcon icon={faSteam} className="h-[17px] w-[17px]" /> },
                   { id: "epic" as const, label: copy.epic, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
                 ]).map((option) => {
                   const selected = formData.launcherType === option.id;

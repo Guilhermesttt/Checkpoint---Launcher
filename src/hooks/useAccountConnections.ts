@@ -22,7 +22,6 @@ interface UseAccountConnectionsProps {
   playSound: (type: SoundEffectType) => void;
   notify: (msg: string, type: "success" | "error" | "info") => void;
   refreshProfile: () => Promise<any>;
-  setIsLoading: (val: boolean) => void;
   setSelectedIndex: (val: number) => void;
   onLibraryChanged?: () => Promise<void> | void;
   language: LauncherLanguage;
@@ -34,7 +33,6 @@ export function useAccountConnections({
   playSound,
   notify,
   refreshProfile,
-  setIsLoading,
   setSelectedIndex,
   onLibraryChanged,
   language,
@@ -54,7 +52,6 @@ export function useAccountConnections({
       notify("Backend Steam offline.", "error");
       return;
     }
-    setIsLoading(true);
     setSteamSyncing(true);
     try {
       const count = await syncSteamLibraryToLocal(userUid, resolvedSteamId, language);
@@ -70,7 +67,6 @@ export function useAccountConnections({
       notify(e instanceof Error ? e.message : "Falha na sincronização Steam.", "error");
     } finally {
       setSteamSyncing(false);
-      setIsLoading(false);
     }
   };
 
@@ -176,7 +172,6 @@ export function useAccountConnections({
   const handleDisconnectSteam = async () => {
     if (!userUid) return;
     playSound("back");
-    setIsLoading(true);
     try {
       await disconnectSteamAccount();
       await deleteLibraryGamesByLauncher(userUid, "steam");
@@ -188,8 +183,6 @@ export function useAccountConnections({
       notify("Steam desconectada e biblioteca atualizada.", "success");
     } catch {
       notify("Erro ao desconectar conta Steam.", "error");
-    } finally {
-      setIsLoading(false);
     }
   };
 

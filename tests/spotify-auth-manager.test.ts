@@ -29,6 +29,29 @@ class FakeAuthWindow {
 }
 
 describe("gerenciador OAuth Spotify", () => {
+  it("sinaliza tokens antigos que precisam autorizar os novos escopos", () => {
+    const manager = createSpotifyAuthManager({
+      BrowserWindow: FakeAuthWindow,
+      fetchImpl: vi.fn(),
+      credentialStore: {
+        read: () => ({
+          accessToken: "access",
+          refreshToken: "refresh",
+          expiresAt: Date.now() + 60_000,
+          scope: "streaming user-read-private",
+          account: { id: "id", displayName: "Player", imageUrl: "", product: "premium" },
+        }),
+        write: vi.fn(),
+        clear: vi.fn(),
+      },
+    });
+
+    expect(manager.getStatus()).toMatchObject({
+      connected: true,
+      requiresReauthorization: true,
+    });
+  });
+
   it("troca o callback PKCE por tokens e retorna a conta conectada", async () => {
     const write = vi.fn();
     const fetchImpl = vi.fn(async (url: string) => {
@@ -93,5 +116,32 @@ describe("gerenciador OAuth Spotify", () => {
     await expect(connecting).rejects.toThrow(
       "Autorizacao do Spotify recusada. Clique em Aceitar e confirme que esta conta Premium foi adicionada em Users Management no painel do app.",
     );
+  });
+
+  it("explica o bloqueio de uma conta fora do Users Management", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("/api/token")) {
+        return new Response(JSON.stringify({
+          access_token: "access",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          scope: "streaming",
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("", { status: 403 });
+    });
+    const manager = createSpotifyAuthManager({
+      BrowserWindow: FakeAuthWindow,
+      fetchImpl,
+      credentialStore: { read: () => null, write: vi.fn(), clear: vi.fn() },
+      redirectUri: "http://127.0.0.1:43821/callback",
+    });
+
+    const connecting = manager.connect("client-id");
+    const authWindow = FakeAuthWindow.latest;
+    const state = new URL(authWindow!.loadedUrl).searchParams.get("state");
+    authWindow?.navigate(`http://127.0.0.1:43821/callback?code=code-1&state=${state}`);
+
+    await expect(connecting).rejects.toThrow(/403.*Users Management/i);
   });
 });

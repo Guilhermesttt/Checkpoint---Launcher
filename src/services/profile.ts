@@ -54,6 +54,7 @@ export const saveCurrentUserProfile = async ({
   const photoURL = profile.photoURL || "";
 
   const payload = {
+    uid,
     display_name: normalized.displayName,
     bio: normalized.bio,
     location: normalized.location,
@@ -63,11 +64,13 @@ export const saveCurrentUserProfile = async ({
     photo_url: photoURL || null,
   };
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
-    .update(payload)
-    .eq("uid", uid);
+    .upsert(payload, { onConflict: "uid" })
+    .select("uid")
+    .single();
   if (error) throw error;
+  if (!data?.uid) throw new Error("Nao foi possivel salvar o perfil.");
 
   return { ...normalized, photoURL };
 };

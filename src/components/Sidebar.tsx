@@ -15,7 +15,6 @@ import {
   Newspaper,
   Laptop,
   Puzzle,
-  Music2,
 } from "lucide-react";
 import {
   GamepadIcon as AnimatedGamepadIcon,
@@ -30,7 +29,7 @@ import {
 } from "./animated/SidebarIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSteam, faDiscord } from "@fortawesome/free-brands-svg-icons";
+import { faSteam, faDiscord, faSpotify } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import type { LauncherLanguage } from "../context/PreferencesContext";
@@ -41,6 +40,17 @@ export const SteamBrandIcon: React.FC<{ className?: string; style?: React.CSSPro
 }) => (
   <FontAwesomeIcon
     icon={faSteam}
+    className={className}
+    style={style as React.ComponentProps<typeof FontAwesomeIcon>["style"]}
+  />
+);
+
+export const SpotifyBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => (
+  <FontAwesomeIcon
+    icon={faSpotify}
     className={className}
     style={style as React.ComponentProps<typeof FontAwesomeIcon>["style"]}
   />
@@ -92,7 +102,7 @@ export const CATEGORIES = [
   { id: "FAVORITES", label: "Favoritos", Icon: Star, AnimatedIcon: AnimatedStarIcon },
   { id: "FRIENDS", label: "Amigos", Icon: Users, AnimatedIcon: AnimatedUsersIcon },
   { id: "FEED", label: "Radar", Icon: Newspaper, AnimatedIcon: AnimatedRadioIcon },
-  { id: "SPOTIFY", label: "Spotify", Icon: Music2 },
+  { id: "SPOTIFY", label: "Spotify", Icon: SpotifyBrandIcon },
   { id: "MODS", label: "Mods", Icon: Puzzle },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },

@@ -115,4 +115,77 @@ describe("useSpotifyPlayer", () => {
     expect(instances).toHaveLength(2);
     expect(result.current.status).toBe("ready");
   });
+
+  it("reflete play e pause imediatamente, bloqueia duplicatas e desfaz em falha", async () => {
+    let rejectToggle!: (reason: Error) => void;
+    const togglePlay = vi.fn(() => new Promise<void>((_resolve, reject) => {
+      rejectToggle = reject;
+    }));
+    const seek = vi.fn().mockResolvedValue(undefined);
+    const instances: OptimisticSpotifyPlayer[] = [];
+    class OptimisticSpotifyPlayer {
+      listeners = new Map<string, (payload: any) => void>();
+      constructor() { instances.push(this); }
+      addListener(event: string, callback: (payload: any) => void) { this.listeners.set(event, callback); return true; }
+      async connect() { this.listeners.get("ready")?.({ device_id: "device-1" }); return true; }
+      disconnect() {}
+      activateElement() { return Promise.resolve(); }
+      togglePlay() { return togglePlay(); }
+      nextTrack() { return Promise.resolve(); }
+      previousTrack() { return Promise.resolve(); }
+      setVolume() { return Promise.resolve(); }
+      seek(positionMs: number) { return seek(positionMs); }
+    }
+    Object.defineProperty(window, "Spotify", {
+      configurable: true,
+      value: { Player: OptimisticSpotifyPlayer },
+    });
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: {
+        getSpotifyStatus: vi.fn().mockResolvedValue({
+          connected: true,
+          requiresReauthorization: false,
+          account: { id: "id", displayName: "Player", imageUrl: "", product: "premium" },
+        }),
+        getSpotifyAccessToken: vi.fn().mockResolvedValue({ accessToken: "access" }),
+      },
+    });
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ currently_playing: null, queue: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { result } = renderHook(() => useSpotifyPlayer("client-id"));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    const instance = instances[0];
+    act(() => instance!.listeners.get("player_state_changed")?.({
+      paused: true,
+      position: 1_000,
+      duration: 60_000,
+      track_window: { current_track: {
+        id: "track", uri: "spotify:track:track", name: "Track",
+        artists: [{ name: "Artist" }], album: { images: [] },
+      } },
+    }));
+
+    let firstCommand!: Promise<void>;
+    act(() => { firstCommand = result.current.togglePlay(); });
+    expect(result.current.playback.paused).toBe(false);
+    expect(result.current.pendingCommands.has("toggle")).toBe(true);
+    act(() => { void result.current.togglePlay(); });
+    expect(togglePlay).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      rejectToggle(new Error("playback failed"));
+      await firstCommand.catch(() => undefined);
+    });
+    expect(result.current.playback.paused).toBe(true);
+    expect(result.current.pendingCommands.has("toggle")).toBe(false);
+    await act(async () => { await result.current.seek(5_000); });
+    expect(seek).toHaveBeenCalledOnce();
+    fetchSpy.mockRestore();
+  });
 });

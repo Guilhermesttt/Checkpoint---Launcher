@@ -8,6 +8,36 @@ export interface SpotifyTrack {
   durationMs: number;
 }
 
+export interface SpotifyTrackPayload {
+  id?: string;
+  uri?: string;
+  name?: string;
+  duration_ms?: number;
+  artists?: Array<{ name?: string }>;
+  album?: { images?: Array<{ url?: string }> };
+  external_urls?: { spotify?: string };
+}
+
+export interface SpotifyQueueSnapshot {
+  current: SpotifyTrack | null;
+  upcoming: SpotifyTrack[];
+}
+
+export const mapSpotifyTrack = (
+  track?: SpotifyTrackPayload | null,
+): SpotifyTrack | null => {
+  if (!track?.id || !track.uri || !track.name) return null;
+  return {
+    id: track.id,
+    uri: track.uri,
+    title: track.name,
+    artist: (track.artists ?? []).map((artist) => artist.name).filter(Boolean).join(", "),
+    coverUrl: track.album?.images?.[0]?.url || "",
+    spotifyUrl: track.external_urls?.spotify || `https://open.spotify.com/track/${track.id}`,
+    durationMs: Number(track.duration_ms) || 0,
+  };
+};
+
 export class SpotifyApiError extends Error {
   code: string;
   status: number;
@@ -37,8 +67,11 @@ export const spotifyRequest = async <T = unknown>(
     },
   });
   if (response.status === 204) return null;
+  const rawBody = await response.text();
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as {
+    const payload = (() => {
+      try { return JSON.parse(rawBody || "{}"); } catch { return {}; }
+    })() as {
       error?: { message?: string } | string;
     };
     const message = typeof payload.error === "string"
@@ -52,7 +85,13 @@ export const spotifyRequest = async <T = unknown>(
       retryAfter,
     );
   }
-  return response.json() as Promise<T>;
+  if (!rawBody.trim()) return null;
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    if (init.method && init.method !== "GET") return null;
+    throw new SpotifyApiError("O Spotify retornou uma resposta inválida.", response.status, "invalid_response");
+  }
 };
 
 export const searchSpotifyTracks = async (
@@ -62,30 +101,92 @@ export const searchSpotifyTracks = async (
 ): Promise<SpotifyTrack[]> => {
   if (!query.trim()) return [];
   const payload = await spotifyRequest<{
-    tracks?: { items?: Array<{
-      id?: string;
-      uri?: string;
-      name?: string;
-      duration_ms?: number;
-      artists?: Array<{ name?: string }>;
-      album?: { images?: Array<{ url?: string }> };
-      external_urls?: { spotify?: string };
-    }> };
+    tracks?: { items?: SpotifyTrackPayload[] };
   }>(accessToken, `/search?type=track&limit=8&q=${encodeURIComponent(query.trim())}`, {}, fetchImpl);
 
-  return (payload?.tracks?.items ?? []).flatMap((track) => {
-    if (!track.id || !track.uri || !track.name) return [];
-    return [{
-      id: track.id,
-      uri: track.uri,
-      title: track.name,
-      artist: (track.artists ?? []).map((artist) => artist.name).filter(Boolean).join(", "),
-      coverUrl: track.album?.images?.[0]?.url || "",
-      spotifyUrl: track.external_urls?.spotify || "",
-      durationMs: Number(track.duration_ms) || 0,
-    }];
-  });
+  return (payload?.tracks?.items ?? [])
+    .map(mapSpotifyTrack)
+    .filter((track): track is SpotifyTrack => track !== null);
 };
+
+const spotifyDeviceSuffix = (deviceId: string) => deviceId.trim()
+  ? `&device_id=${encodeURIComponent(deviceId.trim())}`
+  : "";
+
+export const getSpotifyQueue = async (
+  accessToken: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<SpotifyQueueSnapshot> => {
+  const payload = await spotifyRequest<{
+    currently_playing?: SpotifyTrackPayload | null;
+    queue?: SpotifyTrackPayload[];
+  }>(accessToken, "/me/player/queue", {}, fetchImpl);
+  const current = mapSpotifyTrack(payload?.currently_playing);
+  const seen = new Set(current ? [current.id] : []);
+  const upcoming = (payload?.queue ?? [])
+    .map(mapSpotifyTrack)
+    .filter((track): track is SpotifyTrack => track !== null)
+    .filter((track) => {
+      if (seen.has(track.id)) return false;
+      seen.add(track.id);
+      return true;
+    });
+  return { current, upcoming };
+};
+
+export const addSpotifyTrackToQueue = (
+  accessToken: string,
+  uri: string,
+  deviceId = "",
+  fetchImpl: typeof fetch = fetch,
+) => spotifyRequest(
+  accessToken,
+  `/me/player/queue?uri=${encodeURIComponent(uri)}${spotifyDeviceSuffix(deviceId)}`,
+  { method: "POST" },
+  fetchImpl,
+);
+
+export const startSpotifyTrackSequence = async (
+  accessToken: string,
+  selectedUri: string,
+  nextUris: string[],
+  deviceId: string,
+  fetchImpl: typeof fetch = fetch,
+) => {
+  await spotifyRequest(
+    accessToken,
+    `/me/player/play?device_id=${encodeURIComponent(deviceId)}`,
+    { method: "PUT", body: JSON.stringify({ uris: [selectedUri] }) },
+    fetchImpl,
+  );
+  for (const uri of nextUris) {
+    await addSpotifyTrackToQueue(accessToken, uri, deviceId, fetchImpl);
+  }
+};
+
+export const setSpotifyShuffle = (
+  accessToken: string,
+  enabled: boolean,
+  deviceId = "",
+  fetchImpl: typeof fetch = fetch,
+) => spotifyRequest(
+  accessToken,
+  `/me/player/shuffle?state=${enabled}${spotifyDeviceSuffix(deviceId)}`,
+  { method: "PUT" },
+  fetchImpl,
+);
+
+export const playSpotifyContext = (
+  accessToken: string,
+  contextUri: string,
+  deviceId: string,
+  fetchImpl: typeof fetch = fetch,
+) => spotifyRequest(
+  accessToken,
+  `/me/player/play?device_id=${encodeURIComponent(deviceId)}`,
+  { method: "PUT", body: JSON.stringify({ context_uri: contextUri }) },
+  fetchImpl,
+);
 
 export const resolveSpotifyPlaybackDevice = async (
   accessToken: string,

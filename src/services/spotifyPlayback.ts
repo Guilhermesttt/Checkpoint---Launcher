@@ -69,6 +69,29 @@ export const applySpotifyPlaybackCommand = (
   };
 };
 
+export const buildSpotifyPlaybackSequence = (
+  selected: SpotifyTrack,
+  candidates: SpotifyTrack[],
+  random: () => number = Math.random,
+): SpotifyTrack[] => {
+  const uniqueCandidates = Array.from(
+    new Map(candidates
+      .filter((track) => track.id !== selected.id)
+      .map((track) => [track.id, track])).values(),
+  );
+  for (let index = uniqueCandidates.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(random() * (index + 1));
+    [uniqueCandidates[index], uniqueCandidates[target]] = [uniqueCandidates[target], uniqueCandidates[index]];
+  }
+  return [selected, ...uniqueCandidates].slice(0, 8);
+};
+
+export const getSpotifyCarouselOffset = (index: number) => {
+  if (index === 0) return 0;
+  const distance = Math.ceil(index / 2);
+  return index % 2 === 1 ? -distance : distance;
+};
+
 export const mapSpotifyPlaybackState = (
   rawState: unknown,
 ): SpotifyPlaybackSnapshot => {

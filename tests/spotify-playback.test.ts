@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   applySpotifyPlaybackCommand,
   advanceSpotifyPlayback,
+  buildSpotifyPlaybackSequence,
+  getSpotifyCarouselOffset,
   mapSpotifyPlaybackState,
   mapSpotifyWebApiPlayback,
 } from "../src/services/spotifyPlayback";
@@ -85,5 +87,22 @@ describe("estado do Spotify Web Playback", () => {
     });
     expect(applySpotifyPlaybackCommand(playback, "toggle").paused).toBe(false);
     expect(applySpotifyPlaybackCommand(playback, "seek", 12_000).positionMs).toBe(12_000);
+  });
+
+  it("mantem a faixa escolhida primeiro e embaralha candidatas sem repeticao", () => {
+    const track = (id: string) => ({
+      id, uri: `spotify:track:${id}`, title: id, artist: "Artist",
+      coverUrl: "", spotifyUrl: `https://open.spotify.com/track/${id}`, durationMs: 1,
+    });
+
+    expect(buildSpotifyPlaybackSequence(
+      track("elite"),
+      [track("elite"), track("change"), track("digital-bath"), track("change")],
+      () => 0,
+    ).map((item) => item.id)).toEqual(["elite", "digital-bath", "change"]);
+  });
+
+  it("mantem a capa atual no centro e distribui as proximas ao redor", () => {
+    expect([0, 1, 2, 3, 4].map(getSpotifyCarouselOffset)).toEqual([0, -1, 1, -2, 2]);
   });
 });

@@ -9,7 +9,16 @@ const SPOTIFY_SCOPES = [
   "user-read-playback-state",
   "user-modify-playback-state",
   "user-read-currently-playing",
+  "playlist-read-private",
+  "playlist-read-collaborative",
+  "playlist-modify-public",
+  "playlist-modify-private",
 ];
+
+const hasRequiredSpotifyScopes = (grantedScope = "") => {
+  const granted = new Set(String(grantedScope).split(/\s+/).filter(Boolean));
+  return SPOTIFY_SCOPES.every((scope) => granted.has(scope));
+};
 
 const toBase64Url = (value) => Buffer.from(value)
   .toString("base64")
@@ -71,4 +80,5 @@ module.exports = {
   createSpotifyAuthorizationRequest,
   isSpotifyCallbackUrl,
   normalizeSpotifyTokenPayload,
+  hasRequiredSpotifyScopes,
 };

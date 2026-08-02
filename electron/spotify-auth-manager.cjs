@@ -2,6 +2,7 @@
 
 const {
   createSpotifyAuthorizationRequest,
+  hasRequiredSpotifyScopes,
   isSpotifyCallbackUrl,
   normalizeSpotifyTokenPayload,
 } = require("./spotify-auth.cjs");
@@ -36,7 +37,19 @@ const createSpotifyAuthManager = ({
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error?.message || "Falha ao carregar perfil Spotify.");
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error(
+          "Spotify recusou o perfil (HTTP 403). Adicione esta conta Premium em Users Management no painel do app Spotify e tente novamente.",
+        );
+      }
+      const apiMessage = payload?.error?.message;
+      throw new Error(
+        apiMessage
+          ? `Falha ao carregar perfil Spotify (HTTP ${response.status}): ${apiMessage}`
+          : `Falha ao carregar perfil Spotify (HTTP ${response.status}).`,
+      );
+    }
     return {
       id: String(payload.id || ""),
       displayName: String(payload.display_name || payload.id || "Spotify"),
@@ -137,7 +150,12 @@ const createSpotifyAuthManager = ({
   return {
     connect,
     getAccessToken,
-    getStatus: () => ({ connected: Boolean(tokens?.refreshToken), account }),
+    getStatus: () => ({
+      connected: Boolean(tokens?.refreshToken),
+      account,
+      requiresReauthorization: Boolean(tokens?.refreshToken)
+        && !hasRequiredSpotifyScopes(tokens?.scope),
+    }),
     disconnect: () => {
       tokens = null;
       account = null;

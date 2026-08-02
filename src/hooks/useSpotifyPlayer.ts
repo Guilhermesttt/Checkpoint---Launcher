@@ -1,15 +1,22 @@
 import * as React from "react";
 import {
+  addSpotifyTrackToQueue,
+  getSpotifyQueue,
   getSpotifyClientId,
+  playSpotifyContext,
   resolveSpotifyPlaybackDevice,
   searchSpotifyTracks,
+  setSpotifyShuffle,
+  startSpotifyTrackSequence,
   spotifyRequest,
+  type SpotifyQueueSnapshot,
   type SpotifyTrack,
 } from "../services/spotify";
 import {
   EMPTY_SPOTIFY_PLAYBACK,
   advanceSpotifyPlayback,
   applySpotifyPlaybackCommand,
+  buildSpotifyPlaybackSequence,
   mapSpotifyPlaybackState,
   mapSpotifyWebApiPlayback,
   type SpotifyPlaybackSnapshot,
@@ -99,6 +106,8 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
   const desktopApiAvailable = hasSpotifyDesktopApi();
   const playerRef = React.useRef<SpotifyPlayerInstance | null>(null);
   const deviceIdRef = React.useRef("");
+  const playbackRef = React.useRef<SpotifyPlaybackSnapshot>(EMPTY_SPOTIFY_PLAYBACK);
+  const pendingCommandKeysRef = React.useRef(new Set<string>());
   const [status, setStatus] = React.useState<SpotifyStatus>(() => !clientId
     ? "unconfigured"
     : desktopApiAvailable ? "loading" : "unsupported");
@@ -107,7 +116,20 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
     : desktopApiAvailable ? "" : SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE);
   const [account, setAccount] = React.useState<{ id: string; displayName: string; imageUrl: string; product: string } | null>(null);
   const [playback, setPlayback] = React.useState<SpotifyPlaybackSnapshot>(EMPTY_SPOTIFY_PLAYBACK);
+  const [queue, setQueue] = React.useState<SpotifyQueueSnapshot>({ current: null, upcoming: [] });
+  const [shuffle, setShuffle] = React.useState(false);
+  const [pendingCommands, setPendingCommands] = React.useState<ReadonlySet<string>>(new Set());
   const [remoteMode, setRemoteMode] = React.useState(false);
+
+  const updatePlayback = React.useCallback((
+    next: SpotifyPlaybackSnapshot | ((current: SpotifyPlaybackSnapshot) => SpotifyPlaybackSnapshot),
+  ) => {
+    setPlayback((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      playbackRef.current = resolved;
+      return resolved;
+    });
+  }, []);
 
   const getAccessToken = React.useCallback(async () => {
     const api = window.electronAPI;
@@ -154,7 +176,7 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
       setError("O dispositivo Checkpoint ficou indisponivel no Spotify.");
       rejectReady(new Error("O dispositivo Checkpoint ficou indisponivel no Spotify."));
     });
-    player.addListener("player_state_changed", (state) => setPlayback(mapSpotifyPlaybackState(state)));
+    player.addListener("player_state_changed", (state) => updatePlayback(mapSpotifyPlaybackState(state)));
     player.addListener("initialization_error", ({ message }: { message: string }) => { releaseFailedPlayer(); setStatus("error"); setError(message); rejectReady(new Error(message)); });
     player.addListener("authentication_error", ({ message }: { message: string }) => { releaseFailedPlayer(); setStatus("error"); setError(message); rejectReady(new Error(message)); });
     player.addListener("account_error", () => { const message = "A reproducao dentro do launcher exige Spotify Premium."; releaseFailedPlayer(); setStatus("error"); setError(message); rejectReady(new Error(message)); });
@@ -165,7 +187,7 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
       if (!connected) throw new Error("O Spotify nao conseguiu registrar o Checkpoint como dispositivo.");
       await readyPromise;
     })(), 12_000, "O player interno do Spotify demorou para responder.");
-  }, [getAccessToken]);
+  }, [getAccessToken, updatePlayback]);
 
   const enableRemoteFallback = React.useCallback((reason?: unknown) => {
     playerRef.current?.disconnect();
@@ -189,6 +211,11 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
       .then((result) => {
         if (cancelled) return;
         setAccount(result.account);
+        if (result.requiresReauthorization) {
+          setStatus("disconnected");
+          setError("Reconecte o Spotify uma vez para liberar playlists e fila.");
+          return;
+        }
         if (!result.connected) {
           setStatus("disconnected");
           return;
@@ -208,24 +235,56 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
 
   const syncRemotePlayback = React.useCallback(async () => {
     const state = await spotifyRequest(await getAccessToken(), "/me/player");
-    setPlayback(mapSpotifyWebApiPlayback(state));
+    updatePlayback(mapSpotifyWebApiPlayback(state));
+  }, [getAccessToken, updatePlayback]);
+
+  const refreshQueue = React.useCallback(async () => {
+    const nextQueue = await getSpotifyQueue(await getAccessToken());
+    setQueue(nextQueue);
+    return nextQueue;
   }, [getAccessToken]);
 
   React.useEffect(() => {
     if (!remoteMode || status !== "ready") return;
     const sync = () => void syncRemotePlayback().catch(() => undefined);
     sync();
-    const timer = window.setInterval(sync, 5_000);
+    const timer = window.setInterval(sync, 8_000);
     return () => window.clearInterval(timer);
   }, [remoteMode, status, syncRemotePlayback]);
 
   React.useEffect(() => {
     if (playback.paused || !playback.track) return;
     const timer = window.setInterval(() => {
-      setPlayback((current) => advanceSpotifyPlayback(current, 1_000));
+      updatePlayback((current) => advanceSpotifyPlayback(current, 1_000));
     }, 1_000);
     return () => window.clearInterval(timer);
-  }, [playback.paused, playback.track]);
+  }, [playback.paused, playback.track, updatePlayback]);
+
+  React.useEffect(() => {
+    if (status !== "ready") return;
+    void refreshQueue().catch(() => undefined);
+  }, [refreshQueue, status]);
+
+  const runOptimisticCommand = React.useCallback(async (
+    key: string,
+    optimistic: (current: SpotifyPlaybackSnapshot) => SpotifyPlaybackSnapshot,
+    execute: () => Promise<unknown>,
+  ) => {
+    if (pendingCommandKeysRef.current.has(key)) return;
+    const previous = playbackRef.current;
+    pendingCommandKeysRef.current.add(key);
+    setPendingCommands(new Set(pendingCommandKeysRef.current));
+    updatePlayback(optimistic);
+    try {
+      await execute();
+    } catch (reason) {
+      updatePlayback(previous);
+      throw reason;
+    } finally {
+      pendingCommandKeysRef.current.delete(key);
+      setPendingCommands(new Set(pendingCommandKeysRef.current));
+    }
+  }, [updatePlayback]);
 
   React.useEffect(() => {
     window.dispatchEvent(new CustomEvent("checkpoint:spotify-playback", {
@@ -266,26 +325,48 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
     }
     await api.disconnectSpotify();
     setAccount(null);
-    setPlayback(EMPTY_SPOTIFY_PLAYBACK);
+    updatePlayback(EMPTY_SPOTIFY_PLAYBACK);
+    setQueue({ current: null, upcoming: [] });
     setRemoteMode(false);
     setStatus("disconnected");
     setError("");
-  }, []);
+  }, [updatePlayback]);
 
-  const playTrack = React.useCallback(async (track: SpotifyTrack) => {
+  const playTrack = React.useCallback(async (track: SpotifyTrack, candidates: SpotifyTrack[] = []) => {
     await playerRef.current?.activateElement();
     const token = await getAccessToken();
     const deviceId = await resolveSpotifyPlaybackDevice(token, deviceIdRef.current);
     deviceIdRef.current = deviceId;
-    await spotifyRequest(token, `/me/player/play?device_id=${encodeURIComponent(deviceId)}`, {
-      method: "PUT",
-      body: JSON.stringify({ uris: [track.uri] }),
-    });
-    setPlayback({ paused: false, positionMs: 0, durationMs: track.durationMs, track });
-  }, [getAccessToken]);
+    const previous = playbackRef.current;
+    const sequence = buildSpotifyPlaybackSequence(track, candidates);
+    updatePlayback({ paused: false, positionMs: 0, durationMs: track.durationMs, track });
+    try {
+      await startSpotifyTrackSequence(
+        token,
+        track.uri,
+        sequence.slice(1).map((item) => item.uri),
+        deviceId,
+      );
+    } catch (reason) {
+      updatePlayback(previous);
+      throw reason;
+    }
+    await refreshQueue().catch(() => undefined);
+  }, [getAccessToken, refreshQueue, updatePlayback]);
 
   const search = React.useCallback(async (query: string) =>
     searchSpotifyTracks(await getAccessToken(), query), [getAccessToken]);
+
+  const playContext = React.useCallback(async (contextUri: string) => {
+    const token = await getAccessToken();
+    const deviceId = await resolveSpotifyPlaybackDevice(token, deviceIdRef.current);
+    deviceIdRef.current = deviceId;
+    await playSpotifyContext(token, contextUri, deviceId);
+    window.setTimeout(() => {
+      void syncRemotePlayback().catch(() => undefined);
+      void refreshQueue().catch(() => undefined);
+    }, 1_000);
+  }, [getAccessToken, refreshQueue, syncRemotePlayback]);
 
   const remoteCommand = React.useCallback(async (endpoint: string, method: string) => {
     const deviceId = deviceIdRef.current;
@@ -300,34 +381,81 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
       0,
       Math.min(playback.durationMs || Number.MAX_SAFE_INTEGER, Math.round(positionMs)),
     );
-    if (playerRef.current) {
-      await playerRef.current.seek(boundedPosition);
-    } else {
-      await remoteCommand(`/me/player/seek?position_ms=${boundedPosition}`, "PUT");
-    }
-    setPlayback((current) => applySpotifyPlaybackCommand(current, "seek", boundedPosition));
-  }, [playback.durationMs, remoteCommand]);
+    await runOptimisticCommand(
+      "seek",
+      (current) => applySpotifyPlaybackCommand(current, "seek", boundedPosition),
+      () => playerRef.current
+        ? playerRef.current.seek(boundedPosition)
+        : remoteCommand(`/me/player/seek?position_ms=${boundedPosition}`, "PUT"),
+    );
+  }, [playback.durationMs, remoteCommand, runOptimisticCommand]);
 
   const togglePlay = React.useCallback(async () => {
-    if (playerRef.current) {
-      await playerRef.current.togglePlay();
-      return;
-    }
-    await remoteCommand(playback.paused ? "/me/player/play" : "/me/player/pause", "PUT");
-    setPlayback((current) => applySpotifyPlaybackCommand(current, "toggle"));
-  }, [playback.paused, remoteCommand]);
+    const wasPaused = playbackRef.current.paused;
+    await runOptimisticCommand(
+      "toggle",
+      (current) => applySpotifyPlaybackCommand(current, "toggle"),
+      () => playerRef.current
+        ? playerRef.current.togglePlay()
+        : remoteCommand(wasPaused ? "/me/player/play" : "/me/player/pause", "PUT"),
+    );
+  }, [remoteCommand, runOptimisticCommand]);
 
   const nextTrack = React.useCallback(async () => {
-    if (playerRef.current) return playerRef.current.nextTrack();
-    await remoteCommand("/me/player/next", "POST");
-    await syncRemotePlayback().catch(() => undefined);
-  }, [remoteCommand, syncRemotePlayback]);
+    const predicted = queue.upcoming[0] || null;
+    await runOptimisticCommand(
+      "next",
+      (current) => predicted
+        ? { paused: false, positionMs: 0, durationMs: predicted.durationMs, track: predicted }
+        : current,
+      () => playerRef.current
+        ? playerRef.current.nextTrack()
+        : remoteCommand("/me/player/next", "POST"),
+    );
+    await refreshQueue().catch(() => undefined);
+  }, [queue.upcoming, refreshQueue, remoteCommand, runOptimisticCommand]);
 
   const previousTrack = React.useCallback(async () => {
-    if (playerRef.current) return playerRef.current.previousTrack();
-    await remoteCommand("/me/player/previous", "POST");
-    await syncRemotePlayback().catch(() => undefined);
-  }, [remoteCommand, syncRemotePlayback]);
+    await runOptimisticCommand(
+      "previous",
+      (current) => ({ ...current, positionMs: 0 }),
+      () => playerRef.current
+        ? playerRef.current.previousTrack()
+        : remoteCommand("/me/player/previous", "POST"),
+    );
+    await refreshQueue().catch(() => undefined);
+  }, [refreshQueue, remoteCommand, runOptimisticCommand]);
+
+  const addToQueue = React.useCallback(async (track: SpotifyTrack) => {
+    await addSpotifyTrackToQueue(
+      await getAccessToken(),
+      track.uri,
+      deviceIdRef.current,
+    );
+    await refreshQueue().catch(() => undefined);
+  }, [getAccessToken, refreshQueue]);
+
+  const toggleShuffle = React.useCallback(async () => {
+    if (pendingCommandKeysRef.current.has("shuffle")) return;
+    const previous = shuffle;
+    const next = !previous;
+    pendingCommandKeysRef.current.add("shuffle");
+    setPendingCommands(new Set(pendingCommandKeysRef.current));
+    setShuffle(next);
+    try {
+      await setSpotifyShuffle(
+        await getAccessToken(),
+        next,
+        deviceIdRef.current,
+      );
+    } catch (reason) {
+      setShuffle(previous);
+      throw reason;
+    } finally {
+      pendingCommandKeysRef.current.delete("shuffle");
+      setPendingCommands(new Set(pendingCommandKeysRef.current));
+    }
+  }, [getAccessToken, shuffle]);
 
   return {
     status,
@@ -335,13 +463,21 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
     account,
     remoteMode,
     playback,
+    queue,
+    shuffle,
+    pendingCommands,
     connect,
     disconnect,
     search,
     playTrack,
+    playContext,
     togglePlay,
     nextTrack,
     previousTrack,
+    refreshQueue,
+    addToQueue,
+    toggleShuffle,
+    getAccessToken,
     seek,
     setVolume: (volume: number) => playerRef.current
       ? playerRef.current.setVolume(Math.max(0, Math.min(1, volume)))

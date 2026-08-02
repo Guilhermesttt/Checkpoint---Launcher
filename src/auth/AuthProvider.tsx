@@ -33,6 +33,8 @@ const toProfile = (uid: string, data?: Record<string, any>): UserProfile => ({
       ? "private"
       : "public",
   bio: data?.bio,
+  location: data?.location,
+  pronouns: data?.pronouns,
   website: data?.website,
   favoriteGenres: data?.favoriteGenres ?? data?.favorite_genres,
   steamId: data?.steamId ?? data?.steam_id,
