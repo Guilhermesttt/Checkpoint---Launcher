@@ -154,6 +154,15 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
               </div>
             )}
 
+            {player.status === "unsupported" && (
+              <div className="p-5">
+                <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.04] p-4">
+                  <p className="text-sm font-bold text-white">Spotify indisponível nesta versão</p>
+                  <p className="mt-2 text-[11px] leading-relaxed text-white/45">{player.error}</p>
+                </div>
+              </div>
+            )}
+
             {(player.status === "disconnected" || player.status === "error") && (
               <div className="p-5">
                 <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">

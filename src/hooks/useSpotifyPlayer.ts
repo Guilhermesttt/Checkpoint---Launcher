@@ -15,7 +15,15 @@ import {
   type SpotifyPlaybackSnapshot,
 } from "../services/spotifyPlayback";
 
-type SpotifyStatus = "loading" | "unconfigured" | "disconnected" | "connecting" | "ready" | "error";
+type SpotifyStatus = "loading" | "unconfigured" | "unsupported" | "disconnected" | "connecting" | "ready" | "error";
+
+const SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE =
+  "Atualize o Checkpoint Launcher para usar o Spotify. A integração não está disponível nesta versão do aplicativo ou no navegador.";
+
+const hasSpotifyDesktopApi = () => {
+  const api = window.electronAPI;
+  return typeof api?.getSpotifyStatus === "function";
+};
 
 interface SpotifyPlayerInstance {
   addListener(event: "ready" | "not_ready", callback: (payload: { device_id: string }) => void): boolean;
@@ -88,16 +96,25 @@ const loadSpotifySdk = () => {
 
 export const useSpotifyPlayer = (clientIdOverride?: string) => {
   const clientId = clientIdOverride ?? getSpotifyClientId();
+  const desktopApiAvailable = hasSpotifyDesktopApi();
   const playerRef = React.useRef<SpotifyPlayerInstance | null>(null);
   const deviceIdRef = React.useRef("");
-  const [status, setStatus] = React.useState<SpotifyStatus>(() => clientId ? "loading" : "unconfigured");
-  const [error, setError] = React.useState(() => clientId ? "" : "Configure VITE_SPOTIFY_CLIENT_ID para conectar o Spotify.");
+  const [status, setStatus] = React.useState<SpotifyStatus>(() => !clientId
+    ? "unconfigured"
+    : desktopApiAvailable ? "loading" : "unsupported");
+  const [error, setError] = React.useState(() => !clientId
+    ? "Configure VITE_SPOTIFY_CLIENT_ID para conectar o Spotify."
+    : desktopApiAvailable ? "" : SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE);
   const [account, setAccount] = React.useState<{ id: string; displayName: string; imageUrl: string; product: string } | null>(null);
   const [playback, setPlayback] = React.useState<SpotifyPlaybackSnapshot>(EMPTY_SPOTIFY_PLAYBACK);
   const [remoteMode, setRemoteMode] = React.useState(false);
 
   const getAccessToken = React.useCallback(async () => {
-    const response = await window.electronAPI?.getSpotifyAccessToken(clientId);
+    const api = window.electronAPI;
+    if (typeof api?.getSpotifyAccessToken !== "function") {
+      throw new Error(SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE);
+    }
+    const response = await api.getSpotifyAccessToken(clientId);
     if (!response?.accessToken) throw new Error("Token Spotify indisponivel.");
     return response.accessToken;
   }, [clientId]);
@@ -162,11 +179,13 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
   }, []);
 
   React.useEffect(() => {
-    if (!clientId) {
+    if (!clientId || !desktopApiAvailable) {
       return;
     }
+    const api = window.electronAPI;
+    if (typeof api?.getSpotifyStatus !== "function") return;
     let cancelled = false;
-    void window.electronAPI?.getSpotifyStatus()
+    void api.getSpotifyStatus()
       .then((result) => {
         if (cancelled) return;
         setAccount(result.account);
@@ -185,7 +204,7 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
       playerRef.current?.disconnect();
       playerRef.current = null;
     };
-  }, [clientId, enableRemoteFallback, initializePlayer]);
+  }, [clientId, desktopApiAvailable, enableRemoteFallback, initializePlayer]);
 
   const syncRemotePlayback = React.useCallback(async () => {
     const state = await spotifyRequest(await getAccessToken(), "/me/player");
@@ -216,10 +235,16 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
 
   const connect = React.useCallback(async () => {
     if (!clientId) return;
+    const api = window.electronAPI;
+    if (typeof api?.connectSpotify !== "function") {
+      setStatus("unsupported");
+      setError(SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE);
+      return;
+    }
     setStatus("connecting");
     setError("");
     try {
-      const result = await window.electronAPI?.connectSpotify(clientId);
+      const result = await api.connectSpotify(clientId);
       if (!result) throw new Error("Electron indisponivel para autenticar o Spotify.");
       setAccount(result.account);
       await initializePlayer().catch(enableRemoteFallback);
@@ -233,7 +258,13 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
     playerRef.current?.disconnect();
     playerRef.current = null;
     deviceIdRef.current = "";
-    await window.electronAPI?.disconnectSpotify();
+    const api = window.electronAPI;
+    if (typeof api?.disconnectSpotify !== "function") {
+      setStatus("unsupported");
+      setError(SPOTIFY_DESKTOP_UNAVAILABLE_MESSAGE);
+      return;
+    }
+    await api.disconnectSpotify();
     setAccount(null);
     setPlayback(EMPTY_SPOTIFY_PLAYBACK);
     setRemoteMode(false);

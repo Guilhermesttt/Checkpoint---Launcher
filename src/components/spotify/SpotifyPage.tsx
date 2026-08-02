@@ -119,7 +119,7 @@ const SpotifyPage: React.FC<SpotifyPageProps> = ({ player, friends, language, on
     }
   };
 
-  if (player.status === "unconfigured" || player.status === "disconnected" || player.status === "error") {
+  if (player.status === "unconfigured" || player.status === "unsupported" || player.status === "disconnected" || player.status === "error") {
     return (
       <section className="flex h-full items-center justify-center px-10 pb-10 font-body">
         <div className="w-full max-w-xl rounded-[28px] border border-white/10 bg-black/40 p-8 text-center backdrop-blur-2xl">
@@ -127,7 +127,7 @@ const SpotifyPage: React.FC<SpotifyPageProps> = ({ player, friends, language, on
           <h2 className="mt-5 text-2xl font-black text-white">{copy.connectTitle}</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/45">{copy.connectHint}</p>
           {player.error && <p className="mt-3 text-xs text-red-300/80">{player.error}</p>}
-          {player.status !== "unconfigured" && <button type="button" onClick={() => void player.connect()} className="mt-6 rounded-xl bg-[#1ed760] px-6 py-3 text-xs font-black text-black transition hover:brightness-110">{copy.connect}</button>}
+          {(player.status === "disconnected" || player.status === "error") && <button type="button" onClick={() => void player.connect()} className="mt-6 rounded-xl bg-[#1ed760] px-6 py-3 text-xs font-black text-black transition hover:brightness-110">{copy.connect}</button>}
         </div>
       </section>
     );

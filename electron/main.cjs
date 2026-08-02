@@ -1634,7 +1634,7 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       messages,
     } : null,
     spotify: {
-      status: ["loading", "unconfigured", "disconnected", "connecting", "ready", "error"].includes(payload?.spotify?.status)
+      status: ["loading", "unconfigured", "unsupported", "disconnected", "connecting", "ready", "error"].includes(payload?.spotify?.status)
         ? payload.spotify.status
         : "disconnected",
       remoteMode: Boolean(payload?.spotify?.remoteMode),

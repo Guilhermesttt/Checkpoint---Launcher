@@ -543,7 +543,7 @@ declare global {
           achievements?: number;
         };
         spotify?: {
-          status: "loading" | "unconfigured" | "disconnected" | "connecting" | "ready" | "error";
+          status: "loading" | "unconfigured" | "unsupported" | "disconnected" | "connecting" | "ready" | "error";
           remoteMode: boolean;
           paused: boolean;
           positionMs: number;

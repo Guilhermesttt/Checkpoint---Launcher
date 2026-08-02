@@ -28,6 +28,18 @@ describe("useSpotifyPlayer", () => {
     expect(getSpotifyStatus).toHaveBeenCalledOnce();
   });
 
+  it("nao quebra quando o preload Electron ainda nao possui os metodos Spotify", async () => {
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { openExternalUrl: vi.fn() },
+    });
+
+    const { result } = renderHook(() => useSpotifyPlayer("client-id"));
+
+    await waitFor(() => expect(result.current.status).toBe("unsupported"));
+    expect(result.current.error).toContain("Atualize o Checkpoint Launcher");
+  });
+
   it("abandona o SDK travado e passa a controlar o dispositivo Spotify ativo", async () => {
     vi.useFakeTimers();
     const disconnect = vi.fn();
