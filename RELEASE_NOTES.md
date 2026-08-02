@@ -1,3 +1,49 @@
+## Checkpoint Launcher — v3.0.5
+
+Lançamento: 2 de agosto de 2026.
+
+A versão 3.0.5 aproxima ainda mais o launcher e a experiência in-game. O Spotify ganhou uma superfície completa, os perfis ficaram mais claros e o overlay agora pode ser navegado pelo controle sem abandonar a partida.
+
+### Spotify dentro do launcher
+
+- Nova página dedicada com player híbrido, busca instantânea por música ou artista e atualização otimista dos controles.
+- Biblioteca de playlists com capas, faixas na ordem correta, criação de playlists e adição de músicas à fila.
+- Fila inteligente com faixas variadas, indicação da próxima música e suporte a reprodução aleatória.
+- Sessões Jam para convidar amigos e compartilhar sugestões de faixas.
+- Música do tema pausa enquanto o Spotify está tocando e retorna quando a reprodução termina.
+- Compatibilidade ampliada com instalações que ainda usam um preload Electron anterior.
+
+### Controle também no jogo
+
+- O botão central/Guide abre e fecha o overlay in-game com proteção contra acionamento duplicado.
+- Direcional navega pelos elementos, A/X confirma e B/círculo volta ou fecha.
+- L1/R1 percorrem as abas do overlay na ordem correta.
+- Na página Spotify do overlay, L2/R2 trocam para a faixa anterior ou seguinte.
+- Borda indicativa aparece durante a navegação por controle e segue a posição visual dos componentes.
+
+### Perfis e interface
+
+- Modal de perfil de amigos ampliado e reorganizado para preservar conteúdo em diferentes resoluções.
+- Controles de visibilidade do perfil e persistência de descrição, gêneros e integrações conectadas.
+- Ícones oficiais da Steam e do Spotify nas superfícies correspondentes.
+- Sidebar mantém a sequência correta ao navegar pelos gatilhos do controle.
+
+### Correções e estabilidade
+
+- Notificações de troca de faixa agora exibem `Tocando agora`, nome da música e artista.
+- Player responde imediatamente a pausar, avançar, voltar e alternar reprodução aleatória enquanto confirma o estado remoto.
+- Capas e ordem das músicas permanecem associadas à faixa correta.
+- Melhor tratamento de respostas vazias ou não JSON recebidas do Spotify.
+- Novo modal de novidades exibido uma vez na primeira abertura de cada versão.
+
+### Limitações conhecidas
+
+- Controles completos de reprodução exigem Spotify Premium e um dispositivo Spotify ativo.
+- O botão Guide pode ser reservado pela Xbox Game Bar, Steam ou pelo driver; View + Menu juntos continuam disponíveis como alternativa.
+- Fullscreen exclusivo pode impedir overlays externos; use janela sem borda quando o jogo bloquear sobreposição.
+
+---
+
 ## Checkpoint Launcher — v2.0.0
 
 Lançamento: 16 de julho de 2026.
