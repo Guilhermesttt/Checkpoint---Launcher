@@ -12,6 +12,8 @@ import { GamepadProvider } from "./context/GamepadContext";
 import { GamepadStatusOverlay } from "./components/ui/GamepadStatusOverlay";
 import { useControllerLed } from "./hooks/useControllerLed";
 import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
+import WhatsNewModal from "./components/WhatsNewModal";
+import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
@@ -62,6 +64,10 @@ const AppContent: React.FC = () => {
   const musicTransitionRef = React.useRef(0);
   const completedIntroUserRef = React.useRef<string | null>(null);
   const spotifyPlayingRef = React.useRef(false);
+  const {
+    release: whatsNewRelease,
+    dismiss: dismissWhatsNew,
+  } = useWhatsNewRelease(Boolean(user?.uid) && isIntroVisible === false);
 
   React.useEffect(() => {
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -376,6 +382,9 @@ const AppContent: React.FC = () => {
             <Home />
             <GamepadStatusOverlay />
             <ControllerVirtualKeyboard />
+            {whatsNewRelease && (
+              <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />
+            )}
           </div>
         )}
       </div>
