@@ -27,6 +27,7 @@ describe("superficies compartilhadas do Spotify", () => {
     expect(overlay).toContain('data-panel-view="spotify"');
     expect(overlay).toContain('id="spotify-overlay-seek"');
     expect(overlay).toContain('kind: "spotify-seek"');
+    expect(overlay).toContain('kind: direction < 0 ? "spotify-previous" : "spotify-next"');
   });
 
   it("protege o tema do launcher durante toda reproducao Spotify", () => {

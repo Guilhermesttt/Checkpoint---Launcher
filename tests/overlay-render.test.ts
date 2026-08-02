@@ -12,11 +12,24 @@ describe("overlay de conquistas", () => {
   let panelAction: ReturnType<typeof vi.fn>;
   let mediaPlay: ReturnType<typeof vi.fn>;
   let mediaPause: ReturnType<typeof vi.fn>;
+  let gamepads: Array<Gamepad | null>;
+  let animationFrames: FrameRequestCallback[];
 
   beforeEach(() => {
     vi.useFakeTimers();
     mediaPlay = vi.fn().mockResolvedValue(undefined);
     mediaPause = vi.fn();
+    gamepads = [];
+    animationFrames = [];
+    Object.defineProperty(navigator, "getGamepads", {
+      configurable: true,
+      value: vi.fn(() => gamepads),
+    });
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     Object.defineProperty(HTMLMediaElement.prototype, "play", {
       configurable: true,
       value: mediaPlay,
@@ -29,12 +42,31 @@ describe("overlay de conquistas", () => {
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
     const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
     if (!script) throw new Error("Script do overlay nao encontrado.");
+    window.eval(fs.readFileSync(path.resolve("electron/overlay-gamepad.js"), "utf8"));
 
     document.body.className = "";
     document.body.innerHTML = `
       <div id="achievement-stack"></div><div id="social-stack"></div>
-      <section id="command-panel">
+      <section id="command-panel" aria-hidden="true">
         <div id="panel-game-backdrop"></div><span id="panel-game"></span>
+        <nav>
+          <button data-panel-tab="friends" class="panel-tab is-active">Inicio</button>
+          <button data-panel-tab="chats" class="panel-tab">Chat</button>
+          <button data-panel-tab="game" class="panel-tab">Jogo</button>
+          <button data-panel-tab="media" class="panel-tab">Midia</button>
+          <button data-panel-tab="achievements" class="panel-tab">Conquistas</button>
+          <button data-panel-tab="spotify" class="panel-tab">Spotify</button>
+          <button data-panel-tab="settings" class="panel-tab">Configuracoes</button>
+          <button data-panel-tab="profile" class="panel-tab">Perfil</button>
+        </nav>
+        <div data-panel-view="friends" class="panel-view is-active"><button id="friend-action">Amigo</button></div>
+        <div data-panel-view="chats" class="panel-view"></div>
+        <div data-panel-view="game" class="panel-view"></div>
+        <div data-panel-view="media" class="panel-view"></div>
+        <div data-panel-view="achievements" class="panel-view"></div>
+        <div data-panel-view="spotify" class="panel-view"></div>
+        <div data-panel-view="settings" class="panel-view"></div>
+        <div data-panel-view="profile" class="panel-view"></div>
         <span id="achievement-game-label"></span>
         <span id="panel-profile-name"></span><span id="sidebar-profile-name"></span>
         <img id="sidebar-profile-avatar" /><img id="panel-profile-avatar" /><img id="profile-page-avatar" />
@@ -52,6 +84,9 @@ describe("overlay de conquistas", () => {
         <span id="panel-unlocked"></span><span id="panel-available"></span>
         <div id="panel-achievement-progress"></div><div id="panel-achievements"></div>
         <button id="panel-close"></button><button id="panel-close-top"></button><button id="chat-back"></button><form id="chat-form"><button id="chat-attach" type="button"></button><input id="chat-input" /></form><input id="chat-image-input" type="file" />
+        <button id="spotify-overlay-previous"></button><button id="spotify-overlay-toggle"></button><button id="spotify-overlay-next"></button>
+        <input id="spotify-overlay-seek" type="range" min="0" max="1" value="0" /><span id="spotify-overlay-current"></span>
+        <input id="spotify-overlay-volume" type="range" min="0" max="100" value="55" />
         <span id="chat-name"></span><img id="chat-avatar" /><span id="chat-status"></span>
         <span id="chat-typing"></span><span id="chat-error"></span><button id="chat-send"></button><div id="chat-messages"></div>
         <input id="setting-social" type="checkbox" /><input id="setting-achievements" type="checkbox" /><input id="setting-animations" type="checkbox" />
@@ -80,6 +115,33 @@ describe("overlay de conquistas", () => {
     });
     window.eval(script);
   });
+
+  const makeGamepad = (pressed: number[] = []) => ({
+    id: "Xbox Wireless Controller",
+    index: 0,
+    connected: true,
+    mapping: "standard",
+    timestamp: 0,
+    axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 17 }, (_, index) => ({
+      pressed: pressed.includes(index),
+      touched: pressed.includes(index),
+      value: pressed.includes(index) ? 1 : 0,
+    })),
+    vibrationActuator: null,
+  } as unknown as Gamepad);
+
+  const flushAnimationFrame = () => {
+    const callbacks = animationFrames.splice(0);
+    callbacks.forEach((callback) => callback(performance.now()));
+  };
+
+  const pressGamepadButton = (button: number) => {
+    gamepads = [makeGamepad([button])];
+    flushAnimationFrame();
+    gamepads = [makeGamepad()];
+    flushAnimationFrame();
+  };
 
   it("mantem todas as paginas do painel no mesmo nivel de navegacao", () => {
     const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
@@ -530,5 +592,41 @@ describe("overlay de conquistas", () => {
       title: "Controle conectado",
     });
     expect(document.querySelector(".kind-controller-connected .animate-icon-controller")).not.toBeNull();
+  });
+
+  it("carrega o motor de controle antes do script do overlay", () => {
+    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+    expect(html).toContain('<script src="./overlay-gamepad.js"></script>');
+    expect(html.indexOf("overlay-gamepad.js")).toBeLessThan(html.indexOf("<script>"));
+  });
+
+  it("troca abas em sequencia com L1 e R1", () => {
+    panelVisibility({ open: true, state: {} });
+
+    pressGamepadButton(5);
+    expect(document.querySelector('[data-panel-tab="chats"]')).toHaveClass("is-active");
+
+    pressGamepadButton(4);
+    expect(document.querySelector('[data-panel-tab="friends"]')).toHaveClass("is-active");
+  });
+
+  it("confirma, volta e controla faixas do Spotify pelo controle", () => {
+    const friendAction = document.getElementById("friend-action");
+    const friendClick = vi.fn();
+    friendAction?.addEventListener("click", friendClick);
+    panelVisibility({ open: true, state: {} });
+
+    pressGamepadButton(0);
+    expect(friendClick).toHaveBeenCalledOnce();
+
+    panelAction.mockClear();
+    pressGamepadButton(1);
+    expect(panelAction).toHaveBeenCalledWith({ kind: "close" });
+
+    document.querySelector<HTMLButtonElement>('[data-panel-tab="spotify"]')?.click();
+    pressGamepadButton(7);
+    pressGamepadButton(6);
+    expect(panelAction).toHaveBeenCalledWith({ kind: "spotify-next" });
+    expect(panelAction).toHaveBeenCalledWith({ kind: "spotify-previous" });
   });
 });

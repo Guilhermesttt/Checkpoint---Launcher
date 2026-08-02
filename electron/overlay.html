@@ -78,6 +78,12 @@
       font: inherit;
     }
 
+    body.gamepad-navigation .is-gamepad-focused {
+      outline: 2px solid rgba(255, 255, 255, 0.92) !important;
+      outline-offset: 3px;
+      box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.08), 0 0 24px rgba(255, 255, 255, 0.12);
+    }
+
     .panel-logo,
     .achievement-eyebrow,
     .social-badge,
@@ -3467,6 +3473,7 @@
   </div>
 
   <script src="./overlay-video.js"></script>
+  <script src="./overlay-gamepad.js"></script>
   <script>
     const achievementStack = document.getElementById("achievement-stack");
     const socialStack = document.getElementById("social-stack");
@@ -4613,6 +4620,112 @@
       "input[type='range']",
       ".capture-card",
     ].join(",");
+    let gamepadFocusedElement = null;
+    const panelTabOrder = ["friends", "chats", "game", "media", "achievements", "spotify", "settings", "profile"];
+    const isGamepadFocusable = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hidden || element.closest("[hidden]")) return false;
+      if (element.matches(":disabled") || element.getAttribute("aria-disabled") === "true") return false;
+      const panelView = element.closest("[data-panel-view]");
+      return !panelView || panelView.classList.contains("is-active");
+    };
+    const gamepadFocusableElements = () => Array.from(
+      commandPanel?.querySelectorAll(overlayInteractiveSelector) || [],
+    ).filter(isGamepadFocusable);
+    const setGamepadFocus = (element) => {
+      gamepadFocusedElement?.classList.remove("is-gamepad-focused");
+      gamepadFocusedElement = isGamepadFocusable(element) ? element : null;
+      gamepadFocusedElement?.classList.add("is-gamepad-focused");
+      gamepadFocusedElement?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    };
+    const resetGamepadFocus = () => {
+      const activeView = commandPanel?.querySelector("[data-panel-view].is-active");
+      setGamepadFocus(
+        Array.from(activeView?.querySelectorAll(overlayInteractiveSelector) || []).find(isGamepadFocusable)
+        || commandPanel?.querySelector("[data-panel-tab].is-active")
+        || gamepadFocusableElements()[0]
+        || null,
+      );
+    };
+    const moveGamepadFocus = (direction) => {
+      const elements = gamepadFocusableElements();
+      if (!elements.length) return;
+      if (!isGamepadFocusable(gamepadFocusedElement)) {
+        resetGamepadFocus();
+        return;
+      }
+      const currentRect = gamepadFocusedElement.getBoundingClientRect();
+      const currentCenter = {
+        x: currentRect.left + currentRect.width / 2,
+        y: currentRect.top + currentRect.height / 2,
+      };
+      const candidates = elements
+        .filter((element) => element !== gamepadFocusedElement)
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          const dx = rect.left + rect.width / 2 - currentCenter.x;
+          const dy = rect.top + rect.height / 2 - currentCenter.y;
+          const primary = direction === "left" ? -dx : direction === "right" ? dx : direction === "up" ? -dy : dy;
+          const secondary = direction === "left" || direction === "right" ? Math.abs(dy) : Math.abs(dx);
+          return { element, primary, score: primary + secondary * 2.25 };
+        })
+        .filter((candidate) => candidate.primary > 1)
+        .sort((left, right) => left.score - right.score);
+      if (candidates[0]) {
+        setGamepadFocus(candidates[0].element);
+        return;
+      }
+      const currentIndex = elements.indexOf(gamepadFocusedElement);
+      const step = direction === "left" || direction === "up" ? -1 : 1;
+      setGamepadFocus(elements[(currentIndex + step + elements.length) % elements.length]);
+    };
+    const switchGamepadTab = (direction) => {
+      const activeTab = document.querySelector("[data-panel-tab].is-active")?.dataset.panelTab || panelTabOrder[0];
+      const activeIndex = Math.max(0, panelTabOrder.indexOf(activeTab));
+      const nextTab = panelTabOrder[(activeIndex + direction + panelTabOrder.length) % panelTabOrder.length];
+      document.querySelector(`[data-panel-tab="${nextTab}"]`)?.click();
+      resetGamepadFocus();
+    };
+    const clearGamepadNavigation = () => {
+      document.body.classList.remove("gamepad-navigation");
+      gamepadFocusedElement?.classList.remove("is-gamepad-focused");
+      gamepadFocusedElement = null;
+    };
+    ["pointerdown", "mousemove", "wheel", "keydown"].forEach((eventName) => {
+      window.addEventListener(eventName, clearGamepadNavigation, { passive: true });
+    });
+    const overlayGamepad = window.createOverlayGamepadController?.({
+      getGamepads: () => navigator.getGamepads?.() || [],
+      requestFrame: (callback) => requestAnimationFrame(callback),
+      cancelFrame: (handle) => cancelAnimationFrame(handle),
+      now: () => performance.now(),
+      isPanelOpen: () => commandPanel?.classList.contains("is-open"),
+      isSpotifyActive: () => document.querySelector('[data-panel-view="spotify"]')?.classList.contains("is-active"),
+      actions: {
+        togglePanel: () => window.achievementOverlay.panelAction({ kind: "toggle", source: "gamepad" }),
+        moveFocus: moveGamepadFocus,
+        activateFocus: () => {
+          if (!isGamepadFocusable(gamepadFocusedElement)) resetGamepadFocus();
+          gamepadFocusedElement?.click();
+        },
+        goBack: () => {
+          if (captureViewerIndex >= 0) closeCaptureViewer();
+          else if (latestPanelState.chat) window.achievementOverlay.panelAction({ kind: "close-chat" });
+          else window.achievementOverlay.panelAction({ kind: "close" });
+        },
+        switchTab: switchGamepadTab,
+        spotifyTrack: (direction) => window.achievementOverlay.panelAction({
+          kind: direction < 0 ? "spotify-previous" : "spotify-next",
+        }),
+        onGamepadInput: () => {
+          document.body.classList.add("gamepad-navigation");
+          if (commandPanel?.classList.contains("is-open") && !isGamepadFocusable(gamepadFocusedElement)) {
+            resetGamepadFocus();
+          }
+        },
+      },
+    });
+    overlayGamepad?.start();
     document.addEventListener("pointerover", (event) => {
       if (!document.body.classList.contains("panel-open")) return;
       const target = event.target instanceof Element
@@ -4850,6 +4963,8 @@
         if (!open && captureShortcutRecording) stopCaptureShortcutRecording();
         if (!open) closeCaptureViewer();
         if (state) renderPanelState(state);
+        if (open && document.body.classList.contains("gamepad-navigation")) resetGamepadFocus();
+        if (!open) setGamepadFocus(null);
         if (Boolean(open) !== Boolean(wasOpen) && Date.now() - lastOverlayUiSoundAt > 120) {
           playOverlayUiSound("ui-click");
         }
