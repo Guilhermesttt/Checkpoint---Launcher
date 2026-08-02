@@ -38,7 +38,7 @@ import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/doma
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
-import Sidebar, { CATEGORIES, SIDEBAR_CATEGORIES, SteamBrandIcon, DiscordBrandIcon, EpicBrandIcon } from '../components/Sidebar';
+import Sidebar, { CATEGORIES, SteamBrandIcon, DiscordBrandIcon, EpicBrandIcon } from '../components/Sidebar';
 import { useGamepadFocusNavigation } from '../hooks/useGamepadFocusNavigation';
 import { useGamePresence } from '../hooks/useGamePresence';
 import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
@@ -75,6 +75,7 @@ import {
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
 import {
+  getAdjacentSidebarCategory,
   readLastNavigation,
   writeLastCategory,
   writeLastSettingsTab,
@@ -967,18 +968,18 @@ const Home: React.FC = () => {
 
   useGamepadButton("L2", () => {
     if (isAnyModalOpen || searchOpen) return;
-    const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
-    if (currentIndex > 0) {
-      selectCategory(SIDEBAR_CATEGORIES[currentIndex - 1].id);
+    const previousCategory = getAdjacentSidebarCategory(activeCategory, -1);
+    if (previousCategory) {
+      selectCategory(previousCategory);
       playSound("navigate");
     }
   });
 
   useGamepadButton("R2", () => {
     if (isAnyModalOpen || searchOpen) return;
-    const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
-    if (currentIndex < SIDEBAR_CATEGORIES.length - 1) {
-      selectCategory(SIDEBAR_CATEGORIES[currentIndex + 1].id);
+    const nextCategory = getAdjacentSidebarCategory(activeCategory, 1);
+    if (nextCategory) {
+      selectCategory(nextCategory);
       playSound("navigate");
     }
   });

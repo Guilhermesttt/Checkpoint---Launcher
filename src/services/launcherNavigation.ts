@@ -30,6 +30,30 @@ export const SETTINGS_TABS = [
   "notifications",
 ] as const;
 
+export const SIDEBAR_NAVIGATION_GROUPS = [
+  { key: "filters", ids: ["ALL", "FAVORITES"] },
+  { key: "platforms", ids: ["STEAM", "EPIC", "LOCAL"] },
+  { key: "community", ids: ["FRIENDS", "FEED"] },
+  { key: "music", ids: ["SPOTIFY"] },
+  { key: "mods", ids: ["MODS"] },
+] as const;
+
+export const SIDEBAR_NAVIGATION_ORDER = [
+  ...SIDEBAR_NAVIGATION_GROUPS.flatMap((group) => group.ids),
+  "PROFILE",
+] as const;
+
+export const getAdjacentSidebarCategory = (
+  activeCategory: string,
+  direction: -1 | 1,
+): string | null => {
+  const currentIndex = SIDEBAR_NAVIGATION_ORDER.findIndex(
+    (category) => category === activeCategory,
+  );
+  if (currentIndex < 0) return null;
+  return SIDEBAR_NAVIGATION_ORDER[currentIndex + direction] ?? null;
+};
+
 export type RestorableCategory = (typeof RESTORABLE_CATEGORIES)[number];
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 

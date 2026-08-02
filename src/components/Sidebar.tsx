@@ -33,6 +33,10 @@ import { faSteam, faDiscord, faSpotify } from "@fortawesome/free-brands-svg-icon
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import type { LauncherLanguage } from "../context/PreferencesContext";
+import {
+  SIDEBAR_NAVIGATION_GROUPS,
+  SIDEBAR_NAVIGATION_ORDER,
+} from "../services/launcherNavigation";
 
 export const SteamBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
   className,
@@ -122,16 +126,11 @@ export const CATEGORIES = [
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const SIDEBAR_CATEGORIES = CATEGORIES.filter(({ id }) =>
-  ["ALL", "FAVORITES", "STEAM", "EPIC", "LOCAL", "FRIENDS", "FEED", "SPOTIFY", "MODS", "PROFILE"].includes(id),
+  SIDEBAR_NAVIGATION_ORDER.includes(id as (typeof SIDEBAR_NAVIGATION_ORDER)[number]),
+).sort(
+  (left, right) => SIDEBAR_NAVIGATION_ORDER.indexOf(left.id as (typeof SIDEBAR_NAVIGATION_ORDER)[number])
+    - SIDEBAR_NAVIGATION_ORDER.indexOf(right.id as (typeof SIDEBAR_NAVIGATION_ORDER)[number]),
 );
-
-const NAV_GROUPS: { key: string; ariaLabel: string; ids: string[] }[] = [
-  { key: "filters", ariaLabel: "Biblioteca", ids: ["ALL", "FAVORITES"] },
-  { key: "platforms", ariaLabel: "Plataformas", ids: ["STEAM", "EPIC", "LOCAL"] },
-  { key: "community", ariaLabel: "Social", ids: ["FRIENDS", "FEED"] },
-  { key: "music", ariaLabel: "Música", ids: ["SPOTIFY"] },
-  { key: "mods", ariaLabel: "Ferramentas", ids: ["MODS"] },
-];
 
 interface SidebarProps {
   activeCategory: string;
@@ -401,7 +400,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           aria-label="Navegação principal"
           className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain px-1 no-scrollbar gap-5"
         >
-          {NAV_GROUPS.map((group) => {
+          {SIDEBAR_NAVIGATION_GROUPS.map((group) => {
             return (
               <div key={group.key} role="group" aria-label={groupLabels[group.key]} className="flex w-full flex-col gap-2">
                 {isExpanded && (
