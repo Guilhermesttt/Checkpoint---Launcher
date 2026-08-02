@@ -23,8 +23,6 @@ export const useWhatsNewRelease = (enabled: boolean) => {
   useEffect(() => {
     let active = true;
     if (!enabled) {
-      setRelease(null);
-      setIsReady(false);
       return () => {
         active = false;
       };
@@ -65,5 +63,9 @@ export const useWhatsNewRelease = (enabled: boolean) => {
     });
   }, []);
 
-  return { release, isReady, dismiss };
+  return {
+    release: enabled ? release : null,
+    isReady: enabled && isReady,
+    dismiss,
+  };
 };
