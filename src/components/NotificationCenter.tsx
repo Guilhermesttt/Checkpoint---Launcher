@@ -80,11 +80,13 @@ const StandardToast = ({
   message,
   type,
   title,
+  imageUrl,
   t,
 }: {
   message: string;
   type: NotificationType;
   title?: string;
+  imageUrl?: string;
   t: string | number;
 }) => {
   return (
@@ -105,9 +107,11 @@ const StandardToast = ({
               : "bg-blue-500/20 text-blue-400"
           }`}
         >
-          {type === "success" && <CheckCircle2 size={16} strokeWidth={2.5} />}
-          {type === "error" && <AlertCircle size={16} strokeWidth={2.5} />}
-          {type === "info" && <Info size={16} strokeWidth={2.5} />}
+          {imageUrl ? <img src={imageUrl} alt="" className="h-full w-full rounded-full object-cover" /> : <>
+            {type === "success" && <CheckCircle2 size={16} strokeWidth={2.5} />}
+            {type === "error" && <AlertCircle size={16} strokeWidth={2.5} />}
+            {type === "info" && <Info size={16} strokeWidth={2.5} />}
+          </>}
         </div>
 
         <div className="flex flex-col flex-1 min-w-0 py-0.5">
@@ -153,6 +157,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             message={message}
             type={type}
             title={options?.title}
+            imageUrl={options?.imageUrl}
             t={t}
           />
         ), { id: options?.id, duration });

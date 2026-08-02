@@ -289,7 +289,7 @@ const GameCard: React.FC<GameCardProps> = ({
           >
             {platformBadge ? (
               <div
-                className="flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1 shadow-md"
                 style={{
                   background: platformBadge.background,
                   border: `1px solid ${platformBadge.border}`,
@@ -298,7 +298,7 @@ const GameCard: React.FC<GameCardProps> = ({
               >
                 {platformBadge.icon}
                 <span
-                  className="text-[9px] font-bold uppercase tracking-widest drop-shadow-sm"
+                  className="text-xs font-bold uppercase tracking-wider drop-shadow-sm"
                   style={{ color: platformBadge.color }}
                 >
                   {platformBadge.label}
@@ -310,7 +310,7 @@ const GameCard: React.FC<GameCardProps> = ({
 
             {isFavorite && (
               <div
-                className="flex h-[26px] w-[26px] items-center justify-center rounded-full shadow-md"
+                className="flex h-7 w-7 items-center justify-center rounded-lg shadow-md"
                 style={{
                   background: "rgba(251,191,36,0.15)",
                   border: "1px solid rgba(251,191,36,0.4)",
@@ -327,7 +327,7 @@ const GameCard: React.FC<GameCardProps> = ({
               }`}
             style={{ transform: "translateZ(30px)" }}
           >
-            <p className="mb-1 text-[8.5px] font-semibold uppercase tracking-[0.22em] text-white/50 flex items-center gap-1.5 font-body">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-white/50 flex items-center gap-2 font-body">
               Iniciar
               {visuallyActive && (
                 <span className="relative flex h-1.5 w-1.5">
@@ -336,7 +336,7 @@ const GameCard: React.FC<GameCardProps> = ({
                 </span>
               )}
             </p>
-            <h3 className="line-clamp-2 text-[13px] font-display font-black leading-snug text-white tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+            <h3 className="line-clamp-2 text-sm font-display font-black leading-snug text-white tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               {title}
             </h3>
           </div>

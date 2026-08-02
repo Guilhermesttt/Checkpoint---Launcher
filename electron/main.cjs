@@ -21,12 +21,14 @@ const {
 const {
   createGameProcessTracker,
   normalizeWindowsPath,
+  parseTasklistProcessNames,
   parseProcessSnapshot,
 } = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
 const { createWindowBehaviorController } = require("./window-behavior.cjs");
 const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
+const { createSpotifyAuthManager } = require("./spotify-auth-manager.cjs");
 const {
   getNexusDownloadLinks,
   getNexusModCatalog,
@@ -106,6 +108,7 @@ const HEALTH_CHECK_MAX_ATTEMPTS = 120; // 120 * 500ms = ~60s de tolerância
 const HEALTH_CHECK_INTERVAL_MS = 500;
 
 let mainWindow;
+let spotifyAuthManager;
 let overlayWindow;
 let overlayReady = false;
 let overlayDisplayId = null;
@@ -126,6 +129,7 @@ let overlayPanelState = {
     achievementNotificationPosition: "top-right",
   },
   chat: null,
+  spotify: { status: "disconnected", remoteMode: false, paused: true, positionMs: 0, durationMs: 0, track: null },
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
 const overlayEventCopy = {
@@ -336,6 +340,31 @@ const getNexusApiKey = () => {
     throw new Error("Conecte uma chave pessoal Nexus antes de continuar.");
   }
   return apiKey;
+};
+
+const getSpotifyAuthManager = () => {
+  if (spotifyAuthManager) return spotifyAuthManager;
+  const tokenPath = path.join(app.getPath("userData"), "spotify-session.bin");
+  const credentialStore = {
+    read: () => {
+      try {
+        if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(tokenPath)) return null;
+        return JSON.parse(safeStorage.decryptString(fs.readFileSync(tokenPath)));
+      } catch {
+        return null;
+      }
+    },
+    write: (value) => {
+      if (!safeStorage.isEncryptionAvailable()) return;
+      fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
+      fs.writeFileSync(tokenPath, safeStorage.encryptString(JSON.stringify(value)));
+    },
+    clear: () => {
+      try { fs.rmSync(tokenPath, { force: true }); } catch { /* ignore */ }
+    },
+  };
+  spotifyAuthManager = createSpotifyAuthManager({ BrowserWindow, credentialStore });
+  return spotifyAuthManager;
 };
 
 const getNexusDownloadRoot = () =>
@@ -1604,6 +1633,21 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       error: String(payload.chat.error || "").slice(0, 300),
       messages,
     } : null,
+    spotify: {
+      status: ["loading", "unconfigured", "disconnected", "connecting", "ready", "error"].includes(payload?.spotify?.status)
+        ? payload.spotify.status
+        : "disconnected",
+      remoteMode: Boolean(payload?.spotify?.remoteMode),
+      paused: payload?.spotify?.paused !== false,
+      positionMs: Math.max(0, Number(payload?.spotify?.positionMs) || 0),
+      durationMs: Math.max(0, Number(payload?.spotify?.durationMs) || 0),
+      track: payload?.spotify?.track ? {
+        id: String(payload.spotify.track.id || "").slice(0, 128),
+        title: String(payload.spotify.track.title || "").slice(0, 180),
+        artist: String(payload.spotify.track.artist || "").slice(0, 180),
+        coverUrl: sanitizeOverlayImageSource(payload.spotify.track.coverUrl),
+      } : null,
+    },
     profile: {
       name: String(payload?.profile?.name || "Jogador").slice(0, 80),
       avatar: sanitizeOverlayImageSource(payload?.profile?.avatar),
@@ -1728,6 +1772,15 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       `$shell = New-Object -ComObject WScript.Shell; $shell.SendKeys([char]${keyCode})`,
     ], { windowsHide: true }, () => undefined);
     return;
+  }
+  if (["spotify-toggle", "spotify-next", "spotify-previous", "spotify-seek", "spotify-volume"].includes(kind)) {
+    const payload = { kind };
+    if (kind === "spotify-seek") payload.positionMs = Math.max(0, Number(action?.positionMs) || 0);
+    if (kind === "spotify-volume") payload.volume = Math.max(0, Math.min(1, Number(action?.volume) || 0));
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("overlay:panel-action", payload);
+    }
+    return { ok: true };
   }
   if (["select-chat", "close-chat", "send-message", "send-image", "set-typing"].includes(kind)) {
     const payload = { kind };
@@ -2978,12 +3031,7 @@ const getRunningProcessNames = async () => {
     });
   }).catch(() => "");
 
-  const names = new Set(
-    String(output)
-      .split(/\r?\n/)
-      .map((line) => line.match(/^"([^"]+)"/)?.[1]?.toLowerCase())
-      .filter(Boolean),
-  );
+  const names = parseTasklistProcessNames(output);
 
   _processListCache = { names, expiresAt: Date.now() + 1500 };
   return names;
@@ -3337,6 +3385,33 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
     friendId,
     contentKind,
   });
+});
+
+registerSecureIpcHandler("spotify:get-status", async () =>
+  getSpotifyAuthManager().getStatus());
+
+registerSecureIpcHandler("spotify:connect", async (_event, clientId) =>
+  getSpotifyAuthManager().connect(String(clientId || "").slice(0, 128)));
+
+registerSecureIpcHandler("spotify:disconnect", async () =>
+  getSpotifyAuthManager().disconnect());
+
+registerSecureIpcHandler("spotify:get-access-token", async (_event, clientId) => ({
+  accessToken: await getSpotifyAuthManager().getAccessToken(String(clientId || "").slice(0, 128)),
+}));
+
+registerSecureIpcHandler("overlay:show-spotify-track", async (_event, payload) => {
+  if (!inGameOverlayActive) return { shown: false };
+  const title = String(payload?.title || "").trim().slice(0, 180);
+  const artist = String(payload?.artist || "").trim().slice(0, 180);
+  if (!title) return { shown: false };
+  sendOverlayEvent("overlay:social", {
+    kind: "spotify-track",
+    title,
+    description: artist || "Spotify",
+    avatarUrl: sanitizeOverlayImageSource(payload?.coverUrl) || overlayIconUrl(),
+  });
+  return { shown: true };
 });
 
 registerSecureIpcHandler("overlay:show-friend-accepted", async (_event, payload) => {

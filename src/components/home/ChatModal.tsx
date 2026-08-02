@@ -394,7 +394,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
           playSound("back");
           onClose();
         }}
-        maxWidthClassName={controllerKeyboardOpen ? "max-w-md md:max-w-[38vw]" : "max-w-md"}
+        maxWidthClassName={controllerKeyboardOpen ? "max-w-[min(880px,68vw)]" : "max-w-4xl"}
         zIndexClassName="z-[180]"
         containerClassName={
           controllerKeyboardOpen
@@ -402,10 +402,11 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
             : undefined
         }
         className="overflow-hidden rounded-[24px] border-0 p-0"
+        ariaLabel={`Conversa com ${friend.name}`}
       >
-        <div className="flex h-[calc(100dvh-2rem)] max-h-[550px] w-full flex-col bg-[#050507] md:h-[calc(100dvh-4rem)]">
+        <div className="flex h-[calc(100dvh-2rem)] max-h-[760px] min-h-[560px] w-full flex-col bg-[#050507] md:h-[calc(100dvh-4rem)]">
           {/* Header */}
-          <div className="flex shrink-0 items-center justify-between border-b border-white/5 bg-white/[0.02] px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-white/5 bg-white/[0.02] px-7 py-4">
             <div className="flex items-center gap-3">
               <div className="relative">
                 <img
@@ -439,6 +440,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                 playSound("back");
                 onClose();
               }}
+              aria-label="Fechar conversa"
               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white"
             >
               <X className="h-4 w-4" />
@@ -446,10 +448,32 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
           </div>
 
           {/* Messages */}
-          <div className="chat-scrollbar space-y-4 flex-1 overflow-y-auto p-6 pr-3">
+          <div className="chat-scrollbar flex-1 space-y-3 overflow-y-auto px-8 py-6 pr-5">
+            <section className="flex flex-col items-center pb-8 pt-2 text-center" aria-label="Identidade da amizade">
+              <div className="relative">
+                <div className="h-24 w-24 overflow-hidden rounded-full border border-white/15 bg-white/[0.06] p-1 shadow-[0_18px_48px_rgba(0,0,0,.55)]">
+                  <img
+                    src={friend.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256"}
+                    alt=""
+                    className="h-full w-full rounded-full object-cover"
+                  />
+                </div>
+                <span className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-[3px] border-[#050507] ${friend.status === "offline" ? "bg-white/25" : "bg-emerald-400"}`} />
+              </div>
+              <h2 className="mt-4 text-xl font-black tracking-tight text-white">{friend.name}</h2>
+              <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-white/35">
+                {friend.status === "playing" ? `Jogando ${friend.playing}` : friend.status === "online" ? "Online agora" : "Offline"}
+              </p>
+              <div className="mt-5 flex items-center -space-x-2" aria-hidden="true">
+                <img src={friend.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=128"} alt="" className="h-9 w-9 rounded-full border-2 border-[#050507] object-cover" />
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#050507] bg-white/[0.08] text-[10px] font-black text-white/60">CP</span>
+              </div>
+              <p className="mt-4 text-xs font-semibold text-white/45">Vocês já são amigos</p>
+              <p className="mt-1 text-[10px] text-white/25">Comece a conversar agora</p>
+            </section>
             {displayMessages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center space-y-2 text-center text-white/20">
-                <MessageSquare className="h-8 w-8" />
+              <div className="flex flex-col items-center justify-center space-y-2 pb-8 text-center text-white/20">
+                <MessageSquare className="h-6 w-6" />
                 <p className="text-xs uppercase tracking-wider">Nenhuma mensagem ainda</p>
               </div>
             ) : (
@@ -505,9 +529,9 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                     ) : null}
                     <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                       <div
-                        className={`max-w-[70%] rounded-[18px] px-4 py-2.5 text-xs ${
+                        className={`max-w-[58%] rounded-[16px] px-4 py-2.5 text-sm shadow-[0_8px_24px_rgba(0,0,0,.2)] ${
                           isMe
-                            ? "rounded-tr-none bg-white/10 text-white"
+                            ? "rounded-br-[5px] bg-white text-black"
                             : "rounded-tl-none border border-white/5 bg-white/5 text-white/80"
                         }`}
                       >
@@ -547,7 +571,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                         {msg.text ? (
                           <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
                         ) : null}
-                        <span className="mt-1 block text-right text-[8px] uppercase tracking-wider text-white/30">
+                        <span className={`mt-1 block text-right text-[8px] uppercase tracking-wider ${isMe ? "text-black/45" : "text-white/30"}`}>
                           {new Date(msg.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -591,9 +615,9 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
           {/* Footer / Input */}
           <form
             onSubmit={handleSendMessageSubmit}
-            className="shrink-0 border-t border-white/5 bg-white/[0.01] p-4"
+            className="shrink-0 border-t border-white/5 bg-[#0a0a0d] px-6 py-4"
           >
-            <div className="mb-2 flex min-h-[16px] items-center justify-between px-1">
+            <div className="mb-2 flex min-h-4 items-center justify-between px-1">
               <span className="text-[10px] uppercase tracking-[0.24em] text-white/25">
                 {friendTyping ? `${friend.name} está digitando...` : "Chat em tempo real"}
               </span>
@@ -604,7 +628,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
               ) : null}
             </div>
             {pendingImage ? (
-              <div className="relative mb-3 w-fit max-w-full rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+              <div className="relative mb-3 w-fit max-w-full rounded-2xl border border-white/10 bg-white/4 p-2">
                 <img
                   src={pendingImage.previewUrl}
                   alt="Prévia da imagem anexada"
@@ -624,7 +648,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                 </span>
               </div>
             ) : null}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <input
                 ref={imageInputRef}
                 type="file"
@@ -638,7 +662,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                 disabled={isSendingImage}
                 aria-label="Anexar imagem"
                 title="Anexar imagem"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-40"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-40"
               >
                 <ImagePlus className="h-4 w-4" />
               </button>
@@ -651,7 +675,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                 placeholder={
                   pendingImage ? "Adicionar uma legenda (opcional)..." : "Digite sua mensagem..."
                 }
-                className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/20 focus:outline-none disabled:cursor-wait disabled:opacity-50"
+                className="h-11 flex-1 rounded-full border border-white/10 bg-white/[0.055] px-5 text-sm text-white placeholder-white/25 focus:border-white/20 focus:outline-none disabled:cursor-wait disabled:opacity-50"
               />
               <button
                 type="submit"
@@ -660,7 +684,8 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                   (!inputText.trim() && !pendingImage) ||
                   Boolean(spamLockedUntil && spamLockedUntil > Date.now())
                 }
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-black transition-transform hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-black/50"
+                aria-label="Enviar mensagem"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-black transition-transform hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:bg-white/30 disabled:text-black/50"
               >
                 <Send className="h-4 w-4" />
               </button>

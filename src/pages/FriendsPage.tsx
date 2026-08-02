@@ -79,10 +79,10 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
   return (
     <SystemPageShell eyebrow="Social" title={t("friends")}>
-      <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-        <div className="mb-5 flex items-center justify-between gap-4">
+      <section className="mb-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border-2 border-white/20 bg-white/10">
+            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/20 bg-white/10">
               {discordAvatar ? (
                 <img src={discordAvatar} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -94,7 +94,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             </div>
             <div className="flex-1">
               <div className="mb-1 flex items-center gap-2">
-                <p className="text-base font-black text-white">
+                <p className="text-base md:text-lg font-bold text-white">
                   {discordConnected ? discordUsername || userDisplay : userDisplay}
                 </p>
                 {discordConnected && (
@@ -104,11 +104,11 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-white/70">
+                <p className="text-xs font-bold uppercase tracking-wider text-white/70">
                   {currentPresenceGame ? `${copy.playing} ${currentPresenceGame}` : copy.online}
                 </p>
               </div>
-              <p className="mt-1 text-[10px] text-white/40">
+              <p className="mt-1 text-xs font-medium text-white/40">
                 {discordConnected ? copy.connected : copy.connectHint}
               </p>
             </div>
@@ -117,7 +117,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             <button
               type="button"
               onClick={onAddFriendClick}
-              className="h-10 rounded-xl bg-white px-5 text-[10px] font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
+              className="h-10 rounded-xl bg-white px-5 text-xs font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
             >
               + {t("addFriendTitle")}
             </button>
@@ -125,7 +125,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={onConnectDiscord}
-                className="h-8 rounded-lg bg-indigo-500/20 px-4 text-[9px] font-bold uppercase tracking-wider text-indigo-400 transition-all hover:bg-indigo-500/30"
+                className="h-8 rounded-lg bg-indigo-500/20 px-4 text-xs font-bold uppercase tracking-wider text-indigo-400 transition-all hover:bg-indigo-500/30"
               >
                 {copy.connect}
               </button>
@@ -133,38 +133,38 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
           {[
             { label: copy.online, value: onlineCount },
             { label: copy.playing, value: playingCount },
             { label: copy.total, value: friends.length },
           ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/35">
+            <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-white/40">
                 {item.label}
               </p>
-              <p className="mt-2 text-3xl font-black tabular-nums text-white">{item.value}</p>
+              <p className="mt-1.5 text-3xl font-black tabular-nums text-white">{item.value}</p>
             </div>
           ))}
         </div>
       </section>
 
       {incomingRequests.length > 0 && (
-        <section className="mb-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-          <div className="mb-4 flex items-center justify-between gap-4">
+        <section className="mb-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+          <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-black text-white">{copy.requests}</p>
-              <p className="mt-0.5 text-[10px] text-white/40">{copy.requestHint}</p>
+              <p className="text-base md:text-lg font-bold text-white">{copy.requests}</p>
+              <p className="mt-0.5 text-xs font-medium text-white/40">{copy.requestHint}</p>
             </div>
             <span className="flex h-8 min-w-8 items-center justify-center rounded-xl bg-white/10 px-3 text-xs font-black text-white">
               {incomingRequests.length}
             </span>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
             {incomingRequests.map((request) => (
               <div
                 key={request.uid}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
@@ -178,7 +178,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     <p className="truncate text-sm font-bold text-white">
                       {request.displayName || copy.user}
                     </p>
-                    <p className="text-[10px] uppercase tracking-widest text-white/35">
+                    <p className="text-xs uppercase tracking-wider text-white/35">
                       {copy.wantsFriend}
                     </p>
                   </div>
@@ -187,14 +187,14 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   <button
                     type="button"
                     onClick={() => onRejectRequest(request.uid)}
-                    className="h-9 rounded-lg px-3 text-[10px] font-black uppercase text-red-300/80 hover:bg-red-500/10"
+                    className="h-9 rounded-lg px-3 text-xs font-black uppercase text-red-300/80 hover:bg-red-500/10"
                   >
                     {copy.reject}
                   </button>
                   <button
                     type="button"
                     onClick={() => onAcceptRequest(request.uid)}
-                    className="h-9 rounded-lg bg-white px-3 text-[10px] font-black uppercase text-black hover:bg-white/90"
+                    className="h-9 rounded-lg bg-white px-3 text-xs font-black uppercase text-black hover:bg-white/90"
                   >
                     {copy.accept}
                   </button>
@@ -206,14 +206,14 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
       )}
 
       {friends.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
             <input
               value={friendSearch}
               onChange={(event) => setFriendSearch(event.target.value)}
               placeholder={copy.search}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-black/35 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25"
+              className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 shadow-lg"
             />
           </div>
         </div>
@@ -221,7 +221,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {visibleFriends.length === 0 ? (
-          <div className="rounded-[28px] border border-white/10 bg-black/35 p-8 text-center md:col-span-2">
+          <div className="rounded-[28px] border border-white/10 bg-black/40 p-8 text-center md:col-span-2 shadow-2xl">
             <Users className="mx-auto mb-4 h-8 w-8 text-white/35" />
             <p className="text-sm font-bold text-white/70">
               {!discordConnected
@@ -231,7 +231,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   : copy.noSearch}
             </p>
             {discordConnected && friends.length === 0 && (
-              <p className="mt-2 text-xs text-white/35">{t("addFriendEmptyHint")}</p>
+              <p className="mt-2 text-xs font-medium text-white/40">{t("addFriendEmptyHint")}</p>
             )}
           </div>
         ) : (
@@ -240,10 +240,10 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             return (
               <div
                 key={friend.id}
-                className="flex min-h-[108px] flex-col justify-between gap-4 rounded-[22px] border border-white/10 bg-gradient-to-br from-white/[0.055] to-white/[0.02] p-4 sm:flex-row sm:items-center"
+                className="flex min-h-[108px] flex-col justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5 sm:flex-row sm:items-center"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
+                  <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[var(--launcher-accent-soft)]">
                     {friend.avatar ? (
                       <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
                     ) : friend.source === "discord_friend" ? (
@@ -259,7 +259,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-white">{friend.name}</p>
-                    <p className="truncate text-[10px] uppercase tracking-widest text-white/35">
+                    <p className="truncate text-xs uppercase tracking-wider text-white/35">
                       {friend.source === "discord_friend"
                         ? copy.discordConnected
                         : friend.source === "checkpoint"
@@ -283,12 +283,12 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                       type="button"
                       onClick={() => onOpenChat(friend)}
                       title={copy.openChat}
-                      className="relative flex h-9 items-center gap-2 rounded-xl bg-white px-4 text-[10px] font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
+                      className="relative flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
                     >
                       <MessageSquare className="h-3.5 w-3.5" />
                       <span>{copy.chat}</span>
                       {unreadCount > 0 && (
-                        <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white">
+                        <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-black text-white">
                           {unreadCount}
                         </span>
                       )}
@@ -338,6 +338,7 @@ export interface AddFriendModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddFriend: (profile: UserProfile) => void;
+  onViewProfile: (profile: UserProfile) => void;
   currentUserUid: string;
   friendIds: Set<string>;
   outgoingRequestIds: Set<string>;
@@ -350,6 +351,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = React.memo(({
   isOpen,
   onClose,
   onAddFriend,
+  onViewProfile,
   currentUserUid,
   friendIds,
   outgoingRequestIds,
@@ -609,15 +611,25 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = React.memo(({
                       )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleSendRequest(profile)}
-                    onMouseEnter={() => playSound("hover")}
-                    disabled={action.disabled}
-                    className="h-10 min-w-[94px] rounded-xl bg-white/10 px-5 text-[11px] font-black uppercase tracking-wider text-white transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {action.label}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onViewProfile(profile)}
+                      onMouseEnter={() => playSound("hover")}
+                      className="h-10 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[10px] font-black uppercase tracking-wider text-white/70 transition-all hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95"
+                    >
+                      {t("addFriendViewProfile")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSendRequest(profile)}
+                      onMouseEnter={() => playSound("hover")}
+                      disabled={action.disabled}
+                      className="h-10 min-w-[94px] rounded-xl bg-white/10 px-5 text-[11px] font-black uppercase tracking-wider text-white transition-all enabled:hover:scale-105 enabled:hover:bg-white/20 enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      {action.label}
+                    </button>
+                  </div>
                 </div>
               );
             })

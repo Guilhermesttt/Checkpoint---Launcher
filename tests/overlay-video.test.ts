@@ -21,7 +21,7 @@ const { createOverlayVideoLayer, appendOverlayVideoLayer } = (window as typeof w
 describe("videos decorativos dos overlays", () => {
   it.each([
     ["social", "Kristina_Lane__pindown.io_1785615277.mp4", true],
-    ["achievement", "Overlay_Background.mp4", false],
+    ["achievement", "Overlay_Background.mp4", true],
   ] as const)("cria uma camada %s muda e sem interacao", (kind, filename, rotated) => {
     const layer = createOverlayVideoLayer(kind, document);
     const video = layer.querySelector("video");
@@ -34,6 +34,20 @@ describe("videos decorativos dos overlays", () => {
     expect(video?.getAttribute("src")).toContain(filename);
     expect(video?.classList.contains("is-rotated")).toBe(rotated);
     expect(layer).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("enquadra os videos verticais sem a ampliacao antiga e mantem o fundo visivel", () => {
+    const overlayCss = readFileSync(
+      path.join(process.cwd(), "electron", "overlay.html"),
+      "utf8",
+    );
+
+    expect(overlayCss).not.toContain("width: 160%;");
+    expect(overlayCss).not.toContain("height: 160%;");
+    expect(overlayCss).toContain("width: 35%;");
+    expect(overlayCss).toContain("height: 286%;");
+    expect(overlayCss).toContain("object-fit: fill;");
+    expect(overlayCss).toContain("opacity: 0.52;");
   });
 
   it("insere a camada antes do conteudo existente do card", () => {

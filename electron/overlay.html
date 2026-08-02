@@ -4,14 +4,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline';" />
+    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; font-src 'self'; script-src 'self' 'unsafe-inline';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Checkpoint Overlay</title>
   <style>
+    @font-face {
+      font-family: "Inter";
+      src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: "Unbounded";
+      src: url("../node_modules/@fontsource-variable/unbounded/files/unbounded-latin-ext-wght-normal.woff2") format("woff2-variations");
+      font-style: normal;
+      font-weight: 200 900;
+      font-display: swap;
+    }
+
     :root {
       color-scheme: dark;
-      --overlay-font-display: "Outfit", "Segoe UI", sans-serif;
-      --overlay-font-body: "Outfit", "Segoe UI", sans-serif;
+      --overlay-font-display: "Unbounded", "Segoe UI", sans-serif;
+      --overlay-font-body: "Inter", "Segoe UI", sans-serif;
       --overlay-width: min(392px, calc(100vw - 32px));
 
       /* Context Colors */
@@ -53,6 +69,32 @@
     *::before,
     *::after {
       box-sizing: border-box;
+    }
+
+    button,
+    input,
+    textarea,
+    select {
+      font: inherit;
+    }
+
+    .panel-logo,
+    .achievement-eyebrow,
+    .social-badge,
+    .achievement-title,
+    .social-title,
+    .welcome-copy h1,
+    .section-heading h2,
+    .context-game-copy h2,
+    .quick-access h3,
+    .game-session-copy h2,
+    .media-copy h2,
+    .capture-hero h2,
+    .capture-heading h3,
+    .view-title h2,
+    .settings-card h3,
+    .profile-identity h2 {
+      font-family: var(--overlay-font-display);
     }
 
     /* =========================================================
@@ -249,18 +291,17 @@
 
     .overlay-video {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      opacity: 0.16;
+      opacity: 0.52;
       pointer-events: none;
     }
 
     .overlay-video.is-rotated {
       inset: 50% auto auto 50%;
-      width: 160%;
-      height: 160%;
+      width: 35%;
+      height: 286%;
+      max-width: none;
+      max-height: none;
+      object-fit: fill;
       transform: translate(-50%, -50%) rotate(90deg);
     }
 
@@ -268,8 +309,8 @@
       position: absolute;
       inset: 0;
       background:
-        radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.06), transparent 36%),
-        linear-gradient(145deg, rgba(16, 16, 22, 0.78), rgba(6, 6, 9, 0.9));
+        radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.03), transparent 38%),
+        linear-gradient(145deg, rgba(16, 16, 22, 0.22), rgba(6, 6, 9, 0.38));
     }
 
     .overlay-shell > :not(.overlay-video-layer) {
@@ -872,6 +913,22 @@
       display: none;
       animation: fade-in 300ms ease forwards;
     }
+
+    .spotify-overlay-page { display:grid; grid-template-columns:220px minmax(0,1fr); gap:34px; align-items:center; min-height:100%; padding:30px; }
+    .spotify-overlay-cover { width:220px; aspect-ratio:1; border-radius:28px; object-fit:cover; background:rgba(255,255,255,.06); box-shadow:0 24px 70px rgba(0,0,0,.55); }
+    .spotify-overlay-copy { min-width:0; }
+    .spotify-overlay-kicker { color:#1ed760; font-size:10px; font-weight:900; letter-spacing:.24em; text-transform:uppercase; }
+    .spotify-overlay-copy h2 { margin:10px 0 4px; overflow:hidden; color:#fff; font-size:30px; text-overflow:ellipsis; white-space:nowrap; }
+    .spotify-overlay-copy p { margin:0; overflow:hidden; color:rgba(255,255,255,.42); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+    .spotify-overlay-range { width:100%; margin-top:30px; accent-color:#1ed760; cursor:pointer; }
+    .spotify-overlay-time { display:flex; justify-content:space-between; margin-top:5px; color:rgba(255,255,255,.3); font-size:10px; font-variant-numeric:tabular-nums; }
+    .spotify-overlay-controls { display:flex; align-items:center; justify-content:center; gap:28px; margin-top:18px; }
+    .spotify-overlay-controls button { display:grid; width:42px; height:42px; place-items:center; border:0; border-radius:50%; background:transparent; color:rgba(255,255,255,.55); cursor:pointer; }
+    .spotify-overlay-controls button:hover { color:#fff; background:rgba(255,255,255,.08); }
+    .spotify-overlay-controls .spotify-overlay-toggle { width:54px; height:54px; background:#fff; color:#050505; }
+    .spotify-overlay-volume { display:flex; align-items:center; gap:12px; margin-top:24px; color:rgba(255,255,255,.35); }
+    .spotify-overlay-volume input { flex:1; accent-color:#1ed760; }
+    .spotify-overlay-empty { display:grid; grid-column:1/-1; place-items:center; min-height:360px; color:rgba(255,255,255,.4); text-align:center; }
 
     .panel-view.is-active {
       display: block;
@@ -3006,6 +3063,12 @@
       <symbol id="icon-play" viewBox="0 0 24 24">
         <path d="m8 5 11 7-11 7Z" />
       </symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24">
+        <path d="M8 5v14M16 5v14" />
+      </symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24">
+        <path d="M11 5 6 9H2v6h4l5 4ZM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12" />
+      </symbol>
       <symbol id="icon-skip-back" viewBox="0 0 24 24">
         <path d="M6 5v14M18 6l-9 6 9 6Z" />
       </symbol>
@@ -3029,6 +3092,9 @@
       <symbol id="icon-users" viewBox="0 0 24 24">
         <path
           d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
+      </symbol>
+      <symbol id="icon-music" viewBox="0 0 24 24">
+        <path d="M9 18V5l11-2v13M9 9l11-2M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6M17 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
       </symbol>
     </defs>
   </svg>
@@ -3054,6 +3120,9 @@
         <button class="panel-tab" data-panel-tab="achievements"><span class="nav-icon"><svg class="ui-icon">
               <use href="#icon-trophy" />
             </svg></span><span>Conquistas</span></button>
+        <button class="panel-tab" data-panel-tab="spotify"><span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-music" />
+            </svg></span><span>Spotify</span></button>
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="panel-action panel-tab" data-panel-tab="settings"><span class="nav-icon"><svg class="ui-icon">
@@ -3228,6 +3297,25 @@
               <p class="capture-feedback" id="capture-gallery-feedback" aria-live="polite"></p>
             </div>
           </div>
+          <div class="panel-view" data-panel-view="spotify">
+            <div class="spotify-overlay-page">
+              <div class="spotify-overlay-empty" id="spotify-overlay-empty"><div><svg class="ui-icon" style="width:42px;height:42px"><use href="#icon-music" /></svg><h2>Spotify</h2><p>Conecte e escolha uma música no launcher.</p></div></div>
+              <img class="spotify-overlay-cover" id="spotify-overlay-cover" alt="" hidden />
+              <div class="spotify-overlay-copy" id="spotify-overlay-player" hidden>
+                <span class="spotify-overlay-kicker">Tocando agora</span>
+                <h2 id="spotify-overlay-title">Spotify</h2>
+                <p id="spotify-overlay-artist">Checkpoint Player</p>
+                <input class="spotify-overlay-range" id="spotify-overlay-seek" type="range" min="0" max="1" value="0" aria-label="Posição da música" />
+                <div class="spotify-overlay-time"><span id="spotify-overlay-current">0:00</span><span id="spotify-overlay-duration">0:00</span></div>
+                <div class="spotify-overlay-controls">
+                  <button type="button" id="spotify-overlay-previous" aria-label="Faixa anterior"><svg class="ui-icon"><use href="#icon-skip-back" /></svg></button>
+                  <button type="button" class="spotify-overlay-toggle" id="spotify-overlay-toggle" aria-label="Reproduzir ou pausar"><svg class="ui-icon"><use id="spotify-overlay-toggle-icon" href="#icon-play" /></svg></button>
+                  <button type="button" id="spotify-overlay-next" aria-label="Próxima faixa"><svg class="ui-icon"><use href="#icon-skip-forward" /></svg></button>
+                </div>
+                <label class="spotify-overlay-volume"><svg class="ui-icon"><use href="#icon-volume" /></svg><input id="spotify-overlay-volume" type="range" min="0" max="100" value="55" aria-label="Volume Spotify" /></label>
+              </div>
+            </div>
+          </div>
           <div class="panel-view" data-panel-view="settings">
             <div class="settings-page">
               <div class="view-title">
@@ -3387,7 +3475,7 @@
       try {
         return window.CheckpointOverlayVideo?.appendOverlayVideoLayer(shell, kind) || null;
       } catch (error) {
-        console.warn("[overlay] Falha ao preparar o fundo em vÃ­deo:", error);
+        console.warn("[overlay] Falha ao preparar o fundo em vídeo:", error);
         return null;
       }
     };
@@ -4088,8 +4176,35 @@
       renderCaptureViewer();
     };
 
+    const formatSpotifyTime = (milliseconds) => {
+      const seconds = Math.max(0, Math.floor((Number(milliseconds) || 0) / 1000));
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    };
+    const renderSpotifyState = (spotify = {}) => {
+      const track = spotify.track || null;
+      const empty = document.getElementById("spotify-overlay-empty");
+      const player = document.getElementById("spotify-overlay-player");
+      const cover = document.getElementById("spotify-overlay-cover");
+      if (empty) empty.hidden = Boolean(track);
+      if (player) player.hidden = !track;
+      if (cover) {
+        cover.hidden = !track;
+        cover.src = track ? (safeImageUrl(track.coverUrl) || checkpointIconUrl) : "";
+      }
+      if (!track) return;
+      document.getElementById("spotify-overlay-title").textContent = track.title || "Spotify";
+      document.getElementById("spotify-overlay-artist").textContent = track.artist || "Checkpoint Player";
+      const seek = document.getElementById("spotify-overlay-seek");
+      seek.max = String(Math.max(1, Number(spotify.durationMs) || 0));
+      if (!seek.matches(":active")) seek.value = String(Math.max(0, Number(spotify.positionMs) || 0));
+      document.getElementById("spotify-overlay-current").textContent = formatSpotifyTime(seek.value);
+      document.getElementById("spotify-overlay-duration").textContent = formatSpotifyTime(spotify.durationMs);
+      document.getElementById("spotify-overlay-toggle-icon").setAttribute("href", spotify.paused ? "#icon-play" : "#icon-pause");
+    };
+
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
+      renderSpotifyState(state.spotify);
       applyAchievementPosition(state.settings?.achievementNotificationPosition);
       const achievementSetting = document.getElementById("setting-achievements");
       if (achievementSetting) {
@@ -4494,6 +4609,7 @@
       "[role='button']",
       "[data-panel-tab]",
       "input[type='checkbox']",
+      "input[type='range']",
       ".capture-card",
     ].join(",");
     document.addEventListener("pointerover", (event) => {
@@ -4524,6 +4640,18 @@
       renderPanelState(latestPanelState);
     });
     document.getElementById("chat-back")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close-chat" }));
+    document.getElementById("spotify-overlay-toggle")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-toggle" }));
+    document.getElementById("spotify-overlay-next")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-next" }));
+    document.getElementById("spotify-overlay-previous")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-previous" }));
+    document.getElementById("spotify-overlay-seek")?.addEventListener("input", (event) => {
+      document.getElementById("spotify-overlay-current").textContent = formatSpotifyTime(event.currentTarget.value);
+    });
+    document.getElementById("spotify-overlay-seek")?.addEventListener("change", (event) => {
+      window.achievementOverlay.panelAction({ kind: "spotify-seek", positionMs: Number(event.currentTarget.value) || 0 });
+    });
+    document.getElementById("spotify-overlay-volume")?.addEventListener("input", (event) => {
+      window.achievementOverlay.panelAction({ kind: "spotify-volume", volume: (Number(event.currentTarget.value) || 0) / 100 });
+    });
     const syncOverlayPreferences = () => {
       overlayPreferences.social = document.getElementById("setting-social").checked;
       overlayPreferences.animations = document.getElementById("setting-animations").checked;

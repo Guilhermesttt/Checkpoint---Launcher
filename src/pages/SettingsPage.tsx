@@ -3,11 +3,19 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpotify } from "@fortawesome/free-brands-svg-icons";
 import {
   Bell,
+  CheckCircle2,
   Gamepad2,
   Globe,
+  KeyRound,
   Languages,
+  Lock,
+  LogOut,
+  Palette,
   Settings,
+  ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
+  User,
   Volume2,
   Zap,
 } from "lucide-react";
@@ -18,6 +26,11 @@ import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualThem
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGamepad } from "../context/GamepadContext";
 import { useControllerLedStatus } from "../hooks/useControllerLed";
+import { useAuth } from "../auth/AuthProvider";
+import { supabase } from "../services/supabase";
+import { saveProfileVisibility } from "../services/profilePrivacy";
+import type { SettingsTab } from "../services/launcherNavigation";
+import type { ProfileVisibility } from "../types/domain";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -44,6 +57,24 @@ const CONTROLLER_COPY = {
   "fr-FR": ["Manette", "Manette connectée", "Aucune manette connectée", "Connectez-la en USB ou Bluetooth pour naviguer.", "Tester la LED", "Autoriser"],
   "de-DE": ["Controller", "Controller verbunden", "Kein Controller verbunden", "Über USB oder Bluetooth verbinden, um den Launcher zu steuern.", "LED testen", "Autorisieren"],
   "it-IT": ["Controller", "Controller collegato", "Nessun controller collegato", "Collega tramite USB o Bluetooth per navigare.", "Prova LED", "Autorizza"],
+} as const;
+
+const SETTINGS_SHELL_COPY = {
+  "pt-BR": { preferences: "Preferências do Launcher", general: "Geral", personalization: "Personalização", account: "Conta & Segurança", connections: "Contas & Privacidade", controller: "Controle & Hardware", notifications: "Notificações & Overlay", quit: "Sair do Aplicativo", encrypted: "Sessão Encriptada", encryptedHint: "Conexão protegida com token Supabase JWT de alta segurança.", spotifyDock: "Player disponível na aba Spotify", privacy: "Privacidade do Perfil", privacyHint: "Escolha o que outros jogadores podem ver ao encontrar seu perfil.", public: "Perfil Público", publicHint: "Todos podem abrir seus detalhes, jogos e atividade.", private: "Perfil Privado", privateHint: "Somente você e amigos aceitos veem os detalhes.", saving: "Salvando privacidade...", saved: "Privacidade atualizada.", controllerHint: "Status da navegação e iluminação do controle conectado." },
+  "en-US": { preferences: "Launcher preferences", general: "General", personalization: "Personalization", account: "Account & Security", connections: "Accounts & Privacy", controller: "Controller & Hardware", notifications: "Notifications & Overlay", quit: "Quit Application", encrypted: "Encrypted session", encryptedHint: "Connection protected with a secure Supabase JWT.", spotifyDock: "Player available in the Spotify tab", privacy: "Profile Privacy", privacyHint: "Choose what other players can see when they find your profile.", public: "Public Profile", publicHint: "Anyone can open your details, games, and activity.", private: "Private Profile", privateHint: "Only you and accepted friends can see the details.", saving: "Saving privacy...", saved: "Privacy updated.", controllerHint: "Navigation and lighting status for the connected controller." },
+  "es-ES": { preferences: "Preferencias del launcher", general: "General", personalization: "Personalización", account: "Cuenta y seguridad", connections: "Cuentas y privacidad", controller: "Mando y hardware", notifications: "Notificaciones y overlay", quit: "Salir de la aplicación", encrypted: "Sesión cifrada", encryptedHint: "Conexión protegida con un JWT seguro de Supabase.", spotifyDock: "Player disponible en la pestaña Spotify", privacy: "Privacidad del perfil", privacyHint: "Elige qué pueden ver otros jugadores al encontrar tu perfil.", public: "Perfil público", publicHint: "Todos pueden abrir tus detalles, juegos y actividad.", private: "Perfil privado", privateHint: "Solo tú y tus amigos aceptados pueden ver los detalles.", saving: "Guardando privacidad...", saved: "Privacidad actualizada.", controllerHint: "Estado de navegación e iluminación del mando conectado." },
+  "fr-FR": { preferences: "Préférences du launcher", general: "Général", personalization: "Personnalisation", account: "Compte et sécurité", connections: "Comptes et confidentialité", controller: "Manette et matériel", notifications: "Notifications et overlay", quit: "Quitter l'application", encrypted: "Session chiffrée", encryptedHint: "Connexion protégée par un JWT Supabase sécurisé.", spotifyDock: "Lecteur disponible dans l'onglet Spotify", privacy: "Confidentialité du profil", privacyHint: "Choisissez ce que les autres joueurs voient en trouvant votre profil.", public: "Profil public", publicHint: "Tout le monde peut ouvrir vos détails, jeux et activité.", private: "Profil privé", privateHint: "Seuls vous et vos amis acceptés voyez les détails.", saving: "Enregistrement...", saved: "Confidentialité mise à jour.", controllerHint: "État de navigation et d'éclairage de la manette connectée." },
+  "de-DE": { preferences: "Launcher-Einstellungen", general: "Allgemein", personalization: "Personalisierung", account: "Konto und Sicherheit", connections: "Konten und Datenschutz", controller: "Controller und Hardware", notifications: "Benachrichtigungen und Overlay", quit: "Anwendung beenden", encrypted: "Verschlüsselte Sitzung", encryptedHint: "Verbindung durch ein sicheres Supabase-JWT geschützt.", spotifyDock: "Player im Spotify-Tab verfügbar", privacy: "Profil-Datenschutz", privacyHint: "Lege fest, was andere Spieler in deinem Profil sehen.", public: "Öffentliches Profil", publicHint: "Alle können Details, Spiele und Aktivitäten öffnen.", private: "Privates Profil", privateHint: "Nur du und bestätigte Freunde sehen die Details.", saving: "Datenschutz wird gespeichert...", saved: "Datenschutz aktualisiert.", controllerHint: "Navigations- und Beleuchtungsstatus des verbundenen Controllers." },
+  "it-IT": { preferences: "Preferenze del launcher", general: "Generale", personalization: "Personalizzazione", account: "Account e sicurezza", connections: "Account e privacy", controller: "Controller e hardware", notifications: "Notifiche e overlay", quit: "Esci dall'applicazione", encrypted: "Sessione crittografata", encryptedHint: "Connessione protetta da un JWT Supabase sicuro.", spotifyDock: "Player disponibile nella scheda Spotify", privacy: "Privacy del profilo", privacyHint: "Scegli cosa possono vedere gli altri giocatori nel tuo profilo.", public: "Profilo pubblico", publicHint: "Tutti possono aprire dettagli, giochi e attività.", private: "Profilo privato", privateHint: "Solo tu e gli amici accettati vedete i dettagli.", saving: "Salvataggio privacy...", saved: "Privacy aggiornata.", controllerHint: "Stato di navigazione e illuminazione del controller collegato." },
+} as const;
+
+const SETTINGS_DETAIL_COPY = {
+  "pt-BR": { moreThemes: "Mais temas", comingSoon: "Novos pacotes em breve", audioTitle: "Efeitos Sonoros & Áudio", audioHint: "Ajuste o volume dos sons de navegação, música e alertas do launcher.", performanceTitle: "Modo de Desempenho", performanceHint: "Reduza animações e desative o desfoque em computadores mais antigos.", playerProfile: "Perfil do Jogador", playerProfileHint: "Informações da sua conta sincronizada com a nuvem.", playerFallback: "Jogador Checkpoint", noEmail: "Sem e-mail vinculado", activeAccount: "Conta Ativa", security: "Segurança da Conta", securityHint: "Gerencie sua senha de acesso e opções de recuperação.", resetPassword: "Redefinir Senha", resetPasswordHint: "Envia um e-mail de segurança para alterar sua senha atual.", emailSent: "E-mail enviado!", sending: "Enviando...", sendEmail: "Enviar E-mail", overlayLab: "Overlay Lab", overlayLabHint: "Prévia de como os overlays ficarão quando você estiver jogando.", testWelcome: "Testar Divirta-se", testWelcomeHint: "Mostra o card social ao iniciar um jogo.", testAchievement: "Testar Conquista", testAchievementHint: "Mostra o toast completo com conquista." },
+  "en-US": { moreThemes: "More themes", comingSoon: "New packs coming soon", audioTitle: "Sound Effects & Audio", audioHint: "Adjust navigation, music, and launcher alert volumes.", performanceTitle: "Performance Mode", performanceHint: "Reduce animations and blur on older computers.", playerProfile: "Player Profile", playerProfileHint: "Information from your cloud-synced account.", playerFallback: "Checkpoint Player", noEmail: "No email linked", activeAccount: "Active Account", security: "Account Security", securityHint: "Manage your password and recovery options.", resetPassword: "Reset Password", resetPasswordHint: "Sends a security email to change your current password.", emailSent: "Email sent!", sending: "Sending...", sendEmail: "Send Email", overlayLab: "Overlay Lab", overlayLabHint: "Preview how overlays will look while you play.", testWelcome: "Test Welcome", testWelcomeHint: "Shows the social card when a game starts.", testAchievement: "Test Achievement", testAchievementHint: "Shows the complete achievement toast." },
+  "es-ES": { moreThemes: "Más temas", comingSoon: "Nuevos paquetes próximamente", audioTitle: "Efectos de sonido y audio", audioHint: "Ajusta el volumen de navegación, música y alertas.", performanceTitle: "Modo de rendimiento", performanceHint: "Reduce animaciones y desenfoque en equipos antiguos.", playerProfile: "Perfil del jugador", playerProfileHint: "Información de tu cuenta sincronizada en la nube.", playerFallback: "Jugador Checkpoint", noEmail: "Sin correo vinculado", activeAccount: "Cuenta activa", security: "Seguridad de la cuenta", securityHint: "Gestiona tu contraseña y opciones de recuperación.", resetPassword: "Restablecer contraseña", resetPasswordHint: "Envía un correo de seguridad para cambiar tu contraseña.", emailSent: "¡Correo enviado!", sending: "Enviando...", sendEmail: "Enviar correo", overlayLab: "Laboratorio de overlay", overlayLabHint: "Vista previa de los overlays mientras juegas.", testWelcome: "Probar bienvenida", testWelcomeHint: "Muestra la tarjeta social al iniciar un juego.", testAchievement: "Probar logro", testAchievementHint: "Muestra la notificación completa del logro." },
+  "fr-FR": { moreThemes: "Plus de thèmes", comingSoon: "Nouveaux packs bientôt disponibles", audioTitle: "Effets sonores et audio", audioHint: "Réglez le volume de navigation, musique et alertes.", performanceTitle: "Mode performance", performanceHint: "Réduisez les animations et le flou sur les anciens PC.", playerProfile: "Profil du joueur", playerProfileHint: "Informations de votre compte synchronisé dans le cloud.", playerFallback: "Joueur Checkpoint", noEmail: "Aucun e-mail associé", activeAccount: "Compte actif", security: "Sécurité du compte", securityHint: "Gérez votre mot de passe et les options de récupération.", resetPassword: "Réinitialiser le mot de passe", resetPasswordHint: "Envoie un e-mail de sécurité pour modifier votre mot de passe.", emailSent: "E-mail envoyé !", sending: "Envoi...", sendEmail: "Envoyer l'e-mail", overlayLab: "Laboratoire overlay", overlayLabHint: "Prévisualisez les overlays pendant vos parties.", testWelcome: "Tester la bienvenue", testWelcomeHint: "Affiche la carte sociale au lancement d'un jeu.", testAchievement: "Tester le succès", testAchievementHint: "Affiche la notification complète du succès." },
+  "de-DE": { moreThemes: "Weitere Themes", comingSoon: "Neue Pakete folgen bald", audioTitle: "Soundeffekte und Audio", audioHint: "Passe Navigation, Musik und Hinweislautstärke an.", performanceTitle: "Leistungsmodus", performanceHint: "Reduziert Animationen und Unschärfe auf älteren PCs.", playerProfile: "Spielerprofil", playerProfileHint: "Informationen deines cloud-synchronisierten Kontos.", playerFallback: "Checkpoint-Spieler", noEmail: "Keine E-Mail verknüpft", activeAccount: "Aktives Konto", security: "Kontosicherheit", securityHint: "Verwalte Passwort und Wiederherstellungsoptionen.", resetPassword: "Passwort zurücksetzen", resetPasswordHint: "Sendet eine Sicherheits-E-Mail zum Ändern des Passworts.", emailSent: "E-Mail gesendet!", sending: "Wird gesendet...", sendEmail: "E-Mail senden", overlayLab: "Overlay-Labor", overlayLabHint: "Vorschau der Overlays während des Spielens.", testWelcome: "Willkommen testen", testWelcomeHint: "Zeigt die Social-Karte beim Spielstart.", testAchievement: "Erfolg testen", testAchievementHint: "Zeigt die vollständige Erfolgsbenachrichtigung." },
+  "it-IT": { moreThemes: "Altri temi", comingSoon: "Nuovi pacchetti in arrivo", audioTitle: "Effetti sonori e audio", audioHint: "Regola il volume di navigazione, musica e avvisi.", performanceTitle: "Modalità prestazioni", performanceHint: "Riduce animazioni e sfocatura sui computer più datati.", playerProfile: "Profilo giocatore", playerProfileHint: "Informazioni dell'account sincronizzato nel cloud.", playerFallback: "Giocatore Checkpoint", noEmail: "Nessuna e-mail collegata", activeAccount: "Account attivo", security: "Sicurezza account", securityHint: "Gestisci password e opzioni di recupero.", resetPassword: "Reimposta password", resetPasswordHint: "Invia un'e-mail di sicurezza per modificare la password.", emailSent: "E-mail inviata!", sending: "Invio...", sendEmail: "Invia e-mail", overlayLab: "Laboratorio overlay", overlayLabHint: "Anteprima degli overlay durante il gioco.", testWelcome: "Prova benvenuto", testWelcomeHint: "Mostra la scheda social all'avvio di un gioco.", testAchievement: "Prova obiettivo", testAchievementHint: "Mostra la notifica completa dell'obiettivo." },
 } as const;
 
 const ACHIEVEMENT_NOTIFICATION_COPY = {
@@ -126,37 +157,42 @@ export const SettingsChoice: React.FC<{
 }> = React.memo(({ active, label, hint, swatch, onClick, onHover }) => (
   <button
     type="button"
+    aria-pressed={active}
     onClick={onClick}
     onMouseEnter={onHover}
-    className="relative cursor-pointer overflow-hidden rounded-3xl border p-4 text-left transition-all duration-200 hover:scale-[1.03] hover:border-white/30 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] active:scale-[0.98]"
+    className="relative flex flex-col justify-between cursor-pointer overflow-hidden rounded-2xl border px-4 py-3 text-left transition-all duration-200 hover:scale-[1.015] hover:border-white/30 hover:bg-white/8 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] active:scale-[0.985]"
     style={{
-      background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.04)",
+      background: active ? "var(--launcher-accent-soft)" : "rgba(255,255,255,0.035)",
       borderColor: active
         ? "rgb(var(--launcher-accent) / 0.45)"
-        : "rgba(255,255,255,0.08)",
+        : "rgba(255,255,255,0.07)",
     }}
   >
-    <span className="flex items-center gap-2 text-sm font-bold text-white">
+    <div className="flex items-center gap-2 min-w-0 mb-1">
       {swatch && (
         <span
-          className="h-3 w-3 rounded-full border border-white/20"
+          className="h-3 w-3 shrink-0 rounded-full border border-white/20 shadow-sm"
           style={{ background: swatch }}
         />
       )}
-      {label}
-    </span>
+      <span className="text-xs font-bold text-white whitespace-nowrap truncate min-w-0">
+        {label}
+      </span>
+    </div>
+    {hint && (
+      <span className="text-[10px] font-medium uppercase tracking-wider text-white/40 whitespace-nowrap truncate block min-w-0">
+        {hint}
+      </span>
+    )}
     {active && (
       <span
-        className="pointer-events-none absolute inset-0 rounded-3xl"
+        className="pointer-events-none absolute inset-0 rounded-2xl"
         style={{
           boxShadow:
             "inset 0 0 0 1px rgb(var(--launcher-accent) / 0.28), 0 0 28px rgb(var(--launcher-accent) / 0.16)",
         }}
       />
     )}
-    <span className="mt-1 block text-[10px] uppercase tracking-widest text-white/35">
-      {hint}
-    </span>
   </button>
 ));
 SettingsChoice.displayName = "SettingsChoice";
@@ -171,42 +207,59 @@ export const VolumeSettingsCard: React.FC<{
   onHover?: () => void;
   onChange: (volume: number) => void;
   t: TranslationFn;
-}> = React.memo(({ title, description, value, max, actionLabel, onAction, onHover, onChange, t }) => (
-  <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-    <SettingsHeader
-      icon={<Volume2 className="h-5 w-5 text-white/70" />}
-      title={title}
-      description={description}
-    />
-    <div className="mb-5 flex items-end justify-between gap-5">
-      <div>
-        <span className="tabular-nums text-6xl font-light text-white">{value}</span>
-        <span className="ml-1 text-sm font-bold text-white/35">%</span>
+  gamepadId: string;
+  gamepadNavUp?: string;
+  gamepadNavDown?: string;
+}> = React.memo(({ title, description, value, max, actionLabel, onAction, onHover, onChange, t, gamepadId, gamepadNavUp, gamepadNavDown }) => (
+  <section className="flex min-h-47.5 flex-col justify-between rounded-2xl border border-white/10 bg-black/40 p-4 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+    <div>
+      <div className="mb-3 flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/75 shadow-sm">
+          <Volume2 className="h-4 w-4 text-white/70" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-white leading-tight">{title}</h2>
+          {description && <p className="mt-1 text-[11px] font-medium leading-snug text-white/40 line-clamp-2">{description}</p>}
+        </div>
       </div>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          onMouseEnter={onHover}
-          className="h-10 cursor-pointer rounded-xl bg-white px-4 text-[10px] font-black uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95"
-        >
-          {actionLabel}
-        </button>
-      )}
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <span className="tabular-nums text-3xl font-light text-white">{value}</span>
+          <span className="ml-1 text-xs font-bold text-white/35">%</span>
+        </div>
+        {actionLabel && onAction && (
+          <button
+            type="button"
+            data-gamepad-id={`${gamepadId}-action`}
+            data-gamepad-nav-up={gamepadNavUp?.replace("-slider", "-action")}
+            data-gamepad-nav-down={gamepadNavDown?.replace("-slider", "-action")}
+            onClick={onAction}
+            onMouseEnter={onHover}
+            className="h-8 cursor-pointer rounded-xl bg-white px-3 text-[10px] font-black uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95"
+          >
+            {actionLabel}
+          </button>
+        )}
+      </div>
     </div>
-    <input
-      type="range"
-      min={0}
-      max={max}
-      step={1}
-      value={value}
-      onChange={(event) => onChange(Number(event.target.value))}
-      onMouseEnter={onHover}
-      className="w-full cursor-pointer accent-white transition-all hover:brightness-125"
-    />
-    <div className="mt-3 flex justify-between text-[10px] font-black uppercase tracking-widest text-white/25">
-      <span>{t("mute")}</span>
-      <span>{t("max")}</span>
+    <div>
+      <input
+        type="range"
+        data-gamepad-id={`${gamepadId}-slider`}
+        data-gamepad-nav-up={gamepadNavUp}
+        data-gamepad-nav-down={gamepadNavDown}
+        min={0}
+        max={max}
+        step={1}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        onMouseEnter={onHover}
+        className="w-full cursor-pointer accent-white transition-all hover:brightness-125"
+      />
+      <div className="mt-2 flex justify-between text-[9px] font-black uppercase tracking-wider text-white/30">
+        <span>{t("mute")}</span>
+        <span>{t("max")}</span>
+      </div>
     </div>
   </section>
 ));
@@ -241,14 +294,14 @@ export interface SettingsPageV2Props {
   discordAvatar?: string;
   steamConnecting: boolean;
   discordConnecting: boolean;
-  steamSyncing: boolean;
   onConnectSteam: () => void;
   onConnectDiscord: () => void;
   onDisconnectSteam: () => void;
   onDisconnectDiscord: () => void;
-  onSyncSteam: () => void;
   onTestOverlayWelcome: () => void;
   onTestOverlayAchievement: () => void;
+  initialTab: SettingsTab;
+  onTabChange: (tab: SettingsTab) => void;
 }
 
 export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
@@ -279,14 +332,14 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   discordAvatar,
   steamConnecting,
   discordConnecting,
-  steamSyncing,
   onConnectSteam,
   onConnectDiscord,
   onDisconnectSteam,
   onDisconnectDiscord,
-  onSyncSteam,
   onTestOverlayWelcome,
   onTestOverlayAchievement,
+  initialTab,
+  onTabChange,
 }) => {
   const { playSound } = useSoundEffects(
     effectsVolume / 100,
@@ -301,6 +354,12 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
     setLowPerformanceMode,
     closeOnLaunch,
     setCloseOnLaunch,
+    minimizeToTrayOnClose,
+    setMinimizeToTrayOnClose,
+    restoreLastScreen,
+    setRestoreLastScreen,
+    confirmBeforeExit,
+    setConfirmBeforeExit,
     achievementNotificationsEnabled,
     setAchievementNotificationsEnabled,
     customAchievementNotifications,
@@ -309,10 +368,97 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
     setAchievementNotificationPosition,
   } = usePreferences();
 
+  const { user, userProfile } = useAuth();
+  const [activeTab, setActiveTab] = React.useState<SettingsTab>(initialTab);
+  const [passwordResetSent, setPasswordResetSent] = React.useState(false);
+  const [isResettingPassword, setIsResettingPassword] = React.useState(false);
+  const [profileVisibility, setProfileVisibility] = React.useState<ProfileVisibility>(
+    userProfile?.profileVisibility ?? "public",
+  );
+  const [privacyStatus, setPrivacyStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [privacyError, setPrivacyError] = React.useState("");
+
+  React.useEffect(() => {
+    setProfileVisibility(userProfile?.profileVisibility ?? "public");
+  }, [userProfile?.profileVisibility]);
+
+  const handleProfileVisibilityChange = async (nextVisibility: ProfileVisibility) => {
+    if (!user || nextVisibility === profileVisibility || privacyStatus === "saving") return;
+    const previousVisibility = profileVisibility;
+    setProfileVisibility(nextVisibility);
+    setPrivacyStatus("saving");
+    setPrivacyError("");
+    try {
+      const savedVisibility = await saveProfileVisibility(nextVisibility);
+      setProfileVisibility(savedVisibility);
+      setPrivacyStatus("saved");
+    } catch (error) {
+      setProfileVisibility(previousVisibility);
+      setPrivacyStatus("error");
+      setPrivacyError(error instanceof Error ? error.message : "Não foi possível alterar a privacidade.");
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!user?.email || isResettingPassword) return;
+    setIsResettingPassword(true);
+    try {
+      await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: window.location.origin,
+      });
+      setPasswordResetSent(true);
+    } catch {
+      // Ignore fallback
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const controllerCopy = CONTROLLER_COPY[language] || CONTROLLER_COPY["pt-BR"];
+  const shellCopy = SETTINGS_SHELL_COPY[language] || SETTINGS_SHELL_COPY["pt-BR"];
+  const detailCopy = SETTINGS_DETAIL_COPY[language] || SETTINGS_DETAIL_COPY["pt-BR"];
   const achievementNotificationCopy =
     ACHIEVEMENT_NOTIFICATION_COPY[language] || ACHIEVEMENT_NOTIFICATION_COPY["pt-BR"];
   const led = useControllerLedStatus();
+
+  const selectTab = React.useCallback((tab: SettingsTab) => {
+    setActiveTab(tab);
+    onTabChange(tab);
+    playSound("hover");
+  }, [onTabChange, playSound]);
+
+  const behaviorOptions = [
+    {
+      label: t("openAtLogin"),
+      hint: t("openAtLoginHint"),
+      checked: openAtLogin,
+      onChange: setOpenAtLogin,
+    },
+    {
+      label: t("closeOnLaunch"),
+      hint: t("closeOnLaunchHint"),
+      checked: closeOnLaunch,
+      onChange: setCloseOnLaunch,
+    },
+    {
+      label: t("minimizeToTray"),
+      hint: t("minimizeToTrayHint"),
+      checked: minimizeToTrayOnClose,
+      onChange: setMinimizeToTrayOnClose,
+    },
+    {
+      label: t("restoreLastScreen"),
+      hint: t("restoreLastScreenHint"),
+      checked: restoreLastScreen,
+      onChange: setRestoreLastScreen,
+    },
+    {
+      label: t("confirmBeforeExit"),
+      hint: t("confirmBeforeExitHint"),
+      checked: confirmBeforeExit,
+      onChange: setConfirmBeforeExit,
+    },
+  ];
 
   const activeAppTheme =
     visualTheme === "checkpoint"
@@ -331,403 +477,654 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
 
   return (
     <SystemPageShell eyebrow={t("system")} title={t("settings")}>
-      <section className="mb-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-        <SettingsHeader
-          icon={<Globe className="h-5 w-5 text-white/70" />}
-          title={t("connectedAccounts")}
-          description={t("connectedAccountsHint")}
-        />
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                <SteamIcon className="h-4 w-4 text-white/60" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Steam</p>
-                <p className="text-[10px] text-white/40">
-                  {steamConnected ? t("connected") : t("notConnected")}
-                </p>
-              </div>
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Sub-Navigation Menu */}
+        <aside className="w-full lg:w-64 shrink-0 rounded-[28px] border border-white/10 bg-black/40 p-4 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+          <div className="flex items-center gap-3 px-3 py-2.5 mb-3 border-b border-white/8">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
+              <Settings className="h-4.5 w-4.5" />
             </div>
-            {steamConnected ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onSyncSteam}
-                  onMouseEnter={() => playSound("hover")}
-                  disabled={steamSyncing}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-white/60 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
-                >
-                  {steamSyncing ? t("syncing") : t("sync")}
-                </button>
-                <button
-                  type="button"
-                  onClick={onDisconnectSteam}
-                  onMouseEnter={() => playSound("hover")}
-                  className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
-                >
-                  {t("unlink")}
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={onConnectSteam}
-                onMouseEnter={() => playSound("hover")}
-                disabled={steamConnecting}
-                className="cursor-pointer rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
-              >
-                {steamConnecting ? t("connecting") : t("connectSteam")}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                <FontAwesomeIcon icon={faSpotify} className="h-4 w-4 text-white/60" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">Spotify</p>
-                <p className="text-[10px] text-white/40">Em breve!</p>
-              </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">{t("settings")}</h3>
+              <p className="text-[10px] font-medium text-white/40">{shellCopy.preferences}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white/10">
-                {discordAvatar ? (
-                  <img src={discordAvatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <DiscordIcon className="h-4 w-4 text-white/60" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-white">Discord</p>
-                <p className="max-w-[140px] truncate text-[10px] text-white/40">
-                  {discordConnected ? discordUsername || t("connected") : t("notConnected")}
-                </p>
-              </div>
-            </div>
-            {discordConnected ? (
-              <button
-                type="button"
-                onClick={onDisconnectDiscord}
-                onMouseEnter={() => playSound("hover")}
-                className="cursor-pointer rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
-              >
-                {t("unlink")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onConnectDiscord}
-                onMouseEnter={() => playSound("hover")}
-                disabled={discordConnecting}
-                className="cursor-pointer rounded-lg px-4 py-2 text-[10px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
-              >
-                {discordConnecting ? t("connecting") : t("connectDiscord")}
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="mb-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-        <SettingsHeader
-          icon={<Gamepad2 className="h-5 w-5 text-white/70" />}
-          title={controllerCopy[0]}
-          description="Status da navegacao e da iluminacao do controle conectado."
-        />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
-          <div className="flex min-w-0 items-center gap-4 rounded-3xl border border-white/[0.07] bg-white/[0.035] p-4">
-            <div
-              className={`h-3 w-3 shrink-0 rounded-full ${
-                isGamepadConnected
-                  ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.7)]"
-                  : "bg-white/20"
-              }`}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-black text-white">
-                {isGamepadConnected ? controllerCopy[1] : controllerCopy[2]}
-              </p>
-              <p className="mt-1 truncate text-xs text-white/40">
-                {connectedGamepadId || controllerCopy[3]}
-              </p>
-            </div>
-            {isGamepadConnected && (
-              <span className="ml-auto rounded-lg bg-white/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white/55">
-                {gamepadFamily}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4 lg:min-w-[360px]">
-            <div
-              className={`h-3 w-3 shrink-0 rounded-full ${
-                led.status === "connected"
-                  ? "bg-[rgb(var(--launcher-accent))] shadow-[0_0_14px_rgb(var(--launcher-accent)/.7)]"
-                  : led.status === "error"
-                    ? "bg-red-400"
-                    : "bg-amber-300"
-              }`}
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-black text-white">LED PlayStation</p>
-              <p className="mt-1 text-xs text-white/40">{led.message}</p>
-            </div>
-            {led.status !== "unsupported" && (
-              <button
-                type="button"
-                onClick={led.status === "connected" ? led.testLed : led.requestAccess}
-                onMouseEnter={() => playSound("hover")}
-                disabled={led.status === "connecting"}
-                className="shrink-0 cursor-pointer rounded-xl bg-white px-4 py-2 text-[10px] font-black uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                {led.status === "connected"
-                  ? controllerCopy[4]
-                  : led.status === "connecting"
-                    ? "..."
-                    : controllerCopy[5]}
-              </button>
-            )}
-          </div>
-        </div>
-        <p className="mt-4 text-[11px] leading-relaxed text-white/35">
-          Direcional ou analógico esquerdo move o foco, X confirma, O volta e o analógico direito rola a pagina.
-        </p>
-        {led.status === "connected" && (
-          <p className="mt-2 text-[11px] leading-relaxed text-white/35">
-            Se o teste RGB não aparecer, feche temporariamente o Steam Input ou DS4Windows: outro processo pode sobrescrever a lightbar.
-          </p>
-        )}
-      </section>
-
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-          <SettingsHeader
-            icon={<Languages className="h-5 w-5 text-white/70" />}
-            title={t("language")}
-            description={t("languageHint")}
-          />
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {languageOptions.map((option) => (
-              <SettingsChoice
-                key={option.id}
-                active={language === option.id}
-                label={option.label}
-                hint={option.hint}
-                onHover={() => playSound("hover")}
-                onClick={() => onLanguageChange(option.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-          <SettingsHeader
-            icon={<Settings className="h-5 w-5 text-white/70" />}
-            title={t("themes")}
-            description={t("themesHint")}
-          />
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {appThemeOptions.map((option) => (
-              <SettingsChoice
-                key={option.id}
-                active={activeAppTheme === option.id}
-                label={option.label}
-                hint={option.hint}
-                swatch={option.swatch}
-                onHover={() => playSound("hover")}
-                onClick={() => {
-                  onVisualThemeChange(option.visualTheme);
-                  onSoundThemeChange(option.soundTheme);
-                }}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-          <SettingsHeader
-            icon={<Bell className="h-5 w-5 text-white/70" />}
-            title={achievementNotificationCopy.title}
-            description={achievementNotificationCopy.description}
-          />
-          <div className="space-y-4">
-            <div className="flex items-center justify-between gap-5 rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-              <div>
-                <p className="text-sm font-bold text-white">
-                  {achievementNotificationCopy.enabled}
-                </p>
-                <p className="text-[10px] text-white/40">
-                  {achievementNotificationCopy.enabledHint}
-                </p>
-              </div>
-              <Switch
-                checked={achievementNotificationsEnabled}
-                onCheckedChange={setAchievementNotificationsEnabled}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-5 rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-              <div>
-                <p className="text-sm font-bold text-white">{achievementNotificationCopy.custom}</p>
-                <p className="text-[10px] text-white/40">
-                  {achievementNotificationCopy.customHint}
-                </p>
-              </div>
-              <Switch
-                checked={customAchievementNotifications}
-                disabled={!achievementNotificationsEnabled}
-                onCheckedChange={setCustomAchievementNotifications}
-              />
-            </div>
-            <div
-              className={
-                !achievementNotificationsEnabled || !customAchievementNotifications
-                  ? "pointer-events-none opacity-40"
-                  : ""
-              }
+          <nav className="space-y-1">
+            <button
+              type="button"
+              onClick={() => selectTab("general")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "general"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
             >
-              <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white/40">
-                {achievementNotificationCopy.position}
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                {ACHIEVEMENT_POSITIONS.map((position, index) => (
-                  <SettingsChoice
-                    key={position}
-                    active={achievementNotificationPosition === position}
-                    label={achievementNotificationCopy.positions[index]}
-                    hint=""
+              <SlidersHorizontal className="h-4 w-4 shrink-0" /> {shellCopy.general}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("personalization")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "personalization"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <Palette className="h-4 w-4 shrink-0" /> {shellCopy.personalization}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("account")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "account"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" /> {shellCopy.account}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("connections")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "connections"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <Globe className="h-4 w-4 shrink-0" /> {shellCopy.connections}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("controller")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "controller"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <Gamepad2 className="h-4 w-4 shrink-0" /> {shellCopy.controller}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("notifications")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "notifications"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <Bell className="h-4 w-4 shrink-0" /> {shellCopy.notifications}
+            </button>
+          </nav>
+
+          {user && (
+            <div className="pt-3 mt-3 border-t border-white/8">
+              <button
+                type="button"
+                onClick={() => {
+                  playSound("back");
+                  void window.electronAPI?.requestAppQuit?.();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-red-400 transition-all hover:bg-red-500/10 hover:text-red-300 cursor-pointer"
+              >
+                <LogOut className="h-4 w-4 shrink-0" /> {shellCopy.quit}
+              </button>
+            </div>
+          )}
+        </aside>
+
+        {/* Right Active Content Panel */}
+        <main className="flex-1 w-full min-w-0">
+          {/* TAB 1: GERAL */}
+          {activeTab === "general" && (
+            <div className="space-y-6">
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Languages className="h-5 w-5 text-white/70" />}
+                  title={t("language")}
+                  description={t("languageHint")}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {languageOptions.map((option) => (
+                    <SettingsChoice
+                      key={option.id}
+                      active={language === option.id}
+                      label={option.label}
+                      hint={option.hint}
+                      onHover={() => playSound("hover")}
+                      onClick={() => onLanguageChange(option.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<SlidersHorizontal className="h-5 w-5 text-white/70" />}
+                  title={t("appBehavior")}
+                  description={t("appBehaviorHint")}
+                />
+                <div className="space-y-3.5">
+                  {behaviorOptions.map((option) => (
+                    <div
+                      key={option.label}
+                      className="flex items-center justify-between gap-5 rounded-2xl border border-white/6 bg-white/[0.035] p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white">{option.label}</p>
+                        <p className="mt-1 text-[10px] font-medium leading-relaxed text-white/40">{option.hint}</p>
+                      </div>
+                      <Switch
+                        aria-label={option.label}
+                        checked={option.checked}
+                        onCheckedChange={option.onChange}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <AppUpdateSection />
+            </div>
+          )}
+
+          {/* TAB 2: PERSONALIZAÇÃO */}
+          {activeTab === "personalization" && (
+            <div className="space-y-6">
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Palette className="h-5 w-5 text-white/70" />}
+                  title={t("themes")}
+                  description={t("themesHint")}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                  {appThemeOptions.map((option) => (
+                    <SettingsChoice
+                      key={option.id}
+                      active={activeAppTheme === option.id}
+                      label={option.label}
+                      hint={option.hint}
+                      swatch={option.swatch}
+                      onHover={() => playSound("hover")}
+                      onClick={() => {
+                        onVisualThemeChange(option.visualTheme);
+                        onSoundThemeChange(option.soundTheme);
+                      }}
+                    />
+                  ))}
+                  <div className="flex flex-col justify-between rounded-2xl border border-dashed border-white/10 bg-white/2 px-4 py-3 text-left opacity-60">
+                    <div className="flex items-center gap-2 min-w-0 mb-1">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-300/80 shrink-0" />
+                      <span className="text-xs font-bold text-white/80 whitespace-nowrap truncate min-w-0">
+                        {detailCopy.moreThemes}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-medium text-white/40 whitespace-nowrap truncate block min-w-0">
+                      {detailCopy.comingSoon}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Volume2 className="h-5 w-5 text-white/70" />}
+                  title={detailCopy.audioTitle}
+                  description={detailCopy.audioHint}
+                />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <VolumeSettingsCard
+                    gamepadId="audio-effects"
+                    gamepadNavDown="audio-notification-slider"
+                    title={t("soundEffects")}
+                    description={t("soundEffectsHint")}
+                    value={effectsVolume}
+                    max={100}
+                    actionLabel={t("test")}
+                    onAction={onPreviewSound}
                     onHover={() => playSound("hover")}
-                    onClick={() => setAchievementNotificationPosition(position)}
+                    onChange={onEffectsVolumeChange}
+                    t={t}
                   />
-                ))}
+
+                  <VolumeSettingsCard
+                    gamepadId="audio-achievement"
+                    gamepadNavDown="audio-music-slider"
+                    title={t("achievementSound")}
+                    description={t("achievementSoundHint")}
+                    value={achievementVolume}
+                    max={100}
+                    actionLabel={t("test")}
+                    onAction={achievementNotificationsEnabled ? onTestOverlayAchievement : undefined}
+                    onHover={() => playSound("hover")}
+                    onChange={onAchievementVolumeChange}
+                    t={t}
+                  />
+
+                  <VolumeSettingsCard
+                    gamepadId="audio-notification"
+                    gamepadNavUp="audio-effects-slider"
+                    title={t("notificationSound")}
+                    description={t("notificationSoundHint")}
+                    value={notificationVolume}
+                    max={100}
+                    actionLabel={t("test")}
+                    onAction={onTestNotificationSound}
+                    onHover={() => playSound("hover")}
+                    onChange={onNotificationVolumeChange}
+                    t={t}
+                  />
+
+                  <VolumeSettingsCard
+                    gamepadId="audio-music"
+                    gamepadNavUp="audio-achievement-slider"
+                    title={t("music")}
+                    description={t("musicHint")}
+                    value={musicVolume}
+                    max={35}
+                    onHover={() => playSound("hover")}
+                    onChange={onMusicVolumeChange}
+                    t={t}
+                  />
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Zap className="h-5 w-5 text-white/70" />}
+                  title={detailCopy.performanceTitle}
+                  description={detailCopy.performanceHint}
+                />
+                <div className="flex items-center justify-between gap-5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                  <div>
+                    <p className="text-xs font-bold text-white whitespace-nowrap">{t("lowPerformanceMode")}</p>
+                    <p className="text-[10px] font-medium text-white/40 mt-0.5">{t("lowPerformanceModeHint")}</p>
+                  </div>
+                  <Switch checked={lowPerformanceMode} onCheckedChange={setLowPerformanceMode} />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* TAB 3: CONTA & SEGURANÇA */}
+          {activeTab === "account" && (
+            <div className="space-y-6">
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<User className="h-5 w-5 text-white/70" />}
+                  title={detailCopy.playerProfile}
+                  description={detailCopy.playerProfileHint}
+                />
+                <div className="flex items-center gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10 border border-white/10">
+                    {userProfile?.photoURL ? (
+                      <img src={userProfile.photoURL} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-6 w-6 text-white/70" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-white">
+                      {userProfile?.displayName || user?.displayName || detailCopy.playerFallback}
+                    </p>
+                    <p className="text-xs font-medium text-white/40 mt-0.5">
+                      {user?.email || detailCopy.noEmail}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-lg bg-emerald-500/10 border border-emerald-400/20 px-3 py-1 text-[10px] font-bold text-emerald-300 uppercase">
+                    {detailCopy.activeAccount}
+                  </span>
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Lock className="h-5 w-5 text-white/70" />}
+                  title={detailCopy.security}
+                  description={detailCopy.securityHint}
+                />
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                        <KeyRound className="h-4.5 w-4.5 text-white/70" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white whitespace-nowrap">{detailCopy.resetPassword}</p>
+                        <p className="text-[10px] font-medium text-white/40 mt-0.5">
+                          {detailCopy.resetPasswordHint}
+                        </p>
+                      </div>
+                    </div>
+                    {passwordResetSent ? (
+                      <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-400/30 px-3 py-1.5 text-[9px] font-bold text-emerald-300 uppercase">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {detailCopy.emailSent}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePasswordReset}
+                        disabled={isResettingPassword || !user?.email}
+                        className="shrink-0 cursor-pointer rounded-lg bg-white px-3.5 py-1.5 text-[9px] font-bold uppercase text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      >
+                        {isResettingPassword ? detailCopy.sending : detailCopy.sendEmail}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                        <ShieldCheck className="h-4.5 w-4.5 text-emerald-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white whitespace-nowrap">{shellCopy.encrypted}</p>
+                        <p className="text-[10px] font-medium text-white/40 mt-0.5">
+                          {shellCopy.encryptedHint}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* TAB 4: CONTAS & PRIVACIDADE */}
+          {activeTab === "connections" && (
+            <div className="space-y-6">
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Globe className="h-5 w-5 text-white/70" />}
+                  title={t("connectedAccounts")}
+                  description={t("connectedAccountsHint")}
+                />
+                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
+                  <article aria-label="Steam" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                        <SteamIcon className="h-4.5 w-4.5 text-white/70" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white whitespace-nowrap">Steam</p>
+                        <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">
+                          {steamConnected ? t("connected") : t("notConnected")}
+                        </p>
+                      </div>
+                    </div>
+                    {steamConnected ? (
+                      <div role="group" aria-label={`${t("unlink")} Steam`} className="flex shrink-0 flex-col items-end gap-1">
+                        <button
+                          type="button"
+                          onClick={onDisconnectSteam}
+                          onMouseEnter={() => playSound("hover")}
+                          className="cursor-pointer rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                        >
+                          {t("unlink")}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onConnectSteam}
+                        onMouseEnter={() => playSound("hover")}
+                        disabled={steamConnecting}
+                        className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
+                      >
+                        {steamConnecting ? t("connecting") : t("connectSteam")}
+                      </button>
+                    )}
+                  </article>
+
+                  <article aria-label="Spotify" className="grid min-h-76px grid-cols-1 items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                        <FontAwesomeIcon icon={faSpotify} className="h-4.5 w-4.5 text-white/70" />
+                      </div>
+                      <div className="min-w-0">
+                      <p className="text-xs font-bold text-white whitespace-nowrap">Spotify</p>
+                      <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">{shellCopy.spotifyDock}</p>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article aria-label="Discord" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+                        {discordAvatar ? (
+                          <img src={discordAvatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <DiscordIcon className="h-4.5 w-4.5 text-white/70" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white whitespace-nowrap">Discord</p>
+                        <p className="max-w-27.5 truncate text-[10px] font-medium text-white/40 mt-0.5">
+                          {discordConnected ? discordUsername || t("connected") : t("notConnected")}
+                        </p>
+                      </div>
+                    </div>
+                    {discordConnected ? (
+                      <button
+                        type="button"
+                        onClick={onDisconnectDiscord}
+                        onMouseEnter={() => playSound("hover")}
+                        className="shrink-0 cursor-pointer rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                      >
+                        {t("unlink")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={onConnectDiscord}
+                        onMouseEnter={() => playSound("hover")}
+                        disabled={discordConnecting}
+                        className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
+                      >
+                        {discordConnecting ? t("connecting") : t("connectDiscord")}
+                      </button>
+                    )}
+                  </article>
+                </div>
+              </section>
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<ShieldCheck className="h-5 w-5 text-white/70" />}
+                  title={shellCopy.privacy}
+                  description={shellCopy.privacyHint}
+                />
+                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+                  <SettingsChoice
+                    active={profileVisibility === "public"}
+                    label={shellCopy.public}
+                    hint={shellCopy.publicHint}
+                    onHover={() => playSound("hover")}
+                    onClick={() => void handleProfileVisibilityChange("public")}
+                  />
+                  <SettingsChoice
+                    active={profileVisibility === "private"}
+                    label={shellCopy.private}
+                    hint={shellCopy.privateHint}
+                    onHover={() => playSound("hover")}
+                    onClick={() => void handleProfileVisibilityChange("private")}
+                  />
+                </div>
+                <div aria-live="polite" className="mt-3 min-h-4 text-[10px] font-medium text-white/40">
+                  {privacyStatus === "saving" && shellCopy.saving}
+                  {privacyStatus === "saved" && shellCopy.saved}
+                  {privacyStatus === "error" && privacyError}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* TAB 5: CONTROLE & HARDWARE */}
+          {activeTab === "controller" && (
+            <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+              <SettingsHeader
+                icon={<Gamepad2 className="h-5 w-5 text-white/70" />}
+                title={controllerCopy[0]}
+                description={shellCopy.controllerHint}
+              />
+              <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+                <div className="flex min-w-0 items-center gap-3.5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                  <div
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${isGamepadConnected
+                      ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.7)]"
+                      : "bg-white/20"
+                      }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-white whitespace-nowrap">
+                      {isGamepadConnected ? controllerCopy[1] : controllerCopy[2]}
+                    </p>
+                    <p className="mt-0.5 truncate text-[10px] font-medium text-white/40">
+                      {connectedGamepadId || controllerCopy[3]}
+                    </p>
+                  </div>
+                  {isGamepadConnected && (
+                    <span className="ml-auto shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white/55">
+                      {gamepadFamily}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex min-w-0 items-center gap-3.5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                  <div
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${led.status === "connected"
+                      ? "bg-[rgb(var(--launcher-accent))] shadow-[0_0_12px_rgb(var(--launcher-accent)/.7)]"
+                      : led.status === "error"
+                        ? "bg-red-400"
+                        : "bg-amber-300"
+                      }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-white whitespace-nowrap">LED PlayStation</p>
+                    <p className="mt-0.5 truncate text-[10px] font-medium text-white/40">{led.message}</p>
+                  </div>
+                  {led.status !== "unsupported" && (
+                    <button
+                      type="button"
+                      onClick={led.status === "connected" ? led.testLed : led.requestAccess}
+                      onMouseEnter={() => playSound("hover")}
+                      disabled={led.status === "connecting"}
+                      className="shrink-0 cursor-pointer rounded-lg bg-white px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-black transition-all duration-200 hover:scale-105 hover:bg-white/90 hover:shadow-[0_0_15px_rgba(255,255,255,0.4)] active:scale-95 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {led.status === "connected"
+                        ? controllerCopy[4]
+                        : led.status === "connecting"
+                          ? "..."
+                          : controllerCopy[5]}
+                    </button>
+                  )}
+                </div>
               </div>
+            </section>
+          )}
+
+          {/* TAB 6: NOTIFICAÇÕES & OVERLAY */}
+          {activeTab === "notifications" && (
+            <div className="space-y-6">
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Bell className="h-5 w-5 text-white/70" />}
+                  title={achievementNotificationCopy.title}
+                  description={achievementNotificationCopy.description}
+                />
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between gap-5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white whitespace-nowrap">
+                        {achievementNotificationCopy.enabled}
+                      </p>
+                      <p className="text-[10px] font-medium text-white/40 mt-0.5">
+                        {achievementNotificationCopy.enabledHint}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={achievementNotificationsEnabled}
+                      onCheckedChange={setAchievementNotificationsEnabled}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white whitespace-nowrap">{achievementNotificationCopy.custom}</p>
+                      <p className="text-[10px] font-medium text-white/40 mt-0.5">
+                        {achievementNotificationCopy.customHint}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={customAchievementNotifications}
+                      disabled={!achievementNotificationsEnabled}
+                      onCheckedChange={setCustomAchievementNotifications}
+                    />
+                  </div>
+                  <div
+                    className={
+                      !achievementNotificationsEnabled || !customAchievementNotifications
+                        ? "pointer-events-none opacity-40"
+                        : ""
+                    }
+                  >
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-white/40">
+                      {achievementNotificationCopy.position}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {ACHIEVEMENT_POSITIONS.map((position, index) => (
+                        <SettingsChoice
+                          key={position}
+                          active={achievementNotificationPosition === position}
+                          label={achievementNotificationCopy.positions[index]}
+                          hint=""
+                          onHover={() => playSound("hover")}
+                          onClick={() => setAchievementNotificationPosition(position)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Sparkles className="h-5 w-5 text-white/70" />}
+                  title={detailCopy.overlayLab}
+                  description={detailCopy.overlayLabHint}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <button
+                    type="button"
+                    onClick={onTestOverlayWelcome}
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-2xl border border-white/10 bg-white/4 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-white/25 hover:bg-white/8 active:scale-[0.98]"
+                  >
+                    <span className="block text-xs font-bold text-white whitespace-nowrap">
+                      {detailCopy.testWelcome}
+                    </span>
+                    <span className="mt-1 block text-[10px] font-medium text-white/40">
+                      {detailCopy.testWelcomeHint}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onTestOverlayAchievement}
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-500/8 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-emerald-400/40 hover:bg-emerald-500/[0.14] active:scale-[0.98]"
+                  >
+                    <span className="block text-xs font-bold text-white whitespace-nowrap">
+                      {detailCopy.testAchievement}
+                    </span>
+                    <span className="mt-1 block text-[10px] font-medium text-white/40">
+                      {detailCopy.testAchievementHint}
+                    </span>
+                  </button>
+                </div>
+              </section>
             </div>
-          </div>
-        </section>
-
-        <VolumeSettingsCard
-          title={t("soundEffects")}
-          description={t("soundEffectsHint")}
-          value={effectsVolume}
-          max={100}
-          actionLabel={t("test")}
-          onAction={onPreviewSound}
-          onHover={() => playSound("hover")}
-          onChange={onEffectsVolumeChange}
-          t={t}
-        />
-
-        <VolumeSettingsCard
-          title={t("achievementSound")}
-          description={t("achievementSoundHint")}
-          value={achievementVolume}
-          max={100}
-          actionLabel={t("test")}
-          onAction={achievementNotificationsEnabled ? onTestOverlayAchievement : undefined}
-          onHover={() => playSound("hover")}
-          onChange={onAchievementVolumeChange}
-          t={t}
-        />
-
-        <VolumeSettingsCard
-          title={t("notificationSound")}
-          description={t("notificationSoundHint")}
-          value={notificationVolume}
-          max={100}
-          actionLabel={t("test")}
-          onAction={onTestNotificationSound}
-          onHover={() => playSound("hover")}
-          onChange={onNotificationVolumeChange}
-          t={t}
-        />
-
-        <VolumeSettingsCard
-          title={t("music")}
-          description={t("musicHint")}
-          value={musicVolume}
-          max={35}
-          onHover={() => playSound("hover")}
-          onChange={onMusicVolumeChange}
-          t={t}
-        />
+          )}
+        </main>
       </div>
-
-      <section className="mt-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-        <SettingsHeader
-          icon={<Zap className="h-5 w-5 text-white/70" />}
-          title={t("performance")}
-          description=""
-        />
-        <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div>
-              <p className="text-sm font-bold text-white">{t("openAtLogin")}</p>
-              <p className="text-[10px] text-white/40">{t("openAtLoginHint")}</p>
-            </div>
-            <Switch checked={openAtLogin} onCheckedChange={setOpenAtLogin} />
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div>
-              <p className="text-sm font-bold text-white">{t("lowPerformanceMode")}</p>
-              <p className="text-[10px] text-white/40">{t("lowPerformanceModeHint")}</p>
-            </div>
-            <Switch checked={lowPerformanceMode} onCheckedChange={setLowPerformanceMode} />
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-white/[0.03] p-4">
-            <div>
-              <p className="text-sm font-bold text-white">{t("closeOnLaunch")}</p>
-              <p className="text-[10px] text-white/40">{t("closeOnLaunchHint")}</p>
-            </div>
-            <Switch checked={closeOnLaunch} onCheckedChange={setCloseOnLaunch} />
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-5 rounded-3xl border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
-        <SettingsHeader
-          icon={<Sparkles className="h-5 w-5 text-white/70" />}
-          title="Overlay Lab"
-          description="Prévia de como os overlays ficarão quando você estiver jogando."
-        />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <button
-            type="button"
-            onClick={onTestOverlayWelcome}
-            onMouseEnter={() => playSound("hover")}
-            className="cursor-pointer rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-white/25 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(255,255,255,0.08)] active:scale-[0.98]"
-          >
-            <span className="block text-sm font-black uppercase tracking-wider text-white">
-              Testar divirta-se
-            </span>
-            <span className="mt-2 block text-xs text-white/45">
-              Mostra o card social que aparece ao iniciar um jogo.
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={onTestOverlayAchievement}
-            onMouseEnter={() => playSound("hover")}
-            className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.08] px-5 py-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-emerald-400/40 hover:bg-emerald-500/[0.14] hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] active:scale-[0.98]"
-          >
-            <span className="block text-sm font-black uppercase tracking-wider text-white">
-              Testar conquista
-            </span>
-            <span className="mt-2 block text-xs text-white/45">
-              Mostra o toast completo com titulo, descricao e icone.
-            </span>
-          </button>
-        </div>
-      </section>
-
-      <AppUpdateSection />
     </SystemPageShell>
   );
 });

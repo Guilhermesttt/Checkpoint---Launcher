@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, AlertCircle, ArrowRight, Gamepad2, ArrowLeft } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { NotificationProvider } from "../components/NotificationCenter";

@@ -1,33 +1,34 @@
 import React from "react";
+import bgVideo from "../assets/morpxd_pindown.io_1785615286.mp4";
 
 const MainVideoBackground: React.FC = () => {
   return (
-    <div className="fixed inset-0 z-[-50] overflow-hidden pointer-events-none bg-[#050507]">
+    <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none bg-[#050507]">
       <div className="absolute inset-0 flex items-center justify-center">
         <video
           autoPlay
           loop
           muted
           playsInline
-          className="absolute w-[100vh] h-[100vw] object-cover opacity-20 transition-opacity duration-1000"
+          className="absolute h-[100vw] w-[100vh] max-w-none object-cover opacity-20 transition-opacity duration-1000"
           style={{
             transform: "rotate(90deg)",
           }}
         >
           <source
-            src="/PinDown.io_@sebasoler__1776538674.mp4"
+            src={bgVideo}
             type="video/mp4"
           />
         </video>
       </div>
-      
-      <div 
+
+      <div
         className="absolute inset-0 z-10"
         style={{
           background: "radial-gradient(circle at center, transparent 0%, rgba(5, 5, 7, 0.4) 100%), linear-gradient(to bottom, rgba(5, 5, 7, 0.3), rgba(5, 5, 7, 0.6))"
         }}
       />
-      
+
       <div
         className="absolute inset-0 opacity-[0.03] z-20 mix-blend-overlay pointer-events-none"
         style={{

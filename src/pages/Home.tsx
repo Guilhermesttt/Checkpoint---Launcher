@@ -44,6 +44,8 @@ import { useGamePresence } from '../hooks/useGamePresence';
 import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
 import { useAccountConnections } from '../hooks/useAccountConnections';
 import { buildLocalFriendProfile, useFriendsSystem } from '../hooks/useFriendsSystem';
+import SpotifyPage from '../components/spotify/SpotifyPage';
+import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
   usePreferences,
@@ -72,6 +74,12 @@ import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
 } from "../services/checkpointFriends";
+import {
+  readLastNavigation,
+  writeLastCategory,
+  writeLastSettingsTab,
+  type SettingsTab,
+} from "../services/launcherNavigation";
 
 import {
   deleteLibraryGame,
@@ -186,6 +194,8 @@ const Home: React.FC = () => {
   const [disconnectDiscordModalOpen, setDisconnectDiscordModalOpen] =
     useState(false);
   const [isExitingSession, setIsExitingSession] = useState(false);
+  const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
 
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
@@ -206,6 +216,24 @@ const Home: React.FC = () => {
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem("checkpoint_sidebar_expanded");
+      return stored !== null ? stored === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    const handleToggle = (e: CustomEvent<{ expanded: boolean }>) => {
+      setIsSidebarExpanded(e.detail.expanded);
+    };
+    window.addEventListener("checkpoint:sidebar-toggle" as any, handleToggle);
+    return () => {
+      window.removeEventListener("checkpoint:sidebar-toggle" as any, handleToggle);
+    };
+  }, []);
 
   const lastWheelTime = useRef<number>(0);
   const previousSteamIdRef = useRef<string | undefined>(undefined);
@@ -214,6 +242,8 @@ const Home: React.FC = () => {
   const lastOverlayWelcomeGameRef = useRef<string | null>(null);
 
   const { notify } = useNotification();
+  const spotifyPlayer = useSpotifyPlayer();
+  const lastSpotifyTrackNotificationRef = useRef<string | null>(null);
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
   const {
     language: launcherLanguage,
@@ -230,8 +260,48 @@ const Home: React.FC = () => {
     setMusicVolume,
     setSoundTheme,
     setVisualTheme,
+    minimizeToTrayOnClose,
+    restoreLastScreen,
+    confirmBeforeExit,
+    preferencesHydrated,
     t,
   } = usePreferences();
+
+  const restoredNavigationUidRef = useRef<string | null>(null);
+  const currentUserUid = user?.uid;
+
+  const selectCategory = useCallback((category: string) => {
+    setActiveCategory(category);
+    if (currentUserUid) writeLastCategory(currentUserUid, category);
+  }, [currentUserUid]);
+
+  const handleSettingsTabChange = useCallback((tab: SettingsTab) => {
+    setSettingsTab(tab);
+    if (currentUserUid) writeLastSettingsTab(currentUserUid, tab);
+  }, [currentUserUid]);
+
+  useEffect(() => {
+    if (!currentUserUid || !preferencesHydrated || restoredNavigationUidRef.current === currentUserUid) return;
+    restoredNavigationUidRef.current = currentUserUid;
+    const lastNavigation = readLastNavigation(currentUserUid);
+    const timer = window.setTimeout(() => {
+      setSettingsTab(lastNavigation.settingsTab);
+      if (restoreLastScreen) setActiveCategory(lastNavigation.category);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [currentUserUid, preferencesHydrated, restoreLastScreen]);
+
+  useEffect(() => {
+    if (!preferencesHydrated) return;
+    void window.electronAPI?.setWindowBehavior?.({
+      minimizeToTray: minimizeToTrayOnClose,
+      confirmBeforeExit,
+    }).catch(console.error);
+  }, [confirmBeforeExit, minimizeToTrayOnClose, preferencesHydrated]);
+
+  useEffect(() => window.electronAPI?.onExitConfirmationRequested?.(() => {
+    setExitConfirmationOpen(true);
+  }), []);
   const { playSound } = useSoundEffects(
     effectsVolume / 100,
     soundTheme,
@@ -679,6 +749,7 @@ const Home: React.FC = () => {
     Boolean(pendingDeleteGame) ||
     isAddFriendModalOpen ||
     signOutModalOpen ||
+    exitConfirmationOpen ||
     disconnectSteamModalOpen ||
     disconnectDiscordModalOpen;
 
@@ -757,6 +828,11 @@ const Home: React.FC = () => {
       playSound("back");
       return;
     }
+    if (exitConfirmationOpen) {
+      setExitConfirmationOpen(false);
+      playSound("back");
+      return;
+    }
     if (disconnectSteamModalOpen) {
       setDisconnectSteamModalOpen(false);
       playSound("back");
@@ -787,6 +863,7 @@ const Home: React.FC = () => {
     contextMenu,
     disconnectDiscordModalOpen,
     disconnectSteamModalOpen,
+    exitConfirmationOpen,
     friendProfileModal,
     isAddFriendModalOpen,
     pendingDeleteGame,
@@ -886,7 +963,7 @@ const Home: React.FC = () => {
     if (isAnyModalOpen || searchOpen) return;
     const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
     if (currentIndex > 0) {
-      setActiveCategory(SIDEBAR_CATEGORIES[currentIndex - 1].id);
+      selectCategory(SIDEBAR_CATEGORIES[currentIndex - 1].id);
       playSound("navigate");
     }
   });
@@ -895,7 +972,7 @@ const Home: React.FC = () => {
     if (isAnyModalOpen || searchOpen) return;
     const currentIndex = SIDEBAR_CATEGORIES.findIndex((c) => c.id === activeCategory);
     if (currentIndex < SIDEBAR_CATEGORIES.length - 1) {
-      setActiveCategory(SIDEBAR_CATEGORIES[currentIndex + 1].id);
+      selectCategory(SIDEBAR_CATEGORIES[currentIndex + 1].id);
       playSound("navigate");
     }
   });
@@ -908,13 +985,13 @@ const Home: React.FC = () => {
 
   useGamepadButton("OPTIONS", () => {
     if (isAnyModalOpen || searchOpen) return;
-    setActiveCategory("SETTINGS");
+    selectCategory("SETTINGS");
     playSound("select");
   });
 
   useGamepadButton("SHARE", () => {
     if (isAnyModalOpen || searchOpen) return;
-    setActiveCategory("FRIENDS");
+    selectCategory("FRIENDS");
     playSound("select");
   });
 
@@ -1011,15 +1088,32 @@ const Home: React.FC = () => {
     }
   };
 
+  const handleViewSearchedProfile = async (profile: UserProfile) => {
+    setFriendProfileLoadingId(`cp-profile:${profile.uid}`);
+    try {
+      const payload = await getCheckpointFriendProfile(profile.uid);
+      setFriendProfileModal(payload);
+      setIsAddFriendModalOpen(false);
+      playSound("detailOpen");
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Não foi possível abrir este perfil.",
+        "error",
+      );
+    } finally {
+      setFriendProfileLoadingId(null);
+    }
+  };
+
   const openFriendChatFromOverview = useCallback(
     (friendId: string) => {
       const friend = socialFriends.find((item) => item.id === friendId);
       if (!friend) return;
-      setActiveCategory("FRIENDS");
+      selectCategory("FRIENDS");
       setActiveChatFriend(friend);
       playSound("select");
     },
-    [playSound, setActiveChatFriend, socialFriends],
+    [playSound, selectCategory, setActiveChatFriend, socialFriends],
   );
 
   useEffect(() => {
@@ -1219,6 +1313,14 @@ const Home: React.FC = () => {
         discordUsername: userProfile?.discordUsername || "",
         achievements: calculateAchievementTotals(games).unlocked,
       },
+      spotify: {
+        status: spotifyPlayer.status,
+        remoteMode: spotifyPlayer.remoteMode,
+        paused: spotifyPlayer.playback.paused,
+        positionMs: spotifyPlayer.playback.positionMs,
+        durationMs: spotifyPlayer.playback.durationMs,
+        track: spotifyPlayer.playback.track,
+      },
     }).catch(() => undefined);
   }, [
     overlayAchievements,
@@ -1245,13 +1347,51 @@ const Home: React.FC = () => {
     userProfile?.photoURL,
     userProfile?.steamAvatar,
     userProfile?.steamUsername,
+    spotifyPlayer.status,
+    spotifyPlayer.remoteMode,
+    spotifyPlayer.playback,
   ]);
+
+  useEffect(() => {
+    const track = spotifyPlayer.playback.track;
+    if (!track || spotifyPlayer.playback.paused || lastSpotifyTrackNotificationRef.current === track.id) return;
+    lastSpotifyTrackNotificationRef.current = track.id;
+    notify(`${track.title} — ${track.artist}`, "info", {
+      title: "Tocando agora",
+      imageUrl: track.coverUrl,
+    });
+    void window.electronAPI?.showSpotifyTrackOverlay?.({
+      title: track.title,
+      artist: track.artist,
+      coverUrl: track.coverUrl,
+    });
+  }, [notify, spotifyPlayer.playback.paused, spotifyPlayer.playback.track]);
 
   useEffect(() => {
     if (!window.electronAPI?.onOverlayPanelAction) return;
     return window.electronAPI.onOverlayPanelAction((action) => {
+      if (action.kind === "spotify-toggle") {
+        void spotifyPlayer.togglePlay().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao controlar o Spotify.", "error"));
+        return;
+      }
+      if (action.kind === "spotify-next") {
+        void spotifyPlayer.nextTrack().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao avançar a música.", "error"));
+        return;
+      }
+      if (action.kind === "spotify-previous") {
+        void spotifyPlayer.previousTrack().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao voltar a música.", "error"));
+        return;
+      }
+      if (action.kind === "spotify-seek") {
+        void spotifyPlayer.seek(Number(action.positionMs) || 0).catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao alterar o tempo da música.", "error"));
+        return;
+      }
+      if (action.kind === "spotify-volume") {
+        void spotifyPlayer.setVolume(Math.max(0, Math.min(1, Number(action.volume) || 0))).catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao alterar o volume.", "error"));
+        return;
+      }
       if (action.kind === "open-launcher-chat" || action.kind === "open-launcher-friends") {
-        setActiveCategory("FRIENDS");
+        selectCategory("FRIENDS");
         setIsDetailOpen(false);
         if (action.kind === "open-launcher-chat" && action.friendId) {
           const friend = socialFriends.find((candidate) => candidate.id === action.friendId);
@@ -1330,7 +1470,7 @@ const Home: React.FC = () => {
         setOverlayChatError(error instanceof Error ? error.message : "Não foi possível enviar a mensagem.");
       }).finally(() => setOverlayChatSending(false));
     });
-  }, [overlayChatFriendUid, overlayChatSending, socialFriends, user?.uid]);
+  }, [notify, overlayChatFriendUid, overlayChatSending, selectCategory, setActiveChatFriend, socialFriends, spotifyPlayer, user?.uid]);
 
   const onSelectHandler = useCallback(
     (index: number, openGame?: Game) => {
@@ -1426,7 +1566,7 @@ const Home: React.FC = () => {
 
       {/* Hero Section Gradient */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-background via-background/70 to-transparent"
+        className="pointer-events-none absolute inset-0 z-0 bg-linear-to-t from-background via-background/70 to-transparent"
         style={{ left: 96 }}
       />
 
@@ -1446,7 +1586,7 @@ const Home: React.FC = () => {
               friendsPlaying={friendsPlayingNow}
               recentActivity={recentOverviewActivity}
               onOpenGame={openDetails}
-              onOpenFriends={() => setActiveCategory("FRIENDS")}
+              onOpenFriends={() => selectCategory("FRIENDS")}
               onOpenFriendChat={openFriendChatFromOverview}
               t={t}
             />
@@ -1457,7 +1597,7 @@ const Home: React.FC = () => {
 
       <Sidebar
         activeCategory={activeCategory}
-        onCategory={setActiveCategory}
+        onCategory={selectCategory}
         settingsLabel={t("settings")}
         language={launcherLanguage}
         playSound={playSound}
@@ -1471,8 +1611,8 @@ const Home: React.FC = () => {
       />
 
       <div
-        className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden"
-        style={{ marginLeft: 96 }}
+        className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden transition-[margin-left] duration-300 ease-out"
+        style={{ marginLeft: isSidebarExpanded ? 272 : 96 }}
       >
         <motion.div
           initial={{ opacity: 0, y: -12 }}
@@ -1643,11 +1783,11 @@ const Home: React.FC = () => {
                 language={launcherLanguage}
                 playSound={playSound}
                 onOpenProfile={() => {
-                  setActiveCategory("PROFILE");
+                  selectCategory("PROFILE");
                   playSound("select");
                 }}
                 onOpenSettings={() => {
-                  setActiveCategory("SETTINGS");
+                  selectCategory("SETTINGS");
                   playSound("select");
                 }}
                 onLogout={() => {
@@ -1700,7 +1840,6 @@ const Home: React.FC = () => {
               discordAvatar={userProfile?.discordAvatar}
               steamConnecting={steamConnecting}
               discordConnecting={discordConnecting}
-              steamSyncing={steamSyncing}
               onConnectSteam={connectSteam}
               onConnectDiscord={connectDiscord}
               onDisconnectSteam={() => {
@@ -1711,7 +1850,6 @@ const Home: React.FC = () => {
                 playSound("back");
                 setDisconnectDiscordModalOpen(true);
               }}
-              onSyncSteam={handleSyncSteam}
               onTestOverlayWelcome={() => {
                 playSound("select");
                 void window.electronAPI?.testOverlayWelcome();
@@ -1720,7 +1858,11 @@ const Home: React.FC = () => {
                 playSound("select");
                 void window.electronAPI?.testOverlayAchievement();
               }}
+              initialTab={settingsTab}
+              onTabChange={handleSettingsTabChange}
             />
+          ) : activeCategory === "SPOTIFY" ? (
+            <SpotifyPage player={spotifyPlayer} friends={socialFriends} language={launcherLanguage} onNotify={notify} />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
               t={t}
@@ -1965,9 +2107,9 @@ const Home: React.FC = () => {
         </div>
 
         <div
-          className="fixed bottom-0 z-30 flex items-center justify-between px-8 py-3.5 pointer-events-none"
+          className="fixed bottom-0 z-30 flex items-center justify-between px-8 py-3.5 pointer-events-none transition-[left] duration-300 ease-out"
           style={{
-            left: 96,
+            left: isSidebarExpanded ? 272 : 96,
             right: 0,
             background:
               "linear-gradient(to top, var(--background) 0%, transparent 100%)",
@@ -2007,7 +2149,7 @@ const Home: React.FC = () => {
           onGameHydrated={setSelectedGame}
           onOpenMods={() => {
             setIsDetailOpen(false);
-            setActiveCategory("MODS");
+            selectCategory("MODS");
           }}
         />
       </React.Suspense>
@@ -2026,6 +2168,7 @@ const Home: React.FC = () => {
         isOpen={isAddFriendModalOpen}
         onClose={() => setIsAddFriendModalOpen(false)}
         onAddFriend={handleAddCheckpointFriend}
+        onViewProfile={(profile) => void handleViewSearchedProfile(profile)}
         currentUserUid={user?.uid ?? ""}
         friendIds={new Set(checkpointFriendIds)}
         outgoingRequestIds={new Set(outgoingFriendRequestIds)}
@@ -2042,7 +2185,7 @@ const Home: React.FC = () => {
         }}
         maxWidthClassName="max-w-6xl"
         zIndexClassName="z-[165]"
-        className="relative max-h-[90vh] overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] p-0 shadow-2xl"
+        className="relative flex h-[min(90dvh,820px)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] p-0 shadow-2xl"
       >
         <button
           type="button"
@@ -2107,6 +2250,19 @@ const Home: React.FC = () => {
         onConfirm={async () => {
           setSignOutModalOpen(false);
           await handleSignOut();
+        }}
+        playSound={playSound}
+      />
+
+      <ConfirmationModal
+        isOpen={exitConfirmationOpen}
+        title="Sair do Checkpoint"
+        description="O launcher e os recursos em segundo plano serão encerrados."
+        confirmLabel="Sair do aplicativo"
+        onClose={() => setExitConfirmationOpen(false)}
+        onConfirm={() => {
+          setExitConfirmationOpen(false);
+          void window.electronAPI?.confirmAppQuit?.();
         }}
         playSound={playSound}
       />

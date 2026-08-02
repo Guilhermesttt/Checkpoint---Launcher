@@ -14,6 +14,10 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        overlay: path.resolve(__dirname, "overlay.html"),
+      },
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {

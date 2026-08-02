@@ -494,3 +494,13 @@ body.low-performance [class*="sparkle"] {
 body.low-performance::before {
   display: none !important;
 }
+/* Scroll discreto usado nas superfícies do Spotify. */
+.spotify-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(30, 215, 96, 0.45) rgba(255, 255, 255, 0.04);
+}
+
+.spotify-scrollbar::-webkit-scrollbar { width: 7px; height: 7px; }
+.spotify-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); border-radius: 999px; }
+.spotify-scrollbar::-webkit-scrollbar-thumb { background: rgba(30, 215, 96, 0.45); border-radius: 999px; }
+.spotify-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(30, 215, 96, 0.7); }

@@ -17,7 +17,7 @@
     layer.setAttribute("aria-hidden", "true");
 
     const video = documentRef.createElement("video");
-    video.className = `overlay-video${kind === "social" ? " is-rotated" : ""}`;
+    video.className = "overlay-video is-rotated";
     video.src = source;
     video.autoplay = true;
     video.loop = true;

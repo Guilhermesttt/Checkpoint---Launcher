@@ -195,7 +195,7 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
         className="flex min-h-0 flex-1 flex-col overflow-y-auto px-10 pb-10 pt-4 thin-scrollbar"
       >
         <div className="mx-auto w-full max-w-6xl space-y-5">
-          <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-black/65 p-7 shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
+          <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
             <div
               className="pointer-events-none absolute inset-0 opacity-60"
               style={{
@@ -205,19 +205,19 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             />
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-white/45">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-white/45">
                   <PackageOpen className="h-3.5 w-3.5" />
                   Biblioteca de mods
                 </div>
-                <h1 className="text-3xl font-black tracking-tight text-white">
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
                   Escolha um jogo para modificar
                 </h1>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/42">
+                <p className="mt-1.5 max-w-2xl text-xs md:text-sm font-medium leading-relaxed text-white/40">
                   Cada jogo possui seu próprio catálogo, pasta, mods instalados e controles.
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 <SummaryStat label="Jogos" value={games.length} />
                 <SummaryStat label="Configurados" value={configuredGames} />
                 <SummaryStat label="Mods" value={installedCount} />
@@ -225,27 +225,27 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             </div>
           </section>
 
-          <section className="rounded-[26px] border border-white/10 bg-black/60 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
-            <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <div className="flex items-center gap-2">
-                  <Gamepad2 className="h-4 w-4 text-white/45" />
-                  <h2 className="text-xs font-black uppercase tracking-[0.18em] text-white/65">
+                <div className="flex items-center gap-2.5">
+                  <Gamepad2 className="h-4.5 w-4.5 text-white/50" />
+                  <h2 className="text-base md:text-lg font-bold text-white tracking-tight">
                     Meus jogos
                   </h2>
                 </div>
-                <p className="mt-1 text-[10px] text-white/25">
+                <p className="mt-0.5 text-xs font-medium text-white/40">
                   Abra um card para explorar e gerenciar os mods daquele jogo.
                 </p>
               </div>
 
               <div className="relative w-full md:w-72">
-                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                 <input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Buscar jogo"
-                  className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-white/25"
+                  className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-white/25"
                 />
               </div>
             </div>
@@ -253,10 +253,10 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             {filteredGames.length === 0 ? (
               <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 text-center">
                 <Gamepad2 className="mb-3 h-7 w-7 text-white/15" />
-                <p className="text-sm font-black text-white/50">
+                <p className="text-sm font-bold text-white/50">
                   {games.length ? "Nenhum jogo encontrado" : "Sua biblioteca está vazia"}
                 </p>
-                <p className="mt-1 text-xs text-white/25">
+                <p className="mt-1 text-xs font-medium text-white/40">
                   {games.length ? "Tente outro nome." : "Adicione um jogo antes de configurar seus mods."}
                 </p>
               </div>
@@ -280,7 +280,7 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                         }
                         setSelectedGame(game);
                       }}
-                      className="group overflow-hidden rounded-2xl border border-white/9 bg-white/[0.035] text-left shadow-[0_14px_40px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-white/22 hover:bg-white/[0.07]"
+                      className="group overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.035] text-left shadow-[0_14px_40px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07]"
                     >
                       <div className="relative h-36 overflow-hidden bg-white/[0.04]">
                         {image ? (
@@ -298,28 +298,27 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                         <div className="absolute inset-0 bg-linear-to-t from-black via-black/15 to-transparent" />
                         <div className="absolute left-3 top-3 flex gap-1.5">
                           {folder && (
-                            <span className="flex items-center gap-1 rounded-md border border-emerald-400/20 bg-emerald-500/15 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-300">
-                              <CheckCircle2 className="h-3 w-3" /> Gerenciado
+                            <span className="flex h-6 items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-500/20 px-2 text-[9px] font-black uppercase text-emerald-300 backdrop-blur-md">
+                              <CheckCircle2 className="h-3 w-3" /> Pasta
                             </span>
                           )}
-                          {!folder && (
-                            <span className="rounded-md border border-white/10 bg-black/55 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-white/45">
-                              Configurar
+                          {domain && (
+                            <span className="flex h-6 items-center gap-1 rounded-lg border border-white/15 bg-black/60 px-2 text-[9px] font-black uppercase text-white/70 backdrop-blur-md">
+                              Nexus
                             </span>
                           )}
-                        </div>
-                        <div className="absolute bottom-3 left-3 right-3">
-                          <h3 className="line-clamp-2 text-base font-black leading-tight text-white">
-                            {game.title}
-                          </h3>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-3 p-3.5">
-                        <div>
-                          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-white/25">
+
+                      <div className="flex items-center justify-between p-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-white group-hover:text-white">
+                            {game.title}
+                          </p>
+                          <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/35">
                             {game.launcherType || "local"}
                           </p>
-                          <p className="mt-1 text-[10px] font-semibold text-white/40">
+                          <p className="mt-1 text-xs font-medium text-white/40">
                             {installed.length
                               ? `${activeMods} de ${installed.length} mods ativos`
                               : "Nenhum mod instalado"}
@@ -336,11 +335,11 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             )}
           </section>
 
-          <section className="flex items-center gap-3 rounded-2xl border border-amber-400/15 bg-amber-400/[0.05] px-5 py-4">
-            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-300/70" />
+          <section className="flex items-center gap-3.5 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4.5 backdrop-blur-2xl">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-300/80" />
             <div>
-              <p className="text-xs font-bold text-amber-100/65">Instalação de mods</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-amber-100/30">
+              <p className="text-xs font-bold text-amber-100/80">Instalação de mods</p>
+              <p className="mt-0.5 text-xs font-medium leading-relaxed text-amber-100/50">
                 ZIPs reconhecidos do Cyberpunk 2077 e Resident Evil Requiem são instalados automaticamente
                 com backup. Formatos desconhecidos permanecem disponíveis para instalação manual.
               </p>
@@ -378,9 +377,9 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
 };
 
 const SummaryStat: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="min-w-24 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-right backdrop-blur-xl">
-    <p className="text-xl font-black text-white">{value}</p>
-    <p className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-white/25">{label}</p>
+  <div className="min-w-24 rounded-2xl border border-white/[0.06] bg-white/[0.035] px-4.5 py-3 text-right backdrop-blur-xl">
+    <p className="text-xl font-bold text-white tabular-nums">{value}</p>
+    <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-white/35">{label}</p>
   </div>
 );
 

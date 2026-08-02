@@ -21,6 +21,7 @@ const {
   createGameProcessTracker,
   isLikelyHelper,
   isLikelyLauncher,
+  parseTasklistProcessNames,
   parseProcessSnapshot,
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 } = require("../electron/game-process-monitor.cjs") as {
@@ -36,6 +37,7 @@ const {
   }) => Tracker;
   isLikelyHelper: (name: string) => boolean;
   isLikelyLauncher: (name: string) => boolean;
+  parseTasklistProcessNames: (value: string) => Set<string>;
   parseProcessSnapshot: (value: string) => ProcessRecord[];
 };
 
@@ -51,6 +53,18 @@ const processRecord = (
 });
 
 describe("game process monitor", () => {
+  it("ignora processos fantasmas com memoria residual minima", () => {
+    const names = parseTasklistProcessNames([
+      '"re9.exe","20428","Console","1","72 K"',
+      '"spotify.exe","15320","Console","1","248.320 K"',
+      '"indie-game.exe","9020","Console","1","12,480 K"',
+    ].join("\r\n"));
+
+    expect(names.has("re9.exe")).toBe(false);
+    expect(names.has("spotify.exe")).toBe(true);
+    expect(names.has("indie-game.exe")).toBe(true);
+  });
+
   it("encerra um executavel direto somente apos ausencias consecutivas", () => {
     const target = "C:\\Games\\Checkpoint\\Checkpoint.exe";
     const tracker = createGameProcessTracker({

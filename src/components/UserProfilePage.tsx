@@ -159,10 +159,11 @@ const ProfileAvatar: React.FC<{
   profile: UserProfile | null;
   firebasePhotoURL?: string | null;
   displayName: string;
-}> = ({ profile, firebasePhotoURL, displayName }) => {
+  compact?: boolean;
+}> = ({ profile, firebasePhotoURL, displayName, compact = false }) => {
   const src = avatarUrl(profile, firebasePhotoURL);
   return (
-    <div className="relative h-[74px] w-[74px] shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06]">
+    <div className={`relative shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06] shadow-[0_18px_48px_rgba(0,0,0,.45)] ${compact ? "h-[72px] w-[72px]" : "h-[88px] w-[88px]"}`}>
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
@@ -182,17 +183,19 @@ const PlatformCard: React.FC<{
   icon: React.ReactNode;
   connectedLabel: string;
   disconnectedLabel: string;
-}> = ({ name, connected, username, avatar, icon, connectedLabel, disconnectedLabel }) => (
+  compact?: boolean;
+}> = ({ name, connected, username, avatar, icon, connectedLabel, disconnectedLabel, compact = false }) => (
   <div
-    className={`flex items-center gap-3 rounded-3xl border p-3 ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/8 bg-black/25"
-      }`}
+    className={`flex items-center rounded-2xl border ${compact ? "gap-3 p-2.5" : "gap-3.5 p-3.5"} ${
+      connected ? "border-white/14 bg-white/[0.045]" : "border-white/[0.06] bg-black/25"
+    }`}
   >
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75">
+    <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75 ${compact ? "h-9 w-9" : "h-10 w-10"}`}>
       {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : icon}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="truncate text-xs font-black text-white">{name}</p>
-      <p className="truncate text-[10px] text-white/40">
+      <p className="truncate text-xs font-bold text-white">{name}</p>
+      <p className="truncate text-xs font-medium text-white/40 mt-0.5">
         {connected ? username || connectedLabel : disconnectedLabel}
       </p>
     </div>
@@ -200,28 +203,36 @@ const PlatformCard: React.FC<{
   </div>
 );
 
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode }> = ({
+const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: React.ReactNode; compact?: boolean }> = ({
   icon,
   label,
   value,
+  compact = false,
 }) => (
-  <div className="flex min-h-[90px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-white/[0.045] px-5">
-    <div className="mb-2 text-white/36">{icon}</div>
-    <div className="text-xl font-black text-white tabular-nums">{value}</div>
-    <div className="mt-1 text-[9px] font-black uppercase tracking-widest text-white/32">{label}</div>
+  <div className={`flex flex-col items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.045] ${compact ? "min-h-[72px] px-4 py-2.5" : "min-h-[90px] px-5 py-3.5"}`}>
+    <div className={`${compact ? "mb-1" : "mb-1.5"} text-white/40`}>{icon}</div>
+    <div className={`${compact ? "text-lg" : "text-xl"} font-bold text-white tabular-nums`}>{value}</div>
+    <div className="mt-0.5 text-[9px] font-black uppercase tracking-widest text-white/35">{label}</div>
   </div>
 );
 
-const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode; className?: string }> = ({
+const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode; className?: string; compact?: boolean }> = ({
   title,
   icon,
   children,
   className = "",
+  compact = false,
 }) => (
-  <section className={`rounded-3xl border border-white/10 bg-black/55 p-5 shadow-[0_20px_70px_rgba(0,0,0,0.45)] ${className}`}>
-    <div className="mb-4 flex items-center gap-2">
-      {icon && <span className="text-white/40">{icon}</span>}
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">{title}</p>
+  <section className={`${compact ? "rounded-[24px] p-4 md:p-5" : "rounded-[28px] p-6 md:p-7"} border border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)] ${className}`}>
+    <div className={`${compact ? "mb-3" : "mb-5"} flex items-center gap-3`}>
+      {icon && (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70">
+          {icon}
+        </div>
+      )}
+      <div>
+        <h2 className="text-base md:text-lg font-bold text-white tracking-tight">{title}</h2>
+      </div>
     </div>
     {children}
   </section>
@@ -248,6 +259,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     disableO: true,
   });
   const copy = profileCopy[language];
+  const compactProfile = !editable;
   const displayName = userProfile?.displayName || user?.email?.split("@")[0] || copy.player;
   const email = userProfile?.email || user?.email || "";
 
@@ -342,7 +354,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
       initial={{ opacity: 0, y: 18, filter: "blur(6px)" }}
       animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="relative flex-1 overflow-y-auto px-8 pb-12 pt-6 thin-scrollbar"
+      data-profile-density={compactProfile ? "compact" : "comfortable"}
+      className={`relative min-h-0 flex-1 overflow-y-auto thin-scrollbar ${compactProfile ? "px-5 pb-6 pt-4" : "px-8 pb-12 pt-6"}`}
     >
       <div
         className="pointer-events-none fixed inset-0 opacity-35"
@@ -352,13 +365,16 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
           maskImage: "linear-gradient(120deg, black, transparent 75%)",
         }}
       />
-      <div className="relative mx-auto max-w-6xl space-y-5">
-        <section className="rounded-3xl border border-white/10 bg-black/70 p-6 shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <div className={`relative mx-auto max-w-6xl ${compactProfile ? "space-y-4" : "space-y-6"}`}>
+        <section className={`rounded-[28px] border border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_24px_90px_rgba(0,0,0,0.55)] ${compactProfile ? "p-5 md:p-6" : "p-7 md:p-8"}`}>
+          <div className={`flex flex-col md:flex-row md:items-center md:justify-between ${compactProfile ? "gap-4" : "gap-6"}`}>
             <div className="flex min-w-0 items-center gap-5">
-              <ProfileAvatar profile={userProfile} firebasePhotoURL={user?.photoURL} displayName={displayName} />
+              <ProfileAvatar profile={userProfile} firebasePhotoURL={user?.photoURL} displayName={displayName} compact={compactProfile} />
               <div className="min-w-0">
-                <h1 className="truncate text-3xl font-black tracking-tight text-white">{displayName}</h1>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
+                  {editable ? "Seu perfil" : "Perfil do jogador"}
+                </p>
+                <h1 className={`${compactProfile ? "text-3xl" : "text-4xl"} truncate font-black tracking-tight text-white`}>{displayName}</h1>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {hasSteamProfile && (
                     <button
@@ -431,92 +447,17 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                 </button>
               )}
               <div className="grid grid-cols-3 gap-3">
-                <StatCard icon={<Gamepad2 className="h-4 w-4" />} label={copy.games} value={stats.totalGames} />
-                <StatCard icon={<Clock className="h-4 w-4" />} label={copy.hours} value={`${formatPlayedHours(stats.totalHours)}h`} />
-                <StatCard icon={<Star className="h-4 w-4" />} label={copy.favorites} value={stats.favorites} />
+                <StatCard compact={compactProfile} icon={<Gamepad2 className="h-4 w-4" />} label={copy.games} value={stats.totalGames} />
+                <StatCard compact={compactProfile} icon={<Clock className="h-4 w-4" />} label={copy.hours} value={`${formatPlayedHours(stats.totalHours)}h`} />
+                <StatCard compact={compactProfile} icon={<Star className="h-4 w-4" />} label={copy.favorites} value={stats.favorites} />
               </div>
             </div>
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[285px_1fr]">
-          <div className="space-y-5">
-            <Section title={copy.platforms}>
-              <div className="space-y-2">
-                <PlatformCard
-                  name="Steam"
-                  connected={Boolean(userProfile?.steamId)}
-                  avatar={userProfile?.steamAvatar}
-                  username={userProfile?.steamUsername || userProfile?.steamId}
-                  icon={<FontAwesomeIcon icon={faSteam} className="h-4 w-4" />}
-                  connectedLabel={copy.connected}
-                  disconnectedLabel={copy.disconnected}
-                />
-                <PlatformCard
-                  name="Epic Games"
-                  connected={stats.epicGames > 0}
-                  username={stats.epicGames > 0 ? `${stats.epicGames} ${copy.catalogued}` : copy.catalog}
-                  icon={<EpicIcon className="h-5 w-5" />}
-                  connectedLabel={copy.connected}
-                  disconnectedLabel={copy.disconnected}
-                />
-                <PlatformCard
-                  name="Discord"
-                  connected={Boolean(userProfile?.discordId)}
-                  avatar={userProfile?.discordAvatar}
-                  username={userProfile?.discordUsername}
-                  icon={<FontAwesomeIcon icon={faDiscord} className="h-4 w-4" />}
-                  connectedLabel={copy.connected}
-                  disconnectedLabel={copy.disconnected}
-                />
-              </div>
-            </Section>
-
-            <Section title={copy.achievements}>
-              <div className="mb-3 flex items-end justify-between">
-                <div>
-                  <span className="text-4xl font-black text-white">{stats.totalAchievements}</span>
-                  <span className="ml-1 text-sm font-bold text-white/35">/ {stats.totalPossible}</span>
-                </div>
-                <span className="text-sm font-black text-white/45">{achievementPercent}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/8">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${achievementPercent}%` }}
-                  transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                  className="h-full rounded-full bg-white"
-                />
-              </div>
-              <p className="mt-3 flex items-center gap-1.5 text-[10px] text-white/35">
-                <Trophy className="h-3 w-3" /> {stats.totalAchievements} {copy.unlocked}
-              </p>
-            </Section>
-
-            <Section title={copy.library}>
-              <div className="space-y-3">
-                {libraryRows.map((row) => (
-                  <div key={row.label}>
-                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-white/45">
-                      <span>{row.label}</span>
-                      <span>{row.value}</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: stats.totalGames > 0 ? `${(row.value / stats.totalGames) * 100}%` : "0%" }}
-                        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                        className="h-full rounded-full bg-white"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          </div>
-
-          <div className="space-y-5">
-            <Section title={copy.mostPlayed} icon={<TrendingUp className="h-4 w-4" />} className="min-h-[346px]">
+        <div className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] ${compactProfile ? "gap-4" : "gap-5"}`}>
+          <section aria-label="Atividade do jogador" className="space-y-5">
+            <Section compact={compactProfile} title={copy.mostPlayed} icon={<TrendingUp className="h-4 w-4" />} className={compactProfile ? "min-h-[260px]" : "min-h-[346px]"}>
               {topGames.length > 0 ? (
                 <div className="space-y-4">
                   {topGames.map((game, index) => {
@@ -555,11 +496,11 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   })}
                 </div>
               ) : (
-                <EmptyProfileState title={copy.emptyTitle} body={copy.emptyBody} />
+                <EmptyProfileState compact={compactProfile} title={copy.emptyTitle} body={copy.emptyBody} />
               )}
             </Section>
 
-            <Section title={copy.favorites} icon={<Star className="h-4 w-4" />}>
+            <Section compact={compactProfile} title={copy.favorites} icon={<Star className="h-4 w-4" />}>
               {favoriteGames.length > 0 ? (
                 <div className="flex gap-4 overflow-x-auto pb-1 no-scrollbar">
                   {favoriteGames.map((game) => (
@@ -580,10 +521,75 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   ))}
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm font-bold text-white/35">{copy.noFavorites}</p>
+                <p className={`${compactProfile ? "py-5" : "py-8"} text-center text-sm font-bold text-white/35`}>{copy.noFavorites}</p>
               )}
             </Section>
-          </div>
+          </section>
+
+          <aside aria-label="Resumo do perfil" className="space-y-5">
+            <Section compact={compactProfile} title={copy.platforms}>
+              <div className="space-y-2">
+                <PlatformCard
+                  name="Steam"
+                  connected={Boolean(userProfile?.steamId)}
+                  avatar={userProfile?.steamAvatar}
+                  username={userProfile?.steamUsername || userProfile?.steamId}
+                  icon={<FontAwesomeIcon icon={faSteam} className="h-4 w-4" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
+                  compact={compactProfile}
+                />
+                <PlatformCard
+                  name="Epic Games"
+                  connected={stats.epicGames > 0}
+                  username={stats.epicGames > 0 ? `${stats.epicGames} ${copy.catalogued}` : copy.catalog}
+                  icon={<EpicIcon className="h-5 w-5" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
+                  compact={compactProfile}
+                />
+                <PlatformCard
+                  name="Discord"
+                  connected={Boolean(userProfile?.discordId)}
+                  avatar={userProfile?.discordAvatar}
+                  username={userProfile?.discordUsername}
+                  icon={<FontAwesomeIcon icon={faDiscord} className="h-4 w-4" />}
+                  connectedLabel={copy.connected}
+                  disconnectedLabel={copy.disconnected}
+                  compact={compactProfile}
+                />
+              </div>
+            </Section>
+
+            <Section compact={compactProfile} title={copy.achievements}>
+              <div className="mb-3 flex items-end justify-between">
+                <div>
+                  <span className="text-4xl font-black text-white">{stats.totalAchievements}</span>
+                  <span className="ml-1 text-sm font-bold text-white/35">/ {stats.totalPossible}</span>
+                </div>
+                <span className="text-sm font-black text-white/45">{achievementPercent}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/8">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${achievementPercent}%` }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="h-full rounded-full bg-white" />
+              </div>
+              <p className="mt-3 flex items-center gap-1.5 text-[10px] text-white/35">
+                <Trophy className="h-3 w-3" /> {stats.totalAchievements} {copy.unlocked}
+              </p>
+            </Section>
+
+            <Section compact={compactProfile} title={copy.library}>
+              <div className="space-y-3">
+                {libraryRows.map((row) => (
+                  <div key={row.label}>
+                    <div className="mb-1 flex items-center justify-between text-[10px] font-bold text-white/45"><span>{row.label}</span><span>{row.value}</span></div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
+                      <motion.div initial={{ width: 0 }} animate={{ width: stats.totalGames > 0 ? `${(row.value / stats.totalGames) * 100}%` : "0%" }} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }} className="h-full rounded-full bg-white" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </aside>
         </div>
       </div>
       <ProfileEditorModal
@@ -601,8 +607,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   );
 };
 
-const EmptyProfileState: React.FC<{ title: string; body: string }> = ({ title, body }) => (
-  <div className="flex h-56 flex-col items-center justify-center text-center">
+const EmptyProfileState: React.FC<{ title: string; body: string; compact?: boolean }> = ({ title, body, compact = false }) => (
+  <div className={`flex flex-col items-center justify-center text-center ${compact ? "h-40" : "h-56"}`}>
     <User className="mb-4 h-9 w-9 text-white/20" />
     <p className="text-sm font-black text-white/40">{title}</p>
     <p className="mt-1 text-xs text-white/25">{body}</p>

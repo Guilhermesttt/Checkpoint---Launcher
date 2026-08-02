@@ -17,13 +17,13 @@ export const SettingsHeader: React.FC<{
   title: React.ReactNode;
   description: string;
 }> = React.memo(({ icon, title, description }) => (
-  <div className="mb-6 flex items-center gap-3">
-    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+  <div className="mb-6 flex items-center gap-3.5">
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white/75 shadow-sm">
       {icon}
     </div>
     <div>
-      <h2 className="text-lg font-bold text-white">{title}</h2>
-      <p className="text-xs text-white/40">{description}</p>
+      <h2 className="text-lg md:text-xl font-bold text-white tracking-tight">{title}</h2>
+      {description && <p className="text-xs font-medium text-white/40 mt-0.5 leading-relaxed">{description}</p>}
     </div>
   </div>
 ));
@@ -45,7 +45,7 @@ export const AppUpdateSection: React.FC = React.memo(() => {
   } = useAppUpdater();
 
   return (
-    <section className="mt-5 rounded-[28px] border border-white/10 bg-black/35 p-6 backdrop-blur-3xl">
+    <section className="mt-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
       <SettingsHeader
         icon={<Sparkles className="h-5 w-5 text-white/70" />}
         title={updateCopy[0]}

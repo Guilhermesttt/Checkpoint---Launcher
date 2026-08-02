@@ -38,6 +38,22 @@ const parseProcessSnapshot = (stdout) => {
     .filter((record) => record.pid > 0 && record.name);
 };
 
+const parseTasklistProcessNames = (stdout, minimumWorkingSetKb = 1024) => {
+  const names = new Set();
+  for (const line of String(stdout || "").split(/\r?\n/)) {
+    const fields = (line.match(/"(?:[^"]|"")*"/g) || [])
+      .map((field) => field.slice(1, -1).replace(/""/g, '"'));
+    const name = String(fields[0] || "").trim().toLowerCase();
+    if (!name) continue;
+
+    const memoryDigits = String(fields.at(-1) || "").replace(/\D/g, "");
+    const workingSetKb = memoryDigits ? Number(memoryDigits) : null;
+    if (workingSetKb != null && workingSetKb < minimumWorkingSetKb) continue;
+    names.add(name);
+  }
+  return names;
+};
+
 const isPathInside = (rootPath, candidatePath) => {
   const root = normalizeWindowsPath(rootPath);
   const candidate = normalizeWindowsPath(candidatePath);
@@ -326,5 +342,6 @@ module.exports = {
   isPathInside,
   normalizeProcessRecord,
   normalizeWindowsPath,
+  parseTasklistProcessNames,
   parseProcessSnapshot,
 };

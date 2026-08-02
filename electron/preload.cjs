@@ -51,6 +51,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("auth:account-callback", handler);
     return () => ipcRenderer.removeListener("auth:account-callback", handler);
   },
+  getSpotifyStatus: () => ipcRenderer.invoke("spotify:get-status"),
+  connectSpotify: (clientId) => ipcRenderer.invoke("spotify:connect", clientId),
+  disconnectSpotify: () => ipcRenderer.invoke("spotify:disconnect"),
+  getSpotifyAccessToken: (clientId) =>
+    ipcRenderer.invoke("spotify:get-access-token", clientId),
   setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
   setWindowBehavior: (behavior) => ipcRenderer.invoke("system:set-window-behavior", behavior),
   requestAppQuit: () => ipcRenderer.invoke("system:request-app-quit"),
@@ -104,6 +109,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAchievementDiagnostics: () => ipcRenderer.invoke("achievement:get-diagnostics"),
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
+  showSpotifyTrackOverlay: (payload) => ipcRenderer.invoke("overlay:show-spotify-track", payload),
   updateOverlayPanel: (payload) => ipcRenderer.invoke("overlay:update-panel", payload),
   onOverlayPanelAction: (callback) => {
     const handler = (_event, payload) => callback(payload);

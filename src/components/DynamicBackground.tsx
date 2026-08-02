@@ -1,6 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PVideoBackground, PGlow, useLowPerf } from "./PerformanceComponents";
+import bgVideo from "../assets/morpxd_pindown.io_1785615286.mp4";
 
 interface DynamicBackgroundProps {
   backgroundImage: string;
@@ -14,7 +15,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
   return (
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" style={{ background: "var(--background)" }}>
       <PVideoBackground
-        src="/PinDown.io_@sebasoler__1776538674.mp4"
+        src={bgVideo}
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vh] h-[100vw] rotate-90 object-cover"
         opacity={0.18}
       />
@@ -65,4 +66,3 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
 };
 
 export default DynamicBackground;
-

@@ -2316,18 +2316,24 @@ const StatItem: React.FC<{
   isEmpty?: boolean;
 }> = ({ icon, label, value, isEmpty }) => (
   <div
-    className={`rounded-3xl border p-4 min-h-[94px] flex flex-col justify-between backdrop-blur-xl ${isEmpty ? "border-zinc-800/50 bg-zinc-900/20" : "border-zinc-800 bg-zinc-900/40"
-      }`}
+    className={`flex min-h-[86px] flex-col justify-between rounded-2xl border p-4 backdrop-blur-3xl transition-all ${
+      isEmpty
+        ? "border-white/[0.04] bg-white/[0.02]"
+        : "border-white/[0.06] bg-white/[0.035] shadow-lg"
+    }`}
   >
-    <div className="flex items-center gap-2 text-white/40 font-body">
-      {icon}
-      <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
+    <div className="flex items-center gap-2 text-white/40">
+      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10 text-white/70">
+        {icon}
+      </div>
+      <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-white/40">
         {label}
       </span>
     </div>
     <span
-      className={`text-xl font-semibold tracking-tight truncate ${isEmpty ? "text-white/20" : "text-white"
-        }`}
+      className={`truncate text-sm md:text-base font-bold tracking-tight ${
+        isEmpty ? "text-white/20" : "text-white"
+      }`}
     >
       {value}
     </span>
@@ -2343,17 +2349,19 @@ const AchievementStat: React.FC<{
   const isEmpty = total <= 0;
 
   return (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-900/40 backdrop-blur-xl p-4 min-h-[94px] flex flex-col justify-between col-span-2">
+    <div className="col-span-2 flex min-h-[86px] flex-col justify-between rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4 shadow-lg backdrop-blur-3xl">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-2 text-white/40">
-          <Trophy className="w-4 h-4" />
-          <div className="flex flex-col gap-1">
-            <span className="text-[8px] font-bold tracking-[0.2em] uppercase">
+        <div className="flex items-center gap-2.5 text-white/40">
+          <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-white/10 text-white/70">
+            <Trophy className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <span className="block text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-white/40">
               {label}
             </span>
             <span
               className={
-                isEmpty ? "text-white/20 text-xs" : "text-white/55 text-xs"
+                isEmpty ? "text-xs font-medium text-white/20" : "text-xs font-medium text-white/50"
               }
             >
               {isEmpty ? "---" : `${done}/${total}`}
@@ -2363,19 +2371,19 @@ const AchievementStat: React.FC<{
         <span
           className={
             isEmpty
-              ? "text-2xl font-light text-white/20"
-              : "text-2xl font-light text-white"
+              ? "text-xl md:text-2xl font-bold tabular-nums text-white/20"
+              : "text-xl md:text-2xl font-bold tabular-nums text-white"
           }
         >
           {isEmpty ? "0%" : `${percent}%`}
         </span>
       </div>
-      <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${isEmpty ? 0 : percent}%` }}
           transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full bg-white rounded-full"
+          className="h-full rounded-full bg-white"
         />
       </div>
     </div>
@@ -2397,78 +2405,89 @@ const AchievementRow: React.FC<{
   formatDate,
   onManualUnlock,
 }) => {
-    const unlockedAt = formatDate(achievement.unlockTime);
+  const unlockedAt = formatDate(achievement.unlockTime);
 
-    return (
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-2xl border p-4 transition-all duration-300 ${
+        achievement.achieved
+          ? "border-emerald-500/20 bg-emerald-500/[0.08] shadow-[0_4px_20px_rgba(16,185,129,0.06)]"
+          : "border-white/[0.06] bg-white/[0.035]"
+      }`}
+    >
       <div
-        className={`flex items-center gap-4 py-4 transition-all duration-300 px-4 -mx-4 rounded-xl ${achievement.achieved
-          ? "bg-linear-to-r from-emerald-500/12 via-emerald-500/6 to-transparent border border-emerald-500/15 shadow-[0_4px_20px_rgba(16,185,129,0.06),inset_0_1px_0_rgba(255,255,255,0.05)] hover:from-emerald-500/18 hover:via-emerald-500/10"
-          : "border border-transparent border-b-white/5 hover:bg-white/0.02"
-          }`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-black/25 transition-all duration-300 ${
+          achievement.achieved
+            ? "border-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
+            : "border-white/10 opacity-40 grayscale contrast-75"
+        }`}
       >
-        <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-black/25 transition-all duration-300 ${achievement.achieved
-          ? "border-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-          : "border-white/10 grayscale contrast-75 opacity-40"
-          }`}>
-          {achievement.icon || achievement.iconGray ? (
-            <img
-              src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon}
-              alt=""
-              className="h-full w-full object-cover"
-              loading="lazy"
-              decoding="async"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <Trophy className="h-6 w-6 text-white/25" />
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h4 className={`truncate text-sm font-bold tracking-wide transition-all ${achievement.achieved ? "text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" : "text-white/80"
-                }`}>
-                {achievement.name}
-              </h4>
-              <p className={`mt-1 text-xs leading-relaxed transition-colors ${achievement.achieved ? "text-zinc-300" : "text-white/55"
-                }`}>
-                {achievement.description || " "}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {!achievement.achieved && onManualUnlock && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onManualUnlock();
-                  }}
-                  className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/10 hover:text-white"
-                >
-                  Desbloquear
-                </button>
-              )}
-              <span
-                className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] transition-all ${achievement.achieved
-                  ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-300 drop-shadow-[0_0_8px_rgba(16,185,129,0.2)]"
-                  : "border-white/10 bg-white/5 text-white/35"
-                  }`}
-              >
-                {achievement.achieved ? unlockedLabel : lockedLabel}
-              </span>
-            </div>
-          </div>
-
-          {achievement.achieved && unlockedAt && (
-            <p className="mt-2.5 text-xs text-emerald-400/80 font-semibold tracking-[0.05em]">
-              {unlockedAtLabel} <span className="ml-1 text-white/90 font-medium">{unlockedAt}</span>
-            </p>
-          )}
-        </div>
+        {achievement.icon || achievement.iconGray ? (
+          <img
+            src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <Trophy className="h-5 w-5 text-white/25" />
+        )}
       </div>
-    );
-  };
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h4
+              className={`truncate text-xs md:text-sm font-bold tracking-wide transition-all ${
+                achievement.achieved ? "text-white" : "text-white/80"
+              }`}
+            >
+              {achievement.name}
+            </h4>
+            <p
+              className={`mt-0.5 text-xs leading-relaxed transition-colors ${
+                achievement.achieved ? "text-white/60" : "text-white/40"
+              }`}
+            >
+              {achievement.description || " "}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {!achievement.achieved && onManualUnlock && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManualUnlock();
+                }}
+                className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white"
+              >
+                Desbloquear
+              </button>
+            )}
+            <span
+              className={`rounded-lg border px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider transition-all ${
+                achievement.achieved
+                  ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-300"
+                  : "border-white/10 bg-white/5 text-white/35"
+              }`}
+            >
+              {achievement.achieved ? unlockedLabel : lockedLabel}
+            </span>
+          </div>
+        </div>
+
+        {achievement.achieved && unlockedAt && (
+          <p className="mt-1.5 text-[10px] font-semibold text-emerald-400/80">
+            {unlockedAtLabel} <span className="ml-1 font-medium text-white/70">{unlockedAt}</span>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const TechnicalDetail: React.FC<{
   label: string;
@@ -2476,10 +2495,10 @@ const TechnicalDetail: React.FC<{
   fallback: string;
 }> = ({ label, value, fallback }) => (
   <div>
-    <span className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5">
+    <span className="block text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">
       {label}
     </span>
-    <span className="text-white/80 text-sm font-medium">
+    <span className="text-xs md:text-sm font-bold text-white">
       {value || fallback}
     </span>
   </div>
