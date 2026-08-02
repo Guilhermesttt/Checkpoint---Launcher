@@ -113,6 +113,8 @@ let overlayWindow;
 let overlayReady = false;
 let overlayDisplayId = null;
 let overlayPanelOpen = false;
+const OVERLAY_GAMEPAD_TOGGLE_COOLDOWN_MS = 650;
+let lastOverlayGamepadToggleAt = 0;
 let inGameOverlayActive = false;
 let overlayPanelState = {
   language: "pt-BR",
@@ -1299,6 +1301,20 @@ const setOverlayPanelOpen = (open) => {
   });
 };
 
+const requestOverlayPanelToggle = (source = "unknown") => {
+  const normalizedSource = String(source || "unknown");
+  const now = Date.now();
+  if (
+    normalizedSource === "gamepad"
+    && now - lastOverlayGamepadToggleAt < OVERLAY_GAMEPAD_TOGGLE_COOLDOWN_MS
+  ) {
+    return overlayPanelOpen;
+  }
+  if (normalizedSource === "gamepad") lastOverlayGamepadToggleAt = now;
+  setOverlayPanelOpen(!overlayPanelOpen);
+  return overlayPanelOpen;
+};
+
 const overlaySettingsFile = () => path.join(app.getPath("userData"), "overlay-settings.json");
 const captureDirectory = () => path.join(app.getPath("pictures"), "Checkpoint Captures");
 
@@ -1703,8 +1719,8 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
   }
   const kind = String(action?.kind || "");
   if (kind === "toggle") {
-    setOverlayPanelOpen(!overlayPanelOpen);
-    return { ok: true, open: overlayPanelOpen };
+    const open = requestOverlayPanelToggle(action?.source);
+    return { ok: true, open };
   }
   if (kind === "close") {
     setOverlayPanelOpen(false);
@@ -3332,8 +3348,7 @@ registerSecureIpcHandler("overlay:set-achievement-notification-settings", async 
 });
 
 registerSecureIpcHandler("overlay:toggle-panel", async () => {
-  setOverlayPanelOpen(!overlayPanelOpen);
-  return { open: overlayPanelOpen };
+  return { open: requestOverlayPanelToggle("gamepad") };
 });
 
 registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
