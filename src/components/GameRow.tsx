@@ -56,6 +56,7 @@ const GameCardSlot = React.memo(
             isActive={isActive}
             isSteam={game.source === "steam" || game.launcherType === "steam"}
             isEpic={game.source === "epic" || game.launcherType === "epic"}
+            launcherType={game.launcherType}
             isFavorite={game.isFavorite}
             onClick={handleClick}
           />
@@ -104,22 +105,26 @@ const GameRow: React.FC<GameRowProps> = ({
   }, [canonicalIndex, games]);
 
   const isProgrammaticRef = React.useRef(false);
+  const canonicalIndexRef = React.useRef(canonicalIndex);
+
+  useEffect(() => {
+    canonicalIndexRef.current = canonicalIndex;
+  }, [canonicalIndex]);
 
   useEffect(() => {
     if (!emblaApi) return;
     isProgrammaticRef.current = true;
     emblaApi.scrollTo(canonicalIndex);
-    // Small delay to reset flag after Embla processes the scroll
-    const t = setTimeout(() => { isProgrammaticRef.current = false; }, 100);
+    const t = setTimeout(() => { isProgrammaticRef.current = false; }, 150);
     return () => clearTimeout(t);
   }, [emblaApi, canonicalIndex]);
 
   useEffect(() => {
     if (!emblaApi) return;
     const onSnap = () => {
-      if (isProgrammaticRef.current) return; // Skip sound for programmatic scrolls
+      if (isProgrammaticRef.current) return;
       const idx = emblaApi.selectedScrollSnap();
-      if (idx !== canonicalIndex) {
+      if (idx >= 0 && idx < games.length && idx !== canonicalIndexRef.current) {
         onSelect(idx);
       }
     };
@@ -127,7 +132,7 @@ const GameRow: React.FC<GameRowProps> = ({
     return () => {
       emblaApi.off("select", onSnap);
     };
-  }, [emblaApi, canonicalIndex, onSelect, playSound]);
+  }, [emblaApi, games.length, onSelect]);
 
   return (
     <div className="relative w-full flex flex-col" style={{ gap: 0 }}>

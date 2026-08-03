@@ -32,6 +32,18 @@ import {
 } from "../services/epic";
 import { apiUrl } from "../services/api";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
+import type { LauncherType } from "../types/domain";
+import {
+  SteamBrandIcon,
+  EpicBrandIcon,
+  EaBrandIcon,
+  UbisoftBrandIcon,
+  GogBrandIcon,
+  XboxBrandIcon,
+  RiotBrandIcon,
+  BattlenetBrandIcon,
+  RockstarBrandIcon,
+} from "./Sidebar";
 
 interface AddGameModalProps {
   isOpen: boolean;
@@ -79,7 +91,7 @@ type GameFormData = {
   category: string;
   description: string;
   aboutTheGame?: string;
-  launcherType: "steam" | "local" | "epic";
+  launcherType: LauncherType;
   executablePath: string;
   steamAppId?: string;
   epicCatalogId?: string;
@@ -495,6 +507,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchSource, setSearchSource] = useState<"steam" | "epic">("steam");
 
   const [formData, setFormData] = useState<GameFormData>({
     title: "",
@@ -556,6 +569,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           epicLaunchId: "",
         });
       }
+      setSearchSource(gameToEdit?.launcherType === "epic" ? "epic" : "steam");
       setSearchQuery("");
       setSearchResults([]);
       setIsSearching(false);
@@ -707,9 +721,9 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           logoImage: d.logoImage || "",
           description: d.description || "",
           aboutTheGame: d.aboutTheGame || d.description || "",
-          launcherType: prev.launcherType === "local" ? "local" : "steam",
+          launcherType: prev.launcherType === "steam" ? "steam" : prev.launcherType,
           executablePath:
-            prev.launcherType === "local" ? prev.executablePath : appId,
+            prev.launcherType === "steam" ? appId : prev.executablePath,
           steamAppId: appId,
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
@@ -833,7 +847,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         logoImage: d?.logoImage || game.logoImage || "",
         description: d?.description || game.description || "",
         aboutTheGame: d?.aboutTheGame || game.aboutTheGame || game.description || "",
-        launcherType: "epic",
+        launcherType: prev.launcherType === "epic" ? "epic" : prev.launcherType,
         executablePath:
           (isWindowsExecutablePath(d?.executablePath || "") && d?.executablePath)
           || (isWindowsExecutablePath(game.executablePath) && game.executablePath)
@@ -866,7 +880,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
   const applyExecutableSelection = (
     executablePath: string,
-    launcherType: "local" | "epic",
+    launcherType: LauncherType,
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -886,7 +900,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
 
   const handleExecutableFileFallback = (
     e: React.ChangeEvent<HTMLInputElement>,
-    launcherType: "local" | "epic",
+    launcherType: LauncherType,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -901,7 +915,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     applyExecutableSelection(browserPath, launcherType);
   };
 
-  const handleChooseExecutable = async (launcherType: "local" | "epic") => {
+  const handleChooseExecutable = async (launcherType: LauncherType) => {
     if (!window.electronAPI?.selectExecutable) {
       executableInputRef.current?.click();
       return;
@@ -980,6 +994,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     detailsRequestRef.current += 1;
     setLoading(false);
     resetSearch();
+    setSearchSource(launcherType === "epic" ? "epic" : "steam");
     setFormData((prev) => {
       const platformChanged = prev.launcherType !== launcherType;
       if (launcherType === "local") {
@@ -1166,11 +1181,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.platform}</p>
                 <div className="mt-2 border-b border-white/[0.08]" />
               </div>
-              <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 sm:grid-cols-3">
+              <div role="radiogroup" aria-label={copy.platform} className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
                 {([
                   { id: "local" as const, label: copy.local, icon: () => <HardDrive size={17} /> },
-                  { id: "steam" as const, label: copy.steam, icon: () => <FontAwesomeIcon icon={faSteam} className="h-[17px] w-[17px]" /> },
-                  { id: "epic" as const, label: copy.epic, icon: (selected: boolean) => <EpicIcon className="h-[17px] w-[17px] opacity-80" invert={!selected} /> },
+                  { id: "steam" as const, label: copy.steam, icon: (selected: boolean) => <SteamBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "epic" as const, label: copy.epic, icon: (selected: boolean) => <EpicBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "ea" as const, label: "EA App", icon: (selected: boolean) => <EaBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "ubisoft" as const, label: "Ubisoft", icon: (selected: boolean) => <UbisoftBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "gog" as const, label: "GOG", icon: (selected: boolean) => <GogBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "xbox" as const, label: "Xbox", icon: (selected: boolean) => <XboxBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "riot" as const, label: "Riot Games", icon: (selected: boolean) => <RiotBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "battlenet" as const, label: "Battle.net", icon: (selected: boolean) => <BattlenetBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
+                  { id: "rockstar" as const, label: "Rockstar", icon: (selected: boolean) => <RockstarBrandIcon className="h-[17px] w-[17px]" style={{ color: selected ? "#000" : "#fff" }} /> },
                 ]).map((option) => {
                   const selected = formData.launcherType === option.id;
                   return (
@@ -1180,15 +1202,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                       role="radio"
                       aria-checked={selected}
                       onClick={() => selectLauncherType(option.id)}
-                      className={"flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all " + (selected
+                      className={"flex items-center gap-2.5 rounded-xl border px-3 py-3 text-left transition-all " + (selected
                         ? "border-white bg-white text-black"
                         : "border-white/10 bg-transparent text-white hover:border-white/25 hover:bg-white/[0.04]")}
                     >
-                      <span className={"grid h-8 w-8 shrink-0 place-items-center rounded-lg " + (selected ? "text-black/70" : "text-white/55")}>
+                      <span className={"grid h-7 w-7 shrink-0 place-items-center rounded-lg " + (selected ? "text-black/70" : "text-white/55")}>
                         {option.icon(selected)}
                       </span>
-                      <strong className="text-[13px] font-bold">{option.label}</strong>
-                      {selected && <CheckCircle2 size={16} className="ml-auto text-black/60" />}
+                      <strong className="truncate text-[12px] font-bold">{option.label}</strong>
+                      {selected && <CheckCircle2 size={15} className="ml-auto shrink-0 text-black/60" />}
                     </button>
                   );
                 })}
@@ -1198,7 +1220,39 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             <section className="relative">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.automaticFill}</p>
-                {loading && <RefreshCw size={14} className="animate-spin text-white/45" />}
+                <div className="flex items-center gap-2">
+                  {loading && <RefreshCw size={14} className="animate-spin text-white/45" />}
+                  <div className="flex items-center gap-1 rounded-lg bg-white/[0.04] p-0.5 border border-white/[0.06] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchSource("steam");
+                        resetSearch();
+                      }}
+                      className={`px-3 py-1 rounded-md transition-all font-bold flex items-center gap-1.5 text-[10px] uppercase tracking-wider ${
+                        searchSource === "steam"
+                          ? "bg-white/10 text-white shadow-sm"
+                          : "text-white/40 hover:text-white/70"
+                      }`}
+                    >
+                      <SteamBrandIcon className="w-3.5 h-3.5" style={{ color: searchSource === "steam" ? "#fff" : "currentColor" }} /> Steam
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchSource("epic");
+                        resetSearch();
+                      }}
+                      className={`px-3 py-1 rounded-md transition-all font-bold flex items-center gap-1.5 text-[10px] uppercase tracking-wider ${
+                        searchSource === "epic"
+                          ? "bg-white/10 text-white shadow-sm"
+                          : "text-white/40 hover:text-white/70"
+                      }`}
+                    >
+                      <EpicBrandIcon className="w-3.5 h-3.5" style={{ color: searchSource === "epic" ? "#fff" : "currentColor" }} /> Epic
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="mb-3 border-b border-white/[0.08]" />
 
@@ -1207,13 +1261,13 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                 <input
                   id="game-metadata-search"
                   role="combobox"
-                  aria-label={formData.launcherType === "epic" ? copy.epicSearch : copy.steamSearch}
+                  aria-label={searchSource === "epic" ? copy.epicSearch : copy.steamSearch}
                   aria-autocomplete="list"
                   aria-controls="game-search-results"
                   aria-expanded={searchQuery.length >= 3}
                   value={searchQuery}
-                  onChange={(event) => scheduleSearch(event.target.value, formData.launcherType === "epic" ? "epic" : "steam")}
-                  placeholder={copy.searchPlaceholder}
+                  onChange={(event) => scheduleSearch(event.target.value, searchSource)}
+                  placeholder={searchSource === "epic" ? copy.epicSearch : copy.steamSearch}
                   className="w-full rounded-xl border border-white/10 bg-black/30 py-3.5 pl-11 pr-11 text-[13px] text-white outline-none transition-all placeholder:text-white/22 focus:border-white/24"
                 />
                 {isSearching && <RefreshCw size={14} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-white/32" />}
@@ -1223,7 +1277,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   isSearching={isSearching}
                   hasQuery={searchQuery.length >= 3}
                   noResultsLabel={copy.noSearchResults}
-                  onSelect={formData.launcherType === "epic" ? handleSelectEpicGame : handleSelectSteamGame}
+                  onSelect={searchSource === "epic" ? handleSelectEpicGame : handleSelectSteamGame}
                 />
               </div>
 
@@ -1259,11 +1313,11 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </button>
                 )}
 
-              {formData.launcherType === "epic" && (
+              {formData.launcherType !== "steam" && (
                 <div className="mt-4">
-                  <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={(event) => handleExecutableFileFallback(event, "epic")} />
+                  <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={(event) => handleExecutableFileFallback(event, formData.launcherType)} />
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <button type="button" onClick={() => void handleChooseExecutable("epic")} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-[11px] font-bold text-white/68 transition-all hover:bg-white/[0.06] hover:text-white">
+                    <button type="button" onClick={() => void handleChooseExecutable(formData.launcherType)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-3 text-[11px] font-bold text-white/68 transition-all hover:bg-white/[0.06] hover:text-white">
                       <FolderOpen size={14} /> {copy.chooseExe}
                     </button>
                     <div className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3">

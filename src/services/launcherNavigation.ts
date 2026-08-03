@@ -6,6 +6,13 @@ export const RESTORABLE_CATEGORIES = [
   "MODS",
   "STEAM",
   "EPIC",
+  "EA",
+  "UBISOFT",
+  "GOG",
+  "XBOX",
+  "RIOT",
+  "BATTLENET",
+  "ROCKSTAR",
   "LOCAL",
   "PROFILE",
   "RACING",
@@ -32,7 +39,7 @@ export const SETTINGS_TABS = [
 
 export const SIDEBAR_NAVIGATION_GROUPS = [
   { key: "filters", ids: ["ALL", "FAVORITES"] },
-  { key: "platforms", ids: ["STEAM", "EPIC", "LOCAL"] },
+  { key: "platforms", ids: ["STEAM", "EPIC", "EA", "UBISOFT", "GOG", "XBOX", "RIOT", "BATTLENET", "ROCKSTAR", "LOCAL"] },
   { key: "community", ids: ["FRIENDS", "FEED"] },
   { key: "music", ids: ["SPOTIFY"] },
   { key: "mods", ids: ["MODS"] },

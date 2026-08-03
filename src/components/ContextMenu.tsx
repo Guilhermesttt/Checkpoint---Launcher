@@ -26,10 +26,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
 
   return (
     <RadixContextMenu>
-      <ContextMenuTrigger asChild>
-        <div style={{ display: "contents" }}>
-          {children}
-        </div>
+      <ContextMenuTrigger>
+        {children}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-64 premium-glass-black rounded-2xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.1)] p-2 z-[300]">
         <ContextMenuItem

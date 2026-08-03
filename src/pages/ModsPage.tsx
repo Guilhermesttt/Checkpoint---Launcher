@@ -335,16 +335,6 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             )}
           </section>
 
-          <section className="flex items-center gap-3.5 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-4.5 backdrop-blur-2xl">
-            <ShieldCheck className="h-5 w-5 shrink-0 text-amber-300/80" />
-            <div>
-              <p className="text-xs font-bold text-amber-100/80">Instalação de mods</p>
-              <p className="mt-0.5 text-xs font-medium leading-relaxed text-amber-100/50">
-                ZIPs reconhecidos do Cyberpunk 2077 e Resident Evil Requiem são instalados automaticamente
-                com backup. Formatos desconhecidos permanecem disponíveis para instalação manual.
-              </p>
-            </div>
-          </section>
         </div>
       </motion.main>
 

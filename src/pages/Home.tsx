@@ -38,7 +38,19 @@ import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/doma
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
-import Sidebar, { CATEGORIES, SteamBrandIcon, DiscordBrandIcon, EpicBrandIcon } from '../components/Sidebar';
+import Sidebar, {
+  CATEGORIES,
+  SteamBrandIcon,
+  DiscordBrandIcon,
+  EpicBrandIcon,
+  EaBrandIcon,
+  UbisoftBrandIcon,
+  GogBrandIcon,
+  XboxBrandIcon,
+  RiotBrandIcon,
+  BattlenetBrandIcon,
+  RockstarBrandIcon,
+} from '../components/Sidebar';
 import { useGamepadFocusNavigation } from '../hooks/useGamepadFocusNavigation';
 import { useGamePresence } from '../hooks/useGamePresence';
 import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
@@ -2013,6 +2025,34 @@ const Home: React.FC = () => {
                             className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90"
                           >
                             <EpicBrandIcon className="w-3 h-3 text-white" /> Via Epic
+                          </span>
+                        ) : currentGame?.launcherType === "ea" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-red-400">
+                            <EaBrandIcon className="w-3 h-3 text-red-400" /> Via EA App
+                          </span>
+                        ) : currentGame?.launcherType === "ubisoft" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400">
+                            <UbisoftBrandIcon className="w-3 h-3 text-cyan-400" /> Via Ubisoft
+                          </span>
+                        ) : currentGame?.launcherType === "gog" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-400">
+                            <GogBrandIcon className="w-3 h-3 text-purple-400" /> Via GOG
+                          </span>
+                        ) : currentGame?.launcherType === "xbox" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400">
+                            <XboxBrandIcon className="w-3 h-3 text-emerald-400" /> Via Xbox
+                          </span>
+                        ) : currentGame?.launcherType === "riot" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400">
+                            <RiotBrandIcon className="w-3 h-3 text-rose-400" /> Via Riot Games
+                          </span>
+                        ) : currentGame?.launcherType === "battlenet" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400">
+                            <BattlenetBrandIcon className="w-3 h-3 text-sky-400" /> Via Battle.net
+                          </span>
+                        ) : currentGame?.launcherType === "rockstar" ? (
+                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400">
+                            <RockstarBrandIcon className="w-3 h-3 text-amber-400" /> Via Rockstar
                           </span>
                         ) : (
                           <span

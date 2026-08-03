@@ -11,6 +11,15 @@ import {
 } from "framer-motion";
 import { PCard3D, PGlow, useLowPerf } from "./PerformanceComponents";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
+import {
+  EaBrandIcon,
+  UbisoftBrandIcon,
+  GogBrandIcon,
+  XboxBrandIcon,
+  RiotBrandIcon,
+  BattlenetBrandIcon,
+  RockstarBrandIcon,
+} from "./Sidebar";
 
 interface GameCardProps {
   title: string;
@@ -21,6 +30,7 @@ interface GameCardProps {
   isFavorite?: boolean;
   isSteam?: boolean;
   isEpic?: boolean;
+  launcherType?: string;
 }
 
 const CARD_FRAME_WIDTH = 172;
@@ -39,6 +49,7 @@ const GameCard: React.FC<GameCardProps> = ({
   isFavorite = false,
   isSteam = false,
   isEpic = false,
+  launcherType,
 }) => {
   const reduceMotion = useReducedMotion();
   const low = useLowPerf();
@@ -88,7 +99,8 @@ const GameCard: React.FC<GameCardProps> = ({
   };
 
   const platformBadge = React.useMemo(() => {
-    if (isSteam) {
+    const type = (launcherType || "").toLowerCase() || (isSteam ? "steam" : isEpic ? "epic" : "local");
+    if (type === "steam") {
       return {
         label: "Steam",
         color: "#66C0F4",
@@ -104,7 +116,7 @@ const GameCard: React.FC<GameCardProps> = ({
       };
     }
 
-    if (isEpic) {
+    if (type === "epic") {
       return {
         label: "Epic",
         color: "#f5f5f5",
@@ -123,6 +135,76 @@ const GameCard: React.FC<GameCardProps> = ({
       };
     }
 
+    if (type === "ea") {
+      return {
+        label: "EA",
+        color: "#f87171",
+        border: "rgba(239,68,68,0.4)",
+        background: "rgba(127,29,29,0.7)",
+        icon: <EaBrandIcon className="h-2.5 w-2.5 text-red-400" />,
+      };
+    }
+
+    if (type === "ubisoft") {
+      return {
+        label: "Ubisoft",
+        color: "#22d3ee",
+        border: "rgba(6,182,212,0.4)",
+        background: "rgba(22,78,99,0.7)",
+        icon: <UbisoftBrandIcon className="h-2.5 w-2.5 text-cyan-400" />,
+      };
+    }
+
+    if (type === "gog") {
+      return {
+        label: "GOG",
+        color: "#c084fc",
+        border: "rgba(168,85,247,0.4)",
+        background: "rgba(88,28,135,0.7)",
+        icon: <GogBrandIcon className="h-2.5 w-2.5 text-purple-400" />,
+      };
+    }
+
+    if (type === "xbox") {
+      return {
+        label: "Xbox",
+        color: "#34d399",
+        border: "rgba(16,185,129,0.4)",
+        background: "rgba(6,78,59,0.7)",
+        icon: <XboxBrandIcon className="h-2.5 w-2.5 text-emerald-400" />,
+      };
+    }
+
+    if (type === "riot") {
+      return {
+        label: "Riot",
+        color: "#fb7185",
+        border: "rgba(244,63,94,0.4)",
+        background: "rgba(136,19,55,0.7)",
+        icon: <RiotBrandIcon className="h-2.5 w-2.5 text-rose-400" />,
+      };
+    }
+
+    if (type === "battlenet") {
+      return {
+        label: "B.net",
+        color: "#38bdf8",
+        border: "rgba(14,165,233,0.4)",
+        background: "rgba(12,74,110,0.7)",
+        icon: <BattlenetBrandIcon className="h-2.5 w-2.5 text-sky-400" />,
+      };
+    }
+
+    if (type === "rockstar") {
+      return {
+        label: "Rockstar",
+        color: "#fbbf24",
+        border: "rgba(245,158,11,0.4)",
+        background: "rgba(120,53,15,0.7)",
+        icon: <RockstarBrandIcon className="h-2.5 w-2.5 text-amber-400" />,
+      };
+    }
+
     return {
       label: "Local",
       color: "#a7f3d0",
@@ -130,7 +212,7 @@ const GameCard: React.FC<GameCardProps> = ({
       background: "rgba(6,78,59,0.6)",
       icon: <Gamepad2 className="h-2.5 w-2.5 text-emerald-400" />,
     };
-  }, [isEpic, isSteam]);
+  }, [isEpic, isSteam, launcherType]);
 
   const hasImageError = failedImageSrc === image;
 

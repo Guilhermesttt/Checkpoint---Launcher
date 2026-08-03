@@ -11,6 +11,7 @@ import { PreferencesProvider, usePreferences } from "./context/PreferencesContex
 import { GamepadProvider } from "./context/GamepadContext";
 import { GamepadStatusOverlay } from "./components/ui/GamepadStatusOverlay";
 import { useControllerLed } from "./hooks/useControllerLed";
+import { TooltipProvider } from "./components/ui/tooltip";
 import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
 import WhatsNewModal from "./components/WhatsNewModal";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
@@ -397,7 +398,9 @@ const App: React.FC = () => (
     <AuthProvider>
       <PreferencesProvider>
         <GamepadProvider>
-          <AppContent />
+          <TooltipProvider>
+            <AppContent />
+          </TooltipProvider>
         </GamepadProvider>
       </PreferencesProvider>
     </AuthProvider>

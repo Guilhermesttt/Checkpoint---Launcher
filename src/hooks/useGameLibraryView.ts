@@ -43,13 +43,27 @@ export function useGameLibraryView({
               )
               : activeCategory === "EPIC"
                 ? ordered.filter((g) => g.launcherType === "epic")
-                : ordered.filter((g) => {
-                  const gCat = normalizeCategory(g.category);
-                  return (
-                    gCat === normalizeCategory(activeCategory) ||
-                    gCat === normalizeCategory(categoryLabel)
-                  );
-                });
+                : activeCategory === "EA"
+                  ? ordered.filter((g) => g.launcherType === "ea")
+                  : activeCategory === "UBISOFT"
+                    ? ordered.filter((g) => g.launcherType === "ubisoft")
+                    : activeCategory === "GOG"
+                      ? ordered.filter((g) => g.launcherType === "gog")
+                      : activeCategory === "XBOX"
+                        ? ordered.filter((g) => g.launcherType === "xbox")
+                        : activeCategory === "RIOT"
+                          ? ordered.filter((g) => g.launcherType === "riot")
+                          : activeCategory === "BATTLENET"
+                            ? ordered.filter((g) => g.launcherType === "battlenet")
+                            : activeCategory === "ROCKSTAR"
+                              ? ordered.filter((g) => g.launcherType === "rockstar")
+                              : ordered.filter((g) => {
+                            const gCat = normalizeCategory(g.category);
+                            return (
+                              gCat === normalizeCategory(activeCategory) ||
+                              gCat === normalizeCategory(categoryLabel)
+                            );
+                          });
     return s
       ? filtered.filter(
         (g) =>

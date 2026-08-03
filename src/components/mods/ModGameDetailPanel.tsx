@@ -80,7 +80,6 @@ type PanelTab = "discover" | "installed" | "downloads" | "setup";
 type CatalogSort = "featured" | "recent" | "downloads" | "endorsements" | "name";
 
 const CATALOG_PAGE_SIZE = 30;
-const AUTO_INSTALL_DOMAINS = new Set(["cyberpunk2077", "residentevilrequiem"]);
 
 const formatBytes = (value: number) => {
   if (!Number.isFinite(value) || value <= 0) return "0 MB";
@@ -459,7 +458,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       setInstalledActionError("Não foi possível identificar este mod.");
       return;
     }
-    if (enabled && (!AUTO_INSTALL_DOMAINS.has(gameDomain) || !mod.filePath)) {
+    if (enabled && !mod.filePath) {
       setInstalledActionError("Este formato ainda exige instalação manual.");
       return;
     }
@@ -634,7 +633,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       setFilesError("O identificador deste mod não pôde ser reconhecido.");
       return;
     }
-    if (AUTO_INSTALL_DOMAINS.has(gameDomain) && !gameFolder) {
+    if (!gameFolder) {
       setFilesError(
         "Selecione primeiro a pasta raiz do jogo na aba Configurar.",
       );
@@ -1178,9 +1177,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                         ? "Instalado"
                                         : isDownloaded
                                           ? "Baixado"
-                                          : AUTO_INSTALL_DOMAINS.has(gameDomain)
-                                        ? "Instalar grátis"
-                                        : "Baixar grátis"}
+                                          : "Instalar grátis"}
                                     </button>
                                   </div>
                                 </div>
@@ -1308,11 +1305,10 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                   disabled={isBusy || (
                                     displayedEnabled
                                       ? !mod.manifestPath && !(
-                                        gameDomain === "residentevilrequiem"
-                                        && Boolean(gameFolder)
+                                        Boolean(gameFolder)
                                         && /\.zip$/i.test(mod.filePath || "")
                                       )
-                                      : !mod.filePath || !AUTO_INSTALL_DOMAINS.has(gameDomain)
+                                      : !mod.filePath
                                   )}
                                   title={displayedEnabled && !mod.manifestPath
                                     ? "O Checkpoint verificará os arquivos antes de vincular este mod"

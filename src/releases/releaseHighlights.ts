@@ -1,5 +1,5 @@
 export interface ReleaseHighlight {
-  id: "spotify" | "controller" | "stability";
+  id: "spotify" | "controller" | "stability" | "platforms" | "search";
   title: string;
   description: string;
 }
@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.0.5",
-  title: "Uma nova fase do Checkpoint",
-  description: "Música, controle e uma experiência mais fluida dentro e fora dos seus jogos.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.5",
+  version: "3.0.6",
+  title: "Mais opções, mais liberdade",
+  description: "Novas plataformas suportadas e ferramentas de busca de metadados aprimoradas para organizar sua biblioteca.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.6",
   highlights: [
     {
-      id: "spotify",
-      title: "Spotify dentro do launcher",
-      description: "Player redesenhado, busca instantânea, playlists, fila inteligente e sessões Jam.",
+      id: "platforms",
+      title: "Novas Plataformas Suportadas",
+      description: "Agora você pode adicionar e organizar jogos da Riot Games, Battle.net, Rockstar, GOG, EA App e Ubisoft.",
     },
     {
-      id: "controller",
-      title: "Controle também no jogo",
-      description: "Navegue pelo overlay, troque de aba e controle suas faixas sem sair da partida.",
+      id: "search",
+      title: "Busca Inteligente de Metadados",
+      description: "Escolha entre as bases de dados da Steam e Epic Games para encontrar as melhores capas e informações.",
     },
     {
       id: "stability",
-      title: "Perfis e estabilidade",
-      description: "Melhor organização visual e correções importantes no Spotify, inputs e notificações.",
+      title: "Melhorias e Ajustes",
+      description: "Aprimoramentos visuais na tela inicial e correções gerais de usabilidade no sistema de biblioteca.",
     },
   ],
 };

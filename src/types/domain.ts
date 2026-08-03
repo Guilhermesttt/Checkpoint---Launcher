@@ -1,4 +1,15 @@
-export type LauncherType = "steam" | "local" | "epic";
+export type LauncherType =
+  | "steam"
+  | "local"
+  | "epic"
+  | "ea"
+  | "ubisoft"
+  | "gog"
+  | "xbox"
+  | "riot"
+  | "battlenet"
+  | "rockstar"
+  | "itch";
 
 export interface GameLaunchProfile {
   arguments?: string;

@@ -29,8 +29,16 @@ import {
 } from "./animated/SidebarIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSteam, faDiscord, faSpotify } from "@fortawesome/free-brands-svg-icons";
-import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
+import { faSteam, faDiscord, faSpotify, faXbox } from "@fortawesome/free-brands-svg-icons";
+import {
+  EPIC_GAMES_ICON_PATH,
+  EA_GAMES_ICON_PATH,
+  UBISOFT_ICON_PATH,
+  GOG_ICON_PATH,
+  RIOT_GAMES_ICON_PATH,
+  BATTLENET_ICON_PATH,
+  ROCKSTAR_ICON_PATH,
+} from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import type { LauncherLanguage } from "../context/PreferencesContext";
 import {
@@ -100,6 +108,191 @@ export const EpicBrandIcon: React.FC<{ className?: string; style?: React.CSSProp
   );
 };
 
+export const EaBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${EA_GAMES_ICON_PATH})`,
+        maskImage: `url(${EA_GAMES_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
+export const UbisoftBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${UBISOFT_ICON_PATH})`,
+        maskImage: `url(${UBISOFT_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
+export const GogBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${GOG_ICON_PATH})`,
+        maskImage: `url(${GOG_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
+export const XboxBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => (
+  <FontAwesomeIcon
+    icon={faXbox}
+    className={className}
+    style={style as React.ComponentProps<typeof FontAwesomeIcon>["style"]}
+  />
+);
+
+export const RiotBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${RIOT_GAMES_ICON_PATH})`,
+        maskImage: `url(${RIOT_GAMES_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
+export const BattlenetBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${BATTLENET_ICON_PATH})`,
+        maskImage: `url(${BATTLENET_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
+export const RockstarBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className,
+  style,
+}) => {
+  const { color, filter, ...restStyle } = style ?? {};
+
+  return (
+    <span
+      role="img"
+      aria-hidden="true"
+      className={className}
+      style={{
+        ...restStyle,
+        display: "inline-block",
+        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        WebkitMaskImage: `url(${ROCKSTAR_ICON_PATH})`,
+        maskImage: `url(${ROCKSTAR_ICON_PATH})`,
+        WebkitMaskSize: "contain",
+        maskSize: "contain",
+        WebkitMaskRepeat: "no-repeat",
+        maskRepeat: "no-repeat",
+        WebkitMaskPosition: "center",
+        maskPosition: "center",
+        filter: filter && filter !== "none" ? (filter as string) : undefined,
+      }}
+    />
+  );
+};
+
 // eslint-disable-next-line react-refresh/only-export-components
 export const CATEGORIES = [
   { id: "ALL", label: "Todos", Icon: Gamepad2, AnimatedIcon: AnimatedGamepadIcon },
@@ -110,6 +303,13 @@ export const CATEGORIES = [
   { id: "MODS", label: "Mods", Icon: Puzzle },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },
+  { id: "EA", label: "EA App", Icon: EaBrandIcon },
+  { id: "UBISOFT", label: "Ubisoft", Icon: UbisoftBrandIcon },
+  { id: "GOG", label: "GOG", Icon: GogBrandIcon },
+  { id: "XBOX", label: "Xbox", Icon: XboxBrandIcon },
+  { id: "RIOT", label: "Riot Games", Icon: RiotBrandIcon },
+  { id: "BATTLENET", label: "Battle.net", Icon: BattlenetBrandIcon },
+  { id: "ROCKSTAR", label: "Rockstar", Icon: RockstarBrandIcon },
   { id: "LOCAL", label: "Local", Icon: Laptop, AnimatedIcon: AnimatedLaptopIcon },
   { id: "PROFILE", label: "Perfil", Icon: User, AnimatedIcon: AnimatedUserIcon },
   { id: "RACING", label: "Corrida", Icon: Car },
@@ -279,7 +479,11 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   if (!isExpanded) {
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
+        <TooltipTrigger asChild>
+          <span className="inline-flex w-full justify-center">
+            {buttonContent}
+          </span>
+        </TooltipTrigger>
         <TooltipContent
           side="right"
           align="center"
