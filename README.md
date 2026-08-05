@@ -65,60 +65,6 @@ O atalho de captura pode ser alterado nas configurações do overlay. São aceit
 | Backend Checkpoint | Validação de amizades do chat, integrações protegidas e publicação do feed |
 | Jogos locais | Executável, perfil de inicialização, presença e conquistas compatíveis |
 
-## Instalação
-
-1. Abra [GitHub Releases](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases).
-2. Baixe `Checkpoint-Launcher-Setup-<versão>.exe`.
-3. Execute o instalador e escolha a pasta de instalação.
-4. Entre na sua conta e conecte as integrações desejadas.
-
-Requisitos: Windows 10/11 de 64 bits e conexão com a internet para autenticação, sincronização e recursos sociais.
-
-## Desenvolvimento local
-
-Pré-requisitos:
-
-- Node.js 22 ou superior.
-- npm com o lockfile do projeto.
-- Java 21 para os testes das regras do Firestore e Realtime Database.
-- Projeto Firebase e credenciais opcionais das integrações que você deseja testar.
-
-Configuração:
-
-```powershell
-git clone https://github.com/Guilhermesttt/Checkpoint---Launcher.git
-Set-Location Checkpoint---Launcher
-npm ci
-Copy-Item .env.example .env
-```
-
-Preencha apenas as variáveis necessárias no `.env`. Chaves privadas, tokens, service accounts e certificados nunca devem ser commitados.
-
-Execução do app desktop completo:
-
-```powershell
-npm run electron:dev
-```
-
-Validações principais:
-
-```powershell
-npm run lint
-npm run build
-npm run test:typecheck
-npm run test
-npm run test:rules
-npm run audit:ci
-```
-
-## Estrutura do projeto
-
-- `src/`: interface React, estado, serviços e páginas do launcher.
-- `electron/`: runtime desktop, IPC, overlay, capturas, watchers e inicialização de jogos.
-- `server/`: API Express para Steam, Epic, OAuth e integrações do backend.
-- `tests/`: testes unitários, de DOM, IPC, SQLite e regras Firebase.
-- `docs/`: documentação técnica e checklist de release.
-
 ## Privacidade e segurança
 
 O Checkpoint mantém a biblioteca completa em SQLite dentro de `app.getPath("userData")`. O Firestore recebe somente o resumo público sem caminhos de executáveis ou imagens base64; mensagens ficam no Realtime Database. Steam e Discord são opcionais. Segredos de backend não devem ser expostos ao renderer nem armazenados no repositório. Antes de publicar uma versão, siga o [checklist de release e privacidade](docs/RELEASE_CHECKLIST.md).
