@@ -12,11 +12,11 @@ describe("modal completo de novidades", () => {
 
   afterEach(cleanup);
 
-  it("apresenta os tres destaques da versao 3.0.6", () => {
+  it("apresenta os tres destaques da versao 3.0.7", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={vi.fn()} />);
 
     expect(screen.getByText("Mais opções, mais liberdade")).toBeInTheDocument();
-    expect(screen.getByText("VERSÃO 3.0.6")).toBeInTheDocument();
+    expect(screen.getByText("VERSÃO 3.0.7")).toBeInTheDocument();
     expect(screen.getAllByTestId("release-highlight")).toHaveLength(3);
     expect(screen.getByText("Novas Plataformas Suportadas")).toBeInTheDocument();
     expect(screen.getByText("Busca Inteligente de Metadados")).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("modal completo de novidades", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Ver notas completas" }));
     expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.6",
+      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.7",
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar novidades" }));

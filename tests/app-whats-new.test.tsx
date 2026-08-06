@@ -45,18 +45,18 @@ describe("novidades no fluxo inicial do app", () => {
     });
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { getVersion: vi.fn().mockResolvedValue("3.0.5") },
+      value: { getVersion: vi.fn().mockResolvedValue("3.0.7") },
     });
   });
 
   it("abre o modal somente depois que a introducao termina", async () => {
     render(<App />);
 
-    expect(screen.queryByText("Uma nova fase do Checkpoint")).not.toBeInTheDocument();
+    expect(screen.queryByText("Mais opções, mais liberdade")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Finalizar introdução" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Uma nova fase do Checkpoint")).toBeInTheDocument();
+      expect(screen.getByText("Mais opções, mais liberdade")).toBeInTheDocument();
     });
     expect(screen.getByText("Home pronta")).toBeInTheDocument();
   });

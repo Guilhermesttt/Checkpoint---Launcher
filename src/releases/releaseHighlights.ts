@@ -13,10 +13,10 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.0.6",
+  version: "3.0.7",
   title: "Mais opções, mais liberdade",
   description: "Novas plataformas suportadas e ferramentas de busca de metadados aprimoradas para organizar sua biblioteca.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.6",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.7",
   highlights: [
     {
       id: "platforms",

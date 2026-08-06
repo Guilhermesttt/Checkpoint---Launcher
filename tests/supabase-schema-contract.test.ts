@@ -9,35 +9,35 @@ const migration = readFileSync(
     "supabase/migrations/20260729193000_checkpoint_social_realtime.sql",
   ),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 const fifoMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260730120000_chat_messages_fifo.sql",
   ),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 const retentionMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260730130000_chat_retention.sql",
   ),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 const privacyMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260801090000_profile_visibility.sql",
   ),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 const profileControlsMigration = readFileSync(
   resolve(
     process.cwd(),
     "supabase/migrations/20260802120000_profile_controls_permissions.sql",
   ),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 
 describe("contrato da migration Supabase", () => {
   it("versiona o grafo social e o chat normalizado", () => {

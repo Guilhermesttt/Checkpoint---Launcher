@@ -1,3 +1,13 @@
+## Checkpoint Launcher — v3.0.7
+
+Lançamento: 6 de agosto de 2026.
+
+- Correção de bugs de inicialização do servidor e autenticação do Discord.
+- Otimização do seletor de executáveis da biblioteca para evitar duplicados.
+- Estabilização do processo de atualizações automáticas e testes unitários.
+
+---
+
 ## Checkpoint Launcher — v3.0.5
 
 Lançamento: 2 de agosto de 2026.

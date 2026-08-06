@@ -1313,7 +1313,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
                   </button>
                 )}
 
-              {formData.launcherType !== "steam" && (
+              {formData.launcherType !== "steam" && formData.launcherType !== "local" && (
                 <div className="mt-4">
                   <input ref={executableInputRef} type="file" accept=".exe,application/x-msdownload" className="hidden" onChange={(event) => handleExecutableFileFallback(event, formData.launcherType)} />
                   <div className="flex flex-col gap-2 sm:flex-row">
