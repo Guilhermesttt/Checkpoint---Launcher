@@ -95,12 +95,20 @@ export const launchGame = async (
 
     const epicLaunchUri = buildEpicLaunchUri(game);
     if (epicLaunchUri) {
-      window.location.assign(epicLaunchUri);
+      if (window.electronAPI?.openExternalUrl) {
+        await window.electronAPI.openExternalUrl(epicLaunchUri);
+      } else {
+        window.location.assign(epicLaunchUri);
+      }
       return;
     }
 
     if (game.epicStoreUrl) {
-      window.open(game.epicStoreUrl, "_blank", "noopener,noreferrer");
+      if (window.electronAPI?.openExternalUrl) {
+        await window.electronAPI.openExternalUrl(game.epicStoreUrl);
+      } else {
+        window.open(game.epicStoreUrl, "_blank", "noopener,noreferrer");
+      }
       return;
     }
 
@@ -136,7 +144,12 @@ export const launchGame = async (
   if (game.launcherType === "steam" || /^\d+$/.test(game.executablePath || "")) {
     const steamId = game.steamAppId || game.executablePath;
     if (!steamId) throw new Error("Steam App ID nao encontrado para esse jogo.");
-    window.location.assign(`steam://run/${steamId}`);
+    const steamLaunchUri = `steam://run/${steamId}`;
+    if (window.electronAPI?.openExternalUrl) {
+      await window.electronAPI.openExternalUrl(steamLaunchUri);
+    } else {
+      window.location.assign(steamLaunchUri);
+    }
     return;
   }
 

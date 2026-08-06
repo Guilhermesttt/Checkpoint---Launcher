@@ -52,11 +52,17 @@
     "directories": {
       "output": "release"
     },
-    "publish": {
-      "provider": "github",
-      "owner": "Guilhermesttt",
-      "repo": "Checkpoint---Launcher"
-    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://checkpointlauncher.com/downloads"
+      },
+      {
+        "provider": "github",
+        "owner": "Guilhermesttt",
+        "repo": "Checkpoint---Launcher"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",

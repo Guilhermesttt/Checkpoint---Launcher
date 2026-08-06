@@ -121,11 +121,6 @@ const GamingRadarPage: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       className="relative flex-1 overflow-y-auto px-8 pb-12 pt-6 thin-scrollbar"
     >
-      <div className="pointer-events-none fixed inset-0 opacity-25" style={{
-        backgroundImage: "radial-gradient(circle, rgba(255,255,255,.28) 1px, transparent 1px)",
-        backgroundSize: "20px 20px",
-        maskImage: "linear-gradient(120deg, black, transparent 70%)",
-      }} />
 
       <div className="relative mx-auto max-w-6xl">
         <header className="mb-6 flex flex-col justify-between gap-4 rounded-[28px] border border-white/10 bg-black/65 p-6 md:flex-row md:items-center">

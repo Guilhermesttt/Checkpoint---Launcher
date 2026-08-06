@@ -246,7 +246,11 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
 
   React.useEffect(() => {
     if (!remoteMode || status !== "ready") return;
-    const sync = () => void syncRemotePlayback().catch(() => undefined);
+    const sync = () => {
+      if (!document.hidden && document.hasFocus()) {
+        void syncRemotePlayback().catch(() => undefined);
+      }
+    };
     sync();
     const timer = window.setInterval(sync, 8_000);
     return () => window.clearInterval(timer);
@@ -255,7 +259,9 @@ export const useSpotifyPlayer = (clientIdOverride?: string) => {
   React.useEffect(() => {
     if (playback.paused || !playback.track) return;
     const timer = window.setInterval(() => {
-      updatePlayback((current) => advanceSpotifyPlayback(current, 1_000));
+      if (!document.hidden) {
+        updatePlayback((current) => advanceSpotifyPlayback(current, 1_000));
+      }
     }, 1_000);
     return () => window.clearInterval(timer);
   }, [playback.paused, playback.track, updatePlayback]);

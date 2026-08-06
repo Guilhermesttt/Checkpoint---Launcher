@@ -64,13 +64,40 @@ export const saveCurrentUserProfile = async ({
     photo_url: photoURL || null,
   };
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .upsert(payload, { onConflict: "uid" })
-    .select("uid")
-    .single();
-  if (error) throw error;
-  if (!data?.uid) throw new Error("Nao foi possivel salvar o perfil.");
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(payload, { onConflict: "uid" })
+      .select("uid")
+      .single();
+
+    if (error || !data?.uid) {
+      throw error || new Error("Upsert profile falhou.");
+    }
+  } catch (upsertError) {
+    // Fallback: tentar update direto caso a linha já exista e upsert tenha tido permissao/conflito
+    const updatePayload = {
+      display_name: normalized.displayName,
+      bio: normalized.bio,
+      location: normalized.location,
+      pronouns: normalized.pronouns,
+      website: normalized.website,
+      favorite_genres: normalized.favoriteGenres,
+      photo_url: photoURL || null,
+    };
+    const { data: updateData, error: updateError } = await supabase
+      .from("profiles")
+      .update(updatePayload)
+      .eq("uid", uid)
+      .select("uid")
+      .single();
+
+    if (updateError || !updateData?.uid) {
+      throw upsertError instanceof Error && upsertError.message.includes("salvar o perfil")
+        ? upsertError
+        : (updateError || new Error("Nao foi possivel salvar o perfil."));
+    }
+  }
 
   return { ...normalized, photoURL };
 };

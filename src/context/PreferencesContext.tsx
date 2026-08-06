@@ -909,7 +909,19 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         }).catch(console.error);
       }
     }
-    if (savedLowPerf !== null) setLowPerformanceMode(savedLowPerf === "true");
+    if (savedLowPerf !== null) {
+      setLowPerformanceMode(savedLowPerf === "true");
+    } else {
+      const nav = typeof navigator !== "undefined" ? (navigator as unknown as { deviceMemory?: number; hardwareConcurrency?: number }) : null;
+      const isWeakDevice = Boolean(
+        nav &&
+          ((nav.deviceMemory != null && nav.deviceMemory <= 4) ||
+            (nav.hardwareConcurrency != null && nav.hardwareConcurrency <= 4)),
+      );
+      if (isWeakDevice) {
+        setLowPerformanceMode(true);
+      }
+    }
     if (savedCloseLaunch !== null) setCloseOnLaunch(savedCloseLaunch === "true");
     if (savedMinimizeToTray !== null) setMinimizeToTrayOnClose(savedMinimizeToTray === "true");
     if (savedRestoreLastScreen !== null) setRestoreLastScreen(savedRestoreLastScreen === "true");

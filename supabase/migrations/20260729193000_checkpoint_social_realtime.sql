@@ -525,6 +525,16 @@ grant execute on function private.are_friends(uuid, uuid) to authenticated;
 grant execute on function private.has_relationship(uuid, uuid) to authenticated;
 grant execute on function private.is_chat_participant(uuid, uuid) to authenticated;
 grant select on public.profiles to authenticated;
+grant insert (
+  uid,
+  display_name,
+  photo_url,
+  bio,
+  location,
+  pronouns,
+  website,
+  favorite_genres
+) on public.profiles to authenticated;
 grant update (
   display_name,
   photo_url,

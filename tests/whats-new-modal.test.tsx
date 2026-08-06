@@ -12,14 +12,14 @@ describe("modal completo de novidades", () => {
 
   afterEach(cleanup);
 
-  it("apresenta os tres destaques da versao 3.0.5", () => {
+  it("apresenta os tres destaques da versao 3.0.6", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={vi.fn()} />);
 
-    expect(screen.getByText("Uma nova fase do Checkpoint")).toBeInTheDocument();
-    expect(screen.getByText("VERSÃO 3.0.5")).toBeInTheDocument();
+    expect(screen.getByText("Mais opções, mais liberdade")).toBeInTheDocument();
+    expect(screen.getByText("VERSÃO 3.0.6")).toBeInTheDocument();
     expect(screen.getAllByTestId("release-highlight")).toHaveLength(3);
-    expect(screen.getByText("Spotify dentro do launcher")).toBeInTheDocument();
-    expect(screen.getByText("Controle também no jogo")).toBeInTheDocument();
+    expect(screen.getByText("Novas Plataformas Suportadas")).toBeInTheDocument();
+    expect(screen.getByText("Busca Inteligente de Metadados")).toBeInTheDocument();
   });
 
   it("confirma as novidades pelo botao principal", async () => {
@@ -42,7 +42,7 @@ describe("modal completo de novidades", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Ver notas completas" }));
     expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.5",
+      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.6",
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar novidades" }));

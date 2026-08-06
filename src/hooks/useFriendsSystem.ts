@@ -67,6 +67,11 @@ export function useFriendsSystem({
   const previousOutgoingRequestsRef = useRef<Set<string> | null>(null);
   const previousIncomingRequestsRef = useRef<Set<string> | null>(null);
 
+  const socialFriendsRef = useRef(socialFriends);
+  socialFriendsRef.current = socialFriends;
+  const activeChatFriendRef = useRef(activeChatFriend);
+  activeChatFriendRef.current = activeChatFriend;
+
   // Unread messages snapshot listener for overlay notifications
   useEffect(() => {
     if (!user?.uid) {
@@ -98,7 +103,10 @@ export function useFriendsSystem({
         if (!notifiedMessageIdsRef.current.has(messageId)) {
           notifiedMessageIdsRef.current.add(messageId);
 
-          const senderFriend = socialFriends.find((f) => f.id === `cp-friend:${msg.senderId}`);
+          const currentFriends = socialFriendsRef.current;
+          const currentActiveChat = activeChatFriendRef.current;
+
+          const senderFriend = currentFriends.find((f) => f.id === `cp-friend:${msg.senderId}`);
           const senderName = senderFriend?.name || "Amigo";
           const avatarUrl = senderFriend?.avatar || "";
           const isImage = Boolean(
@@ -107,7 +115,27 @@ export function useFriendsSystem({
             || msg.attachmentPath,
           );
 
-          if (activeChatFriend?.id !== `cp-friend:${msg.senderId}`) {
+          if (currentActiveChat?.id !== `cp-friend:${msg.senderId}`) {
+            const displayContent = isImage ? "📷 Enviou uma imagem" : msg.text;
+            
+            // Toast in-app notification
+            notify(`${senderName}: ${displayContent}`, "info");
+
+            // Native OS notification if window is blurred or in background
+            if ("Notification" in window && Notification.permission === "granted") {
+              try {
+                new Notification(`Mensagem de ${senderName}`, {
+                  body: displayContent,
+                  icon: avatarUrl || "/Checkpoint_Logo.png",
+                });
+              } catch {
+                // Ignore notification permission / Electron background errors
+              }
+            } else if ("Notification" in window && Notification.permission === "default") {
+              void Notification.requestPermission();
+            }
+
+            // In-game overlay notification
             void window.electronAPI?.showFriendMessageOverlay({
               senderName,
               messageText: msg.text,
@@ -122,7 +150,7 @@ export function useFriendsSystem({
     });
 
     return () => unsubscribe();
-  }, [user?.uid, socialFriends, activeChatFriend, playSound]);
+  }, [user?.uid, notify, playSound]);
 
   useEffect(() => {
     if (!user?.uid || (userProfile?.checkpointFriends ?? []).length === 0) return;
@@ -233,9 +261,9 @@ export function useFriendsSystem({
 
     initialSync();
 
-    // Intervalo mais frequente para updates em tempo real (com notificações)
+    // Intervalo de polling: só executa se a janela estiver visível e focada
     const interval = window.setInterval(() => {
-      if (!isInitialSync) {
+      if (!isInitialSync && !document.hidden && document.hasFocus()) {
         syncFriendStatuses();
       }
     }, 15_000);

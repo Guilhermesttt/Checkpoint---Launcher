@@ -60,6 +60,11 @@ const AUTO_START_ARG = "--checkpoint-autostart";
 const IS_AUTO_START = process.argv.includes(AUTO_START_ARG);
 const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_INJECTION === "1";
 
+// ── Otimizações de Memória & GPU para Electron em PCs Fracos ────────────────
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=256");
+app.commandLine.appendSwitch("renderer-process-limit", "2");
+app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
+
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
 const activeWatchers = new Map();
@@ -3429,124 +3434,20 @@ registerSecureIpcHandler("overlay:show-spotify-track", async (_event, payload) =
   return { shown: true };
 });
 
-registerSecureIpcHandler("overlay:show-friend-accepted", async (_event, payload) => {
-  const copy = getOverlayEventCopy();
-  const playerName = String(payload?.playerName || "").trim() || copy.player;
-  const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
-
-  sendOverlayEvent("overlay:social", {
-    kind: "friend-accepted",
-    title: playerName,
-    description: copy.accepted,
-    avatarUrl: avatarUrl || overlayIconUrl(),
-  });
-});
-
-// Patterns that suggest the exe is NOT an actual game (installer, updater, etc.)
-const SKIP_EXE_PATTERN = /setup|install|uninst|update|updater|crash|helper|launcher_updater|redist|vcredist|directx|dxsetup|dotnet|oalinst|ue4|ue5prereq/i;
-const MAX_DEPTH = 4;
-const MAX_RESULTS = 200;
-
-const isGameExecutable = (filePath) => {
-  const baseName = path.basename(filePath).toLowerCase();
-  return baseName.endsWith(".exe") && !SKIP_EXE_PATTERN.test(baseName);
-};
-
-const pushExeResult = (filePath, results, seenPaths) => {
-  const normalizedPath = path.normalize(filePath);
-  if (seenPaths.has(normalizedPath) || !isGameExecutable(normalizedPath)) {
-    return;
-  }
-
-  seenPaths.add(normalizedPath);
-  results.push({
-    name: path.basename(normalizedPath, ".exe"),
-    path: normalizedPath,
-  });
-};
-
-// ─── Scheduler de concorrência limitada para scanForExe ────────────────────────────
-// Processa até SCAN_CONCURRENCY diretórios em paralelo sem dependência externa.
-const SCAN_CONCURRENCY = 4;
-
-const makePLimit = (limit) => {
-  let active = 0;
-  const queue = [];
-  const next = () => {
-    if (active >= limit || queue.length === 0) return;
-    active++;
-    const { fn, resolve, reject } = queue.shift();
-    Promise.resolve().then(fn).then(resolve, reject).finally(() => { active--; next(); });
-  };
-  return (fn) => new Promise((resolve, reject) => { queue.push({ fn, resolve, reject }); next(); });
-};
-
-const scanForExe = async (rootDir, results = [], seenPaths = new Set()) => {
-  const run = makePLimit(SCAN_CONCURRENCY);
-
-  const scan = async (dir, depth) => {
-    if (depth > MAX_DEPTH || results.length >= MAX_RESULTS) return;
-    let entries;
-    try {
-      entries = await fs.promises.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    const subdirs = [];
-    for (const entry of entries) {
-      if (results.length >= MAX_RESULTS) break;
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "$RECYCLE.BIN") continue;
-        subdirs.push(fullPath);
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".exe")) {
-        pushExeResult(fullPath, results, seenPaths);
-      }
-    }
-
-    // Processa subdiretórios em paralelo (até SCAN_CONCURRENCY simultâneos)
-    await Promise.all(subdirs.map((subdir) => run(() => scan(subdir, depth + 1))));
-  };
-
-  await scan(rootDir, 0);
-  return results;
-};
-
-registerSecureIpcHandler("game:scan-local", async (_event) => {
-  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: "Selecione pastas ou executaveis para buscar jogos",
-    properties: ["openDirectory", "openFile", "multiSelections"],
-    buttonLabel: "Buscar Jogos",
-    filters: [{ name: "Executaveis", extensions: ["exe"] }],
-  });
-  if (canceled || filePaths.length === 0) return [];
-
-  const results = [];
-  const seenPaths = new Set();
-  for (const selectedPath of filePaths) {
-    let stats;
-    try {
-      stats = fs.statSync(selectedPath);
-    } catch {
-      continue;
-    }
-
-    if (stats.isDirectory()) {
-      // Cada pasta raiz selecionada inicia seu próprio scan paralelo
-      await scanForExe(selectedPath, results, seenPaths);
-      continue;
-    }
-
-    if (stats.isFile()) {
-      pushExeResult(selectedPath, results, seenPaths);
-    }
-  }
-  return results;
-});
-
 // ─── Auto-Updater ───────────────────────────────────────────────────────────
 const { autoUpdater } = require("electron-updater");
+
+// Suporte a servidor de atualizações próprio / privado (ex: R2, S3, Firebase ou site)
+if (process.env.CHECKPOINT_UPDATE_URL) {
+  try {
+    autoUpdater.setFeedURL({
+      provider: "generic",
+      url: process.env.CHECKPOINT_UPDATE_URL,
+    });
+  } catch (err) {
+    console.warn("[AutoUpdater] Não foi possível definir feed genérico:", err);
+  }
+}
 
 // O usuário escolhe quando iniciar o download. Depois de baixada, escolhe quando reiniciar.
 autoUpdater.autoDownload = false;

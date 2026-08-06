@@ -42,7 +42,7 @@ const DesktopAuth: React.FC = () => {
 
   return (
     <div className="min-h-screen w-full bg-[#05070a] text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md border border-white/10 bg-white/[0.04] rounded-2xl p-8 shadow-2xl">
+      <div className="w-full max-w-md border border-white/10 bg-white/0.04 rounded-2xl p-8 shadow-2xl">
         <div className="flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
             {status === "done" ? (

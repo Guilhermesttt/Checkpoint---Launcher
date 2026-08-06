@@ -2520,6 +2520,65 @@ app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res
   } catch (error) {
     pendingDiscordStates.delete(state);
     res.status(500).json({
+    const profileSnap = await profileRef.get();
+    const currentFriends = Array.isArray(profileSnap.data()?.checkpointFriends)
+      ? profileSnap.data().checkpointFriends
+      : [];
+    await profileRef.set(
+      {
+        checkpointFriends: currentFriends.filter((item) => item?.uid !== friendUid),
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true },
+    );
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro ao remover amigo." });
+  }
+});
+
+app.post("/api/auth/logout", requireFirebaseUser, (req, res) => {
+  const uid = req.firebaseUser.uid;
+
+  for (const key of steamIdCache.keys()) {
+    if (key.startsWith(`${uid}_`)) {
+      steamIdCache.delete(key);
+    }
+  }
+
+  clearLocalSteamId(uid);
+  res.json({ ok: true });
+});
+
+app.post("/auth/steam/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
+  cleanupPendingStates();
+  const token = crypto.randomUUID();
+  pendingStates.set(token, {
+    firebaseUid: req.firebaseUser.uid,
+    createdAt: Date.now(),
+  });
+
+  res.json({ url: buildSteamOpenIdUrl(token) });
+});
+
+app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res) => {
+  cleanupPendingDiscordStates();
+  if (!discordClientId || !discordClientSecret) {
+    res.status(500).json({ error: "Credenciais Discord nao configuradas no backend." });
+    return;
+  }
+
+  const state = crypto.randomUUID();
+  pendingDiscordStates.set(state, {
+    firebaseUid: req.firebaseUser.uid,
+    createdAt: Date.now(),
+  });
+
+  try {
+    res.json({ url: buildDiscordAuthorizeUrl(state) });
+  } catch (error) {
+    pendingDiscordStates.delete(state);
+    res.status(500).json({
       error: error instanceof Error ? error.message : "Falha ao iniciar autenticacao Discord.",
     });
   }
@@ -2608,11 +2667,37 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
     let supaUid = null;
 
     if (supabaseAdmin) {
-      const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+      let linkData;
+      let linkErr;
+      ({ data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
         type: "magiclink",
         email: userEmail,
-      });
-      if (linkErr) throw linkErr;
+      }));
+
+      if (linkErr) {
+        console.warn("[google-oauth] generateLink falhou, criando novo usuário no Supabase Auth:", linkErr.message);
+        const { data: createdUserData, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: userEmail,
+          email_confirm: true,
+          user_metadata: {
+            full_name: payload.name || payload.given_name || userEmail.split("@")[0],
+            name: payload.name || userEmail.split("@")[0],
+            avatar_url: payload.picture || null,
+          },
+        });
+
+        if (createErr && !createErr.message?.includes("already been registered")) {
+          console.error("[google-oauth] Erro ao criar usuário:", createErr);
+          throw linkErr;
+        }
+
+        ({ data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "magiclink",
+          email: userEmail,
+        }));
+        if (linkErr) throw linkErr;
+      }
+
       emailOtp = linkData?.properties?.email_otp || null;
       supaUid = linkData?.user?.id || null;
 

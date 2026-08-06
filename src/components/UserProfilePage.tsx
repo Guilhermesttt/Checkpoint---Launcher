@@ -357,14 +357,6 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
       data-profile-density={compactProfile ? "compact" : "comfortable"}
       className={`relative min-h-0 flex-1 overflow-y-auto thin-scrollbar ${compactProfile ? "px-5 pb-6 pt-4" : "px-8 pb-12 pt-6"}`}
     >
-      <div
-        className="pointer-events-none fixed inset-0 opacity-35"
-        style={{
-          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.32) 1.4px, transparent 1.4px)",
-          backgroundSize: "18px 18px",
-          maskImage: "linear-gradient(120deg, black, transparent 75%)",
-        }}
-      />
       <div className={`relative mx-auto max-w-6xl ${compactProfile ? "space-y-4" : "space-y-6"}`}>
         <section className={`rounded-[28px] border border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_24px_90px_rgba(0,0,0,0.55)] ${compactProfile ? "p-5 md:p-6" : "p-7 md:p-8"}`}>
           <div className={`flex flex-col md:flex-row md:items-center md:justify-between ${compactProfile ? "gap-4" : "gap-6"}`}>

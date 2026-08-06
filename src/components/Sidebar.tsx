@@ -460,18 +460,44 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
             {label}
           </span>
           {hasNotifications && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgb(var(--launcher-accent))] px-1.5 text-[10px] font-black text-black shadow-md">
-              {notificationCount > 99 ? "99+" : notificationCount}
-            </span>
+            <div className="relative flex items-center justify-center">
+              <motion.span
+                animate={{ scale: [1, 1.35, 1], opacity: [0.7, 0, 0.7] }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 rounded-full bg-[rgb(var(--launcher-accent))]"
+              />
+              <motion.span
+                key={notificationCount}
+                initial={{ scale: 1.5, rotate: -12 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                className="relative z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgb(var(--launcher-accent))] px-1.5 text-[10px] font-black text-black shadow-[0_0_12px_rgb(var(--launcher-accent)/0.8)]"
+              >
+                {notificationCount > 99 ? "99+" : notificationCount}
+              </motion.span>
+            </div>
           )}
         </div>
       )}
 
       {/* Badge quando colapsado */}
       {!isExpanded && hasNotifications && (
-        <span className="absolute -right-1 -top-1 z-20 flex h-4 min-w-[16px] items-center justify-center rounded-full border border-black/50 bg-white px-1 text-[10px] font-black text-black shadow-md">
-          {notificationCount > 99 ? "99+" : notificationCount}
-        </span>
+        <div className="absolute -right-1 -top-1 z-20 flex items-center justify-center">
+          <motion.span
+            animate={{ scale: [1, 1.4, 1], opacity: [0.8, 0, 0.8] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 rounded-full bg-[rgb(var(--launcher-accent))]"
+          />
+          <motion.span
+            key={notificationCount}
+            initial={{ scale: 1.5 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 15 }}
+            className="relative z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-black/50 bg-[rgb(var(--launcher-accent))] px-1 text-[10px] font-black text-black shadow-[0_0_12px_rgb(var(--launcher-accent)/0.9)]"
+          >
+            {notificationCount > 99 ? "99+" : notificationCount}
+          </motion.span>
+        </div>
       )}
     </motion.button>
   );

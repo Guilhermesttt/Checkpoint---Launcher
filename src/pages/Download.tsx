@@ -1,7 +1,9 @@
-import { Download, Monitor, ShieldCheck } from "lucide-react";
-
-const GITHUB_RELEASE_URL =
-  "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest";
+import { Download, ShieldCheck } from "lucide-react";
+import {
+  CURRENT_LAUNCHER_VERSION,
+  DIRECT_LAUNCHER_DOWNLOAD_URL,
+  LAUNCHER_EXE_FILENAME,
+} from "../constants/downloads";
 
 const DownloadPage = () => {
   return (
@@ -18,31 +20,29 @@ const DownloadPage = () => {
           <div className="mt-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div>
               <p className="mb-4 text-[11px] font-black uppercase tracking-[0.28em] text-white/35">
-                Download
+                Download • Versão {CURRENT_LAUNCHER_VERSION}
               </p>
               <h1 className="max-w-3xl text-5xl font-black tracking-tight text-white lg:text-7xl">
                 Baixe o Checkpoint Launcher para Windows.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/55">
-                Baixe o arquivo `.zip`, extraia a pasta do launcher e execute o aplicativo no
-                Windows. Sem instalador e sem etapa extra.
+                Baixe o instalador `.exe` da versão oficial v{CURRENT_LAUNCHER_VERSION} e execute no Windows para instalar o Checkpoint Launcher instantaneamente.
               </p>
 
               <div className="mt-10 flex flex-wrap gap-4">
                 <a
-                  href={GITHUB_RELEASE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={DIRECT_LAUNCHER_DOWNLOAD_URL}
+                  download={LAUNCHER_EXE_FILENAME}
                   className="inline-flex items-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition hover:scale-[1.02] hover:bg-white/90"
                 >
                   <Download className="h-4 w-4" />
-                  Ver release no GitHub
+                  Baixar Launcher v{CURRENT_LAUNCHER_VERSION} (.exe)
                 </a>
                 <a
                   href="/privacy-policy"
                   className="inline-flex items-center rounded-full border border-white/15 px-7 py-4 text-sm font-bold text-white/75 transition hover:border-white/30 hover:text-white"
                 >
-                  Politica de privacidade
+                  Política de privacidade
                 </a>
               </div>
             </div>
@@ -51,33 +51,21 @@ const DownloadPage = () => {
               <div className="space-y-5">
                 <div className="flex items-start gap-4">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
-                    <Monitor className="h-5 w-5 text-white/75" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-white">GitHub Releases</h2>
-                    <p className="mt-1 text-sm text-white/45">
-                      O botao abre a pagina do release mais recente publicado no GitHub.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10">
                     <ShieldCheck className="h-5 w-5 text-white/75" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Extrair e abrir</h2>
+                    <h2 className="text-sm font-bold text-white">Instalação Direta para Windows</h2>
                     <p className="mt-1 text-sm text-white/45">
-                      Extraia o `.zip` e abra o executavel dentro da pasta `win-unpacked`.
+                      Baixe o executável e clique para instalar.
                     </p>
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
                   <p className="text-[11px] font-black uppercase tracking-[0.22em] text-white/35">
-                    Arquivo
+                    Arquivo da versão atual
                   </p>
-                  <p className="mt-2 text-sm text-white/75">Checkpoint Launcher Windows (.zip)</p>
+                  <p className="mt-2 text-sm font-mono text-white/75">{LAUNCHER_EXE_FILENAME}</p>
                 </div>
               </div>
             </div>

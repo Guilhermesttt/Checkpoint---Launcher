@@ -144,11 +144,38 @@ export const establishChatConnection = async () => {
   subscribeToActiveChats(uid);
 };
 
+export const subscribeToNewMessages = (callback: (message: ChatMessage) => void) => {
+  messageListeners.add(callback);
+  return () => {
+    messageListeners.delete(callback);
+  };
+};
+
 export const subscribeToActiveChats = (uid: string) => {
   const channelKey = `unread_${uid}`;
   if (activeChatChannels.has(channelKey)) {
     return () => undefined;
   }
+
+  // Inscreve no canal de tempo real PRIMEIRO para evitar perder mensagens criadas durante a busca inicial
+  const channel = supabase
+    .channel(`user_chats_${uid}`)
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "chat_messages", filter: `receiver_id=eq.${uid}` },
+      async (payload) => {
+        const msg = await hydrateAttachmentUrl(
+          normalizeMessage(String(payload.new.id), payload.new as any),
+        );
+        if (!unreadMessages.some((m) => m.id === msg.id)) {
+          unreadMessages.push(msg);
+          emitUnread();
+        }
+        messageListeners.forEach((listener) => listener(msg));
+      }
+    )
+    .subscribe();
+  activeChatChannels.set(channelKey, channel);
 
   void supabase
     .from("chat_messages")
@@ -170,25 +197,6 @@ export const subscribeToActiveChats = (uid: string) => {
       });
       emitUnread();
     });
-
-  const channel = supabase
-    .channel(`user_chats_${uid}`)
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: "chat_messages", filter: `receiver_id=eq.${uid}` },
-      async (payload) => {
-        const msg = await hydrateAttachmentUrl(
-          normalizeMessage(String(payload.new.id), payload.new as any),
-        );
-        if (!unreadMessages.some((m) => m.id === msg.id)) {
-          unreadMessages.push(msg);
-          emitUnread();
-        }
-        messageListeners.forEach((listener) => listener(msg));
-      }
-    )
-    .subscribe();
-  activeChatChannels.set(channelKey, channel);
 
   return () => {
     supabase.removeChannel(channel);
@@ -376,7 +384,6 @@ export const subscribeToChatMessages = (
             latestMessages = [...latestMessages, msg].sort(compareChatMessages);
             callback([...latestMessages]);
           }
-          messageListeners.forEach((fn) => fn(msg));
         }
       )
       .subscribe();
