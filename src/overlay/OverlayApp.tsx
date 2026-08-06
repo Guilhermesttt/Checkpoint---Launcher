@@ -14,6 +14,8 @@ import {
   ChevronLeft,
   Loader2,
   ExternalLink,
+  ZoomIn,
+  Maximize2,
 } from "lucide-react";
 
 interface AchievementToast {
@@ -616,16 +618,20 @@ const OverlayApp: React.FC = () => {
                                     <div className="mb-2 overflow-hidden rounded-xl border border-black/10">
                                       <button
                                         type="button"
-                                        onClick={() => setViewingImage(msg.attachmentUrl!)}
-                                        className="relative group block w-full text-left"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setViewingImage(msg.attachmentUrl!);
+                                        }}
+                                        className="relative group block w-full text-left cursor-pointer"
                                       >
                                         <img
                                           src={msg.attachmentUrl}
                                           alt="Anexo"
-                                          className="max-h-48 w-full object-cover rounded-xl transition-transform group-hover:scale-102"
+                                          className="max-h-48 w-full object-cover rounded-xl transition-transform group-hover:scale-[1.02]"
                                         />
-                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
-                                          <ExternalLink className="h-5 w-5 text-white" />
+                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-xl">
+                                          <ZoomIn className="h-6 w-6 text-white drop-shadow-md" />
                                         </div>
                                       </button>
                                     </div>
@@ -714,9 +720,21 @@ const OverlayApp: React.FC = () => {
                     <h3 className="text-lg font-bold text-white">Capturas de Tela</h3>
                     <div className="grid grid-cols-3 gap-3">
                       {(panelData.screenshots || []).map((url: string, idx: number) => (
-                        <div key={idx} className="h-32 rounded-xl overflow-hidden border border-white/10">
-                          <img src={url} alt="" className="h-full w-full object-cover" />
-                        </div>
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setViewingImage(url);
+                          }}
+                          className="h-32 rounded-xl overflow-hidden border border-white/10 relative group text-left cursor-pointer transition-transform hover:scale-[1.02]"
+                        >
+                          <img src={url} alt="Captura de tela" className="h-full w-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                            <ZoomIn className="h-6 w-6 text-white drop-shadow-md" />
+                          </div>
+                        </button>
                       ))}
                     </div>
                   </div>

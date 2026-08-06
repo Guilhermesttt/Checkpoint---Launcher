@@ -1228,6 +1228,12 @@ const createOverlayWindow = () => {
   syncOverlayBounds();
   const createdOverlayWindow = overlayWindow;
   createdOverlayWindow.loadFile(path.join(__dirname, "overlay.html"));
+  createdOverlayWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSafeOpenExternalUrl(url)) {
+      void shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
   createdOverlayWindow.webContents.once("did-finish-load", () => {
     if (createdOverlayWindow.isDestroyed() || overlayWindow !== createdOverlayWindow) return;
     overlayReady = true;
