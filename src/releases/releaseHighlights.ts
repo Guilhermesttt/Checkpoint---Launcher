@@ -1,5 +1,5 @@
 export interface ReleaseHighlight {
-  id: "spotify" | "controller" | "stability" | "platforms" | "search";
+  id: "spotify" | "controller" | "stability" | "platforms" | "search" | "mods";
   title: string;
   description: string;
 }
@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.0.7",
-  title: "Mais opções, mais liberdade",
-  description: "Novas plataformas suportadas e ferramentas de busca de metadados aprimoradas para organizar sua biblioteca.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.7",
+  version: "3.0.8",
+  title: "Gestão Avançada de Mods e Social",
+  description: "Novo detector de conflitos de mods, perfis customizados, melhorias na atualização do app e central de amigos aprimorada.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.8",
   highlights: [
     {
-      id: "platforms",
-      title: "Novas Plataformas Suportadas",
-      description: "Agora você pode adicionar e organizar jogos da Riot Games, Battle.net, Rockstar, GOG, EA App e Ubisoft.",
-    },
-    {
-      id: "search",
-      title: "Busca Inteligente de Metadados",
-      description: "Escolha entre as bases de dados da Steam e Epic Games para encontrar as melhores capas e informações.",
+      id: "mods",
+      title: "Detector de Conflitos e Perfis de Mods",
+      description: "Gerencie perfis de modding e detecte automaticamente conflitos entre mods instalados.",
     },
     {
       id: "stability",
-      title: "Melhorias e Ajustes",
-      description: "Aprimoramentos visuais na tela inicial e correções gerais de usabilidade no sistema de biblioteca.",
+      title: "Atualizações Mais Confiáveis",
+      description: "Novo sistema de tratamento de erros e relatórios claros no processo de atualização do launcher.",
+    },
+    {
+      id: "search",
+      title: "Navegação e Social Aprimorados",
+      description: "Navegação em breadcrumbs interativa, melhorias na aba de amigos e na exibição dos detalhes de jogos.",
     },
   ],
 };

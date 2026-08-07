@@ -12,14 +12,14 @@ describe("modal completo de novidades", () => {
 
   afterEach(cleanup);
 
-  it("apresenta os tres destaques da versao 3.0.7", () => {
+  it("apresenta os tres destaques da versao 3.0.8", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={vi.fn()} />);
 
-    expect(screen.getByText("Mais opções, mais liberdade")).toBeInTheDocument();
-    expect(screen.getByText("VERSÃO 3.0.7")).toBeInTheDocument();
+    expect(screen.getByText("Gestão Avançada de Mods e Social")).toBeInTheDocument();
+    expect(screen.getByText("VERSÃO 3.0.8")).toBeInTheDocument();
     expect(screen.getAllByTestId("release-highlight")).toHaveLength(3);
-    expect(screen.getByText("Novas Plataformas Suportadas")).toBeInTheDocument();
-    expect(screen.getByText("Busca Inteligente de Metadados")).toBeInTheDocument();
+    expect(screen.getByText("Detector de Conflitos e Perfis de Mods")).toBeInTheDocument();
+    expect(screen.getByText("Atualizações Mais Confiáveis")).toBeInTheDocument();
   });
 
   it("confirma as novidades pelo botao principal", async () => {
@@ -42,7 +42,7 @@ describe("modal completo de novidades", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Ver notas completas" }));
     expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.7",
+      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.8",
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar novidades" }));

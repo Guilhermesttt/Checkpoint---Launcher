@@ -1,82 +1,71 @@
 # Checkpoint Launcher
 
-O Checkpoint é um launcher de jogos para Windows que reúne biblioteca, conquistas, amigos e ferramentas in-game em uma interface pensada para teclado, mouse e controle.
-
-Ele sincroniza jogos da Steam, aceita jogos locais e importações assistidas da Epic Games, inicia executáveis pelo desktop e mantém o monitoramento de sessões e conquistas enquanto a janela principal está em segundo plano.
+O **Checkpoint Launcher** é um gerenciador de jogos de alto desempenho e interface moderna para Windows. Ele reúne biblioteca unificada (Steam, Epic Games, GOG, EA, Ubisoft, Xbox e jogos locais), conquistas, feed social, overlay in-game e gerenciamento integrado de **Nexus Mods** em uma experiência otimizada para teclado, mouse e controle.
 
 [Baixar a versão mais recente](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest) · [Notas da versão](RELEASE_NOTES.md) · [Reportar um problema](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues)
 
-## Principais recursos
+---
 
-- Biblioteca unificada para Steam, Epic Games e jogos locais.
-- Sincronização da biblioteca, horas e conquistas da Steam; o enriquecimento detalhado de metadados prioriza até 80 jogos por sincronização.
-- Conquistas locais com suporte a arquivos de progresso de emuladores Steam compatíveis.
-- Totais de conquistas consolidados em toda a biblioteca, inclusive em perfis de amigos.
-- Overlay in-game com amigos, chat, jogo atual, capturas, conquistas, configurações e perfil.
-- Chat em tempo real, presença, indicador de digitação e mensagens não lidas.
-- Capturas de tela pelo overlay, galeria recente, abertura da pasta e exclusão para a Lixeira.
-- Atalho de captura personalizável e navegação por controle.
-- Perfis de inicialização por jogo local: monitor, modo de janela, resolução, prioridade, argumentos e diretório de trabalho.
-- Feed social para jogos iniciados e conquistas.
-- Integração com Discord para conta e avatar.
-- Atualizador integrado pelo GitHub Releases, com download iniciado pelo usuário.
+## 🚀 Principais Recursos
 
-## O que há de novo na versão 2.0.0
+- 🎮 **Biblioteca Unificada**: Suporte a Steam, Epic Games Store, GOG, EA App, Ubisoft Connect, Xbox, Battle.net, Riot Games, Rockstar e executáveis locais.
+- ⚡ **Integrado com Nexus Mods**: Navegação no catálogo, busca de mods, downloads assistidos por protocolo `nxm://`, instalação e gerenciamento de arquivos por jogo.
+- 🧭 **Navegação Elegante**: Migalhas de pão (breadcrumbs) funcionais e interativas, sistema estandardizado de sub-tabs (`Amigos`, `Chat`, `Solicitações`, `Mods`, `Gerenciar`).
+- 🎨 **Estética Visual Premium**: Adaptabilidade dinâmica de cores baseadas nas capas dos jogos (com clamping automático de contraste), raios aninhados e suporte total a temas escuros.
+- 🛡️ **Atualizações Confiáveis**: Atualizador automático via GitHub Releases com suporte a inspeção detalhada de erros e tratamento amigável de logs.
+- 💬 **Hub Social & Chat**: Amigos no Checkpoint, presença em tempo real (quem está jogando o quê), chat integrado com indicador de digitação e mensagens não lidas.
+- 🏆 **Central de Conquistas**: Acompanhamento de progresso de conquistas da Steam, Epic e conquistas locais (com suporte a emuladores Steam compatíveis).
+- 🎥 **Overlay In-game**: Overlay com atalho personalizável (`Ctrl + Shift + O` ou botão Guide do controle), galeria de capturas nativa e feed de atividades.
+- ⚙️ **Perfis Avançados de Inicialização**: Seleção de monitor, modo de janela, resolução, prioridade de processo e argumentos de linha de comando por jogo.
 
-A 2.0.0 transforma o overlay em uma central in-game multipágina e reforça a base de conquistas e execução em segundo plano.
+---
 
-- Overlay redesenhado no mesmo tema preto e branco do launcher.
-- Páginas próprias para chat, jogo em execução, mídia, conquistas, configurações e perfil.
-- Lista rolável de conquistas do jogo atual, com progresso, estados bloqueado/desbloqueado, descrição e data.
-- Chat utilizável sem reabrir a janela principal do launcher.
-- Captura nativa com atalho configurável e exclusão segura com confirmação.
-- Abertura do overlay por `Ctrl + Shift + O` e suporte ao botão Guide/PS/Home do controle.
-- Dica compacta ao iniciar um jogo e novos toasts de início e conquista.
-- Continuidade de presença, polling e watchers com o launcher minimizado ou oculto na bandeja.
-- Contagem canônica de conquistas sem o antigo limite de 80 jogos e sem zerar resultados válidos por uma falha isolada.
-- Perfis de inicialização para jogos locais.
-- Novo feed de atividade para jogos iniciados e conquistas.
-- Modal Adicionar/Editar jogo reorganizado por plataforma, preenchimento automático, dados e artes, com prévia e validação visível.
-- No chat da janela principal, teclado virtual e conversa permanecem visíveis ao mesmo tempo.
+## 🛠️ Arquitetura Técnica
 
-Consulte [RELEASE_NOTES.md](RELEASE_NOTES.md) para a lista detalhada e as limitações conhecidas.
+- **Frontend**: React 19, TypeScript, TailwindCSS, Framer Motion, Lucide Icons.
+- **Desktop Runtime**: Electron 39 com arquitetura Multi-Window (Janela Principal + Overlay In-Game).
+- **Gerenciador de Bundles**: Vite 8.
+- **Banco de Dados Local**: SQLite (via `userData`) para persistência de biblioteca, sessões e arquivos de mods.
+- **Serviços Cloud**: Supabase & Backend Node.js em nuvem para autenticação, presença social e chat.
+- **Publicação e Auto-update**: Electron Builder + `electron-updater` via GitHub Releases.
 
-## Overlay in-game
+---
 
-O overlay pode ser aberto durante uma sessão por:
+## 💻 Desenvolvimento Local
 
-- Teclado: `Ctrl + Shift + O`.
-- Controle: botão central Guide/PS/Home, quando o dispositivo e o Windows expõem esse botão ao aplicativo.
+### Pré-requisitos
+- Node.js >= 22.0.0
+- npm >= 10.0.0
 
-O atalho de captura pode ser alterado nas configurações do overlay. São aceitas teclas `F1` a `F24`, `Print Screen` e combinações com `Ctrl`, `Alt` ou `Shift`.
+### Instalação
 
-> O overlay é indicado para jogos em janela ou borderless. Fullscreen exclusivo pode impedir que qualquer janela externa seja exibida acima do jogo; nesse caso, use borderless.
+```powershell
+# Clone o repositório
+git clone https://github.com/Guilhermesttt/Checkpoint---Launcher.git
+cd Checkpoint---Launcher
 
-## Plataformas e integrações
+# Instale as dependências
+npm install
 
-| Integração | Uso no Checkpoint |
-| --- | --- |
-| Steam | Biblioteca, perfil, metadados, horas, inicialização e conquistas |
-| Epic Games | Busca/importação assistida; inicialização por executável local ou, quando o identificador completo estiver disponível, pelo launcher Epic |
-| Discord | Conta conectada e avatar |
-| Firestore | Perfis, amizades, feed social e um resumo público compacto da biblioteca |
-| Realtime Database | Mensagens, digitação, recibos de leitura e índice de conversas |
-| SQLite | Biblioteca completa, caminhos locais, preferências e horas observadas no computador |
-| Backend Checkpoint | Validação de amizades do chat, integrações protegidas e publicação do feed |
-| Jogos locais | Executável, perfil de inicialização, presença e conquistas compatíveis |
+# Inicie o ambiente de desenvolvimento (Vite + Electron)
+npm run electron:dev
+```
 
-## Privacidade e segurança
+### Comandos de Teste e Build
 
-O Checkpoint mantém a biblioteca completa em SQLite dentro de `app.getPath("userData")`. O Firestore recebe somente o resumo público sem caminhos de executáveis ou imagens base64; mensagens ficam no Realtime Database. Steam e Discord são opcionais. Segredos de backend não devem ser expostos ao renderer nem armazenados no repositório. Antes de publicar uma versão, siga o [checklist de release e privacidade](docs/RELEASE_CHECKLIST.md).
+```powershell
+# Executar a suíte de testes unitários e checagem de tipos
+npm run test:ci
 
-## Limitações conhecidas
+# Validar compilação e empacotamento
+npm run build
 
-- O botão central do controle pode ser reservado pela Xbox Game Bar, Steam ou pelo próprio driver.
-- Fullscreen exclusivo não garante a sobreposição do overlay; borderless é o modo recomendado.
-- Jogos Steam abertos por URI são verificados quando a presença do perfil está visível. Sessões Epic por URI e perfis Steam privados permanecem provisórios e expiram após 12 horas se não houver um processo local verificável.
-- Recursos sociais e resumos públicos dependem do backend e das regras dos dois bancos estarem publicados.
-- O chat carrega as 50 mensagens mais recentes e o backend remove mensagens com mais de 30 dias quando uma conversa é aberta.
-- A biblioteca SQLite é específica do computador. Steam pode reconstruir seus jogos em outra máquina, mas jogos manuais exigem nova adição ou uma futura função de exportação/importação.
-- Capturas ainda são locais; backup e versionamento de saves na nuvem não fazem parte da 2.0.0.
+# Empacotar instalador Windows (NSIS)
+npm run dist
+```
 
-O projeto está em desenvolvimento ativo. Relatos reproduzíveis e sugestões podem ser enviados pela página de [issues](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues).
+---
+
+## 📄 Licença
+
+Desenvolvido por **Guilherme Sant'Ana**. Todos os direitos reservados.

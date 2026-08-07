@@ -1,7 +1,7 @@
 {
   "name": "checkpoint",
   "private": true,
-  "version": "3.0.7",
+  "version": "3.0.8",
   "description": "Checkpoint Launcher is a Windows game launcher with an integrated Nexus Mods management experience.",
   "author": "Guilherme Sant'Ana",
   "homepage": "https://checkpointlauncher.com",
@@ -52,17 +52,11 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://checkpointlauncher.com/downloads"
-      },
-      {
-        "provider": "github",
-        "owner": "Guilhermesttt",
-        "repo": "Checkpoint---Launcher"
-      }
-    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Guilhermesttt",
+      "repo": "Checkpoint---Launcher"
+    },
     "files": [
       "dist/**/*",
       "electron/**/*",

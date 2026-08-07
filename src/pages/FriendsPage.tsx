@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { MessageSquare, Search, Trash2, User, Users, X } from "lucide-react";
+import { Gamepad2, MessageSquare, Search, Trash2, User, UserCheck, Users, X } from "lucide-react";
 import { SystemPageShell } from "../components/ui/SystemPageShell";
 import ModalShell from "../components/ui/ModalShell";
 import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
 import { searchCheckpointFriends } from "../services/checkpointFriends";
 import type { CheckpointFriendRequest, SocialFriend, UserProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
+import { FriendsSubTabs, type SocialSubTab } from "../components/social/FriendsSubTabs";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -65,6 +66,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 }) => {
   const copy = FRIENDS_COPY[language] || FRIENDS_COPY["pt-BR"];
   const [friendSearch, setFriendSearch] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState<SocialSubTab>("AMIGOS");
   const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
   const onlineCount = presenceFriends.filter((friend) => friend.status !== "offline").length;
   const playingCount = presenceFriends.filter((friend) => friend.status === "playing").length;
@@ -76,21 +78,28 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           friend.playing?.toLowerCase().includes(normalizedSearch),
       )
     : friends;
+  const totalUnreadCount = Object.values(unreadMessagesByFriend).reduce((acc, count) => acc + (count || 0), 0);
+  const checkpointFriends = friends.filter((f) => f.source === "checkpoint");
 
   return (
     <SystemPageShell eyebrow="Social" title={t("friends")}>
+      <FriendsSubTabs
+        activeTab={activeSubTab}
+        onTabChange={setActiveSubTab}
+        incomingRequestsCount={incomingRequests.length}
+        totalFriendsCount={friends.length}
+        unreadCount={totalUnreadCount}
+      />
+
       <section className="mb-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/20 bg-white/10">
+            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/20 bg-white/10 shadow-lg">
               {discordAvatar ? (
                 <img src={discordAvatar} alt="" className="h-full w-full object-cover" />
               ) : (
                 <DiscordIcon className="h-6 w-6 text-white/60" />
               )}
-              <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#0A0A0C]">
-                <div className="h-3 w-3 rounded-full bg-green-500" />
-              </div>
             </div>
             <div className="flex-1">
               <div className="mb-1 flex items-center gap-2">
@@ -103,7 +112,14 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    currentPresenceGame
+                      ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                      : "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                  }`}
+                />
                 <p className="text-xs font-bold uppercase tracking-wider text-white/70">
                   {currentPresenceGame ? `${copy.playing} ${currentPresenceGame}` : copy.online}
                 </p>
@@ -117,7 +133,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             <button
               type="button"
               onClick={onAddFriendClick}
-              className="h-10 rounded-xl bg-white px-5 text-xs font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
+              className="cursor-pointer h-10 rounded-xl bg-white px-5 text-xs font-black uppercase tracking-wider text-black shadow-[0_0_20px_rgba(255,255,255,0.25)] transition-all hover:bg-white/90 hover:scale-105 active:scale-95"
             >
               + {t("addFriendTitle")}
             </button>
@@ -125,7 +141,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={onConnectDiscord}
-                className="h-8 rounded-lg bg-indigo-500/20 px-4 text-xs font-bold uppercase tracking-wider text-indigo-400 transition-all hover:bg-indigo-500/30"
+                className="cursor-pointer h-8 rounded-lg bg-indigo-500/20 px-4 text-xs font-bold uppercase tracking-wider text-indigo-400 transition-all hover:bg-indigo-500/30 active:scale-95"
               >
                 {copy.connect}
               </button>
@@ -135,21 +151,32 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
           {[
-            { label: copy.online, value: onlineCount },
-            { label: copy.playing, value: playingCount },
-            { label: copy.total, value: friends.length },
+            { label: copy.online, value: onlineCount, icon: <UserCheck className="h-4 w-4 text-white/60" />, hint: "Amigos online agora" },
+            { label: copy.playing, value: playingCount, icon: <Gamepad2 className="h-4 w-4 text-white/60" />, hint: "Em uma sessão de jogo" },
+            { label: copy.total, value: friends.length, icon: <Users className="h-4 w-4 text-white/60" />, hint: "Total de conexões" },
           ].map((item) => (
-            <div key={item.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5">
-              <p className="text-xs font-bold uppercase tracking-wider text-white/40">
-                {item.label}
-              </p>
-              <p className="mt-1.5 text-3xl font-black tabular-nums text-white">{item.value}</p>
+            <div key={item.label} className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.035] p-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  {item.icon}
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/50">
+                    {item.label}
+                  </p>
+                </div>
+                <p className="mt-1 text-2xl font-black tabular-nums text-white">{item.value}</p>
+              </div>
+              {item.value === 0 && (
+                <span className="rounded-lg bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/30">
+                  Sem atividade
+                </span>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      {incomingRequests.length > 0 && (
+      {/* ABA SOLICITAÇÕES */}
+      {activeSubTab === "SOLICITAÇÕES" && (
         <section className="mb-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
@@ -160,174 +187,262 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
               {incomingRequests.length}
             </span>
           </div>
-          <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-            {incomingRequests.map((request) => (
-              <div
-                key={request.uid}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
-                    {request.photoURL ? (
-                      <img src={request.photoURL} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <Users className="h-4 w-4 text-white/70" />
-                    )}
+
+          {incomingRequests.length === 0 ? (
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+              <Users className="mb-3 h-8 w-8 text-white/20" />
+              <p className="text-sm font-semibold text-white/50">Nenhuma solicitação de amizade pendente</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              {incomingRequests.map((request) => (
+                <div
+                  key={request.uid}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
+                      {request.photoURL ? (
+                        <img src={request.photoURL} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Users className="h-4 w-4 text-white/70" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-white">
+                        {request.displayName || copy.user}
+                      </p>
+                      <p className="text-xs uppercase tracking-wider text-white/35">
+                        {copy.wantsFriend}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white">
-                      {request.displayName || copy.user}
-                    </p>
-                    <p className="text-xs uppercase tracking-wider text-white/35">
-                      {copy.wantsFriend}
-                    </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRejectRequest(request.uid)}
+                      className="cursor-pointer h-9 rounded-lg px-3 text-xs font-black uppercase text-red-300/80 hover:bg-red-500/10"
+                    >
+                      {copy.reject}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onAcceptRequest(request.uid)}
+                      className="cursor-pointer h-9 rounded-lg bg-white px-3 text-xs font-black uppercase text-black hover:bg-white/90"
+                    >
+                      {copy.accept}
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onRejectRequest(request.uid)}
-                    className="h-9 rounded-lg px-3 text-xs font-black uppercase text-red-300/80 hover:bg-red-500/10"
-                  >
-                    {copy.reject}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAcceptRequest(request.uid)}
-                    className="h-9 rounded-lg bg-white px-3 text-xs font-black uppercase text-black hover:bg-white/90"
-                  >
-                    {copy.accept}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
-      {friends.length > 0 && (
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-            <input
-              value={friendSearch}
-              onChange={(event) => setFriendSearch(event.target.value)}
-              placeholder={copy.search}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 shadow-lg"
-            />
+      {/* ABA CHAT & CONVERSAS */}
+      {activeSubTab === "CHAT" && (
+        <section className="mb-6 rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+          <div className="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-base md:text-lg font-bold text-white">Chat & Conversas</p>
+              <p className="mt-0.5 text-xs font-medium text-white/40">Selecione um amigo para abrir o chat em tempo real.</p>
+            </div>
           </div>
-        </div>
-      )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {visibleFriends.length === 0 ? (
-          <div className="rounded-[28px] border border-white/10 bg-black/40 p-8 text-center md:col-span-2 shadow-2xl">
-            <Users className="mx-auto mb-4 h-8 w-8 text-white/35" />
-            <p className="text-sm font-bold text-white/70">
-              {!discordConnected
-                ? copy.connectEmpty
-                : friends.length === 0
-                  ? copy.noFriends
-                  : copy.noSearch}
-            </p>
-            {discordConnected && friends.length === 0 && (
-              <p className="mt-2 text-xs font-medium text-white/40">{t("addFriendEmptyHint")}</p>
-            )}
-          </div>
-        ) : (
-          visibleFriends.map((friend) => {
-            const unreadCount = unreadMessagesByFriend[friend.id.split(":")[1]] || 0;
-            return (
-              <div
-                key={friend.id}
-                className="flex min-h-[108px] flex-col justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5 sm:flex-row sm:items-center"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[var(--launcher-accent-soft)]">
-                    {friend.avatar ? (
-                      <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
-                    ) : friend.source === "discord_friend" ? (
-                      <DiscordIcon className="h-4 w-4 text-white/70" />
-                    ) : (
-                      <Users className="h-4 w-4 text-white/70" />
-                    )}
-                    <span
-                      className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-[#0A0A0C] ${
-                        friend.status === "offline" ? "bg-red-500" : "bg-green-500"
-                      }`}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white">{friend.name}</p>
-                    <p className="truncate text-xs uppercase tracking-wider text-white/35">
-                      {friend.source === "discord_friend"
-                        ? copy.discordConnected
-                        : friend.source === "checkpoint"
-                          ? friend.status === "playing"
-                            ? `${copy.playing} ${friend.playing || copy.oneGame}`
-                            : friend.status === "online"
-                              ? copy.online
-                              : copy.offline
-                          : friend.status === "playing"
-                            ? `${copy.playing} ${friend.playing || copy.now}`
-                            : friend.status === "online"
-                              ? copy.online
-                              : copy.offline}
-                    </p>
-                  </div>
-                </div>
+          {checkpointFriends.length === 0 ? (
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+              <MessageSquare className="mb-3 h-8 w-8 text-white/20" />
+              <p className="text-sm font-semibold text-white/50">Nenhuma conversa recente</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              {checkpointFriends.map((friend) => {
+                const unreadCount = unreadMessagesByFriend[friend.id.split(":")[1]] || 0;
+                return (
+                  <div
+                    key={friend.id}
+                    onClick={() => onOpenChat(friend)}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5 transition-all hover:bg-white/[0.08] hover:border-white/20 active:scale-[0.99]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-[var(--launcher-accent-soft)]">
+                        {friend.avatar ? (
+                          <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <Users className="h-4 w-4 text-white/70" />
+                        )}
+                        <span
+                          className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border border-[#0A0A0C] ${
+                            friend.status === "offline" ? "bg-red-500" : "bg-green-500"
+                          }`}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-white">{friend.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${
+                              friend.status === "playing"
+                                ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                                : friend.status === "online"
+                                  ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                                  : "bg-red-500/80"
+                            }`}
+                          />
+                          <p className="truncate text-xs uppercase tracking-wider text-white/40">
+                            {friend.status === "playing"
+                              ? `${copy.playing} ${friend.playing || copy.oneGame}`
+                              : friend.status === "online"
+                                ? copy.online
+                                : copy.offline}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="flex shrink-0 items-center justify-end gap-2">
-                  {friend.source === "checkpoint" && (
                     <button
                       type="button"
-                      onClick={() => onOpenChat(friend)}
-                      title={copy.openChat}
-                      className="relative flex h-9 items-center gap-2 rounded-lg bg-white px-4 text-xs font-black uppercase tracking-wider text-black transition-all hover:bg-white/90"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenChat(friend);
+                      }}
+                      className="relative flex h-9 items-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-wider text-black transition-all hover:bg-white/90 shadow-md"
                     >
                       <MessageSquare className="h-3.5 w-3.5" />
-                      <span>{copy.chat}</span>
+                      <span>Abrir Chat</span>
                       {unreadCount > 0 && (
                         <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-xs font-black text-white">
                           {unreadCount}
                         </span>
                       )}
                     </button>
-                  )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
-                  {friend.source === "checkpoint" && (
-                    <button
-                      type="button"
-                      disabled={friendProfileLoadingId === friend.id}
-                      onClick={() => onViewFriendProfile(friend)}
-                      title={copy.viewProfile}
-                      className="flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-[10px] font-black uppercase tracking-wider text-white/80 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
-                    >
-                      <User className="h-3.5 w-3.5" />
-                      <span>
-                        {friendProfileLoadingId === friend.id
-                          ? copy.openingProfile
-                          : copy.profile}
-                      </span>
-                    </button>
-                  )}
-
-                  {friend.source === "checkpoint" && (
-                    <button
-                      type="button"
-                      onClick={() => onRemoveFriend(friend)}
-                      title={copy.remove}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-red-300/70 transition-all hover:bg-red-500/10 hover:text-red-300"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+      {/* ABA AMIGOS */}
+      {activeSubTab === "AMIGOS" && (
+        <>
+          {friends.length > 0 && (
+            <div className="mb-6">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                <input
+                  value={friendSearch}
+                  onChange={(event) => setFriendSearch(event.target.value)}
+                  placeholder={copy.search}
+                  className="h-12 w-full rounded-2xl border border-white/10 bg-black/40 pl-11 pr-4 text-sm font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 shadow-lg"
+                />
               </div>
-            );
-          })
-        )}
-      </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {visibleFriends.length === 0 ? (
+              <div className="rounded-[28px] border border-white/10 bg-black/40 p-8 text-center md:col-span-2 shadow-2xl">
+                <Users className="mx-auto mb-4 h-8 w-8 text-white/35" />
+                <p className="text-sm font-bold text-white/70">
+                  {!discordConnected
+                    ? copy.connectEmpty
+                    : friends.length === 0
+                      ? copy.noFriends
+                      : copy.noSearch}
+                </p>
+                {discordConnected && friends.length === 0 && (
+                  <p className="mt-2 text-xs font-medium text-white/40">{t("addFriendEmptyHint")}</p>
+                )}
+              </div>
+            ) : (
+              visibleFriends.map((friend) => {
+                const unreadCount = unreadMessagesByFriend[friend.id.split(":")[1]] || 0;
+                return (
+                  <div
+                    key={friend.id}
+                    className="flex min-h-[108px] flex-col justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4.5 sm:flex-row sm:items-center"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-[var(--launcher-accent-soft)]">
+                        {friend.avatar ? (
+                          <img src={friend.avatar} alt="" className="h-full w-full object-cover" />
+                        ) : friend.source === "discord_friend" ? (
+                          <DiscordIcon className="h-4 w-4 text-white/70" />
+                        ) : (
+                          <Users className="h-4 w-4 text-white/70" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-white">{friend.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${
+                              friend.status === "playing"
+                                ? "bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]"
+                                : friend.status === "online"
+                                  ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                                  : "bg-red-500/80"
+                            }`}
+                          />
+                          <p className="truncate text-xs uppercase tracking-wider text-white/40">
+                            {friend.source === "discord_friend"
+                              ? copy.discordConnected
+                              : friend.source === "checkpoint"
+                                ? friend.status === "playing"
+                                  ? `${copy.playing} ${friend.playing || copy.oneGame}`
+                                  : friend.status === "online"
+                                    ? copy.online
+                                    : copy.offline
+                                : friend.status === "playing"
+                                  ? `${copy.playing} ${friend.playing || copy.now}`
+                                  : friend.status === "online"
+                                    ? copy.online
+                                    : copy.offline}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center justify-end gap-2">
+
+
+                      {friend.source === "checkpoint" && (
+                        <button
+                          type="button"
+                          disabled={friendProfileLoadingId === friend.id}
+                          onClick={() => onViewFriendProfile(friend)}
+                          title={copy.viewProfile}
+                          className="flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-[10px] font-black uppercase tracking-wider text-white/80 transition-all hover:bg-white/10 hover:text-white disabled:opacity-50"
+                        >
+                          <User className="h-3.5 w-3.5" />
+                          <span>
+                            {friendProfileLoadingId === friend.id
+                              ? copy.openingProfile
+                              : copy.profile}
+                          </span>
+                        </button>
+                      )}
+
+                      {friend.source === "checkpoint" && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveFriend(friend)}
+                          title={copy.remove}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-red-300/70 transition-all hover:bg-red-500/10 hover:text-red-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              }))}
+          </div>
+        </>
+      )}
     </SystemPageShell>
   );
 });

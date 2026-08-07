@@ -42,6 +42,8 @@ const { downloadNexusFile, parseNxmUrl } = require("./nexus-download-manager.cjs
 const { assertAllowedArchive } = require("./nexus-installation-manager.cjs");
 const { selectModGameDirectory } = require("./mod-game-directory.cjs");
 const { runModOperation, shutdownModOperationWorker } = require("./mod-operation-runner.cjs");
+const { detectModConflicts } = require("./mod-conflict-detector.cjs");
+const { loadModProfiles, saveModProfile, deleteModProfile } = require("./mod-profile-store.cjs");
 const {
   detectEmulator,
   parseAchievementState,
@@ -1273,6 +1275,18 @@ const sendOverlayEvent = (channel, payload) => {
 
   if (channel === "overlay:social" || channel === "achievement:unlock") {
     revealOverlayForToast();
+    if (Notification.isSupported() && payload && (payload.title || payload.description)) {
+      try {
+        const notif = new Notification({
+          title: String(payload.title || "Checkpoint"),
+          body: String(payload.description || ""),
+          silent: false,
+        });
+        notif.show();
+      } catch (err) {
+        console.warn("[overlay] Nao foi possivel exibir notificacao nativa:", err);
+      }
+    }
   }
 
   if (!overlayReady || overlayWindow.webContents.isLoadingMainFrame()) {
@@ -3440,6 +3454,29 @@ registerSecureIpcHandler("overlay:show-spotify-track", async (_event, payload) =
   return { shown: true };
 });
 
+registerSecureIpcHandler("mods:detect-conflicts", async (_event, manifestRoot) => {
+  return detectModConflicts(String(manifestRoot || "").trim());
+});
+
+registerSecureIpcHandler("mods:load-profiles", async (_event, gameId) => {
+  return loadModProfiles(app.getPath("userData"), String(gameId || "").trim());
+});
+
+registerSecureIpcHandler("mods:save-profile", async (_event, payload) => {
+  const gameId = String(payload?.gameId || "").trim();
+  const profileName = String(payload?.profileName || "").trim();
+  const activeInstallIds = Array.isArray(payload?.activeInstallIds)
+    ? payload.activeInstallIds.map((id) => String(id))
+    : [];
+  return saveModProfile(app.getPath("userData"), gameId, profileName, activeInstallIds);
+});
+
+registerSecureIpcHandler("mods:delete-profile", async (_event, payload) => {
+  const gameId = String(payload?.gameId || "").trim();
+  const profileId = String(payload?.profileId || "").trim();
+  return deleteModProfile(app.getPath("userData"), gameId, profileId);
+});
+
 // ─── Auto-Updater ───────────────────────────────────────────────────────────
 const { autoUpdater } = require("electron-updater");
 
@@ -3465,7 +3502,10 @@ let updaterState = {
 };
 
 const formatUpdaterError = (error) => {
-  const rawMessage = String(error?.message || error || "");
+  const rawMessage = String(error?.stack || error?.message || error || "");
+  if (/YAMLException|cannot read a block mapping entry|multiline key/i.test(rawMessage)) {
+    return `Formato de arquivo de release invalido (YAML). [Detalhes do erro: ${rawMessage}]`;
+  }
   if (
     /\b404\b/.test(rawMessage)
     && /github\.com\/Guilhermesttt\/Checkpoint---Launcher\/releases/i.test(rawMessage)

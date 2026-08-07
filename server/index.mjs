@@ -173,7 +173,18 @@ export const cleanupExpiredChatData = (options = {}) => {
 app.set("trust proxy", 1);
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://sdk.scdn.co"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        imgSrc: ["'self'", "data:", "blob:", "https://cdn.cloudflare.steamstatic.com", "https://cdn.discordapp.com", "https://i.scdn.co", "https://nexusmods.com", "https://*.nexusmods.com", "https://*.epicgames.com"],
+        connectSrc: ["'self'", "https://*.supabase.co", "https://api.nexusmods.com", "https://api.spotify.com", "https://steamcommunity.com"],
+        frameSrc: ["'self'", "https://sdk.scdn.co"],
+        objectSrc: ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   }),
 );

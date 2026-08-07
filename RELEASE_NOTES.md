@@ -1,3 +1,14 @@
+## Checkpoint Launcher — v3.0.8
+
+Lançamento: 7 de agosto de 2026.
+
+- Detector de conflitos de mods e suporte a armazenamento de perfis de modding.
+- Modal dedicado de tratamento de erros no processo de atualização do aplicativo (`AppUpdateErrorModal`).
+- Navegação interativa por breadcrumb no cabeçalho e reformulação visual da página de amigos.
+- Suporte a metadados de Anti-Cheat em jogos e extração dinâmica de cores com `useGameColor`.
+
+---
+
 ## Checkpoint Launcher — v3.0.7
 
 Lançamento: 6 de agosto de 2026.

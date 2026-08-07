@@ -25,6 +25,8 @@ import { useNotification } from "./NotificationCenter";
 import { useGamepadButton } from "../context/GamepadContext";
 import InputHints from "./ui/InputHints";
 import { fetchEpicAppDetailsResult } from "../services/epic";
+import { ModsSummaryBanner } from "./game/ModsSummaryBanner";
+import { AdvancedLaunchSettings } from "./game/AdvancedLaunchSettings";
 
 interface GameDetailPanelProps {
   game: Game | null;
@@ -1728,6 +1730,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       exit={{ opacity: 0, y: -20 }}
                       className="max-w-3xl"
                     >
+                      <ModsSummaryBanner
+                        installedModsCount={gameMods.length}
+                        activeModsCount={gameMods.filter((m) => m.enabled).length}
+                        onOpenFullModManager={() => {
+                          playSound("select");
+                          onOpenMods?.();
+                        }}
+                      />
                       <div className="mb-5 flex items-center justify-between gap-4">
                         <div>
                           <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-white/55">
@@ -1838,105 +1848,42 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                             type="button"
                             disabled={isSavingLaunchProfile || !user?.uid}
                             onClick={() => void saveLaunchProfile()}
-                            className="rounded-xl bg-white px-4 py-2 text-[9px] font-black uppercase tracking-widest text-black disabled:opacity-40"
+                            className="cursor-pointer rounded-xl bg-white px-4 py-2 text-[9px] font-black uppercase tracking-widest text-black shadow-md transition-all hover:bg-white/90 disabled:opacity-40"
                           >
                             {isSavingLaunchProfile ? "Salvando..." : "Salvar perfil"}
                           </button>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Monitor
-                            <select
-                              value={launchProfile.monitorId ?? ""}
-                              onChange={(event) => setLaunchProfile((current) => ({
-                                ...current,
-                                monitorId: event.target.value ? Number(event.target.value) : null,
-                              }))}
-                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
-                            >
-                              <option value="">Automático</option>
-                              {displayOptions.map((display) => (
-                                <option key={display.id} value={display.id}>
-                                  {display.label} · {display.width}×{display.height}{display.primary ? " (principal)" : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Modo de janela
-                            <select
-                              value={launchProfile.windowMode || "default"}
-                              onChange={(event) => setLaunchProfile((current) => ({
-                                ...current,
-                                windowMode: event.target.value as GameLaunchProfile["windowMode"],
-                              }))}
-                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
-                            >
-                              <option value="default">Padrão do jogo</option>
-                              <option value="borderless">Sem bordas</option>
-                              <option value="windowed">Janela</option>
-                            </select>
-                          </label>
-                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Resolução
-                            <div className="flex gap-2">
-                              <input
-                                inputMode="numeric"
-                                value={launchProfile.resolutionWidth ?? ""}
-                                onChange={(event) => setLaunchProfile((current) => ({
-                                  ...current,
-                                  resolutionWidth: event.target.value ? Number(event.target.value) : null,
-                                }))}
-                                placeholder="1920"
-                                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
-                              />
-                              <input
-                                inputMode="numeric"
-                                value={launchProfile.resolutionHeight ?? ""}
-                                onChange={(event) => setLaunchProfile((current) => ({
-                                  ...current,
-                                  resolutionHeight: event.target.value ? Number(event.target.value) : null,
-                                }))}
-                                placeholder="1080"
-                                className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/50 px-3 text-xs text-white outline-none"
-                              />
-                            </div>
-                          </label>
-                          <label className="space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Prioridade
-                            <select
-                              value={launchProfile.processPriority || "normal"}
-                              onChange={(event) => setLaunchProfile((current) => ({
-                                ...current,
-                                processPriority: event.target.value as GameLaunchProfile["processPriority"],
-                              }))}
-                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
-                            >
-                              <option value="normal">Normal</option>
-                              <option value="above-normal">Acima do normal</option>
-                              <option value="high">Alta</option>
-                            </select>
-                          </label>
-                          <label className="col-span-2 space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Argumentos
-                            <input
-                              value={launchProfile.arguments || ""}
-                              onChange={(event) => setLaunchProfile((current) => ({ ...current, arguments: event.target.value }))}
-                              placeholder='Ex.: -windowed -novid --profile "TV"'
-                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
-                            />
-                          </label>
-                          <label className="col-span-2 space-y-1.5 text-[9px] font-bold uppercase tracking-wider text-white/35">
-                            Diretório de trabalho
-                            <input
-                              value={launchProfile.workingDirectory || ""}
-                              onChange={(event) => setLaunchProfile((current) => ({ ...current, workingDirectory: event.target.value }))}
-                              placeholder="Automático: pasta do executável"
-                              className="h-10 w-full rounded-xl border border-white/10 bg-black/50 px-3 text-xs normal-case tracking-normal text-white outline-none"
-                            />
-                          </label>
-                        </div>
+                        <AdvancedLaunchSettings
+                          monitorIndex={launchProfile.monitorId ?? 0}
+                          onMonitorChange={(monitorId) => setLaunchProfile((curr) => ({ ...curr, monitorId }))}
+                          resolution={
+                            launchProfile.resolutionWidth && launchProfile.resolutionHeight
+                              ? `${launchProfile.resolutionWidth}x${launchProfile.resolutionHeight}`
+                              : "Native"
+                          }
+                          onResolutionChange={(res) => {
+                            const [w, h] = res.split("x").map(Number);
+                            setLaunchProfile((curr) => ({
+                              ...curr,
+                              resolutionWidth: w || null,
+                              resolutionHeight: h || null,
+                            }));
+                          }}
+                          processPriority={launchProfile.processPriority || "Normal"}
+                          onPriorityChange={(processPriority) =>
+                            setLaunchProfile((curr) => ({
+                              ...curr,
+                              processPriority: processPriority as GameLaunchProfile["processPriority"],
+                            }))
+                          }
+                          commandLineArgs={launchProfile.arguments || ""}
+                          onArgsChange={(args) => setLaunchProfile((curr) => ({ ...curr, arguments: args }))}
+                          workingDirectory={launchProfile.workingDirectory || ""}
+                          onWorkDirChange={(workingDirectory) =>
+                            setLaunchProfile((curr) => ({ ...curr, workingDirectory }))
+                          }
+                        />
                       </div>
                     </motion.div>
                   )}

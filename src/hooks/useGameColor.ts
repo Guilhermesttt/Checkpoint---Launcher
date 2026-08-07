@@ -3,6 +3,20 @@ import { FastAverageColor } from 'fast-average-color';
 
 const fac = new FastAverageColor();
 
+/** Clamps luminance for extracted cover color so bright/pastel artwork doesn't wash out contrast */
+function clampColorLuminance(r: number, g: number, b: number): string {
+  const luminance = (r * 299 + g * 587 + b * 114) / 1000;
+  if (luminance > 180) {
+    // Escurece suavemente para preservar o tom sem estourar contraste
+    const factor = 180 / luminance;
+    const clampedR = Math.round(r * factor);
+    const clampedG = Math.round(g * factor);
+    const clampedB = Math.round(b * factor);
+    return `rgb(${clampedR}, ${clampedG}, ${clampedB})`;
+  }
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export const useGameColor = (imageUrl?: string) => {
   const [color, setColor] = useState({ hex: 'rgba(255,255,255,1)', isDark: false });
 
@@ -19,7 +33,12 @@ export const useGameColor = (imageUrl?: string) => {
     const handleLoad = () => {
       try {
         const extracted = fac.getColor(img);
-        setColor({ hex: extracted.hex, isDark: extracted.isDark });
+        const clampedHex = clampColorLuminance(
+          extracted.value[0],
+          extracted.value[1],
+          extracted.value[2],
+        );
+        setColor({ hex: clampedHex, isDark: extracted.isDark });
       } catch {
         setColor({ hex: '#ffffff', isDark: false });
       }

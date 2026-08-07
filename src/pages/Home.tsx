@@ -31,6 +31,7 @@ import {
 import { useNotification } from "../components/NotificationCenter";
 import ModalShell from "../components/ui/ModalShell";
 import { ProfileDropdown } from "../components/ui/ProfileDropdown";
+import { InteractiveBreadcrumb } from "../components/home/InteractiveBreadcrumb";
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../services/supabase";
 // Correção 1: Importando Game, UserProfile e SocialFriend no mesmo lugar
@@ -1640,82 +1641,66 @@ const Home: React.FC = () => {
           className="shrink-0 flex items-center justify-between px-10 pt-7 relative"
         >
           <div className="flex items-center gap-5">
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[9.5px] font-black uppercase tracking-[0.45em] font-body"
-                style={{ color: "rgba(255,255,255,0.22)" }}
-              >
-                Checkpoint
-              </span>
-
-              <div className="relative flex items-center h-4 ml-1">
-                <AnimatePresence>
-                  {searchOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, x: -10 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, x: -10 }}
-                      className="absolute left-6 top-1/2 -translate-y-1/2 z-[60]"
-                    >
-                      <div className="relative">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          placeholder={t("searchPlaceholder")}
-                          className="h-8 w-48 rounded-xl bg-black/40 backdrop-blur-3xl border border-white/5 pl-3 pr-8 text-[11px] text-white outline-none shadow-2xl focus:border-white/10"
-                          onBlur={() => {
-                            if (!searchTerm) setSearchOpen(false);
-                          }}
-                        />
-                        {searchTerm && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSearchTerm("");
-                              playSound("back");
-                            }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-all"
-                          >
-                            <X className="w-2.5 h-2.5 text-white/30 hover:text-white" />
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <button
-                  onClick={() => {
-                    setSearchOpen((s) => !s);
-                    playSound("search");
-                  }}
-                  onMouseEnter={() => playSound("hover")}
-                  className="cursor-pointer p-1.5 hover:bg-white/10 hover:scale-110 active:scale-90 transition-all duration-200 rounded-full group"
-                >
-                  <Search className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
-                </button>
-              </div>
-            </div>
-
-            <span style={{ color: "rgba(255,255,255,0.14)" }}>›</span>
-
-            <AnimatePresence mode="wait">
-              <motion.span
-                key={activeCategory}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.18 }}
-                className="text-[9.5px] font-black uppercase tracking-[0.32em] font-body"
-                style={{ color: "rgba(255,255,255,0.50)" }}
-              >
-                {activeCategory === "SETTINGS"
+            <InteractiveBreadcrumb
+              activeCategory={activeCategory}
+              categoryLabel={
+                activeCategory === "SETTINGS"
                   ? t("settings")
-                  : CATEGORIES.find((c) => c.id === activeCategory)?.label}
-              </motion.span>
-            </AnimatePresence>
+                  : CATEGORIES.find((c) => c.id === activeCategory)?.label
+              }
+              onSelectCategory={selectCategory}
+              playSound={playSound}
+            />
+
+            <div className="relative flex items-center h-4 ml-1">
+              <AnimatePresence>
+                {searchOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, x: -10 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, x: -10 }}
+                    className="absolute left-6 top-1/2 -translate-y-1/2 z-[60]"
+                  >
+                    <div className="relative">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={t("searchPlaceholder")}
+                        className="h-8 w-48 rounded-xl bg-black/40 backdrop-blur-3xl border border-white/5 pl-3 pr-8 text-[11px] text-white outline-none shadow-2xl focus:border-white/10"
+                        onBlur={() => {
+                          if (!searchTerm) setSearchOpen(false);
+                        }}
+                      />
+                      {searchTerm && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSearchTerm("");
+                            playSound("back");
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-all"
+                        >
+                          <X className="w-2.5 h-2.5 text-white/30 hover:text-white" />
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                onClick={() => {
+                  setSearchOpen((s) => !s);
+                  playSound("search");
+                }}
+                onMouseEnter={() => playSound("hover")}
+                className="cursor-pointer p-1.5 hover:bg-white/10 hover:scale-110 active:scale-90 transition-all duration-200 rounded-full group"
+              >
+                <Search className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">

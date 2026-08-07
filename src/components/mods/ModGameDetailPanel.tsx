@@ -17,11 +17,13 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  ShieldAlert,
   Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
 import type { Game } from "../../types/domain";
+import { getAntiCheatInfo } from "../../constants/anticheat-games";
 import {
   adoptNexusInstalledMod,
   connectNexusPersonalKey,
@@ -171,6 +173,58 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
   const recordedDownloadsRef = React.useRef(new Set<string>());
   const downloadScanKeyRef = React.useRef("");
   const downloadNoticeTimerRef = React.useRef<number | null>(null);
+
+  const [modConflicts, setModConflicts] = React.useState<Array<{ relativePath: string; mods: Array<{ name: string }> }>>([]);
+  const [modProfiles, setModProfiles] = React.useState<Array<{ id: string; name: string; activeInstallIds: string[] }>>([]);
+  const [newProfileName, setNewProfileName] = React.useState("");
+  const [showProfileSave, setShowProfileSave] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!window.electronAPI?.detectModConflicts) return;
+    const manifestRoot = installedMods.find((m) => m.manifestPath)?.manifestPath?.split(/[/\\]/).slice(0, -1).join("/") || "";
+    if (!manifestRoot) {
+      setModConflicts([]);
+      return;
+    }
+    window.electronAPI.detectModConflicts(manifestRoot)
+      .then((conflicts) => setModConflicts(Array.isArray(conflicts) ? conflicts : []))
+      .catch(() => setModConflicts([]));
+  }, [installedMods, optimisticModStates]);
+
+  React.useEffect(() => {
+    if (!game?.id || !window.electronAPI?.loadModProfiles) return;
+    window.electronAPI.loadModProfiles(game.id)
+      .then((profs: any) => setModProfiles(Array.isArray(profs) ? profs : []))
+      .catch(() => setModProfiles([]));
+  }, [game?.id]);
+
+  const handleSaveModProfile = async () => {
+    if (!game?.id || !newProfileName.trim() || !window.electronAPI?.saveModProfile) return;
+    const activeIds = installedMods.filter((m) => (optimisticModStates[m.id] ?? m.enabled)).map((m) => m.id);
+    try {
+      const updated = await window.electronAPI.saveModProfile({
+        gameId: game.id,
+        profileName: newProfileName.trim(),
+        activeInstallIds: activeIds,
+      });
+      setModProfiles(updated || []);
+      setNewProfileName("");
+      setShowProfileSave(false);
+    } catch {
+      // Ignora erro de gravação do perfil
+    }
+  };
+
+  const handleApplyModProfile = async (profile: { activeInstallIds: string[] }) => {
+    const activeSet = new Set(profile.activeInstallIds);
+    for (const mod of installedMods) {
+      const shouldEnable = activeSet.has(mod.id);
+      const currentEnabled = optimisticModStates[mod.id] ?? mod.enabled;
+      if (shouldEnable !== currentEnabled) {
+        await changeInstalledModState(mod, shouldEnable);
+      }
+    }
+  };
 
   React.useEffect(() => {
     if (!isOpen || !gameDomain) return;
@@ -933,9 +987,11 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                   <p className="mt-1 line-clamp-2 min-h-8 text-[10px] leading-relaxed text-white/35">
                                     {mod.summary || "Sem descrição."}
                                   </p>
-                                  <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-white/25">
-                                    <UserRound className="h-3 w-3" /> {mod.author || "Autor não informado"}
-                                  </p>
+                                  {mod.author && (
+                                    <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-white/25">
+                                      <UserRound className="h-3 w-3" /> Por {mod.author}
+                                    </p>
+                                  )}
                                 </div>
                               </button>
                             ))}
@@ -970,10 +1026,12 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                             Mod em destaque
                           </p>
                           <h2 className="mt-2 text-2xl font-black leading-tight text-white">{selectedMod.name}</h2>
-                          <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-white/35">
-                            <UserRound className="h-3.5 w-3.5" />
-                            {selectedMod.author || "Autor não informado"}
-                          </p>
+                          {selectedMod.author && (
+                            <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-white/35">
+                              <UserRound className="h-3.5 w-3.5" />
+                              Por {selectedMod.author}
+                            </p>
+                          )}
                           <p className="mt-5 text-sm leading-relaxed text-white/55">
                             {selectedMod.summary || "Este mod não possui uma descrição curta."}
                           </p>
@@ -1235,6 +1293,105 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                         </div>
                       </div>
 
+                      {/* AVISO DE ANTI-CHEAT */}
+                      {(() => {
+                        const acInfo = getAntiCheatInfo(game?.id, gameDomain);
+                        if (!acInfo) return null;
+                        return (
+                          <div className="mb-5 flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-amber-300 backdrop-blur-md">
+                            <ShieldAlert className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+                            <div>
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-200">
+                                Aviso de Proteção Anti-Cheat ({acInfo.antiCheatEngine})
+                              </h4>
+                              <p className="mt-1 text-xs text-amber-300/80 leading-relaxed">
+                                {acInfo.warningNotice}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* AVISO DE CONFLITO DE ARQUIVOS */}
+                      {modConflicts.length > 0 && (
+                        <div className="mb-5 flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-red-300 backdrop-blur-md">
+                          <AlertCircle className="h-5 w-5 shrink-0 text-red-400 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-red-200">
+                              Conflito de Arquivos Detectado ({modConflicts.length} arquivo{modConflicts.length === 1 ? "" : "s"} afetado{modConflicts.length === 1 ? "" : "s"})
+                            </h4>
+                            <p className="mt-1 text-xs text-red-300/80 leading-relaxed">
+                              Múltiplos mods ativos modificam o mesmo arquivo no jogo. O arquivo do último mod ativado sobrescreverá os anteriores.
+                            </p>
+                            <div className="mt-2 space-y-1">
+                              {modConflicts.slice(0, 3).map((c, i) => (
+                                <div key={i} className="text-[10px] font-mono text-red-200/60 truncate">
+                                  • {c.relativePath} ({c.mods.map((m) => m.name).join(" vs ")})
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* GERENCIAMENTO DE PERFIS DE MODS */}
+                      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Settings2 className="h-4 w-4 text-white/50" />
+                          <span className="text-xs font-bold uppercase tracking-wider text-white">Perfil de Mods:</span>
+                          {modProfiles.length === 0 ? (
+                            <span className="text-xs text-white/40">Padrão</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {modProfiles.map((prof) => (
+                                <button
+                                  key={prof.id}
+                                  type="button"
+                                  onClick={() => void handleApplyModProfile(prof)}
+                                  className="cursor-pointer rounded-lg border border-white/10 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-white/20 active:scale-95"
+                                >
+                                  {prof.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {showProfileSave ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={newProfileName}
+                              onChange={(e) => setNewProfileName(e.target.value)}
+                              placeholder="Nome do perfil"
+                              className="h-8 rounded-lg border border-white/15 bg-black/50 px-2.5 text-xs text-white outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleSaveModProfile()}
+                              className="cursor-pointer rounded-lg bg-white px-3 py-1.5 text-[10px] font-black uppercase text-black transition hover:bg-white/90"
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowProfileSave(false)}
+                              className="cursor-pointer text-[10px] text-white/40 hover:text-white"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowProfileSave(true)}
+                            className="cursor-pointer rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/60 transition hover:bg-white/10 hover:text-white"
+                          >
+                            + Salvar como Novo Perfil
+                          </button>
+                        )}
+                      </div>
+
                       {folderActionError && (
                         <p className="mb-4 rounded-xl border border-red-400/15 bg-red-400/[0.06] px-3 py-2 text-[10px] leading-relaxed text-red-200/65">
                           {folderActionError}
@@ -1266,7 +1423,10 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                               <div className="min-w-0 flex-1">
                                 <h3 className="truncate text-sm font-black text-white/80">{mod.name}</h3>
                                 <p className="mt-1 text-[10px] text-white/30">
-                                  {mod.author || "Autor não informado"} · versão {mod.version || "—"}
+                                  {[
+                                    mod.author ? `Por ${mod.author}` : null,
+                                    mod.version ? `v${mod.version}` : null,
+                                  ].filter(Boolean).join(" · ")}
                                 </p>
                               </div>
                               <div className="ml-auto flex items-center gap-3">
@@ -1335,7 +1495,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
                       <div>
                         <h2 className="flex items-center gap-2.5 text-lg font-black tracking-tight text-white sm:text-xl">
-                          <Download className="h-5 w-5 text-sky-400" />
+                          <Download className="h-5 w-5 text-white/70" />
                           Gerenciador de Downloads
                         </h2>
                         <p className="mt-0.5 text-xs text-white/40">

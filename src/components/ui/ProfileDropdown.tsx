@@ -43,7 +43,7 @@ export function ProfileDropdown({
   playSound,
 }: ProfileDropdownProps) {
   const initials = userDisplay.slice(0, 2).toUpperCase();
-  const copy = dropdownCopy[language];
+  const copy = dropdownCopy[language] || dropdownCopy["pt-BR"];
 
   return (
     <DropdownMenu>
@@ -51,21 +51,21 @@ export function ProfileDropdown({
         <button
           onPointerEnter={() => playSound("hover")}
           onClick={() => playSound("select")}
-          className="flex cursor-pointer items-center gap-3 rounded-2xl p-1.5 transition-colors hover:bg-white/5 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          className="group flex cursor-pointer items-center gap-3 rounded-2xl p-1.5 transition-all hover:bg-white/10 active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-white/20"
         >
           <div className="flex flex-col items-end pl-2">
-            <span className="text-[8px] font-black uppercase tracking-widest text-white/30">
+            <span className="text-[9px] font-black uppercase tracking-widest text-white/40 group-hover:text-white/60 transition-colors">
               {copy.identity}
             </span>
-            <span className="text-[10px] font-black uppercase text-white/80">
+            <span className="text-xs font-black uppercase text-white/90 group-hover:text-white transition-colors">
               {userDisplay}
             </span>
           </div>
-          <div className="h-10 w-10 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+          <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-white/20 bg-white/10 ring-2 ring-white/10 group-hover:ring-white/30 group-hover:scale-105 transition-all shadow-md">
             {avatarUrl ? (
               <img src={avatarUrl} alt={userDisplay} className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-xs font-black text-white/50">
+              <div className="flex h-full w-full items-center justify-center text-xs font-black text-white/70">
                 {initials}
               </div>
             )}

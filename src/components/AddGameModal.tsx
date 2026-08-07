@@ -17,6 +17,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
 import ModalShell from "./ui/ModalShell";
+import { AddGameWizardSteps } from "./game/AddGameWizardSteps";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -1176,6 +1177,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
             }}
             className="add-game-scrollbar min-h-0 space-y-8 border-white/[0.07] p-5 pb-8 lg:overflow-y-auto lg:border-r lg:p-7"
           >
+            <AddGameWizardSteps currentStep={completedSetupChecks === 3 ? 3 : completedSetupChecks === 2 ? 2 : 1} />
             <section>
               <div className="mb-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/38">{copy.platform}</p>

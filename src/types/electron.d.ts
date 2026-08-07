@@ -10,6 +10,10 @@ declare global {
       ) => Promise<void>;
       selectExecutable: () => Promise<string | null>;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
+      detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
+      loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
+      saveModProfile?: (request: { gameId: string; profileName: string; activeInstallIds: string[] }) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
+      deleteModProfile?: (request: { gameId: string; profileId: string }) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
       getNexusStatus: () => Promise<{
         connected: boolean;
         encryptionAvailable: boolean;
