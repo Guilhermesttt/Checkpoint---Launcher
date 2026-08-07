@@ -16,9 +16,11 @@ describe("imagens do overlay", () => {
     expect(sanitizeOverlayImageSource(avatar)).toBe(avatar);
   });
 
-  it("aceita HTTPS e rejeita fontes inseguras ou grandes demais", () => {
+  it("aceita HTTPS, HTTP e rejeita fontes inseguras ou grandes demais", () => {
     expect(sanitizeOverlayImageSource("https://cdn.example.com/avatar.png"))
       .toBe("https://cdn.example.com/avatar.png");
+    expect(sanitizeOverlayImageSource("http://localhost:8787/avatar.png"))
+      .toBe("http://localhost:8787/avatar.png");
     expect(sanitizeOverlayImageSource("javascript:alert(1)")).toBe("");
     expect(sanitizeOverlayImageSource(
       `data:image/png;base64,${"A".repeat(MAX_DATA_IMAGE_CHARACTERS)}`,

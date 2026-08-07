@@ -15,7 +15,7 @@ const sanitizeOverlayImageSource = (value) => {
   if (source.length > MAX_URL_CHARACTERS) return "";
   try {
     const url = new URL(source);
-    return ["https:", "file:"].includes(url.protocol) ? url.toString() : "";
+    return ["https:", "http:", "file:"].includes(url.protocol) ? url.toString() : "";
   } catch {
     return "";
   }
