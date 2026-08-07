@@ -1,7 +1,13 @@
 [[redirects]]
-  from = "/downloads/*"
-  to = "/downloads/:splat"
-  status = 200
+  from = "/downloads/latest.yml"
+  to = "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest/download/latest.yml"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/downloads/:filename"
+  to = "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest/download/:filename"
+  status = 302
   force = true
 
 [[redirects]]

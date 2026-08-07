@@ -3503,8 +3503,8 @@ let updaterState = {
 
 const formatUpdaterError = (error) => {
   const rawMessage = String(error?.stack || error?.message || error || "");
-  if (/YAMLException|cannot read a block mapping entry|multiline key/i.test(rawMessage)) {
-    return `Formato de arquivo de release invalido (YAML). [Detalhes do erro: ${rawMessage}]`;
+  if (/YAMLException|cannot read a block mapping entry|multiline key|end of the stream or a document separator is expected/i.test(rawMessage)) {
+    return "O servidor de atualizações retornou uma página HTML/inválida em vez do arquivo de release YAML (latest.yml). Verifique as rotas do servidor de download ou tente novamente.";
   }
   if (
     /\b404\b/.test(rawMessage)
