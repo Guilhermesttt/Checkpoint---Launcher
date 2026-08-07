@@ -31,6 +31,7 @@ interface GameCardProps {
   isSteam?: boolean;
   isEpic?: boolean;
   launcherType?: string;
+  steamAppId?: string;
 }
 
 const CARD_FRAME_WIDTH = 172;
@@ -50,12 +51,40 @@ const GameCard: React.FC<GameCardProps> = ({
   isSteam = false,
   isEpic = false,
   launcherType,
+  steamAppId,
 }) => {
   const reduceMotion = useReducedMotion();
   const low = useLowPerf();
   const noAnimation = reduceMotion || low;
-  const [failedImageSrc, setFailedImageSrc] = React.useState<string | null>(null);
+  const [currentImageSrc, setCurrentImageSrc] = React.useState<string>("");
+  const [hasAllFailed, setHasAllFailed] = React.useState(false);
   const [isFocused, setIsFocused] = React.useState(false);
+
+  React.useEffect(() => {
+    const initial =
+      image ||
+      (steamAppId
+        ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900_2x.jpg`
+        : "");
+    setCurrentImageSrc(initial);
+    setHasAllFailed(!initial);
+  }, [image, steamAppId]);
+
+  const handleImageError = () => {
+    if (steamAppId) {
+      if (currentImageSrc.includes("library_600x900_2x.jpg")) {
+        setCurrentImageSrc(`https://cdn.akamai.steamstatic.com/steam/apps/${steamAppId}/header.jpg`);
+        return;
+      }
+      if (currentImageSrc.includes("header.jpg")) {
+        setCurrentImageSrc(
+          `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900.jpg`,
+        );
+        return;
+      }
+    }
+    setHasAllFailed(true);
+  };
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
@@ -214,8 +243,6 @@ const GameCard: React.FC<GameCardProps> = ({
     };
   }, [isEpic, isSteam, launcherType]);
 
-  const hasImageError = failedImageSrc === image;
-
   return (
     <button
       type="button"
@@ -285,7 +312,7 @@ const GameCard: React.FC<GameCardProps> = ({
             }}
           />
 
-          {hasImageError ? (
+          {hasAllFailed ? (
             <div
               className="absolute inset-0 flex items-end p-4"
               style={{ background: FALLBACK_CARD_BACKGROUND }}
@@ -296,7 +323,7 @@ const GameCard: React.FC<GameCardProps> = ({
             </div>
           ) : (
             <img
-              src={image}
+              src={currentImageSrc}
               alt={title}
               className={`absolute inset-0 h-full w-full object-cover transition-transform ease-out ${visuallyActive && !noAnimation
                 ? "scale-110 duration-[12000ms]"
@@ -305,8 +332,7 @@ const GameCard: React.FC<GameCardProps> = ({
               loading="lazy"
               decoding="async"
               draggable={false}
-              referrerPolicy="no-referrer"
-              onError={() => setFailedImageSrc(image)}
+              onError={handleImageError}
             />
           )}
 
