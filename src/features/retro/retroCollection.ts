@@ -1,4 +1,4 @@
-import godOfWarCover from "../../assets/Retro_Capes/PS2/God of War - Box Front.png";
+import godOfWarCover from "../../assets/Retro_Capes/PS2/god-of-war-front-optimized.jpg";
 
 export interface RetroGame {
   id: string;
@@ -118,6 +118,14 @@ export function filterRetroGames<T extends Pick<RetroGame, "year">>(
 export function getWrappedIndex(index: number, direction: -1 | 1, length: number): number {
   if (length <= 0) return 0;
   return (index + direction + length) % length;
+}
+
+export function getCircularOffset(index: number, selectedIndex: number, length: number): number {
+  if (length <= 0) return 0;
+
+  const forward = (index - selectedIndex + length) % length;
+  const midpoint = length / 2;
+  return forward >= midpoint ? forward - length : forward;
 }
 
 export function getSelectionAtFilterChange<T extends Pick<RetroGame, "year">>(

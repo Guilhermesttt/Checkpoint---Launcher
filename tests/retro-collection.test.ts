@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   filterRetroGames,
+  getCircularOffset,
   getSelectionAtFilterChange,
   getWrappedIndex,
 } from "../src/features/retro/retroCollection";
@@ -50,5 +51,18 @@ describe("retro collection behavior", () => {
       games: [games[1]],
       selectedIndex: 0,
     });
+  });
+
+  it("distributes a wrapped collection on both sides of the active game", () => {
+    expect(Array.from({ length: 8 }, (_, index) => getCircularOffset(index, 0, 8))).toEqual([
+      0,
+      1,
+      2,
+      3,
+      -4,
+      -3,
+      -2,
+      -1,
+    ]);
   });
 });
