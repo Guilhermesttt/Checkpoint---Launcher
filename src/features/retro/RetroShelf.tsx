@@ -24,7 +24,14 @@ export function RetroShelf({
         const relative = getCircularOffset(index, selectedIndex, games.length);
         const side = Math.sign(relative);
         const distance = Math.abs(relative);
-        const x = relative === 0 ? 0 : side * (1.78 + (distance - 1) * 0.5);
+        const inspectionOpen = inspectedIndex === selectedIndex;
+        const nearestOffset = inspectionOpen ? 2.32 : 1.78;
+        const x =
+          relative === 0
+            ? inspectionOpen
+              ? 0.34
+              : 0
+            : side * (nearestOffset + (distance - 1) * 0.5);
         const z = relative === 0 ? 0.82 : -0.18 - distance * 0.025;
 
         return (

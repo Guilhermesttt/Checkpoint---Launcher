@@ -82,9 +82,9 @@ export function RetroGameCase({
     const group = groupRef.current;
     if (!group) return;
 
-    group.position.x = THREE.MathUtils.damp(group.position.x, position[0], 8, delta);
-    group.position.y = THREE.MathUtils.damp(group.position.y, position[1], 8, delta);
-    group.position.z = THREE.MathUtils.damp(group.position.z, position[2], 8, delta);
+    group.position.x = THREE.MathUtils.damp(group.position.x, position[0], motion.damping, delta);
+    group.position.y = THREE.MathUtils.damp(group.position.y, position[1], motion.damping, delta);
+    group.position.z = THREE.MathUtils.damp(group.position.z, position[2], motion.damping, delta);
     group.rotation.y = THREE.MathUtils.damp(
       group.rotation.y,
       motion.rotationY,
@@ -129,7 +129,12 @@ export function RetroGameCase({
 
       <mesh position={[0, 0, 0.054]}>
         <planeGeometry args={[1.32, 1.94]} />
-        <meshStandardMaterial color="#24211e" roughness={0.72} />
+        <meshStandardMaterial
+          color="#3d3935"
+          emissive="#151311"
+          emissiveIntensity={0.22}
+          roughness={0.68}
+        />
       </mesh>
       <mesh position={[0.18, 0, 0.074]}>
         <torusGeometry args={[0.108, 0.024, 18, 64]} />
@@ -152,7 +157,13 @@ export function RetroGameCase({
 
           <mesh position={[0, 0, -0.039]} rotation={[0, Math.PI, 0]}>
             <planeGeometry args={[1.32, 1.94]} />
-            <meshStandardMaterial color="#292622" roughness={0.68} side={THREE.DoubleSide} />
+            <meshStandardMaterial
+              color="#403b37"
+              emissive="#171411"
+              emissiveIntensity={0.18}
+              roughness={0.64}
+              side={THREE.DoubleSide}
+            />
           </mesh>
 
           {hasCover && (
