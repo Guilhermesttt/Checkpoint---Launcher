@@ -167,7 +167,7 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
         handleNext();
-      } else if (event.key === "Escape") {
+      } else if (event.key === "Escape" || event.key === "Backspace") {
         event.preventDefault();
         handleCancel();
       } else if (event.key === "Enter" || event.key === " ") {

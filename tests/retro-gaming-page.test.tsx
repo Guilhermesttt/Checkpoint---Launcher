@@ -79,4 +79,18 @@ describe("RetroGamingPage semantic interface", () => {
     expect(screen.getByRole("button", { name: "Jogar jogo selecionado" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Caixa aberta: God of War");
   });
+
+  it("closes an open case with Backspace before returning to the launcher", () => {
+    const onReturn = vi.fn();
+    render(<RetroGamingPage onReturnToStandard={onReturn} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir caixa do jogo selecionado" }));
+    fireEvent.keyDown(window, { key: "Backspace" });
+
+    expect(screen.getByRole("button", { name: "Abrir caixa do jogo selecionado" })).toBeInTheDocument();
+    expect(onReturn).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Backspace" });
+    expect(onReturn).toHaveBeenCalledTimes(1);
+  });
 });
