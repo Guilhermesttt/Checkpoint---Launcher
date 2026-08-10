@@ -1,4 +1,12 @@
-import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { OrthographicCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useReducedMotion } from "framer-motion";
@@ -9,6 +17,7 @@ import { useSoundEffects } from "../hooks/useSoundEffects";
 import { RetroCrtPass } from "../features/retro/RetroCrtPass";
 import { RetroInterface } from "../features/retro/RetroInterface";
 import { RetroShelf } from "../features/retro/RetroShelf";
+import { RetroTvOverlay } from "../features/retro/RetroTvOverlay";
 import {
   RETRO_COLLECTION,
   RETRO_FILTERS,
@@ -25,8 +34,11 @@ interface RetroGamingPageProps {
   onReturnToStandard?: () => void;
 }
 
-export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) => {
-  const { toggleLauncherMode, effectsVolume, soundTheme, notificationVolume } = usePreferences();
+export const RetroGamingPage = ({
+  onReturnToStandard,
+}: RetroGamingPageProps) => {
+  const { toggleLauncherMode, effectsVolume, soundTheme, notificationVolume } =
+    usePreferences();
   const { playSound } = useSoundEffects(
     effectsVolume / 100,
     soundTheme,
@@ -42,7 +54,9 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
   );
   const [webglUnavailable, setWebglUnavailable] = useState(false);
   const transitionSignal = useRef(0);
-  const transition = useRef(createRetroTransition(prefersReducedMotion ? 240 : 420));
+  const transition = useRef(
+    createRetroTransition(prefersReducedMotion ? 240 : 420),
+  );
   const transitionFrame = useRef<number | null>(null);
 
   const filteredGames = useMemo(
@@ -52,13 +66,16 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
   const activeGame = filteredGames[selectedIndex];
 
   useEffect(() => {
-    transition.current = createRetroTransition(prefersReducedMotion ? 240 : 420);
+    transition.current = createRetroTransition(
+      prefersReducedMotion ? 240 : 420,
+    );
     transitionSignal.current = 0;
   }, [prefersReducedMotion]);
 
   useEffect(
     () => () => {
-      if (transitionFrame.current !== null) cancelAnimationFrame(transitionFrame.current);
+      if (transitionFrame.current !== null)
+        cancelAnimationFrame(transitionFrame.current);
       document.body.style.cursor = "default";
     },
     [],
@@ -134,10 +151,12 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
   const handleFilter = useCallback(
     (filterId: string) => {
       if (filterId === selectedFilter) return;
-      if (beginTransition(() => {
-        setSelectedFilter(filterId);
-        setSelectedIndex(0);
-      })) {
+      if (
+        beginTransition(() => {
+          setSelectedFilter(filterId);
+          setSelectedIndex(0);
+        })
+      ) {
         dispatchInspection({ type: "SELECT" });
       }
     },
@@ -207,11 +226,19 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
               event.preventDefault();
               setWebglUnavailable(true);
             });
-            canvas.addEventListener("webglcontextrestored", () => setWebglUnavailable(false));
+            canvas.addEventListener("webglcontextrestored", () =>
+              setWebglUnavailable(false),
+            );
           }}
         >
           <color attach="background" args={["#171615"]} />
-          <OrthographicCamera makeDefault position={[0, 0, 10]} zoom={118} near={0.1} far={30} />
+          <OrthographicCamera
+            makeDefault
+            position={[0, 0, 10]}
+            zoom={118}
+            near={0.1}
+            far={30}
+          />
           <ambientLight intensity={1.65} />
           <directionalLight
             castShadow
@@ -220,7 +247,11 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
             shadow-mapSize-width={1024}
             shadow-mapSize-height={1024}
           />
-          <pointLight position={[-4, 0.5, 4]} color="#b52322" intensity={0.75} />
+          <pointLight
+            position={[-4, 0.5, 4]}
+            color="#b52322"
+            intensity={0.75}
+          />
           <pointLight position={[4, 2, 5]} color="#eee9dd" intensity={0.5} />
 
           <RetroShelf
@@ -245,6 +276,9 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
             reducedMotion={prefersReducedMotion}
             transitionSignal={transitionSignal}
           />
+          <Suspense fallback={null}>
+            <RetroTvOverlay />
+          </Suspense>
         </Canvas>
       </Suspense>
 
@@ -266,19 +300,23 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
             </button>
           ))}
         </div>
-        <button type="button" onClick={handlePrevious} disabled={filteredGames.length === 0}>
-          Jogo anterior
-        </button>
         <button
           type="button"
-          onClick={handleConfirm}
-          disabled={!activeGame}
+          onClick={handlePrevious}
+          disabled={filteredGames.length === 0}
         >
+          Jogo anterior
+        </button>
+        <button type="button" onClick={handleConfirm} disabled={!activeGame}>
           {inspection.inspectedIndex === selectedIndex
             ? "Jogar jogo selecionado"
             : "Abrir caixa do jogo selecionado"}
         </button>
-        <button type="button" onClick={handleNext} disabled={filteredGames.length === 0}>
+        <button
+          type="button"
+          onClick={handleNext}
+          disabled={filteredGames.length === 0}
+        >
           Próximo jogo
         </button>
         <div role="list" aria-label="Jogos no filtro atual">
@@ -306,8 +344,8 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
       {webglUnavailable && (
         <div className="absolute inset-0 z-10 grid place-items-center bg-[#171615] px-8 text-center">
           <p className="max-w-md font-mono text-sm tracking-wide text-[#ddd8ca]">
-            O sinal da TV foi interrompido. A cena será restaurada assim que o contexto gráfico
-            estiver disponível.
+            O sinal da TV foi interrompido. A cena será restaurada assim que o
+            contexto gráfico estiver disponível.
           </p>
         </div>
       )}

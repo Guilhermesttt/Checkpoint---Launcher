@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 export default defineConfig({
+  assetsInclude: ["**/*.glb"],
   plugins: [react()],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
@@ -16,10 +17,7 @@ export default defineConfig({
     },
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
-    exclude: [
-      "tests/firestore.rules.test.ts",
-      "tests/database.rules.test.ts",
-    ],
+    exclude: ["tests/firestore.rules.test.ts", "tests/database.rules.test.ts"],
     restoreMocks: true,
     clearMocks: true,
     coverage: {
@@ -31,8 +29,8 @@ export default defineConfig({
         "src/utils/controllerTextInput.ts",
         "src/utils/achievementTotals.ts",
         "src/hooks/useInterval.ts",
-      "electron/achievement-summary.cjs",
-      "electron/launch-profile.cjs",
+        "electron/achievement-summary.cjs",
+        "electron/launch-profile.cjs",
         "electron/ipc-security.cjs",
       ],
       thresholds: { lines: 55, functions: 55, statements: 55, branches: 45 },

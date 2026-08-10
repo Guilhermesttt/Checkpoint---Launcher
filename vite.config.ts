@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
+  assetsInclude: ["**/*.glb"],
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -27,7 +28,11 @@ export default defineConfig({
             if (id.includes("firebase")) {
               return "firebase-vendor";
             }
-            if (id.includes("framer-motion") || id.includes("lucide-react") || id.includes("@radix-ui")) {
+            if (
+              id.includes("framer-motion") ||
+              id.includes("lucide-react") ||
+              id.includes("@radix-ui")
+            ) {
               return "ui-vendor";
             }
           }

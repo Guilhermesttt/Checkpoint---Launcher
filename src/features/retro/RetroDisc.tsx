@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- The GLB adapter reuses the component's disc texture factory. */
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -10,7 +11,7 @@ interface RetroDiscProps {
   reducedMotion: boolean;
 }
 
-function createDiscTexture(game: RetroGame) {
+export function createRetroDiscTexture(game: RetroGame) {
   const canvas = document.createElement("canvas");
   canvas.width = 768;
   canvas.height = 768;
@@ -18,7 +19,14 @@ function createDiscTexture(game: RetroGame) {
   if (!context) return null;
 
   const center = canvas.width / 2;
-  const gradient = context.createRadialGradient(center, center, 40, center, center, 360);
+  const gradient = context.createRadialGradient(
+    center,
+    center,
+    40,
+    center,
+    center,
+    360,
+  );
   gradient.addColorStop(0, "#0d0d0d");
   gradient.addColorStop(0.18, "#292522");
   gradient.addColorStop(0.62, game.accent);
@@ -37,7 +45,11 @@ function createDiscTexture(game: RetroGame) {
   context.textBaseline = "middle";
   context.font = "700 54px Georgia, serif";
   const title = game.title.toUpperCase();
-  context.fillText(title.length > 24 ? `${title.slice(0, 22)}…` : title, center, 232);
+  context.fillText(
+    title.length > 24 ? `${title.slice(0, 22)}…` : title,
+    center,
+    232,
+  );
   context.font = "28px monospace";
   context.fillStyle = "rgba(238, 233, 221, 0.78)";
   context.fillText(`${game.console}  /  ${game.year}`, center, 292);
@@ -52,7 +64,7 @@ function createDiscTexture(game: RetroGame) {
 
 export function RetroDisc({ game, visible, reducedMotion }: RetroDiscProps) {
   const discRef = useRef<THREE.Group>(null);
-  const texture = useMemo(() => createDiscTexture(game), [game]);
+  const texture = useMemo(() => createRetroDiscTexture(game), [game]);
 
   useEffect(
     () => () => {
@@ -80,7 +92,11 @@ export function RetroDisc({ game, visible, reducedMotion }: RetroDiscProps) {
       </mesh>
       <mesh position={[0, 0, 0.004]}>
         <ringGeometry args={[0.056, 0.09, 48]} />
-        <meshStandardMaterial color="#d8d5cc" metalness={0.82} roughness={0.2} />
+        <meshStandardMaterial
+          color="#d8d5cc"
+          metalness={0.82}
+          roughness={0.2}
+        />
       </mesh>
     </group>
   );
