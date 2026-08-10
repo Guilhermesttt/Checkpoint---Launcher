@@ -27,12 +27,12 @@
 
 **Interfaces:**
 - Produces: `RetroInspectionState`, `RetroInspectionEvent`, and `reduceRetroInspection(state, event)`.
-- State shape: `{ selectedIndex: number; inspectedIndex: number | null; playRequested: boolean }`.
+- State shape: `{ inspectedIndex: number | null; playRequested: boolean }`; selection remains owned exclusively by `RetroGamingPage`.
 - Events: `SELECT`, `CONFIRM`, `CANCEL`, and `PLAY_HANDLED`.
 
 - [ ] **Step 1: Write failing reducer tests**
 
-Cover these exact behaviors: selecting a different index closes inspection; first confirm opens the selected case; second confirm sets `playRequested`; cancel closes an open case; cancel with no open case leaves state unchanged.
+Cover these exact behaviors: any selection change closes inspection; first confirm with an index opens that case; second confirm for the same index sets `playRequested`; cancel closes an open case; cancel with no open case leaves state unchanged.
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
@@ -42,7 +42,7 @@ Expected: FAIL because `retroInspection` does not exist.
 
 - [ ] **Step 3: Implement the pure reducer**
 
-Use exhaustive event switching and return a new object only when state changes. `SELECT` clears `playRequested`; `CONFIRM` opens before requesting play; `CANCEL` clears only `inspectedIndex`; `PLAY_HANDLED` clears only `playRequested`.
+Use exhaustive event switching and return a new object only when state changes. `SELECT` clears `inspectedIndex` and `playRequested`; `CONFIRM` carries the current index and opens before requesting play; `CANCEL` clears only `inspectedIndex`; `PLAY_HANDLED` clears only `playRequested`.
 
 - [ ] **Step 4: Run the focused test and verify GREEN**
 
