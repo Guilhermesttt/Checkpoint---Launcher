@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { OrthographicCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useReducedMotion } from "framer-motion";
@@ -16,6 +16,10 @@ import {
   getWrappedIndex,
 } from "../features/retro/retroCollection";
 import { createRetroTransition } from "../features/retro/retroCrt";
+import {
+  INITIAL_RETRO_INSPECTION_STATE,
+  reduceRetroInspection,
+} from "../features/retro/retroInspection";
 
 interface RetroGamingPageProps {
   onReturnToStandard?: () => void;
@@ -32,7 +36,10 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
 
   const [selectedFilter, setSelectedFilter] = useState("ALL");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [showPlay, setShowPlay] = useState(false);
+  const [inspection, dispatchInspection] = useReducer(
+    reduceRetroInspection,
+    INITIAL_RETRO_INSPECTION_STATE,
+  );
   const [webglUnavailable, setWebglUnavailable] = useState(false);
   const transitionSignal = useRef(0);
   const transition = useRef(createRetroTransition(prefersReducedMotion ? 240 : 420));
@@ -63,7 +70,6 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
       if (transition.current.isLocked(now)) return false;
 
       transition.current.start(now);
-      setShowPlay(false);
       playSound("navigate");
 
       const tick = (frameNow: number) => {
@@ -93,43 +99,64 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
   const handlePrevious = useCallback(() => {
     if (filteredGames.length === 0) return;
     const nextIndex = getWrappedIndex(selectedIndex, -1, filteredGames.length);
-    beginTransition(() => setSelectedIndex(nextIndex));
+    if (beginTransition(() => setSelectedIndex(nextIndex))) {
+      dispatchInspection({ type: "SELECT" });
+    }
   }, [beginTransition, filteredGames.length, selectedIndex]);
 
   const handleNext = useCallback(() => {
     if (filteredGames.length === 0) return;
     const nextIndex = getWrappedIndex(selectedIndex, 1, filteredGames.length);
-    beginTransition(() => setSelectedIndex(nextIndex));
+    if (beginTransition(() => setSelectedIndex(nextIndex))) {
+      dispatchInspection({ type: "SELECT" });
+    }
   }, [beginTransition, filteredGames.length, selectedIndex]);
+
+  const handleConfirm = useCallback(() => {
+    if (!activeGame) return;
+    dispatchInspection({ type: "CONFIRM", index: selectedIndex });
+    playSound("select");
+  }, [activeGame, playSound, selectedIndex]);
 
   const handleSelect = useCallback(
     (index: number) => {
       if (index === selectedIndex) {
-        setShowPlay(true);
-        playSound("select");
+        handleConfirm();
         return;
       }
-      beginTransition(() => setSelectedIndex(index));
+      if (beginTransition(() => setSelectedIndex(index))) {
+        dispatchInspection({ type: "SELECT" });
+      }
     },
-    [beginTransition, playSound, selectedIndex],
+    [beginTransition, handleConfirm, selectedIndex],
   );
 
   const handleFilter = useCallback(
     (filterId: string) => {
       if (filterId === selectedFilter) return;
-      beginTransition(() => {
+      if (beginTransition(() => {
         setSelectedFilter(filterId);
         setSelectedIndex(0);
-      });
+      })) {
+        dispatchInspection({ type: "SELECT" });
+      }
     },
     [beginTransition, selectedFilter],
   );
 
-  const handlePlay = useCallback(() => {
-    if (!activeGame) return;
-    setShowPlay(true);
-    playSound("select");
-  }, [activeGame, playSound]);
+  const handleCancel = useCallback(() => {
+    if (inspection.inspectedIndex !== null) {
+      dispatchInspection({ type: "CANCEL" });
+      playSound("back");
+      return;
+    }
+    handleReturn();
+  }, [handleReturn, inspection.inspectedIndex, playSound]);
+
+  useEffect(() => {
+    if (!inspection.playRequested) return;
+    dispatchInspection({ type: "PLAY_HANDLED" });
+  }, [inspection.playRequested]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -142,21 +169,21 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
         handleNext();
       } else if (event.key === "Escape") {
         event.preventDefault();
-        handleReturn();
-      } else if (event.key === "Enter") {
+        handleCancel();
+      } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        handlePlay();
+        handleConfirm();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePlay, handlePrevious, handleReturn]);
+  }, [handleCancel, handleConfirm, handleNext, handlePrevious]);
 
   useGamepadButton("DPAD_LEFT", handlePrevious, true, 60);
   useGamepadButton("DPAD_RIGHT", handleNext, true, 60);
-  useGamepadButton("X", handlePlay, true, 60);
-  useGamepadButton("O", handleReturn, true, 60);
+  useGamepadButton("X", handleConfirm, true, 60);
+  useGamepadButton("O", handleCancel, true, 60);
 
   return (
     <main
@@ -199,19 +226,20 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
           <RetroShelf
             games={filteredGames}
             selectedIndex={selectedIndex}
+            inspectedIndex={inspection.inspectedIndex}
+            reducedMotion={prefersReducedMotion}
             onSelect={handleSelect}
-            onActiveHoverChange={setShowPlay}
           />
           <RetroInterface
             activeGame={activeGame}
             filters={RETRO_FILTERS}
             selectedFilter={selectedFilter}
-            showPlay={showPlay}
+            inspectionOpen={inspection.inspectedIndex === selectedIndex}
             onReturn={handleReturn}
             onFilter={handleFilter}
             onPrevious={handlePrevious}
             onNext={handleNext}
-            onPlay={handlePlay}
+            onPrimaryAction={handleConfirm}
           />
           <RetroCrtPass
             reducedMotion={prefersReducedMotion}
@@ -243,12 +271,12 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
         </button>
         <button
           type="button"
-          onClick={handlePlay}
-          onFocus={() => setShowPlay(true)}
-          onBlur={() => setShowPlay(false)}
+          onClick={handleConfirm}
           disabled={!activeGame}
         >
-          Jogar jogo selecionado
+          {inspection.inspectedIndex === selectedIndex
+            ? "Jogar jogo selecionado"
+            : "Abrir caixa do jogo selecionado"}
         </button>
         <button type="button" onClick={handleNext} disabled={filteredGames.length === 0}>
           Próximo jogo
@@ -268,7 +296,9 @@ export const RetroGamingPage = ({ onReturnToStandard }: RetroGamingPageProps) =>
         </div>
         <p role="status" aria-live="polite">
           {activeGame
-            ? `Jogo selecionado: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
+            ? inspection.inspectedIndex === selectedIndex
+              ? `Caixa aberta: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
+              : `Jogo selecionado: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
             : "Nenhum jogo encontrado nesta década"}
         </p>
       </section>

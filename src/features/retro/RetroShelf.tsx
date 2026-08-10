@@ -6,23 +6,25 @@ import { RetroGameCase } from "./RetroGameCase";
 interface RetroShelfProps {
   games: RetroGame[];
   selectedIndex: number;
+  inspectedIndex: number | null;
+  reducedMotion: boolean;
   onSelect: (index: number) => void;
-  onActiveHoverChange: (hovered: boolean) => void;
 }
 
 export function RetroShelf({
   games,
   selectedIndex,
+  inspectedIndex,
+  reducedMotion,
   onSelect,
-  onActiveHoverChange,
 }: RetroShelfProps) {
   return (
-    <group position={[0, 0.22, 0]}>
+    <group position={[0, 0.42, 0]}>
       {games.map((game, index) => {
         const relative = getCircularOffset(index, selectedIndex, games.length);
         const side = Math.sign(relative);
         const distance = Math.abs(relative);
-        const x = relative === 0 ? 0 : side * (1.38 + (distance - 1) * 0.42);
+        const x = relative === 0 ? 0 : side * (1.78 + (distance - 1) * 0.5);
         const z = relative === 0 ? 0.82 : -0.18 - distance * 0.025;
 
         return (
@@ -31,13 +33,14 @@ export function RetroShelf({
             game={game}
             position={[x, 0, z]}
             selected={index === selectedIndex}
+            inspected={index === inspectedIndex}
+            reducedMotion={reducedMotion}
             onSelect={() => onSelect(index)}
-            onActiveHoverChange={onActiveHoverChange}
           />
         );
       })}
 
-      <ContactShadows position={[0, -1.11, -0.1]} opacity={0.56} scale={10} blur={2.4} far={3.5} />
+      <ContactShadows position={[0, -1.35, -0.1]} opacity={0.48} scale={11} blur={2.8} far={4} />
     </group>
   );
 }

@@ -70,4 +70,13 @@ describe("RetroGamingPage semantic interface", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Castlevania");
     expect(screen.queryByRole("button", { name: /God of War, 2005/ })).not.toBeInTheDocument();
   });
+
+  it("opens the selected case before exposing the play action", () => {
+    render(<RetroGamingPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir caixa do jogo selecionado" }));
+
+    expect(screen.getByRole("button", { name: "Jogar jogo selecionado" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Caixa aberta: God of War");
+  });
 });

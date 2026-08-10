@@ -66,24 +66,24 @@ interface RetroInterfaceProps {
   activeGame?: RetroGame;
   filters: RetroFilter[];
   selectedFilter: string;
-  showPlay: boolean;
+  inspectionOpen: boolean;
   onReturn: () => void;
   onFilter: (filterId: string) => void;
   onPrevious: () => void;
   onNext: () => void;
-  onPlay: () => void;
+  onPrimaryAction: () => void;
 }
 
 export function RetroInterface({
   activeGame,
   filters,
   selectedFilter,
-  showPlay,
+  inspectionOpen,
   onReturn,
   onFilter,
   onPrevious,
   onNext,
-  onPlay,
+  onPrimaryAction,
 }: RetroInterfaceProps) {
   const { viewport } = useThree();
   const halfWidth = viewport.width / 2;
@@ -159,15 +159,14 @@ export function RetroInterface({
             maxWidth={1.5}
             color="#aaa49a"
           />
-          {showPlay && (
-            <CanvasTextButton
-              label="▶  JOGAR"
-              position={[0, -0.4, 0]}
-              width={1.16}
-              fontSize={0.072}
-              onClick={onPlay}
-            />
-          )}
+          <CanvasTextButton
+            label={inspectionOpen ? "▶  JOGAR" : "□  ABRIR CAIXA"}
+            position={[0, -0.4, 0]}
+            width={inspectionOpen ? 1.3 : 1.72}
+            fontSize={0.078}
+            active={inspectionOpen}
+            onClick={onPrimaryAction}
+          />
         </group>
       ) : (
         <CanvasText
