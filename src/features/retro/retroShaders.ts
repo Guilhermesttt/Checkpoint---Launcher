@@ -35,14 +35,9 @@ export const retroCrtFragmentShader = /* glsl */ `
   vec2 curveUv(vec2 uv) {
     vec2 centered = uv * 2.0 - 1.0;
     float radius = dot(centered, centered);
-    centered *= 1.0 + curvature * radius;
-    return centered * 0.5 + 0.5;
-  }
-
-  float tubeMask(vec2 uv) {
-    vec2 edge = smoothstep(vec2(0.0), vec2(0.018), uv) *
-      (1.0 - smoothstep(vec2(0.982), vec2(1.0), uv));
-    return edge.x * edge.y;
+    float overscan = 1.0 + curvature * 2.05;
+    centered *= (1.0 + curvature * radius) / overscan;
+    return clamp(centered * 0.5 + 0.5, vec2(0.001), vec2(0.999));
   }
 
   vec3 sampleChromatic(vec2 uv) {
@@ -52,9 +47,9 @@ export const retroCrtFragmentShader = /* glsl */ `
       chromaticAberration * (0.35 + edgeAmount * 1.65);
 
     return vec3(
-      texture2D(tDiffuse, uv + offset).r,
+      texture2D(tDiffuse, clamp(uv + offset, vec2(0.001), vec2(0.999))).r,
       texture2D(tDiffuse, uv).g,
-      texture2D(tDiffuse, uv - offset).b
+      texture2D(tDiffuse, clamp(uv - offset, vec2(0.001), vec2(0.999))).b
     );
   }
 
@@ -81,12 +76,6 @@ export const retroCrtFragmentShader = /* glsl */ `
     float tearBand = exp(-pow((uv.y - tearCenter) * 32.0, 2.0));
     uv.x += tearBand * transitionSignal * syncTearStrength * 0.085;
     uv.y = fract(uv.y + transitionSignal * syncTearStrength * 0.022);
-
-    float mask = tubeMask(uv);
-    if (mask <= 0.001) {
-      gl_FragColor = vec4(0.003, 0.003, 0.003, 1.0);
-      return;
-    }
 
     vec3 color = sampleChromatic(uv);
     color += softBloom(uv) * bloomStrength;
@@ -118,6 +107,6 @@ export const retroCrtFragmentShader = /* glsl */ `
     color *= vec3(1.035, 0.99, 0.94);
     color = pow(color, vec3(0.94));
 
-    gl_FragColor = vec4(color * mask, 1.0);
+    gl_FragColor = vec4(color, 1.0);
   }
 `;

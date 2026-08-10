@@ -50,6 +50,22 @@ export function getCrtProfile(reducedMotion: boolean): CrtProfile {
   return reducedMotion ? REDUCED_MOTION_CRT_PROFILE : STANDARD_CRT_PROFILE;
 }
 
+export function curveCrtUvWithOverscan(
+  uv: readonly [number, number],
+  curvature: number,
+): [number, number] {
+  const centeredX = uv[0] * 2 - 1;
+  const centeredY = uv[1] * 2 - 1;
+  const radius = centeredX * centeredX + centeredY * centeredY;
+  const overscan = 1 + curvature * 2.05;
+  const curve = (1 + curvature * radius) / overscan;
+
+  return [
+    Math.min(1, Math.max(0, centeredX * curve * 0.5 + 0.5)),
+    Math.min(1, Math.max(0, centeredY * curve * 0.5 + 0.5)),
+  ];
+}
+
 export function createRetroTransition(durationMs = 420): RetroTransitionController {
   let startedAt: number | null = null;
   let didSwap = false;

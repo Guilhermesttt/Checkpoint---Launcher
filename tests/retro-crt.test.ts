@@ -1,8 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { createRetroTransition, getCrtProfile } from "../src/features/retro/retroCrt";
+import {
+  createRetroTransition,
+  curveCrtUvWithOverscan,
+  getCrtProfile,
+} from "../src/features/retro/retroCrt";
+import { retroCrtFragmentShader } from "../src/features/retro/retroShaders";
 
 describe("retro CRT behavior", () => {
+  it("keeps every curved viewport corner inside the source texture", () => {
+    const curvature = getCrtProfile(false).curvature;
+    const corners: Array<[number, number]> = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ];
+
+    for (const corner of corners) {
+      const curved = curveCrtUvWithOverscan(corner, curvature);
+      expect(curved[0]).toBeGreaterThanOrEqual(0);
+      expect(curved[0]).toBeLessThanOrEqual(1);
+      expect(curved[1]).toBeGreaterThanOrEqual(0);
+      expect(curved[1]).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("does not paint an external black tube mask", () => {
+    expect(retroCrtFragmentShader).not.toContain("mask <= 0.001");
+    expect(retroCrtFragmentShader).not.toContain("color * mask");
+  });
+
   it("keeps the cinematic tube effect without crushing interface legibility", () => {
     const profile = getCrtProfile(false);
 
