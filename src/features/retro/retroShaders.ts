@@ -15,6 +15,8 @@ export const retroCrtFragmentShader = /* glsl */ `
   uniform sampler2D tDiffuse;
   uniform vec2 resolution;
   uniform float time;
+  uniform float exposure;
+  uniform float blackLift;
   uniform float curvature;
   uniform float chromaticAberration;
   uniform float scanlineStrength;
@@ -88,6 +90,7 @@ export const retroCrtFragmentShader = /* glsl */ `
 
     vec3 color = sampleChromatic(uv);
     color += softBloom(uv) * bloomStrength;
+    color *= exposure;
 
     float scanline = 0.5 + 0.5 * sin(uv.y * resolution.y * 3.14159265);
     color *= 1.0 - scanlineStrength * (0.34 + scanline * 0.66);
@@ -104,15 +107,16 @@ export const retroCrtFragmentShader = /* glsl */ `
     color += grain * noiseStrength;
 
     vec2 centered = uv * 2.0 - 1.0;
-    float vignette = smoothstep(1.18, 0.18, dot(centered, centered));
+    float vignette = 1.0 - smoothstep(0.18, 1.18, dot(centered, centered));
     color *= mix(1.0 - vignetteStrength, 1.0, vignette);
+    color += vec3(blackLift) * (1.0 - max(max(color.r, color.g), color.b));
 
     float flicker = sin(time * 103.0) * flickerStrength;
     color *= 1.0 + flicker + transitionSignal * 0.075 * sin(time * 47.0);
 
     color = max(color, vec3(0.009));
     color *= vec3(1.035, 0.99, 0.94);
-    color = pow(color, vec3(0.96));
+    color = pow(color, vec3(0.94));
 
     gl_FragColor = vec4(color * mask, 1.0);
   }

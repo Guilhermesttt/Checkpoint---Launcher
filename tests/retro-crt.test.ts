@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { createRetroTransition, getCrtProfile } from "../src/features/retro/retroCrt";
 
 describe("retro CRT behavior", () => {
+  it("keeps the cinematic tube effect without crushing interface legibility", () => {
+    const profile = getCrtProfile(false);
+
+    expect(profile.exposure).toBeGreaterThanOrEqual(1.2);
+    expect(profile.exposure).toBeLessThanOrEqual(1.3);
+    expect(profile.blackLift).toBeGreaterThanOrEqual(0.012);
+    expect(profile.blackLift).toBeLessThanOrEqual(0.025);
+    expect(profile.vignette).toBeLessThanOrEqual(0.28);
+    expect(profile.scanline).toBeLessThanOrEqual(0.12);
+    expect(profile.noise).toBeLessThanOrEqual(0.025);
+  });
+
   it("removes continuous flicker and reduces sync displacement for reduced motion", () => {
     expect(getCrtProfile(true)).toMatchObject({ flicker: 0, syncTear: 0.08 });
     expect(getCrtProfile(false).flicker).toBeGreaterThan(0);

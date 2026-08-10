@@ -39,6 +39,8 @@ export function RetroCrtPass({ reducedMotion, transitionSignal }: RetroCrtPassPr
         tDiffuse: { value: target.texture },
         resolution: { value: new THREE.Vector2(1, 1) },
         time: { value: 0 },
+        exposure: { value: profile.exposure },
+        blackLift: { value: profile.blackLift },
         curvature: { value: profile.curvature },
         chromaticAberration: { value: profile.chromaticAberration },
         scanlineStrength: { value: profile.scanline },

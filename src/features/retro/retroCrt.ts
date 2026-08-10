@@ -1,4 +1,6 @@
 export interface CrtProfile {
+  exposure: number;
+  blackLift: number;
   curvature: number;
   chromaticAberration: number;
   scanline: number;
@@ -24,20 +26,22 @@ export interface RetroTransitionController {
 }
 
 const STANDARD_CRT_PROFILE: CrtProfile = {
-  curvature: 0.095,
+  exposure: 1.25,
+  blackLift: 0.018,
+  curvature: 0.18,
   chromaticAberration: 0.0024,
-  scanline: 0.16,
+  scanline: 0.11,
   phosphorMask: 0.08,
-  bloom: 0.24,
-  noise: 0.035,
-  vignette: 0.42,
+  bloom: 0.2,
+  noise: 0.022,
+  vignette: 0.26,
   flicker: 0.012,
   syncTear: 0.38,
 };
 
 const REDUCED_MOTION_CRT_PROFILE: CrtProfile = {
   ...STANDARD_CRT_PROFILE,
-  noise: 0.018,
+  noise: 0.012,
   flicker: 0,
   syncTear: 0.08,
 };
