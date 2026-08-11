@@ -356,7 +356,17 @@ export const RetroGamingPage = ({
                   far={50}
                 />
                 {/* Luz ambiente: mais forte para garantir visibilidade base */}
-                <ambientLight intensity={view === "library" ? 1.65 : 1.3} />
+                <ambientLight intensity={view === "library" ? 0.9 : 0.85} />
+
+                {/* RectAreaLight vindo de cima — ilumina o topo da TV e do console como softbox de estúdio */}
+                <rectAreaLight
+                  position={[0.1, 4.2, 0.5]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  width={4.8}
+                  height={3.2}
+                  color="#fff5ea"
+                  intensity={view === "library" ? 4.5 : 7.0}
+                />
 
                 {/* Luz direcional principal — vem de cima-frente para iluminar TV e console */}
                 <directionalLight
@@ -368,27 +378,24 @@ export const RetroGamingPage = ({
                   shadow-mapSize-height={1024}
                 />
 
-                {/* Luz de fill do lado esquerdo — pega o console que fica à esquerda */}
                 <directionalLight
                   visible={view !== "library"}
                   position={[-3, 2, 3]}
                   color="#e8d5b0"
-                  intensity={1.8}
+                  intensity={1.0}
                 />
 
-                {/* Luz quente lateral inferior */}
                 <pointLight
                   position={view === "library" ? [-4, 0.5, 4] : [-2, -0.5, 2]}
                   color={view === "library" ? "#b52322" : "#c8702a"}
-                  intensity={view === "library" ? 0.75 : 1.2}
+                  intensity={view === "library" ? 0.5 : 0.7}
                   distance={12}
                 />
 
-                {/* Luz frontal — simula brilho da tela rebatendo */}
                 <pointLight
                   position={view === "library" ? [4, 2, 5] : [1.5, 1.5, 4]}
                   color={view === "library" ? "#eee9dd" : "#b0c8e8"}
-                  intensity={view === "library" ? 0.5 : 1.2}
+                  intensity={view === "library" ? 0.35 : 0.6}
                   distance={12}
                 />
 

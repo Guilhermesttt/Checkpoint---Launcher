@@ -30,7 +30,7 @@ function TvArtworkPlane({ url }: { url: string }) {
         map={texture}
         // Brilho extra para simular tela CRT iluminada
         color={new THREE.Color(2.0, 1.9, 1.75)}
-        toneMapped={false}
+        toneMapped={true}
       />
     </mesh>
   );
