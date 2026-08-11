@@ -92,6 +92,7 @@ import {
   readLastNavigation,
   writeLastCategory,
   writeLastSettingsTab,
+  consumeSettingsConnectionsRequest,
   type SettingsTab,
 } from "../services/launcherNavigation";
 
@@ -106,6 +107,10 @@ import { useGamepadButton, useGamepad } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
 import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
+import {
+  disconnectRetroAchievements,
+  linkRetroAchievements,
+} from "../services/retroAchievements";
 import InputHints from "../components/ui/InputHints";
 import { resolveLibraryLoadingState, shouldShowLibraryFooter } from "../utils/libraryLoading";
 
@@ -212,6 +217,8 @@ const Home: React.FC = () => {
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const [retroAchievementsConnecting, setRetroAchievementsConnecting] = useState(false);
+  const [retroAchievementsError, setRetroAchievementsError] = useState<string>();
 
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
@@ -300,9 +307,10 @@ const Home: React.FC = () => {
     if (!currentUserUid || !preferencesHydrated || restoredNavigationUidRef.current === currentUserUid) return;
     restoredNavigationUidRef.current = currentUserUid;
     const lastNavigation = readLastNavigation(currentUserUid);
+    const openConnections = consumeSettingsConnectionsRequest(currentUserUid);
     const timer = window.setTimeout(() => {
       setSettingsTab(lastNavigation.settingsTab);
-      if (restoreLastScreen) setActiveCategory(lastNavigation.category);
+      if (openConnections || restoreLastScreen) setActiveCategory(lastNavigation.category);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [currentUserUid, preferencesHydrated, restoreLastScreen]);
@@ -396,6 +404,44 @@ const Home: React.FC = () => {
     onLibraryChanged: refreshLibrary,
     language: launcherLanguage,
   });
+
+  const connectRetroAchievements = useCallback(async (username: string) => {
+    setRetroAchievementsConnecting(true);
+    setRetroAchievementsError(undefined);
+    try {
+      const identity = await linkRetroAchievements(username);
+      await refreshProfile();
+      playSound("select");
+      notify(`RetroAchievements conectada como ${identity.username}.`, "success");
+    } catch (reason) {
+      const message = reason instanceof Error
+        ? reason.message
+        : "Não foi possível conectar a RetroAchievements.";
+      setRetroAchievementsError(message);
+      notify(message, "error");
+    } finally {
+      setRetroAchievementsConnecting(false);
+    }
+  }, [notify, playSound, refreshProfile]);
+
+  const disconnectRetroAchievementsAccount = useCallback(async () => {
+    setRetroAchievementsConnecting(true);
+    setRetroAchievementsError(undefined);
+    try {
+      await disconnectRetroAchievements();
+      await refreshProfile();
+      playSound("back");
+      notify("RetroAchievements desconectada.", "success");
+    } catch (reason) {
+      const message = reason instanceof Error
+        ? reason.message
+        : "Não foi possível desconectar a RetroAchievements.";
+      setRetroAchievementsError(message);
+      notify(message, "error");
+    } finally {
+      setRetroAchievementsConnecting(false);
+    }
+  }, [notify, playSound, refreshProfile]);
 
   const {
     socialFriends,
@@ -1844,8 +1890,13 @@ const Home: React.FC = () => {
               discordAvatar={userProfile?.discordAvatar}
               steamConnecting={steamConnecting}
               discordConnecting={discordConnecting}
+              retroAchievementsConnected={Boolean(userProfile?.retroAchievementsUlid)}
+              retroAchievementsUsername={userProfile?.retroAchievementsUsername}
+              retroAchievementsConnecting={retroAchievementsConnecting}
+              retroAchievementsError={retroAchievementsError}
               onConnectSteam={connectSteam}
               onConnectDiscord={connectDiscord}
+              onConnectRetroAchievements={connectRetroAchievements}
               onDisconnectSteam={() => {
                 playSound("back");
                 setDisconnectSteamModalOpen(true);
@@ -1854,6 +1905,7 @@ const Home: React.FC = () => {
                 playSound("back");
                 setDisconnectDiscordModalOpen(true);
               }}
+              onDisconnectRetroAchievements={disconnectRetroAchievementsAccount}
               onTestOverlayWelcome={() => {
                 playSound("select");
                 void window.electronAPI?.testOverlayWelcome();

@@ -4,8 +4,8 @@ import {
   createRetroTransition,
   curveCrtUvWithOverscan,
   getCrtProfile,
-} from "../src/features/retro/retroCrt";
-import { retroCrtFragmentShader } from "../src/features/retro/retroShaders";
+} from "../src/features/retro/crt/retroCrt";
+import { retroCrtFragmentShader } from "../src/features/retro/crt/retroShaders";
 
 describe("retro CRT behavior", () => {
   it("keeps every curved viewport corner inside the source texture", () => {
@@ -26,9 +26,12 @@ describe("retro CRT behavior", () => {
     }
   });
 
-  it("does not paint an external black tube mask", () => {
-    expect(retroCrtFragmentShader).not.toContain("mask <= 0.001");
-    expect(retroCrtFragmentShader).not.toContain("color * mask");
+  it("curves the rendered image inside the external CRT glass", () => {
+    expect(getCrtProfile(false).curvature).toBeGreaterThanOrEqual(0.1);
+    expect(getCrtProfile(false).curvature).toBeLessThanOrEqual(0.2);
+    expect(retroCrtFragmentShader).toContain("vec2 curveCrtUv");
+    expect(retroCrtFragmentShader).toContain("float tubeMask");
+    expect(retroCrtFragmentShader).toContain("color *= tubeMask");
   });
 
   it("keeps the cinematic tube effect without crushing interface legibility", () => {
@@ -44,9 +47,31 @@ describe("retro CRT behavior", () => {
   });
 
   it("removes continuous flicker and reduces sync displacement for reduced motion", () => {
-    expect(getCrtProfile(true)).toMatchObject({ flicker: 0, syncTear: 0.08 });
+    expect(getCrtProfile(true)).toMatchObject({
+      flicker: 0,
+      syncTear: 0.08,
+      rgbSeparation: 0.75,
+      pixelSplit: 0.15,
+    });
     expect(getCrtProfile(false).flicker).toBeGreaterThan(0);
     expect(getCrtProfile(false).syncTear).toBeGreaterThan(0.08);
+  });
+
+  it("combines pixel-quantized image splits with horizontal RGB separation", () => {
+    const profile = getCrtProfile(false);
+
+    expect(profile.rgbSeparation).toBeGreaterThanOrEqual(1.5);
+    expect(profile.pixelSplit).toBeGreaterThanOrEqual(0.35);
+    expect(profile.bloom).toBeGreaterThan(0.2);
+    expect(retroCrtFragmentShader).toContain("uniform float bloomStrength");
+    expect(retroCrtFragmentShader).toContain("float vignette = 1.0 - vignetteStrength");
+    expect(retroCrtFragmentShader).not.toContain("smoothstep(0.9, vignetteStrength");
+    expect(retroCrtFragmentShader).toContain("uniform float rgbSeparationStrength");
+    expect(retroCrtFragmentShader).toContain("uniform float pixelSplitStrength");
+    expect(retroCrtFragmentShader).toContain("floor(uv.y * resolution.y)");
+    expect(retroCrtFragmentShader).toContain("sampleAnalogRgb");
+    expect(retroCrtFragmentShader).toContain("vec3 rgbTriad");
+    expect(retroCrtFragmentShader).toContain("phosphorStrength");
   });
 
   it("emits the selection swap once at peak distortion", () => {

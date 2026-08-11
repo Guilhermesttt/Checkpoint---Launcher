@@ -66,6 +66,8 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 const categoryKey = (uid: string) => `checkpoint_last_category_${uid}`;
 const settingsTabKey = (uid: string) => `checkpoint_last_settings_tab_${uid}`;
+const settingsConnectionsRequestKey = (uid: string) =>
+  `checkpoint_open_settings_connections_${uid}`;
 
 const isRestorableCategory = (value: unknown): value is RestorableCategory =>
   RESTORABLE_CATEGORIES.includes(value as RestorableCategory);
@@ -108,4 +110,23 @@ export const writeLastCategory = (uid: string, category: string) => {
 
 export const writeLastSettingsTab = (uid: string, settingsTab: string) => {
   if (isSettingsTab(settingsTab)) writeStored(settingsTabKey(uid), settingsTab);
+};
+
+export const requestSettingsConnections = (uid: string) => {
+  writeLastCategory(uid, "SETTINGS");
+  writeLastSettingsTab(uid, "connections");
+  writeStored(settingsConnectionsRequestKey(uid), "1");
+};
+
+export const consumeSettingsConnectionsRequest = (uid: string) => {
+  const key = settingsConnectionsRequestKey(uid);
+  const pending = readStored(key) === "1";
+  if (pending) {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      console.warn(`[navigation] Falha ao consumir ${key}.`, error);
+    }
+  }
+  return pending;
 };

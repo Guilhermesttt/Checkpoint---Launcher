@@ -40,7 +40,7 @@ import {
   ROCKSTAR_ICON_PATH,
 } from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
-import type { LauncherLanguage } from "../context/PreferencesContext";
+import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
 import {
   SIDEBAR_NAVIGATION_GROUPS,
   SIDEBAR_NAVIGATION_ORDER,
@@ -533,6 +533,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   notificationCount = 0,
   language = "pt-BR",
 }) => {
+  const { toggleLauncherMode } = usePreferences();
   const prefersReducedMotion = useReducedMotion();
   const [isExpanded, setIsExpanded] = useState<boolean>(() => {
     try {
@@ -667,6 +668,18 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Rodapé: Perfil e Ajustes */}
         <div className="w-full flex flex-col gap-1.5 shrink-0 px-1">
+          <SidebarButton
+            id="RETRO_MODE"
+            label="Modo Retrô"
+            Icon={Gamepad2}
+            active={false}
+            onClick={() => {
+              playSound("navigate");
+              toggleLauncherMode();
+            }}
+            reducedMotion={Boolean(prefersReducedMotion)}
+            isExpanded={isExpanded}
+          />
           <SidebarButton
             id="PROFILE"
             label={sidebarLabels.PROFILE || "Perfil"}

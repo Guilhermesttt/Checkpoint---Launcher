@@ -1,5 +1,5 @@
 import React from "react";
-import { LogOut, Settings, User } from "lucide-react";
+import { Gamepad2, LogOut, Settings, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
-import type { LauncherLanguage } from "../../context/PreferencesContext";
+import { usePreferences, type LauncherLanguage } from "../../context/PreferencesContext";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 interface ProfileDropdownProps {
@@ -24,12 +24,12 @@ interface ProfileDropdownProps {
 }
 
 const dropdownCopy = {
-  "pt-BR": { identity: "Identidade", profile: "Ver perfil", settings: "Configurações", logout: "Sair" },
-  "en-US": { identity: "Identity", profile: "View profile", settings: "Settings", logout: "Sign out" },
-  "es-ES": { identity: "Identidad", profile: "Ver perfil", settings: "Configuración", logout: "Salir" },
-  "fr-FR": { identity: "Identité", profile: "Voir le profil", settings: "Paramètres", logout: "Se déconnecter" },
-  "de-DE": { identity: "Identität", profile: "Profil anzeigen", settings: "Einstellungen", logout: "Abmelden" },
-  "it-IT": { identity: "Identità", profile: "Vedi profilo", settings: "Impostazioni", logout: "Esci" },
+  "pt-BR": { identity: "Identidade", profile: "Ver perfil", settings: "Configurações", logout: "Sair", retro: "Modo Retrô" },
+  "en-US": { identity: "Identity", profile: "View profile", settings: "Settings", logout: "Sign out", retro: "Retro Mode" },
+  "es-ES": { identity: "Identidad", profile: "Ver perfil", settings: "Configuración", logout: "Salir", retro: "Modo Retro" },
+  "fr-FR": { identity: "Identité", profile: "Voir le profil", settings: "Paramètres", logout: "Se déconnecter", retro: "Mode Rétro" },
+  "de-DE": { identity: "Identität", profile: "Profil anzeigen", settings: "Einstellungen", logout: "Abmelden", retro: "Retro-Modus" },
+  "it-IT": { identity: "Identità", profile: "Vedi profilo", settings: "Impostazioni", logout: "Esci", retro: "Modalità Retrò" },
 } as const;
 
 export function ProfileDropdown({
@@ -42,6 +42,7 @@ export function ProfileDropdown({
   language = "pt-BR",
   playSound,
 }: ProfileDropdownProps) {
+  const { toggleLauncherMode } = usePreferences();
   const initials = userDisplay.slice(0, 2).toUpperCase();
   const copy = dropdownCopy[language] || dropdownCopy["pt-BR"];
 
@@ -96,6 +97,17 @@ export function ProfileDropdown({
               {copy.profile}
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem
+            onClick={() => {
+              playSound("select");
+              toggleLauncherMode();
+            }}
+            onPointerEnter={() => playSound("hover")}
+            className="flex cursor-pointer items-center gap-3 rounded-xl p-3 text-xs font-semibold text-purple-300 hover:text-purple-200 transition-colors focus:bg-purple-500/20 focus:text-white"
+          >
+            <Gamepad2 className="h-4 w-4 text-purple-400" />
+            {copy.retro}
+          </DropdownMenuItem>
           {onOpenSettings && (
             <DropdownMenuItem
               onClick={onOpenSettings}

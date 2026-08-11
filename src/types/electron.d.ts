@@ -9,6 +9,20 @@ declare global {
         launchOptions?: { hideLauncher?: boolean },
       ) => Promise<void>;
       selectExecutable: () => Promise<string | null>;
+      importRetroArtwork: (imageUrl: string) => Promise<string>;
+      searchTheGamesDb: (request: { name: string }) => Promise<Array<{
+        id: number;
+        title: string;
+        releaseDate?: string;
+        year?: number;
+        description: string;
+        publisher: string;
+        developer: string;
+        platform: string;
+        frontImage?: string;
+        backImage?: string;
+        images: string[];
+      }>>;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
       loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;

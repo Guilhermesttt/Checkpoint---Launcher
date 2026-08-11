@@ -31,6 +31,7 @@ import { supabase } from "../services/supabase";
 import { saveProfileVisibility } from "../services/profilePrivacy";
 import type { SettingsTab } from "../services/launcherNavigation";
 import type { ProfileVisibility } from "../types/domain";
+import { RetroAchievementsSettingsCard } from "../features/retro/components/RetroAchievementsSettingsCard";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -294,10 +295,16 @@ export interface SettingsPageV2Props {
   discordAvatar?: string;
   steamConnecting: boolean;
   discordConnecting: boolean;
+  retroAchievementsConnected: boolean;
+  retroAchievementsUsername?: string;
+  retroAchievementsConnecting: boolean;
+  retroAchievementsError?: string;
   onConnectSteam: () => void;
   onConnectDiscord: () => void;
+  onConnectRetroAchievements: (username: string) => Promise<void>;
   onDisconnectSteam: () => void;
   onDisconnectDiscord: () => void;
+  onDisconnectRetroAchievements: () => Promise<void>;
   onTestOverlayWelcome: () => void;
   onTestOverlayAchievement: () => void;
   initialTab: SettingsTab;
@@ -332,10 +339,16 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   discordAvatar,
   steamConnecting,
   discordConnecting,
+  retroAchievementsConnected,
+  retroAchievementsUsername,
+  retroAchievementsConnecting,
+  retroAchievementsError,
   onConnectSteam,
   onConnectDiscord,
+  onConnectRetroAchievements,
   onDisconnectSteam,
   onDisconnectDiscord,
+  onDisconnectRetroAchievements,
   onTestOverlayWelcome,
   onTestOverlayAchievement,
   initialTab,
@@ -926,6 +939,16 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       </button>
                     )}
                   </article>
+                </div>
+                <div className="mt-3.5">
+                  <RetroAchievementsSettingsCard
+                    username={retroAchievementsUsername}
+                    connected={retroAchievementsConnected}
+                    busy={retroAchievementsConnecting}
+                    error={retroAchievementsError}
+                    onConnect={onConnectRetroAchievements}
+                    onDisconnect={onDisconnectRetroAchievements}
+                  />
                 </div>
               </section>
               <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">

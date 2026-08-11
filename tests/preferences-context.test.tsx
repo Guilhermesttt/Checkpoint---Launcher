@@ -23,6 +23,18 @@ const PreferenceProbe = () => {
   );
 };
 
+const RetroProbe = () => {
+  const { launcherMode, toggleLauncherMode } = usePreferences();
+  return (
+    <div>
+      <output data-testid="mode-state">{launcherMode}</output>
+      <button type="button" onClick={toggleLauncherMode}>
+        Alternar modo
+      </button>
+    </div>
+  );
+};
+
 describe("preferencias de comportamento do aplicativo", () => {
   beforeEach(() => {
     cleanup();
@@ -58,6 +70,22 @@ describe("preferencias de comportamento do aplicativo", () => {
 
     await waitFor(() => {
       expect(localStorage.getItem("checkpoint_restore_last_screen_user-1")).toBe("true");
+    });
+  });
+
+  it("alterna entre modo padrao e modo retro persistindo a escolha", async () => {
+    render(
+      <PreferencesProvider>
+        <RetroProbe />
+      </PreferencesProvider>,
+    );
+
+    expect(await screen.findByTestId("mode-state")).toHaveTextContent("standard");
+    fireEvent.click(screen.getByRole("button", { name: "Alternar modo" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mode-state")).toHaveTextContent("retro");
+      expect(localStorage.getItem("checkpoint_launcher_mode_user-1")).toBe("retro");
     });
   });
 });

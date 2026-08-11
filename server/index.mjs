@@ -10,6 +10,7 @@ import os from "node:os";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createClient } from "@supabase/supabase-js";
+import { createRetroAchievementsRouter } from "./retroachievements.mjs";
 import { fileURLToPath } from "url";
 import { getGamingNews } from "./gaming-news.mjs";
 
@@ -1078,6 +1079,27 @@ const requireAuth = async (req, res, next) => {
 };
 
 const requireFirebaseUser = requireAuth;
+
+app.use(
+  "/api/retroachievements",
+  steamPrivateLimiter,
+  createRetroAchievementsRouter({
+    apiKey: process.env.RETROACHIEVEMENTS_API_KEY,
+    fetchImpl: fetch,
+    requireUser: requireFirebaseUser,
+    loadProfile: async (uid) => {
+      if (!supabaseAdmin) return null;
+      const { data, error } = await supabaseAdmin
+        .from("profiles")
+        .select("retroachievements_ulid, retroachievements_username")
+        .eq("uid", uid)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    saveProfile: updateLinkedAccountProfile,
+  }),
+);
 
 app.post("/api/chat/open", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   const currentUid = req.firebaseUser.uid;

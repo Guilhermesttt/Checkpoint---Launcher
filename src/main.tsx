@@ -1,5 +1,8 @@
 import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource/archivo-black/400.css";
+import "@fontsource/stix-two-text/400.css";
+import "@fontsource/stix-two-text/700.css";
 import "./index.css";
 import { Navigate, createBrowserRouter, RouterProvider } from "react-router-dom";
 

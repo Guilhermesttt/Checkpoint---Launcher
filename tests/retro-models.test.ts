@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   classifyDvdCaseNode,
   classifyJvcMesh,
-  getJvcOverlayScale,
-} from "../src/features/retro/retroModels";
+  classifyPostalPs1Node,
+} from "../src/features/retro/shelf/retroModels";
 
 describe("retro GLB model adaptation", () => {
   it("separates the JVC display from its physical cabinet", () => {
@@ -23,10 +23,12 @@ describe("retro GLB model adaptation", () => {
     expect(classifyDvdCaseNode("UnknownNode")).toBe("detail");
   });
 
-  it("crops the TV body while keeping a recognizable bezel around its screen", () => {
-    const scale = getJvcOverlayScale(7.6, 0.198);
-
-    expect(scale).toBeGreaterThan(29);
-    expect(scale).toBeLessThan(31);
+  it("keeps both PS1 artwork faces and removes both disc meshes", () => {
+    expect(classifyPostalPs1Node("Object_2", "Material__28")).toBe("front-artwork");
+    expect(classifyPostalPs1Node("Object_5", "Material__26")).toBe("back-artwork");
+    expect(classifyPostalPs1Node("Object_3", "Material__97")).toBe("disc");
+    expect(classifyPostalPs1Node("Object_10", "Material__99")).toBe("disc");
+    expect(classifyPostalPs1Node("Object_7", "Material__29")).toBe("case");
   });
+
 });

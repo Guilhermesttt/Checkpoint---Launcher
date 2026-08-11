@@ -96,6 +96,8 @@ export interface UserProfile {
   discordAvatar?: string;
   steamAvatar?: string;
   steamUsername?: string;
+  retroAchievementsUlid?: string;
+  retroAchievementsUsername?: string;
   status?: "online" | "playing" | "offline";
   playing?: string | null;
   discordFriends?: Array<{

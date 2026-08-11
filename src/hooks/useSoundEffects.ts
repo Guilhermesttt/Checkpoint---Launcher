@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { SoundTheme } from "../context/PreferencesContext";
+import { usePreferences, type SoundTheme } from "../context/PreferencesContext";
 
 import ps5PlusNavigateSound from "../sounds/PS5_Plus/deck_ui_navigation.wav";
 import ps5PlusHoverSound from "../sounds/PS5_Plus/deck_ui_slider_down.wav";
@@ -14,6 +14,29 @@ import ps5PlusIntoGameDetailSound from "../sounds/PS5_Plus/deck_ui_into_game_det
 import ps5PlusMessageToastSound from "../sounds/PS5_Plus/deck_ui_message_toast.wav";
 import ps5PlusToastSound from "../sounds/PS5_Plus/deck_ui_toast.wav";
 import ps5AchievementUnlockSound from "../sounds/PS5_Plus/deck_ui_achievement_toast.wav";
+
+// Glitch Noises Theme for Retro/Arcade Mode
+import glitchNavigate from "../sounds/Glitch Noises/UIMvmt_Scroll 001_VZ_GN.wav";
+import glitchHover from "../sounds/Glitch Noises/UIMvmt_Scroll 002_VZ_GN.wav";
+import glitchSelect from "../sounds/Glitch Noises/UIClick_Click 001_VZ_GN.wav";
+import glitchBack from "../sounds/Glitch Noises/UIAlert_Cancel 001_VZ_GN.wav";
+import glitchEdit from "../sounds/Glitch Noises/UIBeep_Clicky 001_VZ_GN.wav";
+import glitchModalClose from "../sounds/Glitch Noises/UIAlert_Cancel 002_VZ_GN.wav";
+import glitchFavoriteOn from "../sounds/Glitch Noises/UIClick_Select 001_VZ_GN.wav";
+import glitchFavoriteOff from "../sounds/Glitch Noises/UIAlert_Cancel 003_VZ_GN.wav";
+import glitchDelete from "../sounds/Glitch Noises/UIAlert_Warning 001_VZ_GN.wav";
+import glitchPlay from "../sounds/Glitch Noises/UIData_Processing Complete 001_VZ_GN.wav";
+import glitchBoot from "../sounds/Glitch Noises/UIData_Processing Complete 002_VZ_GN.wav";
+import glitchSearch from "../sounds/Glitch Noises/UIBeep_Button 001_VZ_GN.wav";
+import glitchDetailOpen from "../sounds/Glitch Noises/UIMvmt_Transition 001_VZ_GN.wav";
+import glitchFriendRequest from "../sounds/Glitch Noises/UIAlert_Notification 001_VZ_GN.wav";
+import glitchChatSent from "../sounds/Glitch Noises/UIBeep_Button Tiny 001_VZ_GN.wav";
+import glitchChatReceived from "../sounds/Glitch Noises/UIAlert_Notification 002_VZ_GN.wav";
+import glitchSwitchOn from "../sounds/Glitch Noises/UIBeep_Button Tiny 002_VZ_GN.wav";
+import glitchSwitchOff from "../sounds/Glitch Noises/UIBeep_Button Tiny 003_VZ_GN.wav";
+import glitchScreenshot from "../sounds/Glitch Noises/UIClick_Select 002_VZ_GN.wav";
+import glitchShowModal from "../sounds/Glitch Noises/UIMvmt_Transition 002_VZ_GN.wav";
+import glitchAchievementUnlock from "../sounds/Glitch Noises/UIData_Processing Complete 003_VZ_GN.wav";
 
 import ps4NavigateSound from "../sounds/PS4/deck_ui_navigation.wav";
 import ps4ShowModalSound from "../sounds/PS4/deck_ui_show_modal.wav";
@@ -252,6 +275,30 @@ const soundThemes = {
   },
 };
 
+const retroSoundTheme = {
+  navigate: glitchNavigate,
+  hover: glitchHover,
+  select: glitchSelect,
+  back: glitchBack,
+  edit: glitchEdit,
+  modalClose: glitchModalClose,
+  favoriteOn: glitchFavoriteOn,
+  favoriteOff: glitchFavoriteOff,
+  delete: glitchDelete,
+  play: glitchPlay,
+  boot: glitchPlay,
+  search: glitchSearch,
+  detailOpen: glitchDetailOpen,
+  friendRequest: glitchFriendRequest,
+  chatSent: glitchChatSent,
+  chatReceived: glitchChatReceived,
+  switchOn: glitchSwitchOn,
+  switchOff: glitchSwitchOff,
+  screenshot: glitchScreenshot,
+  showModal: glitchShowModal,
+  overlayAchievement: glitchAchievementUnlock,
+};
+
 export type SoundEffectType = keyof (typeof soundThemes)["ps5"];
 
 const audioCache = new Map<string, HTMLAudioElement>();
@@ -278,11 +325,12 @@ export const useSoundEffects = (
   theme: SoundTheme = "ps5",
   notificationVolume = 0.4,
 ) => {
+  const { launcherMode } = usePreferences();
   const lastNavigateAtRef = useRef(0);
   const lastHoverAtRef = useRef(0);
   const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
   const activeNotificationAudiosRef = useRef(new Set<HTMLAudioElement>());
-  const sounds = soundThemes[theme] ?? soundThemes.ps5;
+  const sounds = launcherMode === "retro" ? retroSoundTheme : (soundThemes[theme] ?? soundThemes.ps5);
   const soundPaths = useMemo(() => sounds, [sounds]);
 
   useEffect(() => {

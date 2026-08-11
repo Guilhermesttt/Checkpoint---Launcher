@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   launchExecutable: (executablePath, launchProfile, launchOptions) =>
     ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile, launchOptions),
   selectExecutable: () => ipcRenderer.invoke("launcher:select-executable"),
+  importRetroArtwork: (imageUrl) => ipcRenderer.invoke("retro:import-artwork", imageUrl),
+  searchTheGamesDb: (request) => ipcRenderer.invoke("retro:search-thegamesdb", request),
   selectModGameDirectory: (gameTitle) =>
     ipcRenderer.invoke("mods:select-game-directory", gameTitle),
   getNexusStatus: () => ipcRenderer.invoke("nexus:get-status"),

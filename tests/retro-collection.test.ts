@@ -5,7 +5,8 @@ import {
   getCircularOffset,
   getSelectionAtFilterChange,
   getWrappedIndex,
-} from "../src/features/retro/retroCollection";
+  RETRO_COLLECTION,
+} from "../src/features/retro/shelf/retroCollection";
 
 const games = [
   {
@@ -64,5 +65,20 @@ describe("retro collection behavior", () => {
       -2,
       -1,
     ]);
+  });
+
+  it("ships only verified RetroAchievements IDs for the built-in collection", () => {
+    expect(Object.fromEntries(
+      RETRO_COLLECTION.map((game) => [game.id, game.retroAchievementsGameId]),
+    )).toEqual({
+      gow: 2782,
+      sotn: 11240,
+      smw: 228,
+      chrono: 319,
+      "san-andreas": 2772,
+      "tekken-3": 11259,
+      "silent-hill-2": 1324,
+      "zelda-totk": undefined,
+    });
   });
 });

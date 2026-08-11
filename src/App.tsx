@@ -18,6 +18,8 @@ import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
+import RetroGamingPage from "./pages/RetroGamingPage";
+
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
   ps5: () =>
     import("./sounds/PS5_Plus/003. Home Menu.mp3").then((module) => module.default),
@@ -51,9 +53,10 @@ const menuMusicGain: Record<SoundTheme, number> = {
 
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { musicVolume, soundTheme, lowPerformanceMode } = usePreferences();
+  const { musicVolume, soundTheme, lowPerformanceMode, launcherMode } = usePreferences();
   useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState<boolean | null>(null);
+
   const musicRef = React.useRef<HTMLAudioElement | null>(null);
   const musicAudioContextRef = React.useRef<AudioContext | null>(null);
   const musicGainRef = React.useRef<GainNode | null>(null);
@@ -85,6 +88,43 @@ const AppContent: React.FC = () => {
       document.body.style.overscrollBehavior = previousBodyOverscroll;
     };
   }, []);
+
+  const [mountedMode, setMountedMode] = React.useState(launcherMode);
+  const [transitionPhase, setTransitionPhase] = React.useState<"idle" | "collapsing" | "static">("idle");
+  const lastModeRef = React.useRef(launcherMode);
+
+  React.useEffect(() => {
+    if (loading || isIntroVisible !== false) {
+      setMountedMode(launcherMode);
+      lastModeRef.current = launcherMode;
+      return;
+    }
+
+    if (launcherMode === lastModeRef.current) return;
+
+    const targetMode = launcherMode;
+    lastModeRef.current = targetMode;
+
+    // Fase A: Esmagamento CRT (600ms)
+    setTransitionPhase("collapsing");
+
+    const collapseTimer = window.setTimeout(() => {
+      // Fase B: O Ponto Cego (Mudar o estado sob estática/chiado - 800ms)
+      setTransitionPhase("static");
+      setMountedMode(targetMode);
+
+      const staticTimer = window.setTimeout(() => {
+        // Fase C: Fim da Transição e Boot Reveal
+        setTransitionPhase("idle");
+      }, 800);
+
+      return () => window.clearTimeout(staticTimer);
+    }, 600);
+
+    return () => {
+      window.clearTimeout(collapseTimer);
+    };
+  }, [launcherMode, loading, isIntroVisible]);
 
   const clearMusicFade = React.useCallback(() => {
     if (musicFadeRef.current) {
@@ -378,15 +418,30 @@ const AppContent: React.FC = () => {
             />
           </AnimatePresence>
         ) : (
-          <div className="absolute inset-0">
-            {!lowPerformanceMode && <MainVideoBackground />}
-            <Home />
-            <GamepadStatusOverlay />
-            <ControllerVirtualKeyboard />
-            {whatsNewRelease && (
-              <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />
+          <>
+            {mountedMode === "retro" ? (
+              <div className={`absolute inset-0 z-50 bg-black ${transitionPhase === "collapsing" ? "crt-collapse-active" : ""}`}>
+                <RetroGamingPage />
+              </div>
+            ) : (
+              <div className={`absolute inset-0 ${transitionPhase === "collapsing" ? "crt-collapse-active" : ""}`}>
+                {!lowPerformanceMode && <MainVideoBackground />}
+                <Home />
+                <GamepadStatusOverlay />
+                <ControllerVirtualKeyboard />
+                {whatsNewRelease && (
+                  <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />
+                )}
+              </div>
             )}
-          </div>
+
+            {transitionPhase === "static" && (
+              <>
+                <div className="crt-static-background" />
+                <div className="crt-static-overlay" />
+              </>
+            )}
+          </>
         )}
       </div>
     </MotionConfig>

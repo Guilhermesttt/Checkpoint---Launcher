@@ -43,6 +43,10 @@ const toProfile = (uid: string, data?: Record<string, any>): UserProfile => ({
   discordId: data?.discordId ?? data?.discord_id,
   discordUsername: data?.discordUsername ?? data?.discord_username,
   discordAvatar: data?.discordAvatar ?? data?.discord_avatar,
+  retroAchievementsUlid:
+    data?.retroAchievementsUlid ?? data?.retroachievements_ulid,
+  retroAchievementsUsername:
+    data?.retroAchievementsUsername ?? data?.retroachievements_username,
   status: data?.status,
   playing: data?.playing,
   discordFriends: data?.discordFriends ?? data?.discord_friends,

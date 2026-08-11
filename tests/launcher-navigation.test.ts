@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   getAdjacentSidebarCategory,
+  consumeSettingsConnectionsRequest,
   readLastNavigation,
+  requestSettingsConnections,
   writeLastCategory,
   writeLastSettingsTab,
 } from "../src/services/launcherNavigation";
@@ -36,6 +38,17 @@ describe("restauracao da navegacao do launcher", () => {
 
     expect(readLastNavigation("user-1").category).toBe("ACTION");
     expect(readLastNavigation("user-2").category).toBe("ALL");
+  });
+
+  it("encaminha uma solicitação retro uma única vez para conexões", () => {
+    requestSettingsConnections("user-1");
+
+    expect(readLastNavigation("user-1")).toEqual({
+      category: "SETTINGS",
+      settingsTab: "connections",
+    });
+    expect(consumeSettingsConnectionsRequest("user-1")).toBe(true);
+    expect(consumeSettingsConnectionsRequest("user-1")).toBe(false);
   });
 });
 

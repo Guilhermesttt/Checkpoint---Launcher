@@ -38,6 +38,10 @@ const profileControlsMigration = readFileSync(
   ),
   "utf8",
 ).replace(/\r\n/g, "\n");
+const retroAchievementsIdentityMigrationPath = resolve(
+  process.cwd(),
+  "supabase/migrations/20260810120000_retroachievements_identity.sql",
+);
 
 describe("contrato da migration Supabase", () => {
   it("versiona o grafo social e o chat normalizado", () => {
@@ -96,5 +100,22 @@ describe("contrato da migration Supabase", () => {
     expect(profileControlsMigration).toContain("grant update (profile_visibility)");
     expect(profileControlsMigration).toContain("grant insert (");
     expect(profileControlsMigration).toContain("uid,");
+  });
+
+  it("persiste a identidade estavel da RetroAchievements no perfil", () => {
+    const retroAchievementsIdentityMigration = readFileSync(
+      retroAchievementsIdentityMigrationPath,
+      "utf8",
+    ).replace(/\r\n/g, "\n");
+
+    expect(retroAchievementsIdentityMigration).toMatch(
+      /add column if not exists retroachievements_ulid text/i,
+    );
+    expect(retroAchievementsIdentityMigration).toMatch(
+      /add column if not exists retroachievements_username text/i,
+    );
+    expect(retroAchievementsIdentityMigration).toContain(
+      "profiles_retroachievements_ulid_unique",
+    );
   });
 });

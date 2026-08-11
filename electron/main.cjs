@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 const { pathToFileURL, fileURLToPath } = require("node:url");
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
 const { readAchievementLibrarySummary } = require("./achievement-summary.cjs");
@@ -27,6 +28,8 @@ const {
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
 const { createWindowBehaviorController } = require("./window-behavior.cjs");
+const { createRetroArtworkImporter } = require("./retro-artwork-importer.cjs");
+const { createTheGamesDbClient } = require("./thegamesdb.cjs");
 const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
 const { createSpotifyAuthManager } = require("./spotify-auth-manager.cjs");
 const {
@@ -1014,6 +1017,19 @@ const createWindow = async () => {
   });
 
   configureHidAccess(mainWindow.webContents.session);
+
+  // Permite que o renderer carregue imagens diretamente do archive.org (capas de jogos retrô).
+  // Injeta CORS permissivo em TODAS as respostas do archive.org incluindo CDNs de redirect.
+  mainWindow.webContents.session.webRequest.onHeadersReceived(
+    { urls: ["https://archive.org/*", "https://*.archive.org/*"] },
+    (details, callback) => {
+      const headers = { ...details.responseHeaders };
+      headers["Access-Control-Allow-Origin"] = ["*"];
+      headers["Access-Control-Allow-Methods"] = ["GET, HEAD"];
+      headers["Cross-Origin-Resource-Policy"] = ["cross-origin"];
+      callback({ responseHeaders: headers });
+    },
+  );
 
   mainWindow.once("ready-to-show", () => {
     if (!IS_AUTO_START) {
@@ -2372,21 +2388,31 @@ registerSecureIpcHandler("launcher:get-displays", async () => screen.getAllDispl
 
 registerSecureIpcHandler("launcher:select-executable", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: "Selecione o executavel do jogo",
+    title: "Selecione o executável ou ROM do jogo",
     properties: ["openFile"],
-    buttonLabel: "Selecionar jogo",
-    filters: [{ name: "Executaveis do Windows", extensions: ["exe"] }],
+    buttonLabel: "Selecionar jogo / ROM",
+    filters: [
+      { name: "Executáveis e ROMs", extensions: ["exe", "iso", "bin", "chd", "cue", "sfc", "nes", "z64", "n64", "elf", "gcm", "wbfs", "xbe", "bat", "cmd", "lnk"] },
+      { name: "Todos os Arquivos", extensions: ["*"] },
+    ],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   const selectedPath = path.normalize(result.filePaths[0]);
-  if (
-    !path.isAbsolute(selectedPath)
-    || path.extname(selectedPath).toLowerCase() !== ".exe"
-  ) {
-    throw new Error("Selecione um arquivo executavel .exe valido.");
+  if (!path.isAbsolute(selectedPath)) {
+    throw new Error("Selecione um caminho de arquivo válido.");
   }
   return selectedPath;
 });
+
+const importRetroArtwork = createRetroArtworkImporter();
+const theGamesDb = createTheGamesDbClient({ apiKey: process.env.THEGAMESDB_API_KEY });
+
+registerSecureIpcHandler("retro:import-artwork", async (_event, imageUrl) =>
+  importRetroArtwork(imageUrl));
+
+registerSecureIpcHandler("retro:search-thegamesdb", async (_event, request) =>
+  theGamesDb.searchGamesByName(request || {}));
+
 
 registerSecureIpcHandler("mods:select-game-directory", async (_event, gameTitle) =>
   selectModGameDirectory({

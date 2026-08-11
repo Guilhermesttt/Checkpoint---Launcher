@@ -129,6 +129,10 @@ const renderSettings = ({ steamConnected = false } = {}) => render(
     discordConnected={false}
     steamConnecting={false}
     discordConnecting={false}
+    retroAchievementsConnected={false}
+    retroAchievementsConnecting={false}
+    onConnectRetroAchievements={vi.fn()}
+    onDisconnectRetroAchievements={vi.fn()}
     onConnectSteam={vi.fn()}
     onConnectDiscord={vi.fn()}
     onDisconnectSteam={vi.fn()}
@@ -216,5 +220,16 @@ describe("hierarquia dos ajustes", () => {
     expect(within(steamCard).queryByRole("button", { name: /sync/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sair da Conta" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sair do Aplicativo" })).toBeInTheDocument();
+  });
+
+  it("oferece a conexao RetroAchievements somente na area de contas", () => {
+    renderSettings();
+    expect(screen.queryByRole("article", { name: "RetroAchievements" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /contas & privacidade/i }));
+
+    expect(screen.getByRole("article", { name: "RetroAchievements" }))
+      .toBeInTheDocument();
   });
 });

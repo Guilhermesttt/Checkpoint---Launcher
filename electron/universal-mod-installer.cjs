@@ -60,8 +60,15 @@ function loadGameProfile(gameDomain) {
     schemaVersion: 1,
     gameDomain: domainKey,
     displayName: domainKey,
-    rootFolders: ["mods", "plugins", "data", "bin"],
-    rootFiles: ["dinput8.dll", "dxgi.dll", "version.dll"],
+    rootFolders: [
+      "mods", "plugins", "data", "bin", "engine", "r6", "archive", "content",
+      "pc", "nativedx11", "nativedx12", "x64", "scripts", "redscript", "cet",
+      "tweaks", "ue4ss", "game", "system", "dlc", "reframework"
+    ],
+    rootFiles: [
+      "dinput8.dll", "dxgi.dll", "version.dll", "bink2w64.dll", "winmm.dll",
+      "xinput1_3.dll", "xinput1_4.dll", "openhook.dll", "d3d11.dll", "d3d12.dll"
+    ],
     routingRules: [],
   };
   profileCache.set(domainKey, fallbackProfile);
@@ -292,6 +299,13 @@ async function installUniversalMod({
       } else if (isInside(gameRoot, item.destination)) {
         await fs.promises.rm(item.destination, { force: true }).catch(() => {});
       }
+    }
+    if (error && (error.code === "EACCES" || error.code === "EPERM")) {
+      const permErr = new Error(
+        `Permissão de arquivo negada (${error.code}). A pasta do jogo está protegida pelo Windows (ex: Program Files). Execute o Checkpoint Launcher como Administrador para poder instalar mods neste jogo.`,
+      );
+      permErr.code = error.code;
+      throw permErr;
     }
     throw error;
   }

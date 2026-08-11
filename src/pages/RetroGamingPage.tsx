@@ -3,42 +3,56 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useReducer,
   useRef,
   useState,
 } from "react";
+import type { CSSProperties } from "react";
 import { OrthographicCamera } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useReducedMotion } from "framer-motion";
 
 import { useGamepadButton } from "../context/GamepadContext";
 import { usePreferences } from "../context/PreferencesContext";
+import { useAuth } from "../auth/AuthProvider";
 import { useSoundEffects } from "../hooks/useSoundEffects";
-import { RetroCrtPass } from "../features/retro/RetroCrtPass";
-import { RetroInterface } from "../features/retro/RetroInterface";
-import { RetroShelf } from "../features/retro/RetroShelf";
-import { RetroTvOverlay } from "../features/retro/RetroTvOverlay";
+import { RetroBootScreen } from "../features/retro/boot/RetroBootScreen";
+import { RetroCrtPass } from "../features/retro/crt/RetroCrtPass";
+import { RETRO_TV_CURVE } from "../features/retro/crt/retroViewport";
+import { RetroInterface } from "../features/retro/components/RetroInterface";
+import { RetroPlatformDisplay } from "../features/retro/platform/RetroPlatformDisplay";
+import { RetroShelf } from "../features/retro/shelf/RetroShelf";
 import {
   RETRO_COLLECTION,
   RETRO_FILTERS,
   filterRetroGames,
   getWrappedIndex,
-} from "../features/retro/retroCollection";
-import { createRetroTransition } from "../features/retro/retroCrt";
-import {
-  INITIAL_RETRO_INSPECTION_STATE,
-  reduceRetroInspection,
-} from "../features/retro/retroInspection";
+} from "../features/retro/shelf/retroCollection";
+import { createRetroTransition } from "../features/retro/crt/retroCrt";
+import { RETRO_DETAIL_TRANSITION_MS } from "../features/retro/shelf/retroDetailTransition";
+import { requestSettingsConnections } from "../services/launcherNavigation";
+
+import { RetroAddGameModal } from "../features/retro/components/RetroAddGameModal";
+import { RetroGameDetailsScreen } from "../features/retro/components/RetroGameDetailsScreen";
+import type { RetroGame } from "../features/retro/shelf/retroCollection";
 
 interface RetroGamingPageProps {
   onReturnToStandard?: () => void;
+  transitionComplete?: boolean;
 }
+
+const LOCAL_STORAGE_CUSTOM_GAMES_KEY = "checkpoint_retro_custom_games";
+const LOCAL_STORAGE_HIDDEN_GAMES_KEY = "checkpoint_retro_hidden_game_ids";
+const retroViewportStyle: CSSProperties & { "--retro-tv-curve": string } = {
+  "--retro-tv-curve": RETRO_TV_CURVE,
+};
 
 export const RetroGamingPage = ({
   onReturnToStandard,
+  transitionComplete = true,
 }: RetroGamingPageProps) => {
   const { toggleLauncherMode, effectsVolume, soundTheme, notificationVolume } =
     usePreferences();
+  const { user } = useAuth();
   const { playSound } = useSoundEffects(
     effectsVolume / 100,
     soundTheme,
@@ -46,24 +60,112 @@ export const RetroGamingPage = ({
   );
   const prefersReducedMotion = Boolean(useReducedMotion());
 
+  const [customGames, setCustomGames] = useState<RetroGame[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_CUSTOM_GAMES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [hiddenGameIds, setHiddenGameIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_HIDDEN_GAMES_KEY);
+      const parsed: unknown = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed)
+        ? parsed.filter((id): id is string => typeof id === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [selectedFilter, setSelectedFilter] = useState("ALL");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [inspection, dispatchInspection] = useReducer(
-    reduceRetroInspection,
-    INITIAL_RETRO_INSPECTION_STATE,
-  );
+  const [view, setView] = useState<"library" | "opening-details" | "details">("library");
   const [webglUnavailable, setWebglUnavailable] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
+  const [libraryRevealed, setLibraryRevealed] = useState(false);
+
+  // Estados do cadastro/edição e da tela de detalhes.
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [gameToEdit, setGameToEdit] = useState<RetroGame | null>(null);
+  const selectedCaseButtonRef = useRef<HTMLButtonElement>(null);
+
   const transitionSignal = useRef(0);
   const transition = useRef(
     createRetroTransition(prefersReducedMotion ? 240 : 420),
   );
   const transitionFrame = useRef<number | null>(null);
+  const detailTransitionTimer = useRef<number | null>(null);
+
+  // Coleção completa (Original + Adicionados pelo Usuário)
+  const fullCollection = useMemo(() => {
+    const gamesById = new Map(RETRO_COLLECTION.map((game) => [game.id, game]));
+    customGames.forEach((game) => gamesById.set(game.id, game));
+    return [...gamesById.values()].filter((game) => !hiddenGameIds.includes(game.id));
+  }, [customGames, hiddenGameIds]);
 
   const filteredGames = useMemo(
-    () => filterRetroGames(RETRO_COLLECTION, selectedFilter),
-    [selectedFilter],
+    () => filterRetroGames(fullCollection, selectedFilter),
+    [fullCollection, selectedFilter],
   );
-  const activeGame = filteredGames[selectedIndex];
+
+  // Garante índice válido e seguro de forma puramente determinística na renderização
+  const safeSelectedIndex =
+    filteredGames.length > 0
+      ? Math.min(selectedIndex, filteredGames.length - 1)
+      : 0;
+
+  const activeGame = filteredGames[safeSelectedIndex];
+
+  // Salvar novo jogo ou alterações
+  const handleSaveGame = useCallback((savedGame: RetroGame) => {
+    setCustomGames((prev) => {
+      const existsIndex = prev.findIndex((g) => g.id === savedGame.id);
+      let updated: RetroGame[];
+      if (existsIndex >= 0) {
+        updated = [...prev];
+        updated[existsIndex] = savedGame;
+      } else {
+        updated = [...prev, savedGame];
+      }
+      try {
+        localStorage.setItem(
+          LOCAL_STORAGE_CUSTOM_GAMES_KEY,
+          JSON.stringify(updated),
+        );
+      } catch {
+        console.error("Erro ao salvar jogo no localStorage");
+      }
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteGame = useCallback((game: RetroGame) => {
+    setCustomGames((previousGames) => {
+      const updatedGames = previousGames.filter((candidate) => candidate.id !== game.id);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_CUSTOM_GAMES_KEY, JSON.stringify(updatedGames));
+      } catch {
+        console.error("Erro ao excluir jogo do localStorage");
+      }
+      return updatedGames;
+    });
+    setHiddenGameIds((previousIds) => {
+      const updatedIds = previousIds.includes(game.id)
+        ? previousIds
+        : [...previousIds, game.id];
+      try {
+        localStorage.setItem(LOCAL_STORAGE_HIDDEN_GAMES_KEY, JSON.stringify(updatedIds));
+      } catch {
+        console.error("Erro ao ocultar jogo no localStorage");
+      }
+      return updatedIds;
+    });
+    setSelectedIndex(0);
+    setView("library");
+  }, []);
 
   useEffect(() => {
     transition.current = createRetroTransition(
@@ -76,6 +178,8 @@ export const RetroGamingPage = ({
     () => () => {
       if (transitionFrame.current !== null)
         cancelAnimationFrame(transitionFrame.current);
+      if (detailTransitionTimer.current !== null)
+        window.clearTimeout(detailTransitionTimer.current);
       document.body.style.cursor = "default";
     },
     [],
@@ -114,38 +218,41 @@ export const RetroGamingPage = ({
   }, [onReturnToStandard, playSound, toggleLauncherMode]);
 
   const handlePrevious = useCallback(() => {
+    if (view !== "library") return;
     if (filteredGames.length === 0) return;
-    const nextIndex = getWrappedIndex(selectedIndex, -1, filteredGames.length);
-    if (beginTransition(() => setSelectedIndex(nextIndex))) {
-      dispatchInspection({ type: "SELECT" });
-    }
-  }, [beginTransition, filteredGames.length, selectedIndex]);
+    const nextIndex = getWrappedIndex(safeSelectedIndex, -1, filteredGames.length);
+    beginTransition(() => setSelectedIndex(nextIndex));
+  }, [beginTransition, filteredGames.length, safeSelectedIndex, view]);
 
   const handleNext = useCallback(() => {
+    if (view !== "library") return;
     if (filteredGames.length === 0) return;
-    const nextIndex = getWrappedIndex(selectedIndex, 1, filteredGames.length);
-    if (beginTransition(() => setSelectedIndex(nextIndex))) {
-      dispatchInspection({ type: "SELECT" });
-    }
-  }, [beginTransition, filteredGames.length, selectedIndex]);
+    const nextIndex = getWrappedIndex(safeSelectedIndex, 1, filteredGames.length);
+    beginTransition(() => setSelectedIndex(nextIndex));
+  }, [beginTransition, filteredGames.length, safeSelectedIndex, view]);
 
   const handleConfirm = useCallback(() => {
-    if (!activeGame) return;
-    dispatchInspection({ type: "CONFIRM", index: selectedIndex });
-    playSound("select");
-  }, [activeGame, playSound, selectedIndex]);
+    if (!activeGame || view !== "library") return;
+    setView("opening-details");
+    playSound("detailOpen");
+    detailTransitionTimer.current = window.setTimeout(() => {
+      setView("details");
+      detailTransitionTimer.current = null;
+    }, RETRO_DETAIL_TRANSITION_MS);
+  }, [activeGame, playSound, view]);
+
+  const handleBootReady = useCallback(() => setIsBooting(false), []);
+  const handleBootRevealStart = useCallback(() => setLibraryRevealed(true), []);
 
   const handleSelect = useCallback(
     (index: number) => {
-      if (index === selectedIndex) {
+      if (index === safeSelectedIndex) {
         handleConfirm();
         return;
       }
-      if (beginTransition(() => setSelectedIndex(index))) {
-        dispatchInspection({ type: "SELECT" });
-      }
+      beginTransition(() => setSelectedIndex(index));
     },
-    [beginTransition, handleConfirm, selectedIndex],
+    [beginTransition, handleConfirm, safeSelectedIndex],
   );
 
   const handleFilter = useCallback(
@@ -156,30 +263,30 @@ export const RetroGamingPage = ({
           setSelectedFilter(filterId);
           setSelectedIndex(0);
         })
-      ) {
-        dispatchInspection({ type: "SELECT" });
-      }
+      )
+        return;
     },
     [beginTransition, selectedFilter],
   );
 
   const handleCancel = useCallback(() => {
-    if (inspection.inspectedIndex !== null) {
-      dispatchInspection({ type: "CANCEL" });
+    if (view !== "library") {
+      if (detailTransitionTimer.current !== null) {
+        window.clearTimeout(detailTransitionTimer.current);
+        detailTransitionTimer.current = null;
+      }
+      setView("library");
       playSound("back");
       return;
     }
     handleReturn();
-  }, [handleReturn, inspection.inspectedIndex, playSound]);
-
-  useEffect(() => {
-    if (!inspection.playRequested) return;
-    dispatchInspection({ type: "PLAY_HANDLED" });
-  }, [inspection.playRequested]);
+  }, [handleReturn, playSound, view]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return;
+      const target = event.target;
+      if (target instanceof Element && target.matches("input, textarea, select, [contenteditable='true']")) return;
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         handlePrevious();
@@ -189,7 +296,7 @@ export const RetroGamingPage = ({
       } else if (event.key === "Escape" || event.key === "Backspace") {
         event.preventDefault();
         handleCancel();
-      } else if (event.key === "Enter" || event.key === " ") {
+      } else if (view === "library" && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
         handleConfirm();
       }
@@ -197,159 +304,273 @@ export const RetroGamingPage = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleCancel, handleConfirm, handleNext, handlePrevious]);
+  }, [handleCancel, handleConfirm, handleNext, handlePrevious, view]);
 
-  useGamepadButton("DPAD_LEFT", handlePrevious, true, 60);
-  useGamepadButton("DPAD_RIGHT", handleNext, true, 60);
-  useGamepadButton("X", handleConfirm, true, 60);
-  useGamepadButton("O", handleCancel, true, 60);
+  useGamepadButton("DPAD_LEFT", handlePrevious, !isBooting, 60);
+  useGamepadButton("DPAD_RIGHT", handleNext, !isBooting, 60);
+  useGamepadButton("X", handleConfirm, !isBooting, 60);
+  useGamepadButton("O", handleCancel, !isBooting, 60);
 
   return (
-    <main
-      className="relative h-screen w-full overflow-hidden bg-[#171615] text-[#eee9dd]"
-      aria-label="Acervo de jogos retrô"
-      data-system-page
-    >
-      <Suspense fallback={null}>
-        <Canvas
-          dpr={[1, 1.5]}
-          shadows
-          gl={{
-            alpha: false,
-            antialias: false,
-            powerPreference: "high-performance",
-          }}
-          onCreated={({ gl }) => {
-            const canvas = gl.domElement;
-            canvas.setAttribute("aria-hidden", "true");
-            canvas.addEventListener("webglcontextlost", (event) => {
-              event.preventDefault();
-              setWebglUnavailable(true);
-            });
-            canvas.addEventListener("webglcontextrestored", () =>
-              setWebglUnavailable(false),
-            );
-          }}
+    <div className="retro-tv-container">
+      <main
+        className="retro-tv-viewport retro-mode font-arquivoBlack relative overflow-hidden bg-[#303030] text-[#eee9dd]"
+        style={retroViewportStyle}
+        aria-label="Acervo de jogos retrô"
+        aria-busy={isBooting}
+        data-system-page
+      >
+        <div
+          data-testid="retro-crt-screen"
+          className="retro-crt-screen"
         >
-          <color attach="background" args={["#171615"]} />
-          <OrthographicCamera
-            makeDefault
-            position={[0, 0, 10]}
-            zoom={118}
-            near={0.1}
-            far={30}
-          />
-          <ambientLight intensity={1.65} />
-          <directionalLight
-            castShadow
-            position={[3.8, 5.8, 6]}
-            intensity={2.15}
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-          />
-          <pointLight
-            position={[-4, 0.5, 4]}
-            color="#b52322"
-            intensity={0.75}
-          />
-          <pointLight position={[4, 2, 5]} color="#eee9dd" intensity={0.5} />
+          {transitionComplete && (
+            <Suspense fallback={null}>
+              <Canvas
+                dpr={[1, 1.5]}
+                frameloop="always"
+                shadows
+                gl={{
+                  alpha: false,
+                  antialias: false,
+                  powerPreference: "high-performance",
+                }}
+                onCreated={({ gl }) => {
+                  const canvas = gl.domElement;
+                  canvas.setAttribute("aria-hidden", "true");
+                  canvas.addEventListener("webglcontextlost", (event) => {
+                    event.preventDefault();
+                    setWebglUnavailable(true);
+                  });
+                  canvas.addEventListener("webglcontextrestored", () =>
+                    setWebglUnavailable(false),
+                  );
+                }}
+              >
+                <color attach="background" args={[view === "library" ? "#303030" : "#09090a"]} />
+                <OrthographicCamera
+                  makeDefault
+                  position={[0, 0, 10]}
+                  zoom={100}
+                  near={0.2}
+                  far={30}
+                />
+                {/* Luz ambiente: mais forte para garantir visibilidade base */}
+              <ambientLight intensity={view === "library" ? 1.65 : 1.3} />
+              
+              {/* Luz direcional principal — vem de cima-frente para iluminar TV e console */}
+              <directionalLight
+                castShadow
+                position={view === "library" ? [3.8, 5.8, 6] : [2, 5, 4]}
+                color={view === "library" ? "#ffffff" : "#ccd8f0"}
+                intensity={view === "library" ? 2.15 : 2.5}
+                shadow-mapSize-width={1024}
+                shadow-mapSize-height={1024}
+              />
+              
+              {/* Luz de fill do lado esquerdo — pega o console que fica à esquerda */}
+              <directionalLight
+                visible={view !== "library"}
+                position={[-3, 2, 3]}
+                color="#e8d5b0"
+                intensity={1.8}
+              />
+              
+              {/* Luz quente lateral inferior */}
+              <pointLight
+                position={view === "library" ? [-4, 0.5, 4] : [-2, -0.5, 2]}
+                color={view === "library" ? "#b52322" : "#c8702a"}
+                intensity={view === "library" ? 0.75 : 1.2}
+                distance={12}
+              />
+              
+              {/* Luz frontal — simula brilho da tela rebatendo */}
+              <pointLight
+                position={view === "library" ? [4, 2, 5] : [1.5, 1.5, 4]}
+                color={view === "library" ? "#eee9dd" : "#b0c8e8"}
+                intensity={view === "library" ? 0.5 : 1.2}
+                distance={12}
+              />
 
-          <RetroShelf
-            games={filteredGames}
-            selectedIndex={selectedIndex}
-            inspectedIndex={inspection.inspectedIndex}
-            reducedMotion={prefersReducedMotion}
-            onSelect={handleSelect}
+                {activeGame && (
+                  <RetroPlatformDisplay
+                    game={activeGame}
+                    visible={view !== "library"}
+                    reducedMotion={prefersReducedMotion}
+                  />
+                )}
+                <RetroShelf
+                  games={filteredGames}
+                  selectedIndex={safeSelectedIndex}
+                  reducedMotion={prefersReducedMotion}
+                  detailMode={view !== "library"}
+                  revealed={libraryRevealed}
+                  onSelect={handleSelect}
+                />
+                {view === "library" && (
+                  <RetroInterface
+                    activeGame={activeGame}
+                    filters={RETRO_FILTERS}
+                    selectedFilter={selectedFilter}
+                    onReturn={handleReturn}
+                    onFilter={handleFilter}
+                    onPrevious={handlePrevious}
+                    onNext={handleNext}
+                    onPrimaryAction={handleConfirm}
+                    onAddGame={() => {
+                      playSound("showModal");
+                      setGameToEdit(null);
+                      setIsAddModalOpen(true);
+                    }}
+                  />
+                )}
+                <RetroCrtPass
+                  reducedMotion={prefersReducedMotion}
+                  transitionSignal={transitionSignal}
+                />
+              </Canvas>
+            </Suspense>
+          )}
+        </div>
+        <div
+          data-testid="retro-crt-glass"
+          aria-hidden="true"
+          className="retro-crt-glass"
+        />
+        <div
+          data-testid="retro-crt-bezel"
+          aria-hidden="true"
+          className="retro-crt-bezel"
+        />
+
+        {isBooting && (
+          <RetroBootScreen
+            onRevealStart={handleBootRevealStart}
+            onReady={handleBootReady}
+            minimumDuration={3500}
           />
-          <RetroInterface
-            activeGame={activeGame}
-            filters={RETRO_FILTERS}
-            selectedFilter={selectedFilter}
-            inspectionOpen={inspection.inspectedIndex === selectedIndex}
-            onReturn={handleReturn}
-            onFilter={handleFilter}
-            onPrevious={handlePrevious}
-            onNext={handleNext}
-            onPrimaryAction={handleConfirm}
-          />
-          <RetroCrtPass
-            reducedMotion={prefersReducedMotion}
-            transitionSignal={transitionSignal}
-          />
+        )}
+
+        {/* Modais de Cadastro/Edição e Painel de Detalhes Retrô */}
+        <RetroAddGameModal
+          isOpen={isAddModalOpen}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setGameToEdit(null);
+          }}
+          playSound={playSound}
+          gameToEdit={gameToEdit}
+          onSaveGame={handleSaveGame}
+          onDeleteGame={handleDeleteGame}
+        />
+
+        {activeGame && (
           <Suspense fallback={null}>
-            <RetroTvOverlay />
+            <RetroGameDetailsScreen
+              game={activeGame}
+              isOpen={view === "details"}
+              onClose={() => setView("library")}
+              playSound={playSound}
+              restoreFocusRef={selectedCaseButtonRef}
+              onOpenSettingsConnections={() => {
+                if (user?.uid) requestSettingsConnections(user.uid);
+                setView("library");
+                handleReturn();
+              }}
+              onEditGame={(game) => {
+                setView("library");
+                setGameToEdit(game);
+                setIsAddModalOpen(true);
+              }}
+            />
           </Suspense>
-        </Canvas>
-      </Suspense>
+        )}
 
-      <section className="sr-only" aria-label="Controles do acervo retrô">
-        <button type="button" onClick={handleReturn}>
-          Voltar ao launcher
-        </button>
-        <div role="group" aria-label="Filtros por década">
-          {RETRO_FILTERS.map((filter) => (
-            <button
-              key={filter.id}
-              type="button"
-              aria-pressed={selectedFilter === filter.id}
-              onClick={() => handleFilter(filter.id)}
-            >
-              {filter.id === "ALL"
-                ? "Filtrar todos os jogos"
-                : `Filtrar anos ${filter.startYear}`}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={handlePrevious}
-          disabled={filteredGames.length === 0}
-        >
-          Jogo anterior
-        </button>
-        <button type="button" onClick={handleConfirm} disabled={!activeGame}>
-          {inspection.inspectedIndex === selectedIndex
-            ? "Jogar jogo selecionado"
-            : "Abrir caixa do jogo selecionado"}
-        </button>
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={filteredGames.length === 0}
-        >
-          Próximo jogo
-        </button>
-        <div role="list" aria-label="Jogos no filtro atual">
-          {filteredGames.map((game, index) => (
-            <button
-              key={game.id}
-              type="button"
-              role="listitem"
-              aria-current={index === selectedIndex ? "true" : undefined}
-              onClick={() => handleSelect(index)}
-            >
-              {game.title}, {game.year}, {game.console}
-            </button>
-          ))}
-        </div>
-        <p role="status" aria-live="polite">
-          {activeGame
-            ? inspection.inspectedIndex === selectedIndex
-              ? `Caixa aberta: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
-              : `Jogo selecionado: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
-            : "Nenhum jogo encontrado nesta década"}
-        </p>
-      </section>
+        <section className="sr-only" aria-label="Controles do acervo retrô">
+          {view === "details" ? (
+            <>
+              <button type="button" onClick={handleCancel}>
+                Voltar ao acervo
+              </button>
+              <p role="status" aria-live="polite">
+                Detalhes de {activeGame?.title}
+              </p>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={handleReturn}>
+                Voltar ao launcher
+              </button>
+              <div role="group" aria-label="Filtros por década">
+                {RETRO_FILTERS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    aria-pressed={selectedFilter === filter.id}
+                    onClick={() => handleFilter(filter.id)}
+                  >
+                    {filter.id === "ALL"
+                      ? "Filtrar todos os jogos"
+                      : `Filtrar anos ${filter.startYear}`}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handlePrevious}
+                disabled={filteredGames.length === 0}
+              >
+                Jogo anterior
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={!activeGame}
+              >
+                Abrir detalhes do jogo selecionado
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={filteredGames.length === 0}
+              >
+                Próximo jogo
+              </button>
+              <div role="list" aria-label="Jogos no filtro atual">
+                {filteredGames.map((game, index) => (
+                  <div key={game.id} role="listitem">
+                    <button
+                      ref={index === safeSelectedIndex ? selectedCaseButtonRef : undefined}
+                      type="button"
+                      aria-current={index === safeSelectedIndex ? "true" : undefined}
+                      onClick={() => handleSelect(index)}
+                    >
+                      {game.title}, {game.year}, {game.console}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p role="status" aria-live="polite">
+                {activeGame
+                  ? `Jogo selecionado: ${activeGame.title}, ${activeGame.year}, ${activeGame.console}`
+                  : "Nenhum jogo encontrado nesta década"}
+              </p>
+            </>
+          )}
+        </section>
 
-      {webglUnavailable && (
-        <div className="absolute inset-0 z-10 grid place-items-center bg-[#171615] px-8 text-center">
-          <p className="max-w-md font-mono text-sm tracking-wide text-[#ddd8ca]">
-            O sinal da TV foi interrompido. A cena será restaurada assim que o
-            contexto gráfico estiver disponível.
-          </p>
-        </div>
-      )}
-    </main>
+        {webglUnavailable && (
+          <div className="absolute inset-0 z-10 grid place-items-center bg-[#757575] px-8 text-center">
+            {/* A classe 'font-mono' foi removida do <p> abaixo */}
+            <p className="max-w-md text-sm tracking-wide text-[#ddd8ca]">
+              O sinal da TV foi interrompido. A cena será restaurada assim que o
+              contexto gráfico estiver disponível.
+            </p>
+          </div>
+        )}
+      </main>
+      <div className="retro-tv-bezel-overlay" aria-hidden="true" />
+    </div>
   );
 };
 
