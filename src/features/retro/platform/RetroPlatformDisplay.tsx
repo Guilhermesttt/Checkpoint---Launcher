@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import type { RetroGame } from "../shelf/retroCollection";
+import type { StudioTunerParams } from "../studio/retroStudioTuner";
 import { resolveRetroPlatform } from "./retroPlatformRegistry";
 import { RetroPlatformHardware } from "./RetroPlatformHardware";
 import { RetroTvScreen } from "./RetroTvScreen";
@@ -9,20 +10,35 @@ export interface RetroPlatformDisplayProps {
   game: RetroGame;
   visible: boolean;
   reducedMotion: boolean;
+  tunerParams?: StudioTunerParams;
 }
 
 export function RetroPlatformDisplay({
   game,
   visible,
   reducedMotion,
+  tunerParams,
 }: RetroPlatformDisplayProps) {
   const artworkUrl = game.coverImage ?? game.wrapImage;
   const platform = resolveRetroPlatform(game.console);
 
+  const tvX = tunerParams?.tvX ?? 0.1;
+  const tvY = tunerParams?.tvY ?? 0.55;
+  const tvZ = tunerParams?.tvZ ?? -0.6;
+
+  const consoleX = tunerParams?.consoleX ?? 0.15;
+  const consoleY = tunerParams?.consoleY ?? -0.75;
+  const consoleZ = tunerParams?.consoleZ ?? 0.8;
+
+  const lightX = tunerParams?.consoleLightX ?? 0.0;
+  const lightY = tunerParams?.consoleLightY ?? 2.5;
+  const lightZ = tunerParams?.consoleLightZ ?? 3.0;
+  const lightIntensity = tunerParams?.consoleLightIntensity ?? 5.0;
+
   return (
     <group visible={visible}>
-      {/* TV CRT — posicionada no centro atrás (X = 0.1, Y = 0.55, Z = -0.6) */}
-      <group position={[0.1, 0.55, -0.6]}>
+      {/* TV CRT — posicionada no centro atrás */}
+      <group position={[tvX, tvY, tvZ]}>
         <Suspense fallback={null}>
           <RetroTvScreen
             artworkUrl={artworkUrl}
@@ -31,18 +47,19 @@ export function RetroPlatformDisplay({
         </Suspense>
       </group>
 
-      {/* Console de hardware 3D (PS2, PS1, SNES, NES) — posicionado em destaque na frente da TV (X = 0.15, Y = -0.75, Z = 0.8) */}
+      {/* Console de hardware 3D (PS2, PS1, SNES, NES) — posicionado em destaque na frente da TV */}
       {platform ? (
-        <group position={[0.15, -0.75, 0.8]}>
+        <group position={[consoleX, consoleY, consoleZ]}>
           <RetroPlatformHardware
             consoleName={game.console}
             reducedMotion={reducedMotion}
+            tunerParams={tunerParams}
           />
           {/* Luzes dedicadas para iluminar a parte superior e frontal do console */}
           <pointLight
-            position={[0, 2.5, 3.0]}
+            position={[lightX, lightY, lightZ]}
             color="#ffffff"
-            intensity={5.0}
+            intensity={lightIntensity}
             distance={10}
             decay={1.2}
           />
@@ -57,7 +74,7 @@ export function RetroPlatformDisplay({
       {/* Luz de brilho da tela da TV */}
       <pointLight
         data-testid="retro-tv-bloom-light"
-        position={[0.1, 0.55, 1.2]}
+        position={[tvX, tvY, tvZ + 1.8]}
         color="#fcf1d4"
         intensity={2.8}
         distance={6.5}

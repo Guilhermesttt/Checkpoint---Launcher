@@ -15,17 +15,22 @@ import {
 } from "./retroPlatformModel";
 import { RetroPlatformModelBoundary } from "./RetroPlatformModelBoundary";
 
+import type { StudioTunerParams } from "../studio/retroStudioTuner";
+
 export interface RetroPlatformHardwareProps {
   consoleName: string;
   reducedMotion: boolean;
+  tunerParams?: StudioTunerParams;
 }
 
 function RetroPlatformHardwareModel({
   definition,
   reducedMotion,
+  tunerParams,
 }: {
   definition: RetroPlatformDefinition;
   reducedMotion: boolean;
+  tunerParams?: StudioTunerParams;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene: sourceScene } = useGLTF(definition.modelUrl);
@@ -61,11 +66,15 @@ function RetroPlatformHardwareModel({
     [adapted.materials],
   );
 
+  const rotX = tunerParams?.consoleRotX ?? definition.rotation[0];
+  const rotYBase = tunerParams?.consoleRotY ?? definition.rotation[1];
+  const rotZ = tunerParams?.consoleRotZ ?? definition.rotation[2];
+
   useFrame(({ clock }) => {
     const group = groupRef.current;
     if (!group) return;
     const drift = reducedMotion ? 0 : Math.sin(clock.elapsedTime * 0.58) * 0.018;
-    group.rotation.y = definition.rotation[1] + drift;
+    group.rotation.set(rotX, rotYBase + drift, rotZ);
   });
 
   return (
@@ -74,7 +83,7 @@ function RetroPlatformHardwareModel({
       data-testid="retro-platform-hardware"
       data-console={definition.aliases[0]}
       position={[...definition.position]}
-      rotation={[...definition.rotation]}
+      rotation={[rotX, rotYBase, rotZ]}
     >
       <primitive object={adapted.scene} />
     </group>
@@ -84,6 +93,7 @@ function RetroPlatformHardwareModel({
 export function RetroPlatformHardware({
   consoleName,
   reducedMotion,
+  tunerParams,
 }: RetroPlatformHardwareProps) {
   const definition = resolveRetroPlatform(consoleName);
   if (!definition) return null;
@@ -95,6 +105,7 @@ export function RetroPlatformHardware({
         <RetroPlatformHardwareModel
           definition={definition}
           reducedMotion={reducedMotion}
+          tunerParams={tunerParams}
         />
       </Suspense>
     </RetroPlatformModelBoundary>

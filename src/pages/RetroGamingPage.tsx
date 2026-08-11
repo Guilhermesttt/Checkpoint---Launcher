@@ -34,6 +34,11 @@ import { requestSettingsConnections } from "../services/launcherNavigation";
 import { RetroAddGameModal } from "../features/retro/components/RetroAddGameModal";
 import { RetroGameDetailsScreen } from "../features/retro/components/RetroGameDetailsScreen";
 import type { RetroGame } from "../features/retro/shelf/retroCollection";
+import {
+  DEFAULT_STUDIO_TUNER_PARAMS,
+  type StudioTunerParams,
+} from "../features/retro/studio/retroStudioTuner";
+import { RetroStudioTunerPanel } from "../features/retro/studio/RetroStudioTunerPanel";
 
 interface RetroGamingPageProps {
   onReturnToStandard?: () => void;
@@ -91,6 +96,9 @@ export const RetroGamingPage = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [gameToEdit, setGameToEdit] = useState<RetroGame | null>(null);
   const selectedCaseButtonRef = useRef<HTMLButtonElement>(null);
+  const [tunerParams, setTunerParams] = useState<StudioTunerParams>(
+    DEFAULT_STUDIO_TUNER_PARAMS,
+  );
 
   const transitionSignal = useRef(0);
   const transition = useRef(
@@ -355,25 +363,15 @@ export const RetroGamingPage = ({
                   near={0.1}
                   far={50}
                 />
-                {/* Luz ambiente: mais forte para garantir visibilidade base */}
-                <ambientLight intensity={view === "library" ? 0.9 : 0.85} />
-
-                {/* RectAreaLight vindo de cima — ilumina o topo da TV e do console como softbox de estúdio */}
-                <rectAreaLight
-                  position={[0.1, 4.2, 0.5]}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                  width={4.8}
-                  height={3.2}
-                  color="#fff5ea"
-                  intensity={view === "library" ? 4.5 : 7.0}
-                />
+                {/* Luz ambiente: configurável ao vivo pelo Estúdio 3D */}
+                <ambientLight intensity={view === "library" ? 0.9 : tunerParams.ambientIntensity} />
 
                 {/* Luz direcional principal — vem de cima-frente para iluminar TV e console */}
                 <directionalLight
                   castShadow
-                  position={view === "library" ? [3.8, 5.8, 6] : [2, 5, 4]}
+                  position={view === "library" ? [3.8, 5.8, 6] : [tunerParams.dirLightX, tunerParams.dirLightY, tunerParams.dirLightZ]}
                   color={view === "library" ? "#ffffff" : "#ccd8f0"}
-                  intensity={view === "library" ? 2.15 : 2.5}
+                  intensity={view === "library" ? 2.15 : tunerParams.dirLightIntensity}
                   shadow-mapSize-width={1024}
                   shadow-mapSize-height={1024}
                 />
@@ -404,6 +402,7 @@ export const RetroGamingPage = ({
                     game={activeGame}
                     visible={view !== "library"}
                     reducedMotion={prefersReducedMotion}
+                    tunerParams={tunerParams}
                   />
                 )}
                 <RetroShelf
@@ -457,6 +456,13 @@ export const RetroGamingPage = ({
             minimumDuration={3500}
           />
         )}
+
+        {/* Painel de Controles de Estúdio 3D (Luzes e Posição de Objetos) */}
+        <RetroStudioTunerPanel
+          params={tunerParams}
+          onChange={setTunerParams}
+          onReset={() => setTunerParams(DEFAULT_STUDIO_TUNER_PARAMS)}
+        />
 
         {/* Modais de Cadastro/Edição e Painel de Detalhes Retrô */}
         <RetroAddGameModal
