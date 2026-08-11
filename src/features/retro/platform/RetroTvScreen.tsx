@@ -75,20 +75,26 @@ export function RetroTvScreen({ artworkUrl, reducedMotion }: RetroTvScreenProps)
       </mesh>
 
       {/* Entalhe interno da tela (recesso escuro) */}
-      <mesh position={[0, 0.1, screenZ + 0.001]}>
+      <mesh position={[0, 0.1, screenZ - 0.005]}>
         <planeGeometry args={[SW + 0.12, SH + 0.08]} />
         <meshStandardMaterial color="#070709" roughness={1} metalness={0} />
       </mesh>
 
+      {/* Detalhe: moldura interna do bezel */}
+      <mesh position={[0, 0.1, screenZ - 0.002]}>
+        <planeGeometry args={[SW + 0.22, SH + 0.18]} />
+        <meshStandardMaterial color="#161618" roughness={0.92} metalness={0.05} />
+      </mesh>
+
       {/* Tela preta de fundo */}
-      <mesh position={[0, 0.1, screenZ + 0.01]}>
+      <mesh position={[0, 0.1, screenZ + 0.002]}>
         <planeGeometry args={[SW, SH]} />
         <meshBasicMaterial color="#010203" toneMapped={false} />
       </mesh>
 
-      {/* Artwork do jogo na tela */}
+      {/* Artwork do jogo na tela (colocada na frente de todas as molduras) */}
       {artworkUrl ? (
-        <group position={[0, 0.1, screenZ]}>
+        <group position={[0, 0.1, screenZ + 0.015]}>
           <Suspense fallback={null}>
             <TvArtworkPlane url={artworkUrl} />
           </Suspense>
@@ -99,7 +105,7 @@ export function RetroTvScreen({ artworkUrl, reducedMotion }: RetroTvScreenProps)
       <pointLight
         position={[0, 0.1, screenZ + 1.2]}
         color="#b0c8ff"
-        intensity={artworkUrl ? 2.2 : 0.6}
+        intensity={artworkUrl ? 2.8 : 0.6}
         distance={5.5}
         decay={2}
       />
@@ -108,12 +114,6 @@ export function RetroTvScreen({ artworkUrl, reducedMotion }: RetroTvScreenProps)
       <mesh position={[0, -H / 2 - 0.06, 0]} castShadow receiveShadow>
         <boxGeometry args={[W * 0.55, 0.12, D * 0.65]} />
         <meshStandardMaterial color="#0a0a0e" roughness={0.9} metalness={0.05} />
-      </mesh>
-
-      {/* Detalhe: bordas laterais mais claras (plástico do bezel) */}
-      <mesh position={[0, 0.1, screenZ + 0.02]} renderOrder={0}>
-        <planeGeometry args={[SW + 0.22, SH + 0.18]} />
-        <meshStandardMaterial color="#161618" roughness={0.92} metalness={0.05} />
       </mesh>
     </group>
   );

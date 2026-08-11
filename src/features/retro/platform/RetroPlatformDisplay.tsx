@@ -3,8 +3,7 @@ import { Suspense } from "react";
 import type { RetroGame } from "../shelf/retroCollection";
 import { resolveRetroPlatform } from "./retroPlatformRegistry";
 import { RetroPlatformHardware } from "./RetroPlatformHardware";
-import { RetroPlatformModelBoundary } from "./RetroPlatformModelBoundary";
-import { RetroPvmTelevision } from "./RetroPvmTelevision";
+import { RetroTvScreen } from "./RetroTvScreen";
 
 export interface RetroPlatformDisplayProps {
   game: RetroGame;
@@ -22,37 +21,35 @@ export function RetroPlatformDisplay({
 
   return (
     <group visible={visible}>
-      {/* TV PVM — à direita e levemente recuada */}
-      <RetroPlatformModelBoundary resetKey={`pvm:${artworkUrl ?? "dark"}`}>
+      {/* TV CRT — posicionada no centro atrás (X = 0.1, Y = 0.55, Z = -0.6) */}
+      <group position={[0.1, 0.55, -0.6]}>
         <Suspense fallback={null}>
-          <RetroPvmTelevision
+          <RetroTvScreen
             artworkUrl={artworkUrl}
             reducedMotion={reducedMotion}
           />
         </Suspense>
-      </RetroPlatformModelBoundary>
+      </group>
 
-      {/* Console de hardware — à esquerda e levemente à frente, na cena */}
+      {/* Console de hardware 3D (PS2, PS1, SNES, NES) — posicionado em destaque na frente da TV (X = 0.15, Y = -0.75, Z = 0.8) */}
       {platform ? (
-        <group position={[-1.1, 0, 0.6]}>
+        <group position={[0.15, -0.75, 0.8]}>
           <RetroPlatformHardware
             consoleName={game.console}
             reducedMotion={reducedMotion}
           />
-          {/* Luz dedicada para iluminar o hardware do console */}
+          {/* Luzes dedicadas para iluminar a parte superior e frontal do console */}
           <pointLight
-            position={[0, 2.5, 2.5]}
-            color="#d0c8b8"
-            intensity={4.0}
-            distance={8}
-            decay={1.5}
+            position={[0, 2.5, 3.0]}
+            color="#ffffff"
+            intensity={5.0}
+            distance={10}
+            decay={1.2}
           />
-          <pointLight
-            position={[2, 0.5, 1.5]}
-            color="#8ba6d6"
-            intensity={2.5}
-            distance={6}
-            decay={1.5}
+          <directionalLight
+            position={[1, 3, 2]}
+            color="#d0e0ff"
+            intensity={2.2}
           />
         </group>
       ) : null}
@@ -60,12 +57,13 @@ export function RetroPlatformDisplay({
       {/* Luz de brilho da tela da TV */}
       <pointLight
         data-testid="retro-tv-bloom-light"
-        position={[1.15, 0.25, 2.25]}
+        position={[0.1, 0.55, 1.2]}
         color="#fcf1d4"
-        intensity={2.4}
+        intensity={2.8}
         distance={6.5}
         decay={2}
       />
     </group>
   );
 }
+

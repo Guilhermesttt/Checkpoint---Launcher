@@ -178,14 +178,14 @@ export function RetroGameDetailsScreen({ game, isOpen, onClose, onEditGame, play
           <motion.section
             initial={reducedMotion ? false : { opacity: 0, x: -42 }}
             animate={{ opacity: 1, x: 0 }}
-            className="absolute inset-y-4 left-4 flex w-[clamp(280px,34vw,460px)] min-w-0 flex-col overflow-hidden border border-white/15 bg-[#09090a]/92 xl:inset-y-6 xl:left-6 2xl:inset-y-8 2xl:left-8"
+            className="retro-detail-editorial-panel absolute inset-y-4 left-4 flex w-[clamp(280px,34vw,460px)] min-w-0 flex-col overflow-hidden border border-white/15 bg-[#09090a]/92 xl:inset-y-6 xl:left-6 2xl:inset-y-8 2xl:left-8"
           >
             <header className="flex items-center gap-5 px-8 pt-7">
               <span className="font-['Unbounded'] text-[10px] uppercase tracking-[0.2em] text-[#77736c]">{game.console} / {game.year}</span>
               <span className="h-px flex-1 bg-white/10" />
             </header>
             <div className="px-8 pt-7">
-              <h1 className="font-['Unbounded'] text-2xl font-bold leading-tight">{game.title}</h1>
+              <h1 className="retro-crt-text-glow font-['Unbounded'] text-2xl font-bold leading-tight">{game.title}</h1>
               <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.22em] text-[#b52322]">{game.subtitle}</p>
             </div>
             <RetroDetailTabs
@@ -212,7 +212,7 @@ export function RetroGameDetailsScreen({ game, isOpen, onClose, onEditGame, play
             {launchError && <p role="alert" className="mx-8 mb-6 border border-white/15 bg-black/70 p-3 text-xs text-[#fcf9f3]">{launchError}</p>}
           </motion.section>
 
-          <button ref={closeButtonRef} type="button" aria-label="Fechar detalhes" onClick={handleClose} className="absolute right-8 top-8 grid h-12 w-12 place-items-center border border-white/25 bg-[#09090a]/75 text-2xl text-[#fcf9f3] transition hover:bg-[#242321] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#fcf9f3]">×</button>
+          <button ref={closeButtonRef} type="button" aria-label="Fechar detalhes" onClick={handleClose} className="absolute right-8 top-8 grid h-10 w-10 place-items-center border border-white/25 bg-[#09090a]/75 text-xl text-[#fcf9f3] transition hover:bg-[#242321] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#fcf9f3]">×</button>
         </motion.div>
       )}
     </AnimatePresence>

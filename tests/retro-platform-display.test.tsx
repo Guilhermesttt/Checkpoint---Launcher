@@ -6,6 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RetroGame } from "../src/features/retro/shelf/retroCollection";
 import { RetroPlatformDisplay } from "../src/features/retro/platform/RetroPlatformDisplay";
 
+vi.mock("../src/features/retro/platform/RetroTvScreen", () => ({
+  RetroTvScreen: ({ artworkUrl }: { artworkUrl?: string }) => (
+    <div data-testid="retro-pvm-television" data-artwork={artworkUrl} />
+  ),
+}));
+
 vi.mock("../src/features/retro/platform/RetroPvmTelevision", () => ({
   RetroPvmTelevision: ({ artworkUrl }: { artworkUrl?: string }) => (
     <div data-testid="retro-pvm-television" data-artwork={artworkUrl} />

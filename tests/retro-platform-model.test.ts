@@ -2,29 +2,36 @@ import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  classifyPvmNode,
+  classifyPvmMesh,
   cloneFilteredPlatformScene,
   createOwnedPlatformMaterialDisposer,
   shouldKeepPlatformNode,
+  shouldKeepPvmMeshByMaterial,
 } from "../src/features/retro/platform/retroPlatformModel";
 
 describe("retro platform model helpers", () => {
   it.each([
-    ["main_body_27", "television"],
-    ["front_panel_24", "television"],
-    ["glass_and_fence_25", "television"],
-    ["Ps1_body_18", "ps1-hardware"],
-    ["ps_controller.001_4", "ps1-hardware"],
-    ["ps_cable_19", "ps1-hardware"],
-    ["unknown_mesh", "discard"],
-  ] as const)("classifies %s as %s", (nodeName, role) => {
-    expect(classifyPvmNode(nodeName)).toBe(role);
+    ["pvm_panel_and_more_mat", "television"],
+    ["pvm_screen_and_details_mat", "television"],
+    ["ps1_body_mat", "ps1-hardware"],
+    ["ps1_controller", "ps1-hardware"],
+    ["unknown_mat", "discard"],
+  ] as const)("classifies material %s as %s", (matName, role) => {
+    expect(classifyPvmMesh([matName])).toBe(role);
+  });
+
+  it("identifies PVM television vs PS1 hardware by material", () => {
+    expect(shouldKeepPvmMeshByMaterial("television", ["pvm_panel_and_more_mat"])).toBe(true);
+    expect(shouldKeepPvmMeshByMaterial("television", ["ps1_body_mat"])).toBe(false);
+    expect(shouldKeepPvmMeshByMaterial("ps1-hardware", ["ps1_body_mat"])).toBe(true);
   });
 
   it.each([
     ["nes", "Console_0", true],
     ["nes", "Controller_1", true],
-    ["ps2", "DualShock_Controller", false],
+    ["ps2", "PS2_Body_M_PS2_Details_0", true],
+    ["ps2", "Object009_M_PS2_Body_0", true],
+    ["ps2", "Other_Node", false],
     ["snes", "Cylinder001_03 - Default_0", true],
   ] as const)("keeps %s node %s: %s", (platform, nodeName, expected) => {
     expect(shouldKeepPlatformNode(platform, nodeName)).toBe(expected);
@@ -52,32 +59,6 @@ describe("retro platform model helpers", () => {
     expect(new THREE.Box3().setFromObject(result.scene).getSize(new THREE.Vector3()).x).toBeCloseTo(4);
   });
 
-  it("adapts only cloned PS2 standard materials without mutating their source", () => {
-    const source = new THREE.Group();
-    const sourceMaterial = new THREE.MeshStandardMaterial({
-      roughness: 0.94,
-      metalness: 0.03,
-    });
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 1, 1), sourceMaterial);
-    mesh.name = "PS2_Body_M_PS2_Details_0";
-    source.add(mesh);
-
-    const ps2Result = cloneFilteredPlatformScene(source, () => true, 2, "ps2");
-    const ps2Material = (ps2Result.scene.getObjectByName(mesh.name) as THREE.Mesh)
-      .material as THREE.MeshStandardMaterial;
-    expect(ps2Material).not.toBe(sourceMaterial);
-    expect(ps2Material.roughness).toBe(0.68);
-    expect(ps2Material.metalness).toBe(0.12);
-    expect(sourceMaterial.roughness).toBe(0.94);
-    expect(sourceMaterial.metalness).toBe(0.03);
-
-    const snesResult = cloneFilteredPlatformScene(source, () => true, 2, "snes");
-    const snesMaterial = (snesResult.scene.getObjectByName(mesh.name) as THREE.Mesh)
-      .material as THREE.MeshStandardMaterial;
-    expect(snesMaterial.roughness).toBe(0.94);
-    expect(snesMaterial.metalness).toBe(0.03);
-  });
-
   it("disposes once per ownership cycle and again after lifecycle replay", () => {
     const material = new THREE.MeshBasicMaterial();
     const dispose = vi.spyOn(material, "dispose");
@@ -93,3 +74,4 @@ describe("retro platform model helpers", () => {
     expect(dispose).toHaveBeenCalledTimes(2);
   });
 });
+

@@ -350,47 +350,47 @@ export const RetroGamingPage = ({
                 <color attach="background" args={[view === "library" ? "#303030" : "#09090a"]} />
                 <OrthographicCamera
                   makeDefault
-                  position={[0, 0, 10]}
+                  position={[0, 0, 20]}
                   zoom={100}
-                  near={0.2}
-                  far={30}
+                  near={0.1}
+                  far={50}
                 />
                 {/* Luz ambiente: mais forte para garantir visibilidade base */}
-              <ambientLight intensity={view === "library" ? 1.65 : 1.3} />
-              
-              {/* Luz direcional principal — vem de cima-frente para iluminar TV e console */}
-              <directionalLight
-                castShadow
-                position={view === "library" ? [3.8, 5.8, 6] : [2, 5, 4]}
-                color={view === "library" ? "#ffffff" : "#ccd8f0"}
-                intensity={view === "library" ? 2.15 : 2.5}
-                shadow-mapSize-width={1024}
-                shadow-mapSize-height={1024}
-              />
-              
-              {/* Luz de fill do lado esquerdo — pega o console que fica à esquerda */}
-              <directionalLight
-                visible={view !== "library"}
-                position={[-3, 2, 3]}
-                color="#e8d5b0"
-                intensity={1.8}
-              />
-              
-              {/* Luz quente lateral inferior */}
-              <pointLight
-                position={view === "library" ? [-4, 0.5, 4] : [-2, -0.5, 2]}
-                color={view === "library" ? "#b52322" : "#c8702a"}
-                intensity={view === "library" ? 0.75 : 1.2}
-                distance={12}
-              />
-              
-              {/* Luz frontal — simula brilho da tela rebatendo */}
-              <pointLight
-                position={view === "library" ? [4, 2, 5] : [1.5, 1.5, 4]}
-                color={view === "library" ? "#eee9dd" : "#b0c8e8"}
-                intensity={view === "library" ? 0.5 : 1.2}
-                distance={12}
-              />
+                <ambientLight intensity={view === "library" ? 1.65 : 1.3} />
+
+                {/* Luz direcional principal — vem de cima-frente para iluminar TV e console */}
+                <directionalLight
+                  castShadow
+                  position={view === "library" ? [3.8, 5.8, 6] : [2, 5, 4]}
+                  color={view === "library" ? "#ffffff" : "#ccd8f0"}
+                  intensity={view === "library" ? 2.15 : 2.5}
+                  shadow-mapSize-width={1024}
+                  shadow-mapSize-height={1024}
+                />
+
+                {/* Luz de fill do lado esquerdo — pega o console que fica à esquerda */}
+                <directionalLight
+                  visible={view !== "library"}
+                  position={[-3, 2, 3]}
+                  color="#e8d5b0"
+                  intensity={1.8}
+                />
+
+                {/* Luz quente lateral inferior */}
+                <pointLight
+                  position={view === "library" ? [-4, 0.5, 4] : [-2, -0.5, 2]}
+                  color={view === "library" ? "#b52322" : "#c8702a"}
+                  intensity={view === "library" ? 0.75 : 1.2}
+                  distance={12}
+                />
+
+                {/* Luz frontal — simula brilho da tela rebatendo */}
+                <pointLight
+                  position={view === "library" ? [4, 2, 5] : [1.5, 1.5, 4]}
+                  color={view === "library" ? "#eee9dd" : "#b0c8e8"}
+                  intensity={view === "library" ? 0.5 : 1.2}
+                  distance={12}
+                />
 
                 {activeGame && (
                   <RetroPlatformDisplay

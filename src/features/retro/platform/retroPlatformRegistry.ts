@@ -18,34 +18,34 @@ const retroPlatformDefinitions: readonly RetroPlatformDefinition[] = Object.free
   Object.freeze({
     key: "ps1",
     modelUrl: ps1ConsoleUrl,
-    targetWidth: 2.2,
-    position: Object.freeze([0, -0.55, 0]) as readonly [number, number, number],
-    rotation: Object.freeze([0, 0.28, 0]) as readonly [number, number, number],
-    aliases: Object.freeze(["PS1", "PSX", "PLAYSTATION", "PLAYSTATION 1"]),
+    targetWidth: 2.6,
+    position: Object.freeze([0, 0, 0]) as readonly [number, number, number],
+    rotation: Object.freeze([0.35, -0.28, 0]) as readonly [number, number, number],
+    aliases: Object.freeze(["PS1", "PSX", "PLAYSTATION", "PLAYSTATION 1", "SONY PLAYSTATION", "SONY PLAYSTATION 1"]),
   }),
   Object.freeze({
     key: "ps2",
     modelUrl: ps2ConsoleUrl,
-    targetWidth: 2.4,
-    position: Object.freeze([0, -0.65, 0]) as readonly [number, number, number],
-    rotation: Object.freeze([0, 0.32, 0]) as readonly [number, number, number],
-    aliases: Object.freeze(["PS2", "PLAYSTATION 2"]),
+    targetWidth: 3.2,
+    position: Object.freeze([0, 0, 0]) as readonly [number, number, number],
+    rotation: Object.freeze([0.38, -0.32, 0]) as readonly [number, number, number],
+    aliases: Object.freeze(["PS2", "PLAYSTATION 2", "SONY PLAYSTATION 2", "PLAYSTATION2"]),
   }),
   Object.freeze({
     key: "snes",
     modelUrl: snesConsoleUrl,
-    targetWidth: 2.35,
-    position: Object.freeze([0, -0.58, 0]) as readonly [number, number, number],
-    rotation: Object.freeze([0, 0.2, 0]) as readonly [number, number, number],
-    aliases: Object.freeze(["SNES", "SUPER NINTENDO", "SUPER NES"]),
+    targetWidth: 2.8,
+    position: Object.freeze([0, 0, 0]) as readonly [number, number, number],
+    rotation: Object.freeze([0.36, -0.25, 0]) as readonly [number, number, number],
+    aliases: Object.freeze(["SNES", "SUPER NINTENDO", "SUPER NES", "SUPER NINTENDO ENTERTAINMENT SYSTEM"]),
   }),
   Object.freeze({
     key: "nes",
     modelUrl: nesConsoleUrl,
-    targetWidth: 2.3,
-    position: Object.freeze([0, -0.6, 0]) as readonly [number, number, number],
-    rotation: Object.freeze([0, 0.24, 0]) as readonly [number, number, number],
-    aliases: Object.freeze(["NES", "NINTENDO ENTERTAINMENT SYSTEM"]),
+    targetWidth: 2.8,
+    position: Object.freeze([0, 0, 0]) as readonly [number, number, number],
+    rotation: Object.freeze([0.36, -0.25, 0]) as readonly [number, number, number],
+    aliases: Object.freeze(["NES", "NINTENDO ENTERTAINMENT SYSTEM", "NINTENDO"]),
   }),
 ]);
 
@@ -56,6 +56,23 @@ const platformByAlias = new Map(
 );
 
 export function resolveRetroPlatform(consoleName: string): RetroPlatformDefinition | null {
-  const normalizedConsoleName = consoleName.trim().toUpperCase();
-  return platformByAlias.get(normalizedConsoleName) ?? null;
+  if (!consoleName || !consoleName.trim()) return null;
+  const upper = consoleName.trim().toUpperCase();
+  // Exact match
+  const exact = platformByAlias.get(upper);
+  if (exact) return exact;
+
+  // Fuzzy match (check if console string contains any alias)
+  for (const def of retroPlatformDefinitions) {
+    if (def.aliases.some((alias) => upper.includes(alias) || alias.includes(upper))) {
+      return def;
+    }
+  }
+
+  // Fallback default: if console name starts with PS or PLAYSTATION, use PS2
+  if (upper.includes("PS") || upper.includes("PLAYSTATION")) {
+    return platformByAlias.get("PS2") ?? retroPlatformDefinitions[1];
+  }
+
+  return null;
 }
