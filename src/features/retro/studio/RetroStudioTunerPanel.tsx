@@ -46,7 +46,7 @@ export function RetroStudioTunerPanel({
   }
 
   return (
-    <div className="retro-mode fixed right-6 top-16 z-50 flex h-[calc(100vh-6rem)] w-80 flex-col border border-white/20 bg-[#09090a]/95 text-[#fcf9f3] shadow-2xl backdrop-blur-md">
+    <div className="retro-mode fixed right-6 top-16 z-50 flex mr-40 h-[calc(100vh-6rem)] w-80 flex-col border border-white/20 bg-[#09090a]/95 text-[#fcf9f3] shadow-2xl backdrop-blur-md">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h3 className="font-['Unbounded'] text-xs font-bold tracking-wider text-[#b52322]">

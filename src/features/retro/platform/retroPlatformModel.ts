@@ -77,8 +77,7 @@ export function classifyPvmNode(_name: string): PvmNodeRole {
 export function shouldKeepPlatformNode(key: RetroPlatformKey, name: string): boolean {
   switch (key) {
     case "ps1":
-      // Classificado por material (via classifyPvmMesh) — este path não é usado
-      // diretamente; RetroPlatformHardware usa shouldKeepPlatformMesh() abaixo.
+      // Classificado por material (via classifyPvmMesh) — este path não é usado diretamente
       return false;
     case "ps2":
       // Nodes reais: PS2_Body, PS2_Box, PS2_Details, Object009 (e seus filhos mesh)
@@ -124,7 +123,16 @@ export function cloneFilteredPlatformScene(
       : [node.material];
     const matNames = originalMaterials.map((m) => m.name ?? "");
 
-    if (!keepNode(node.name, matNames)) {
+    // Coleta o nome do próprio mesh e de todos os seus pais na hierarquia GLB
+    const namesToCheck: string[] = [node.name];
+    let curr: THREE.Object3D | null = node.parent;
+    while (curr) {
+      if (curr.name) namesToCheck.push(curr.name);
+      curr = curr.parent;
+    }
+
+    const isMatch = namesToCheck.some((n) => keepNode(n, matNames));
+    if (!isMatch) {
       rejectedMeshes.push(node);
       return;
     }
