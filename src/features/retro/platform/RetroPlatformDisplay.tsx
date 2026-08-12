@@ -22,18 +22,18 @@ export function RetroPlatformDisplay({
   const artworkUrl = game.coverImage ?? game.wrapImage;
   const platform = resolveRetroPlatform(game.console);
 
-  const tvX = tunerParams?.tvX ?? 0.1;
-  const tvY = tunerParams?.tvY ?? 0.55;
-  const tvZ = tunerParams?.tvZ ?? -0.6;
+  const tvX = tunerParams?.tvX ?? 0.38;
+  const tvY = tunerParams?.tvY ?? 0.65;
+  const tvZ = tunerParams?.tvZ ?? -0.2;
 
-  const consoleX = tunerParams?.consoleX ?? 0.15;
-  const consoleY = tunerParams?.consoleY ?? -0.35;
-  const consoleZ = tunerParams?.consoleZ ?? 1.2;
+  const consoleX = tunerParams?.consoleX ?? 1.45;
+  const consoleY = tunerParams?.consoleY ?? -0.16;
+  const consoleZ = tunerParams?.consoleZ ?? 2.2;
 
-  const lightX = tunerParams?.consoleLightX ?? 0.0;
-  const lightY = tunerParams?.consoleLightY ?? 2.5;
-  const lightZ = tunerParams?.consoleLightZ ?? 3.5;
-  const lightIntensity = tunerParams?.consoleLightIntensity ?? 6.5;
+  const lightX = tunerParams?.consoleLightX ?? 2.24;
+  const lightY = tunerParams?.consoleLightY ?? 4.96;
+  const lightZ = tunerParams?.consoleLightZ ?? 5.18;
+  const lightIntensity = tunerParams?.consoleLightIntensity ?? 5.0;
 
   return (
     <group visible={visible}>

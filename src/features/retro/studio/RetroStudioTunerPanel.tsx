@@ -46,7 +46,7 @@ export function RetroStudioTunerPanel({
   }
 
   return (
-    <div className="retro-mode fixed right-6 top-16 z-50 flex mr-40 h-[calc(100vh-6rem)] w-80 flex-col border border-white/20 bg-[#09090a]/95 text-[#fcf9f3] shadow-2xl backdrop-blur-md">
+    <div className="retro-mode fixed right-6 top-16 z-50 flex mr-55 h-[calc(100vh-6rem)] w-80 flex-col border border-white/20 bg-[#09090a]/95 text-[#fcf9f3] shadow-2xl backdrop-blur-md">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h3 className="font-['Unbounded'] text-xs font-bold tracking-wider text-[#b52322]">
@@ -66,44 +66,40 @@ export function RetroStudioTunerPanel({
         <button
           type="button"
           onClick={() => setActiveTab("lights")}
-          className={`flex-1 py-2 text-center transition ${
-            activeTab === "lights"
+          className={`flex-1 py-2 text-center transition ${activeTab === "lights"
               ? "border-b-2 border-[#b52322] text-[#fcf9f3] bg-white/5"
               : "text-[#77736c] hover:text-white"
-          }`}
+            }`}
         >
           💡 LUZES
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("tv")}
-          className={`flex-1 py-2 text-center transition ${
-            activeTab === "tv"
+          className={`flex-1 py-2 text-center transition ${activeTab === "tv"
               ? "border-b-2 border-[#b52322] text-[#fcf9f3] bg-white/5"
               : "text-[#77736c] hover:text-white"
-          }`}
+            }`}
         >
           📺 TV
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("console")}
-          className={`flex-1 py-2 text-center transition ${
-            activeTab === "console"
+          className={`flex-1 py-2 text-center transition ${activeTab === "console"
               ? "border-b-2 border-[#b52322] text-[#fcf9f3] bg-white/5"
               : "text-[#77736c] hover:text-white"
-          }`}
+            }`}
         >
           🕹️ CONSOLE
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("case")}
-          className={`flex-1 py-2 text-center transition ${
-            activeTab === "case"
+          className={`flex-1 py-2 text-center transition ${activeTab === "case"
               ? "border-b-2 border-[#b52322] text-[#fcf9f3] bg-white/5"
               : "text-[#77736c] hover:text-white"
-          }`}
+            }`}
         >
           📦 CAPA
         </button>
@@ -125,11 +121,10 @@ export function RetroStudioTunerPanel({
               <button
                 type="button"
                 onClick={() => onChange({ ...params, crtEnabled: !params.crtEnabled })}
-                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider transition ${
-                  params.crtEnabled
+                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider transition ${params.crtEnabled
                     ? "bg-[#b52322] text-white shadow-[0_0_8px_rgba(181,35,34,0.5)]"
                     : "bg-white/10 text-[#88837a] hover:text-white"
-                }`}
+                  }`}
               >
                 {params.crtEnabled ? "LIGADO" : "DESLIGADO"}
               </button>

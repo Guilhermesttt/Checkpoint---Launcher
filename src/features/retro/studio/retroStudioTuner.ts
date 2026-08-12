@@ -36,27 +36,27 @@ export const DEFAULT_STUDIO_TUNER_PARAMS: StudioTunerParams = {
   // CRT
   crtEnabled: true,
 
-  // Lights
-  ambientIntensity: 1.1,
-  dirLightX: 2.0,
-  dirLightY: 5.0,
-  dirLightZ: 4.0,
-  dirLightIntensity: 3.2,
-  consoleLightX: 0.0,
-  consoleLightY: 2.5,
-  consoleLightZ: 3.5,
-  consoleLightIntensity: 6.5,
+  // Lights (Parâmetros extraídos da sua cena 3D)
+  ambientIntensity: 1.8,
+  dirLightX: -0.69,
+  dirLightY: 5.68,
+  dirLightZ: 0.79,
+  dirLightIntensity: 3.52,
+  consoleLightX: 2.24,
+  consoleLightY: 4.96,
+  consoleLightZ: 5.18,
+  consoleLightIntensity: 5.0,
 
-  // TV
-  tvX: 0.1,
-  tvY: 0.55,
-  tvZ: -0.6,
+  // TV (old_jvc_tv / PVM)
+  tvX: 0.38,
+  tvY: 0.65,
+  tvZ: -0.2,
 
-  // Console
-  consoleX: 0.15,
-  consoleY: -0.35,
-  consoleZ: 1.2,
-  consoleRotX: 0.42,
+  // Console PS2 (sony_playstation_2.glb)
+  consoleX: 1.45,
+  consoleY: -0.16,
+  consoleZ: 2.2,
+  consoleRotX: 0.38,
   consoleRotY: -0.32,
   consoleRotZ: 0.0,
 
