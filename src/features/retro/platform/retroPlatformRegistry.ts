@@ -1,6 +1,7 @@
 import nesConsoleUrl from "../../../assets/3D_OBJS/nes_console_and_controller.glb";
 import ps1ConsoleUrl from "../../../assets/3D_OBJS/sony_pvm-1341__sony_playstation.glb";
-import ps2ConsoleUrl from "../../../assets/3D_OBJS/sony_playstation_2.glb";
+import ps2ConsoleUrl from "../../../assets/3D_OBJS/ps2+tv.glb";
+import ps2TextureSourceUrl from "../../../assets/3D_OBJS/sony_playstation_2.glb";
 import snesConsoleUrl from "../../../assets/3D_OBJS/super_yes.glb";
 
 export type RetroPlatformKey = "ps1" | "ps2" | "snes" | "nes";
@@ -8,6 +9,7 @@ export type RetroPlatformKey = "ps1" | "ps2" | "snes" | "nes";
 export interface RetroPlatformDefinition {
   key: RetroPlatformKey;
   modelUrl: string;
+  textureSourceUrl?: string;
   targetWidth: number;
   position: readonly [number, number, number];
   rotation: readonly [number, number, number];
@@ -26,6 +28,7 @@ const retroPlatformDefinitions: readonly RetroPlatformDefinition[] = Object.free
   Object.freeze({
     key: "ps2",
     modelUrl: ps2ConsoleUrl,
+    textureSourceUrl: ps2TextureSourceUrl,
     targetWidth: 3.2,
     position: Object.freeze([0, 0, 0]) as readonly [number, number, number],
     rotation: Object.freeze([0.38, -0.32, 0]) as readonly [number, number, number],

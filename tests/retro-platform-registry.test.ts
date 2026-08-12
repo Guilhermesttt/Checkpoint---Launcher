@@ -22,10 +22,14 @@ describe("retro platform registry", () => {
 
   it.each([
     ["PS1", "sony_pvm-1341__sony_playstation.glb"],
-    ["PS2", "sony_playstation_2.glb"],
+    ["PS2", "ps2+tv.glb"],
     ["SNES", "super_yes.glb"],
     ["NES", "nes_console_and_controller.glb"],
   ] as const)("uses the approved %s hardware model", (consoleName, modelFileName) => {
-    expect(resolveRetroPlatform(consoleName)?.modelUrl).toContain(modelFileName);
+    const platform = resolveRetroPlatform(consoleName);
+    expect(platform?.modelUrl).toContain(modelFileName);
+    if (consoleName === "PS2") {
+      expect(platform?.textureSourceUrl).toContain("sony_playstation_2.glb");
+    }
   });
 });

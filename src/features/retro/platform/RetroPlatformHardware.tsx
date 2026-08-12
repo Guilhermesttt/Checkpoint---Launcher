@@ -34,7 +34,25 @@ function RetroPlatformHardwareModel({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { scene: sourceScene } = useGLTF(definition.modelUrl);
+  const textureSourceGltf = useGLTF(
+    definition.textureSourceUrl ?? definition.modelUrl,
+  );
+  const textureScene = textureSourceGltf ? textureSourceGltf.scene : null;
+
   const adapted = useMemo(() => {
+    // Mapeia materiais por nome de nó a partir do GLB fonte de textura
+    const materialMap = new Map<string, THREE.Material>();
+    if (textureScene) {
+      textureScene.traverse((node) => {
+        if (node instanceof THREE.Mesh && node.name && node.material) {
+          const mat = Array.isArray(node.material)
+            ? node.material[0]
+            : node.material;
+          if (mat) materialMap.set(node.name, mat);
+        }
+      });
+    }
+
     const result = cloneFilteredPlatformScene(
       sourceScene,
       (name, matNames) => {
@@ -50,6 +68,16 @@ function RetroPlatformHardwareModel({
 
     result.scene.traverse((node) => {
       if (!(node instanceof THREE.Mesh)) return;
+
+      // Se houver um material no modelo de textura com o mesmo nome de nó, aplica-o!
+      if (node.name && materialMap.has(node.name)) {
+        const sourceMat = materialMap.get(node.name)!;
+        const ownedMat = sourceMat.clone();
+        ownedMat.needsUpdate = true;
+        node.material = ownedMat;
+        result.materials.push(ownedMat);
+      }
+
       node.castShadow = true;
       node.receiveShadow = true;
     });
@@ -59,7 +87,7 @@ function RetroPlatformHardwareModel({
     result.scene.position.set(-center.x, -bounds.min.y, -center.z);
     result.scene.updateMatrixWorld(true);
     return result;
-  }, [definition, sourceScene]);
+  }, [definition, sourceScene, textureScene]);
 
   useEffect(
     () => createOwnedPlatformMaterialDisposer(adapted.materials),
