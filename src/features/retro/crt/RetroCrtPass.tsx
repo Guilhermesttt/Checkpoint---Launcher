@@ -10,9 +10,11 @@ import { retroCrtFragmentShader, retroCrtVertexShader } from "./retroShaders";
 interface RetroCrtPassProps {
   reducedMotion: boolean;
   transitionSignal: RefObject<number>;
+  enabled?: boolean;
 }
 
-export function RetroCrtPass({ reducedMotion, transitionSignal }: RetroCrtPassProps) {
+export function RetroCrtPass({ reducedMotion, transitionSignal, enabled = true }: RetroCrtPassProps) {
+  if (!enabled) return null;
   const { gl, scene, camera, size } = useThree();
 
   const resources = useMemo(() => {

@@ -96,9 +96,26 @@ export const RetroGamingPage = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [gameToEdit, setGameToEdit] = useState<RetroGame | null>(null);
   const selectedCaseButtonRef = useRef<HTMLButtonElement>(null);
-  const [tunerParams, setTunerParams] = useState<StudioTunerParams>(
-    DEFAULT_STUDIO_TUNER_PARAMS,
-  );
+  const [tunerParams, setTunerParams] = useState<StudioTunerParams>(() => {
+    try {
+      const savedCrt = localStorage.getItem("checkpoint_retro_crt_enabled");
+      if (savedCrt !== null) {
+        return { ...DEFAULT_STUDIO_TUNER_PARAMS, crtEnabled: savedCrt === "true" };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_STUDIO_TUNER_PARAMS;
+  });
+
+  const handleTunerChange = useCallback((newParams: StudioTunerParams) => {
+    setTunerParams(newParams);
+    try {
+      localStorage.setItem("checkpoint_retro_crt_enabled", String(newParams.crtEnabled));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const transitionSignal = useRef(0);
   const transition = useRef(
@@ -433,21 +450,26 @@ export const RetroGamingPage = ({
                 <RetroCrtPass
                   reducedMotion={prefersReducedMotion}
                   transitionSignal={transitionSignal}
+                  enabled={tunerParams.crtEnabled}
                 />
               </Canvas>
             </Suspense>
           )}
         </div>
-        <div
-          data-testid="retro-crt-glass"
-          aria-hidden="true"
-          className="retro-crt-glass"
-        />
-        <div
-          data-testid="retro-crt-bezel"
-          aria-hidden="true"
-          className="retro-crt-bezel"
-        />
+        {tunerParams.crtEnabled && (
+          <>
+            <div
+              data-testid="retro-crt-glass"
+              aria-hidden="true"
+              className="retro-crt-glass"
+            />
+            <div
+              data-testid="retro-crt-bezel"
+              aria-hidden="true"
+              className="retro-crt-bezel"
+            />
+          </>
+        )}
 
         {isBooting && (
           <RetroBootScreen
@@ -460,8 +482,8 @@ export const RetroGamingPage = ({
         {/* Painel de Controles de Estúdio 3D (Luzes e Posição de Objetos) */}
         <RetroStudioTunerPanel
           params={tunerParams}
-          onChange={setTunerParams}
-          onReset={() => setTunerParams(DEFAULT_STUDIO_TUNER_PARAMS)}
+          onChange={handleTunerChange}
+          onReset={() => handleTunerChange(DEFAULT_STUDIO_TUNER_PARAMS)}
         />
 
         {/* Modais de Cadastro/Edição e Painel de Detalhes Retrô */}

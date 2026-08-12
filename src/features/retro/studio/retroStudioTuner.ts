@@ -1,4 +1,7 @@
 export interface StudioTunerParams {
+  // CRT Shader Pass
+  crtEnabled: boolean;
+
   // Lights
   ambientIntensity: number;
   dirLightX: number;
@@ -30,6 +33,9 @@ export interface StudioTunerParams {
 }
 
 export const DEFAULT_STUDIO_TUNER_PARAMS: StudioTunerParams = {
+  // CRT
+  crtEnabled: true,
+
   // Lights
   ambientIntensity: 1.1,
   dirLightX: 2.0,

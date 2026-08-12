@@ -113,6 +113,28 @@ export function RetroStudioTunerPanel({
       <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs scrollbar-thin">
         {activeTab === "lights" && (
           <>
+            <div className="flex items-center justify-between border border-white/15 bg-white/5 p-2.5 rounded-xs">
+              <div className="space-y-0.5">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-[#eee9dd]">
+                  📺 Efeito CRT (Scanlines)
+                </span>
+                <span className="block text-[8px] text-[#88837a]">
+                  {params.crtEnabled ? "Simulação Tubo 480i" : "Imagem HD Limpa"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onChange({ ...params, crtEnabled: !params.crtEnabled })}
+                className={`px-3 py-1.5 text-[10px] font-bold tracking-wider transition ${
+                  params.crtEnabled
+                    ? "bg-[#b52322] text-white shadow-[0_0_8px_rgba(181,35,34,0.5)]"
+                    : "bg-white/10 text-[#88837a] hover:text-white"
+                }`}
+              >
+                {params.crtEnabled ? "LIGADO" : "DESLIGADO"}
+              </button>
+            </div>
+            <hr className="border-white/10" />
             <SliderControl
               label="Luz Ambiente"
               value={params.ambientIntensity}
