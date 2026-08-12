@@ -31,15 +31,15 @@ export interface StudioTunerParams {
 
 export const DEFAULT_STUDIO_TUNER_PARAMS: StudioTunerParams = {
   // Lights
-  ambientIntensity: 0.85,
+  ambientIntensity: 1.1,
   dirLightX: 2.0,
   dirLightY: 5.0,
   dirLightZ: 4.0,
-  dirLightIntensity: 2.5,
+  dirLightIntensity: 3.2,
   consoleLightX: 0.0,
   consoleLightY: 2.5,
-  consoleLightZ: 3.0,
-  consoleLightIntensity: 5.0,
+  consoleLightZ: 3.5,
+  consoleLightIntensity: 6.5,
 
   // TV
   tvX: 0.1,
@@ -48,9 +48,9 @@ export const DEFAULT_STUDIO_TUNER_PARAMS: StudioTunerParams = {
 
   // Console
   consoleX: 0.15,
-  consoleY: -0.75,
-  consoleZ: 0.8,
-  consoleRotX: 0.38,
+  consoleY: -0.35,
+  consoleZ: 1.2,
+  consoleRotX: 0.42,
   consoleRotY: -0.32,
   consoleRotZ: 0.0,
 

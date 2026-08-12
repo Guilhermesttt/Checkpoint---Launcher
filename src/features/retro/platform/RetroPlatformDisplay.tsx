@@ -27,13 +27,13 @@ export function RetroPlatformDisplay({
   const tvZ = tunerParams?.tvZ ?? -0.6;
 
   const consoleX = tunerParams?.consoleX ?? 0.15;
-  const consoleY = tunerParams?.consoleY ?? -0.75;
-  const consoleZ = tunerParams?.consoleZ ?? 0.8;
+  const consoleY = tunerParams?.consoleY ?? -0.35;
+  const consoleZ = tunerParams?.consoleZ ?? 1.2;
 
   const lightX = tunerParams?.consoleLightX ?? 0.0;
   const lightY = tunerParams?.consoleLightY ?? 2.5;
-  const lightZ = tunerParams?.consoleLightZ ?? 3.0;
-  const lightIntensity = tunerParams?.consoleLightIntensity ?? 5.0;
+  const lightZ = tunerParams?.consoleLightZ ?? 3.5;
+  const lightIntensity = tunerParams?.consoleLightIntensity ?? 6.5;
 
   return (
     <group visible={visible}>
