@@ -2413,6 +2413,9 @@ registerSecureIpcHandler("retro:import-artwork", async (_event, imageUrl) =>
 registerSecureIpcHandler("retro:search-thegamesdb", async (_event, request) =>
   theGamesDb.searchGamesByName(request || {}));
 
+registerSecureIpcHandler("retro:thegamesdb-screenshots", async (_event, request) =>
+  theGamesDb.getGameScreenshots(request || {}));
+
 
 registerSecureIpcHandler("mods:select-game-directory", async (_event, gameTitle) =>
   selectModGameDirectory({

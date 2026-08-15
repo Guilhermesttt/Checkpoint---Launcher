@@ -49,27 +49,58 @@ const normalizeGame = (game, include = {}) => {
   };
 };
 
+const normalizeGameScreenshots = (payload, gameId) => {
+  const id = Number(gameId);
+  const base = payload?.data?.base_url?.original;
+  const imagesByGame = payload?.data?.images || {};
+  const entries = imagesByGame[id] || imagesByGame[String(id)] || [];
+
+  const screenshots = (Array.isArray(entries) ? entries : [])
+    .filter((image) => String(image?.type || "").toLowerCase() === "screenshot")
+    .map((image) => absoluteImageUrl(base, image.filename))
+    .filter(Boolean);
+
+  return { screenshots };
+};
+
 function createTheGamesDbClient({ apiKey, fetchImpl = globalThis.fetch } = {}) {
+  const requestJson = async (pathname, params = {}) => {
+    const key = String(apiKey || "").trim();
+    if (!key) throw new Error("Configure THEGAMESDB_API_KEY no arquivo .env e reinicie o launcher.");
+
+    const url = new URL(pathname, API_ROOT);
+    url.searchParams.set("apikey", key);
+    Object.entries(params).forEach(([paramKey, value]) => {
+      if (value !== undefined && value !== null) url.searchParams.set(paramKey, String(value));
+    });
+
+    const response = await fetchImpl(url.toString(), { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`TheGamesDB respondeu com erro ${response.status}.`);
+    return response.json();
+  };
+
   return {
     async searchGamesByName({ name }) {
-      const key = String(apiKey || "").trim();
-      if (!key) throw new Error("Configure THEGAMESDB_API_KEY no arquivo .env e reinicie o launcher.");
       const query = String(name || "").trim();
       if (query.length < 2) throw new Error("Digite pelo menos 2 caracteres do título.");
 
-      const url = new URL("/v1.1/Games/ByGameName", API_ROOT);
-      url.searchParams.set("apikey", key);
-      url.searchParams.set("name", query);
-      url.searchParams.set("mode", "natural");
-      url.searchParams.set("fields", "players,publishers,genres,overview,platform,rating");
-      url.searchParams.set("include", "boxart,platform");
-      const response = await fetchImpl(url.toString(), { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error(`TheGamesDB respondeu com erro ${response.status}.`);
-      const payload = await response.json();
+      const payload = await requestJson("/v1.1/Games/ByGameName", {
+        name: query,
+        mode: "natural",
+        fields: "players,publishers,genres,overview,platform,rating",
+        include: "boxart,platform",
+      });
       const games = Array.isArray(payload?.data?.games) ? payload.data.games : [];
       return games.map((game) => normalizeGame(game, payload.include || {})).filter((game) => game.id && game.title);
+    },
+
+    async getGameScreenshots({ gameId }) {
+      const id = Number(gameId);
+      if (!Number.isFinite(id) || id <= 0) throw new Error("ID de jogo TheGamesDB inválido.");
+      const payload = await requestJson("/v1/Games/Images", { games_id: id });
+      return normalizeGameScreenshots(payload, id);
     },
   };
 }
 
-module.exports = { createTheGamesDbClient, normalizeGame };
+module.exports = { createTheGamesDbClient, normalizeGame, normalizeGameScreenshots };

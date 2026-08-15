@@ -14,11 +14,14 @@ import { useControllerLed } from "./hooks/useControllerLed";
 import { TooltipProvider } from "./components/ui/tooltip";
 import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
 import WhatsNewModal from "./components/WhatsNewModal";
+import { TransitionOverlay } from "./components/TransitionOverlay";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
+import { useLauncherTransition } from "./hooks/useLauncherTransition";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
 
-import RetroGamingPage from "./pages/RetroGamingPage";
+const loadRetroGamingPage = () => import("./pages/RetroGamingPage");
+const RetroGamingPage = React.lazy(loadRetroGamingPage);
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
   ps5: () =>
@@ -51,9 +54,13 @@ const menuMusicGain: Record<SoundTheme, number> = {
   cyberpunk: 16,
 };
 
+const retroMenuMusicLoader = () =>
+  import("./sounds/Emotion Engine.mp3").then((module) => module.default);
+const RETRO_MENU_MUSIC_GAIN = 0.85;
+
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { musicVolume, soundTheme, lowPerformanceMode, launcherMode } = usePreferences();
+  const { musicVolume, soundTheme, lowPerformanceMode, launcherMode, retroMusicEnabled } = usePreferences();
   useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState<boolean | null>(null);
 
@@ -89,41 +96,19 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  const [mountedMode, setMountedMode] = React.useState(launcherMode);
-  const [transitionPhase, setTransitionPhase] = React.useState<"idle" | "collapsing" | "static">("idle");
-  const lastModeRef = React.useRef(launcherMode);
+  const [retroBootProgress, setRetroBootProgress] = React.useState(0);
+  const {
+    mountedMode,
+    phase: transitionPhase,
+    completeBoot,
+  } = useLauncherTransition({
+    requestedMode: launcherMode,
+    enabled: !loading && isIntroVisible === false,
+  });
 
   React.useEffect(() => {
-    if (loading || isIntroVisible !== false) {
-      setMountedMode(launcherMode);
-      lastModeRef.current = launcherMode;
-      return;
-    }
-
-    if (launcherMode === lastModeRef.current) return;
-
-    const targetMode = launcherMode;
-    lastModeRef.current = targetMode;
-
-    // Fase A: Esmagamento CRT (600ms)
-    setTransitionPhase("collapsing");
-
-    const collapseTimer = window.setTimeout(() => {
-      // Fase B: O Ponto Cego (Mudar o estado sob estática/chiado - 800ms)
-      setTransitionPhase("static");
-      setMountedMode(targetMode);
-
-      const staticTimer = window.setTimeout(() => {
-        // Fase C: Fim da Transição e Boot Reveal
-        setTransitionPhase("idle");
-      }, 800);
-
-      return () => window.clearTimeout(staticTimer);
-    }, 600);
-
-    return () => {
-      window.clearTimeout(collapseTimer);
-    };
+    if (launcherMode !== "retro" || loading || isIntroVisible !== false) return;
+    void loadRetroGamingPage();
   }, [launcherMode, loading, isIntroVisible]);
 
   const clearMusicFade = React.useCallback(() => {
@@ -155,9 +140,19 @@ const AppContent: React.FC = () => {
     [clearMusicFade],
   );
 
-  const ensureMusicSource = React.useCallback(async (theme: SoundTheme) => {
-    const loader = menuMusicLoaders[theme] ?? menuMusicLoaders.ps5;
-    const musicSrc = await loader();
+  const resolveActiveMusic = React.useCallback(async () => {
+    if (launcherMode === "retro") {
+      if (!retroMusicEnabled) return { src: null as string | null, gain: 1 };
+      const src = await retroMenuMusicLoader();
+      return { src, gain: RETRO_MENU_MUSIC_GAIN };
+    }
+    const loader = menuMusicLoaders[soundTheme] ?? menuMusicLoaders.ps5;
+    const src = await loader();
+    return { src, gain: menuMusicGain[soundTheme] ?? 1 };
+  }, [launcherMode, retroMusicEnabled, soundTheme]);
+
+  const ensureMusicSource = React.useCallback(async () => {
+    const { src: musicSrc, gain } = await resolveActiveMusic();
 
     if (!musicSrc) {
       musicRef.current?.pause();
@@ -190,11 +185,11 @@ const AppContent: React.FC = () => {
     }
 
     if (musicGainRef.current) {
-      musicGainRef.current.gain.value = menuMusicGain[theme] ?? 1;
+      musicGainRef.current.gain.value = gain;
     }
 
     return audio;
-  }, []);
+  }, [resolveActiveMusic]);
 
   const startBackgroundMusic = React.useCallback(async () => {
     if (spotifyPlayingRef.current) return;
@@ -203,7 +198,7 @@ const AppContent: React.FC = () => {
       pendingMusicStartRef.current = true;
       return;
     }
-    const audio = await ensureMusicSource(soundTheme);
+    const audio = await ensureMusicSource();
     if (!audio) return;
     if (spotifyPlayingRef.current) return;
 
@@ -223,7 +218,49 @@ const AppContent: React.FC = () => {
       .catch(() => {
         pendingMusicStartRef.current = true;
       });
-  }, [ensureMusicSource, fadeMusicTo, musicVolume, soundTheme, lowPerformanceMode]);
+  }, [ensureMusicSource, fadeMusicTo, musicVolume, lowPerformanceMode]);
+
+  const activeMusicSignature = `${launcherMode}:${retroMusicEnabled}:${soundTheme}`;
+
+  React.useEffect(() => {
+    const audio = musicRef.current;
+    const wasPlaying = Boolean(audio && !audio.paused);
+    const transitionId = ++musicTransitionRef.current;
+
+    const changeMusicSource = () => {
+      if (transitionId !== musicTransitionRef.current) return;
+
+      void ensureMusicSource().then((resolvedAudio) => {
+        if (!resolvedAudio) {
+          musicRef.current?.pause();
+          loadedMusicSrcRef.current = null;
+          return;
+        }
+        if (transitionId !== musicTransitionRef.current) return;
+        if (!wasPlaying) return;
+
+        resolvedAudio.volume = 0;
+        resolvedAudio.play().then(() => {
+          if (transitionId !== musicTransitionRef.current) return;
+          fadeMusicTo(musicVolumeRef.current / 100, 900);
+        }).catch(() => {
+          pendingMusicStartRef.current = true;
+        });
+      });
+    };
+
+    if (wasPlaying) {
+      fadeMusicTo(0, 650, changeMusicSource);
+    } else {
+      changeMusicSource();
+    }
+
+    return () => {
+      if (musicTransitionRef.current === transitionId) {
+        musicTransitionRef.current += 1;
+      }
+    };
+  }, [activeMusicSignature, ensureMusicSource, fadeMusicTo]);
 
   const stopBackgroundMusic = React.useCallback(() => {
     const audio = musicRef.current;
@@ -321,41 +358,6 @@ const AppContent: React.FC = () => {
     fadeMusicTo(musicVolume / 100, 450);
   }, [fadeMusicTo, musicVolume]);
 
-  React.useEffect(() => {
-    const audio = musicRef.current;
-    const wasPlaying = Boolean(audio && !audio.paused);
-    const transitionId = ++musicTransitionRef.current;
-
-    const changeMusicSource = () => {
-      if (transitionId !== musicTransitionRef.current) return;
-
-      void ensureMusicSource(soundTheme).then((resolvedAudio) => {
-        if (!resolvedAudio || transitionId !== musicTransitionRef.current) return;
-        if (!wasPlaying) return;
-
-        resolvedAudio.volume = 0;
-        resolvedAudio.play().then(() => {
-          if (transitionId !== musicTransitionRef.current) return;
-          fadeMusicTo(musicVolumeRef.current / 100, 900);
-        }).catch(() => {
-          pendingMusicStartRef.current = true;
-        });
-      });
-    };
-
-    if (wasPlaying) {
-      fadeMusicTo(0, 650, changeMusicSource);
-    } else {
-      changeMusicSource();
-    }
-
-    return () => {
-      if (musicTransitionRef.current === transitionId) {
-        musicTransitionRef.current += 1;
-      }
-    };
-  }, [ensureMusicSource, fadeMusicTo, soundTheme]);
-
   React.useEffect(
     () => () => {
       clearMusicFade();
@@ -418,13 +420,28 @@ const AppContent: React.FC = () => {
             />
           </AnimatePresence>
         ) : (
-          <>
+          <TransitionOverlay
+            phase={transitionPhase}
+            bootProgress={retroBootProgress}
+          >
             {mountedMode === "retro" ? (
-              <div className={`absolute inset-0 z-50 bg-black ${transitionPhase === "collapsing" ? "crt-collapse-active" : ""}`}>
-                <RetroGamingPage />
+              <div className="absolute inset-0 z-50 bg-black">
+                <React.Suspense
+                  fallback={
+                    <div
+                      className="retro-route-loading"
+                      aria-label="Preparando sistema retro"
+                    />
+                  }
+                >
+                  <RetroGamingPage
+                    onBootReady={completeBoot}
+                    onBootProgress={setRetroBootProgress}
+                  />
+                </React.Suspense>
               </div>
             ) : (
-              <div className={`absolute inset-0 ${transitionPhase === "collapsing" ? "crt-collapse-active" : ""}`}>
+              <div className="absolute inset-0">
                 {!lowPerformanceMode && <MainVideoBackground />}
                 <Home />
                 <GamepadStatusOverlay />
@@ -434,14 +451,7 @@ const AppContent: React.FC = () => {
                 )}
               </div>
             )}
-
-            {transitionPhase === "static" && (
-              <>
-                <div className="crt-static-background" />
-                <div className="crt-static-overlay" />
-              </>
-            )}
-          </>
+          </TransitionOverlay>
         )}
       </div>
     </MotionConfig>

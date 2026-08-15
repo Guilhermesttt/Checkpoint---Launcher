@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveRetroPlatform } from "../src/features/retro/platform/retroPlatformRegistry";
+import {
+  isRetroPlatformPreTextured,
+  resolveRetroPlatform,
+} from "../src/features/retro/platform/retroPlatformRegistry";
 
 describe("retro platform registry", () => {
   it.each([
@@ -11,6 +14,7 @@ describe("retro platform registry", () => {
     ["Super Nintendo", "snes"],
     ["Super NES", "snes"],
     ["Nintendo Entertainment System", "nes"],
+    ["Game Boy Advance", "gba"],
   ] as const)("resolves %s as %s", (consoleName, key) => {
     expect(resolveRetroPlatform(consoleName)?.key).toBe(key);
   });
@@ -25,11 +29,28 @@ describe("retro platform registry", () => {
     ["PS2", "ps2+tv.glb"],
     ["SNES", "super_yes.glb"],
     ["NES", "nes_console_and_controller.glb"],
-  ] as const)("uses the approved %s hardware model", (consoleName, modelFileName) => {
+  ] as const)("uses the available %s hardware model", (consoleName, modelFileName) => {
     const platform = resolveRetroPlatform(consoleName);
     expect(platform?.modelUrl).toContain(modelFileName);
-    if (consoleName === "PS2") {
-      expect(platform?.textureSourceUrl).toContain("sony_playstation_2.glb");
-    }
+  });
+
+  it("marks user-authored GLBs as pre-textured", () => {
+    expect(isRetroPlatformPreTextured("ps2")).toBe(true);
+    expect(isRetroPlatformPreTextured("snes")).toBe(true);
+    expect(isRetroPlatformPreTextured("nes")).toBe(true);
+    expect(isRetroPlatformPreTextured("gba")).toBe(true);
+    expect(isRetroPlatformPreTextured("ps1")).toBe(true);
+  });
+
+  it("uses combined pre-textured models without a separate TV GLB", () => {
+    expect(resolveRetroPlatform("SNES")?.tvModelUrl).toBeUndefined();
+    expect(resolveRetroPlatform("NES")?.tvModelUrl).toBeUndefined();
+    expect(resolveRetroPlatform("PS2")?.tvModelUrl).toBeUndefined();
+  });
+
+  it("composes the GBA console and cartridge accessory", () => {
+    const gba = resolveRetroPlatform("GBA");
+    expect(gba?.modelUrl).toContain("GBA.glb");
+    expect(gba?.accessoryModelUrl).toContain("gba_cartidge.glb");
   });
 });

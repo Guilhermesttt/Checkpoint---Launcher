@@ -22,6 +22,7 @@ export interface RetroAchievementsGameMatch {
   consoleId: number;
   consoleName: string;
   imageUrl?: string;
+  logoUrl?: string;
   achievementCount: number;
   points: number;
 }
@@ -46,6 +47,8 @@ export interface RetroAchievementsProgress {
     title: string;
     consoleName: string;
     imageUrl?: string;
+    logoUrl?: string;
+    boxArtUrl?: string;
   };
   summary: {
     total: number;

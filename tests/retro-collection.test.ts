@@ -5,6 +5,7 @@ import {
   getCircularOffset,
   getSelectionAtFilterChange,
   getWrappedIndex,
+  matchesRetroConsoleFilter,
   RETRO_COLLECTION,
 } from "../src/features/retro/shelf/retroCollection";
 
@@ -27,15 +28,31 @@ const games = [
     publisher: "TEST",
     accent: "#ef4444",
   },
+  {
+    id: "c",
+    title: "C",
+    subtitle: "",
+    year: 1990,
+    console: "SNES",
+    publisher: "TEST",
+    accent: "#ef4444",
+  },
 ];
 
 describe("retro collection behavior", () => {
-  it("filters a decade using an inclusive start and exclusive end", () => {
-    expect(filterRetroGames(games, "1990s").map((game) => game.id)).toEqual(["a"]);
+  it("filters games by console family", () => {
+    expect(filterRetroGames(games, "PS1").map((game) => game.id)).toEqual(["a"]);
+    expect(filterRetroGames(games, "PS2").map((game) => game.id)).toEqual(["b"]);
+    expect(filterRetroGames(games, "SNES").map((game) => game.id)).toEqual(["c"]);
   });
 
-  it("returns an empty collection for a decade without games", () => {
-    expect(filterRetroGames(games, "1980s")).toEqual([]);
+  it("returns an empty collection for a console without games", () => {
+    expect(filterRetroGames(games, "GBA")).toEqual([]);
+  });
+
+  it("treats generic PlayStation as PS1 but not PS2", () => {
+    expect(matchesRetroConsoleFilter("PlayStation", "PS1")).toBe(true);
+    expect(matchesRetroConsoleFilter("PlayStation 2", "PS1")).toBe(false);
   });
 
   it("wraps previous and next selection at both boundaries", () => {
@@ -48,7 +65,7 @@ describe("retro collection behavior", () => {
   });
 
   it("resets filter selection to the first matching game", () => {
-    expect(getSelectionAtFilterChange(games, "2000s")).toEqual({
+    expect(getSelectionAtFilterChange(games, "PS2")).toEqual({
       games: [games[1]],
       selectedIndex: 0,
     });

@@ -11,6 +11,24 @@ export type LauncherType =
   | "rockstar"
   | "itch";
 
+export interface RetroGame {
+  id: string;
+  title: string;
+  subtitle?: string;
+  year?: number;
+  console: string;
+  publisher?: string;
+  accent?: string;
+  coverImage?: string;
+  backImage?: string;
+  wrapImage?: string;
+  artworkImages?: string[];
+  executablePath?: string;
+  description?: string;
+  retroAchievementsGameId?: number;
+  theGamesDbId?: number;
+}
+
 export interface GameLaunchProfile {
   arguments?: string;
   workingDirectory?: string;

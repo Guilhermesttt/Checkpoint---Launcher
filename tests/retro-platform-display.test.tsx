@@ -6,21 +6,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RetroGame } from "../src/features/retro/shelf/retroCollection";
 import { RetroPlatformDisplay } from "../src/features/retro/platform/RetroPlatformDisplay";
 
-vi.mock("../src/features/retro/platform/RetroTvScreen", () => ({
-  RetroTvScreen: ({ artworkUrl }: { artworkUrl?: string }) => (
-    <div data-testid="retro-pvm-television" data-artwork={artworkUrl} />
-  ),
+vi.mock("../src/features/retro/platform/useRetroTvArtworkUrl", () => ({
+  useRetroTvArtworkUrl: (
+    game: RetroGame | undefined,
+    layoutView: string = "jogos",
+  ) => {
+    if (layoutView === "jogos") return undefined;
+    if (layoutView === "details") return "tgdb-screenshot.jpg";
+    return game?.coverImage ?? game?.wrapImage;
+  },
+  useRetroGameArtworkUrl: (game: RetroGame | undefined) =>
+    game?.coverImage ?? game?.wrapImage,
 }));
 
-vi.mock("../src/features/retro/platform/RetroPvmTelevision", () => ({
-  RetroPvmTelevision: ({ artworkUrl }: { artworkUrl?: string }) => (
-    <div data-testid="retro-pvm-television" data-artwork={artworkUrl} />
-  ),
-}));
-
-vi.mock("../src/features/retro/platform/RetroPlatformHardware", () => ({
-  RetroPlatformHardware: ({ consoleName }: { consoleName: string }) => (
-    <div data-testid="retro-platform-hardware" data-console={consoleName} />
+vi.mock("../src/features/retro/platform/RetroDynamicPlatformTvScene", () => ({
+  RetroDynamicPlatformTvScene: ({
+    consoleName,
+    artworkUrl,
+  }: {
+    consoleName?: string;
+    artworkUrl?: string;
+  }) => (
+    <div
+      data-testid="retro-dynamic-platform-scene"
+      data-console={consoleName}
+      data-artwork={artworkUrl}
+    />
   ),
 }));
 
@@ -54,36 +65,50 @@ afterEach(() => {
 });
 
 describe("RetroPlatformDisplay", () => {
-  it("composes the shared television, selected platform hardware, and screen light", () => {
+  it("uses PS2 boot video on the Jogos view without TGDB artwork", () => {
     render(<RetroPlatformDisplay game={game} visible reducedMotion={false} />);
 
-    expect(screen.getByTestId("retro-pvm-television")).toHaveAttribute(
+    expect(screen.getByTestId("retro-dynamic-platform-scene")).not.toHaveAttribute(
       "data-artwork",
-      "cover.jpg",
     );
-    expect(screen.getByTestId("retro-platform-hardware")).toHaveAttribute(
+    expect(screen.getByTestId("retro-dynamic-platform-scene")).toHaveAttribute(
       "data-console",
       "PS2",
     );
-    expect(screen.getByTestId("retro-tv-bloom-light")).toBeInTheDocument();
+    expect(document.querySelector('[name="retro-tv-bloom-light"]')).toBeTruthy();
   });
 
-  it("falls back to wrap artwork when the game has no front cover", () => {
+  it("keeps non-PS2 consoles on standby artwork in Jogos view", () => {
     render(
       <RetroPlatformDisplay
-        game={{ ...game, coverImage: undefined }}
+        game={{ ...game, console: "NES" }}
         visible
         reducedMotion={false}
       />,
     );
 
-    expect(screen.getByTestId("retro-pvm-television")).toHaveAttribute(
+    expect(screen.getByTestId("retro-dynamic-platform-scene")).not.toHaveAttribute(
       "data-artwork",
-      "wrap.jpg",
     );
   });
 
-  it("keeps the television and omits incorrect hardware for unsupported consoles", () => {
+  it("uses TGDB artwork on the PS2 details view", () => {
+    render(
+      <RetroPlatformDisplay
+        game={{ ...game, coverImage: undefined }}
+        visible
+        reducedMotion={false}
+        layoutView="details"
+      />,
+    );
+
+    expect(screen.getByTestId("retro-dynamic-platform-scene")).toHaveAttribute(
+      "data-artwork",
+      "tgdb-screenshot.jpg",
+    );
+  });
+
+  it("renders the fallback mesh for unsupported consoles", () => {
     render(
       <RetroPlatformDisplay
         game={{ ...game, console: "SWITCH" }}
@@ -92,7 +117,7 @@ describe("RetroPlatformDisplay", () => {
       />,
     );
 
-    expect(screen.getByTestId("retro-pvm-television")).toBeInTheDocument();
-    expect(screen.queryByTestId("retro-platform-hardware")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("retro-dynamic-platform-scene")).not.toBeInTheDocument();
+    expect(document.querySelector('[name="retro-tv-bloom-light"]')).toBeTruthy();
   });
 });

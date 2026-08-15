@@ -11,6 +11,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { createClient } from "@supabase/supabase-js";
 import { createRetroAchievementsRouter } from "./retroachievements.mjs";
+import { createTheGamesDbRouter } from "./thegamesdb.mjs";
 import { fileURLToPath } from "url";
 import { getGamingNews } from "./gaming-news.mjs";
 
@@ -1098,6 +1099,15 @@ app.use(
       return data;
     },
     saveProfile: updateLinkedAccountProfile,
+  }),
+);
+
+app.use(
+  "/api/thegamesdb",
+  steamPrivateLimiter,
+  createTheGamesDbRouter({
+    apiKey: process.env.THEGAMESDB_API_KEY,
+    fetchImpl: fetch,
   }),
 );
 

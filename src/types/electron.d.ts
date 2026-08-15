@@ -23,6 +23,7 @@ declare global {
         backImage?: string;
         images: string[];
       }>>;
+      getTheGamesDbScreenshots: (request: { gameId: number }) => Promise<{ screenshots: string[] }>;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
       loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;

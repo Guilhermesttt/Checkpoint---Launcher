@@ -4,7 +4,22 @@ import path from "node:path";
 
 export default defineConfig({
   assetsInclude: ["**/*.glb"],
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "vitest-glb-stub",
+      enforce: "pre",
+      resolveId(source) {
+        if (source.endsWith(".glb")) return `\0vitest-glb:${source}`;
+      },
+      load(id) {
+        if (!id.startsWith("\0vitest-glb:")) return;
+        const source = id.slice("\0vitest-glb:".length);
+        const fileName = path.basename(source);
+        return `export default ${JSON.stringify(`/mock/${fileName}`)};`;
+      },
+    },
+  ],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },

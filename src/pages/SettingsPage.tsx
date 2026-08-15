@@ -31,7 +31,6 @@ import { supabase } from "../services/supabase";
 import { saveProfileVisibility } from "../services/profilePrivacy";
 import type { SettingsTab } from "../services/launcherNavigation";
 import type { ProfileVisibility } from "../types/domain";
-import { RetroAchievementsSettingsCard } from "../features/retro/components/RetroAchievementsSettingsCard";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -77,6 +76,25 @@ const SETTINGS_DETAIL_COPY = {
   "de-DE": { moreThemes: "Weitere Themes", comingSoon: "Neue Pakete folgen bald", audioTitle: "Soundeffekte und Audio", audioHint: "Passe Navigation, Musik und Hinweislautstärke an.", performanceTitle: "Leistungsmodus", performanceHint: "Reduziert Animationen und Unschärfe auf älteren PCs.", playerProfile: "Spielerprofil", playerProfileHint: "Informationen deines cloud-synchronisierten Kontos.", playerFallback: "Checkpoint-Spieler", noEmail: "Keine E-Mail verknüpft", activeAccount: "Aktives Konto", security: "Kontosicherheit", securityHint: "Verwalte Passwort und Wiederherstellungsoptionen.", resetPassword: "Passwort zurücksetzen", resetPasswordHint: "Sendet eine Sicherheits-E-Mail zum Ändern des Passworts.", emailSent: "E-Mail gesendet!", sending: "Wird gesendet...", sendEmail: "E-Mail senden", overlayLab: "Overlay-Labor", overlayLabHint: "Vorschau der Overlays während des Spielens.", testWelcome: "Willkommen testen", testWelcomeHint: "Zeigt die Social-Karte beim Spielstart.", testAchievement: "Erfolg testen", testAchievementHint: "Zeigt die vollständige Erfolgsbenachrichtigung." },
   "it-IT": { moreThemes: "Altri temi", comingSoon: "Nuovi pacchetti in arrivo", audioTitle: "Effetti sonori e audio", audioHint: "Regola il volume di navigazione, musica e avvisi.", performanceTitle: "Modalità prestazioni", performanceHint: "Riduce animazioni e sfocatura sui computer più datati.", playerProfile: "Profilo giocatore", playerProfileHint: "Informazioni dell'account sincronizzato nel cloud.", playerFallback: "Giocatore Checkpoint", noEmail: "Nessuna e-mail collegata", activeAccount: "Account attivo", security: "Sicurezza account", securityHint: "Gestisci password e opzioni di recupero.", resetPassword: "Reimposta password", resetPasswordHint: "Invia un'e-mail di sicurezza per modificare la password.", emailSent: "E-mail inviata!", sending: "Invio...", sendEmail: "Invia e-mail", overlayLab: "Laboratorio overlay", overlayLabHint: "Anteprima degli overlay durante il gioco.", testWelcome: "Prova benvenuto", testWelcomeHint: "Mostra la scheda social all'avvio di un gioco.", testAchievement: "Prova obiettivo", testAchievementHint: "Mostra la notifica completa dell'obiettivo." },
 } as const;
+
+const RetroAchievementsSettingsCard: React.FC<{
+  username?: string;
+  connected?: boolean;
+  busy?: boolean;
+  error?: string;
+  onConnect?: (username: string) => Promise<void>;
+  onDisconnect?: () => Promise<void>;
+}> = () => {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+      <div>
+        <h4 className="text-sm font-semibold text-white">RetroAchievements</h4>
+        <p className="text-xs text-white/50">Integre conquistas retrô à sua conta.</p>
+      </div>
+      <span className="text-xs font-mono text-purple-400">Em Breve</span>
+    </article>
+  );
+};
 
 const ACHIEVEMENT_NOTIFICATION_COPY = {
   "pt-BR": {

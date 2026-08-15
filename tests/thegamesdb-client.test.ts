@@ -44,4 +44,30 @@ describe("TheGamesDB client", () => {
     const client = createTheGamesDbClient({ apiKey: "", fetchImpl: vi.fn() });
     await expect(client.searchGamesByName({ name: "Crash" })).rejects.toThrow("THEGAMESDB_API_KEY");
   });
+
+  it("returns screenshot URLs from the Games/Images endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          base_url: { original: "https://cdn.thegamesdb.net/images/original/" },
+          images: {
+            53145: [
+              { type: "screenshot", filename: "screenshot/53145-1.jpg" },
+              { type: "boxart", filename: "boxart/front/53145-1.jpg" },
+            ],
+          },
+        },
+      }),
+    });
+
+    const client = createTheGamesDbClient({ apiKey: "test-key", fetchImpl });
+    const result = await client.getGameScreenshots({ gameId: 53145 });
+
+    expect(result.screenshots).toEqual([
+      "https://cdn.thegamesdb.net/images/original/screenshot/53145-1.jpg",
+    ]);
+    expect(fetchImpl.mock.calls[0][0]).toContain("/v1/Games/Images");
+    expect(fetchImpl.mock.calls[0][0]).toContain("games_id=53145");
+  });
 });

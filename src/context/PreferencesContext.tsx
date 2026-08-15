@@ -54,6 +54,12 @@ interface PreferencesContextValue {
   setRestoreLastScreen: (value: boolean) => void;
   confirmBeforeExit: boolean;
   setConfirmBeforeExit: (value: boolean) => void;
+  retroMusicEnabled: boolean;
+  setRetroMusicEnabled: (value: boolean) => void;
+  retroCrtEnabled: boolean;
+  setRetroCrtEnabled: (value: boolean) => void;
+  retroReducedMotion: boolean;
+  setRetroReducedMotion: (value: boolean) => void;
   preferencesHydrated: boolean;
   t: (key: TranslationKey) => string;
 }
@@ -873,6 +879,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true);
   const [restoreLastScreen, setRestoreLastScreen] = useState(false);
   const [confirmBeforeExit, setConfirmBeforeExit] = useState(true);
+  const [retroMusicEnabled, setRetroMusicEnabled] = useState(true);
+  const [retroCrtEnabled, setRetroCrtEnabled] = useState(true);
+  const [retroReducedMotion, setRetroReducedMotion] = useState(false);
   const [hydratedPreferencesUid, setHydratedPreferencesUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -903,6 +912,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedMinimizeToTray = readPreference(user.uid, "minimize_to_tray");
     const savedRestoreLastScreen = readPreference(user.uid, "restore_last_screen");
     const savedConfirmBeforeExit = readPreference(user.uid, "confirm_before_exit");
+    const savedRetroMusicEnabled = readPreference(user.uid, "retro_music_enabled");
+    const savedRetroCrtEnabled = readPreference(user.uid, "retro_crt_enabled");
+    const savedRetroReducedMotion = readPreference(user.uid, "retro_reduced_motion");
     const savedAchievementNotifications = readPreference(user.uid, "achievement_notifications");
     const savedCustomAchievementNotifications = readPreference(user.uid, "custom_achievement_notifications");
     const savedAchievementNotificationPosition = readPreference(user.uid, "achievement_notification_position");
@@ -936,6 +948,9 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedMinimizeToTray !== null) setMinimizeToTrayOnClose(savedMinimizeToTray === "true");
     if (savedRestoreLastScreen !== null) setRestoreLastScreen(savedRestoreLastScreen === "true");
     if (savedConfirmBeforeExit !== null) setConfirmBeforeExit(savedConfirmBeforeExit === "true");
+    if (savedRetroMusicEnabled !== null) setRetroMusicEnabled(savedRetroMusicEnabled === "true");
+    if (savedRetroCrtEnabled !== null) setRetroCrtEnabled(savedRetroCrtEnabled === "true");
+    if (savedRetroReducedMotion !== null) setRetroReducedMotion(savedRetroReducedMotion === "true");
     if (savedAchievementNotifications !== null) {
       setAchievementNotificationsEnabled(savedAchievementNotifications === "true");
     }
@@ -1006,7 +1021,10 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     writePreference(user.uid, "achievement_notifications", String(achievementNotificationsEnabled));
     writePreference(user.uid, "custom_achievement_notifications", String(customAchievementNotifications));
     writePreference(user.uid, "achievement_notification_position", achievementNotificationPosition);
-  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme]);
+    writePreference(user.uid, "retro_music_enabled", String(retroMusicEnabled));
+    writePreference(user.uid, "retro_crt_enabled", String(retroCrtEnabled));
+    writePreference(user.uid, "retro_reduced_motion", String(retroReducedMotion));
+  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, retroCrtEnabled, retroMusicEnabled, retroReducedMotion, soundTheme, user?.uid, visualTheme]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -1089,6 +1107,12 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setRestoreLastScreen,
       confirmBeforeExit,
       setConfirmBeforeExit,
+      retroMusicEnabled,
+      setRetroMusicEnabled,
+      retroCrtEnabled,
+      setRetroCrtEnabled,
+      retroReducedMotion,
+      setRetroReducedMotion,
       preferencesHydrated: hydratedPreferencesUid === user?.uid,
       t: (key) => {
         if (language === "pt-BR" || language === "en-US" || language === "es-ES") {
@@ -1101,7 +1125,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       },
     }),
-    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme],
+    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, retroCrtEnabled, retroMusicEnabled, retroReducedMotion, soundTheme, user?.uid, visualTheme],
   );
 
   return (

@@ -102,6 +102,65 @@ describe("RetroBootScreen", () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
+  it("reports the real Three.js loading progress to the global transition", () => {
+    vi.useFakeTimers();
+    progressState.active = true;
+    progressState.progress = 64;
+    progressState.loaded = 3;
+    progressState.total = 5;
+    const onProgressChange = vi.fn();
+
+    render(
+      <RetroBootScreen
+        minimumDuration={900}
+        onReady={vi.fn()}
+        onProgressChange={onProgressChange}
+      />,
+    );
+
+    expect(onProgressChange).toHaveBeenLastCalledWith(64);
+    act(() => vi.advanceTimersByTime(250));
+    expect(onProgressChange).toHaveBeenLastCalledWith(64);
+    expect(screen.getByRole("progressbar")).not.toHaveAttribute(
+      "aria-valuenow",
+      "64",
+    );
+  });
+
+  it("waits for the first prerendered library frame after assets reach 100%", () => {
+    vi.useFakeTimers();
+    const onReady = vi.fn();
+    const onAssetsReady = vi.fn();
+    const { rerender } = render(
+      <RetroBootScreen
+        minimumDuration={500}
+        exitDuration={300}
+        sceneReady={false}
+        onAssetsReady={onAssetsReady}
+        onReady={onReady}
+      />,
+    );
+
+    act(() => vi.advanceTimersByTime(500));
+    expect(onAssetsReady).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(300));
+    expect(onReady).not.toHaveBeenCalled();
+
+    rerender(
+      <RetroBootScreen
+        minimumDuration={500}
+        exitDuration={300}
+        sceneReady
+        onAssetsReady={onAssetsReady}
+        onReady={onReady}
+      />,
+    );
+    act(() => vi.advanceTimersByTime(50));
+    act(() => vi.advanceTimersByTime(300));
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the supplied CRT splash design tokens and local STIX font", () => {
     const css = readFileSync("src/index.css", "utf8");
     const entry = readFileSync("src/main.tsx", "utf8");

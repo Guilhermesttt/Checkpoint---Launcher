@@ -180,6 +180,8 @@ export const normalizeRetroAchievementsProgress = (payload) => {
       title: String(read(payload, "Title", "title") ?? "Jogo retrô").trim(),
       consoleName: String(read(payload, "ConsoleName", "consoleName") ?? "").trim(),
       imageUrl: mediaUrl(read(payload, "ImageIcon", "imageIcon")),
+      logoUrl: mediaUrl(read(payload, "ImageTitle", "imageTitle")),
+      boxArtUrl: mediaUrl(read(payload, "ImageBoxArt", "imageBoxArt")),
     },
     summary: {
       total,
@@ -214,6 +216,7 @@ const normalizeGameMatch = (game) => ({
   consoleId: safeNumber(read(game, "ConsoleID", "consoleId")),
   consoleName: String(read(game, "ConsoleName", "consoleName") ?? "").trim(),
   imageUrl: mediaUrl(read(game, "ImageIcon", "imageIcon")),
+  logoUrl: mediaUrl(read(game, "ImageTitle", "imageTitle")),
   achievementCount: Math.max(
     0,
     safeNumber(read(game, "NumAchievements", "numAchievements")),
@@ -262,7 +265,13 @@ export const createRetroAchievementsRouter = ({
       const response = await fetchImpl(url.toString(), {
         headers: { Accept: "application/json" },
       });
-      if (!response?.ok) throw fail("RA_UPSTREAM_UNAVAILABLE");
+      if (!response?.ok) {
+        if (response.status === 404) throw fail("RA_INVALID_USERNAME");
+        if (response.status === 401 || response.status === 403) {
+          throw fail("RA_NOT_CONFIGURED");
+        }
+        throw fail("RA_UPSTREAM_UNAVAILABLE");
+      }
       try {
         return await response.json();
       } catch {
@@ -297,8 +306,11 @@ export const createRetroAchievementsRouter = ({
     const ulid = String(
       profile?.retroachievements_ulid ?? profile?.retroAchievementsUlid ?? "",
     ).trim().toUpperCase();
+    const username = String(
+      profile?.retroachievements_username ?? profile?.retroAchievementsUsername ?? "",
+    ).trim();
     if (!/^[0-9A-HJKMNP-TV-Z]{26}$/.test(ulid)) throw fail("RA_NOT_LINKED");
-    return { ...profile, retroachievements_ulid: ulid };
+    return { ...profile, retroachievements_ulid: ulid, retroachievements_username: username };
   };
 
   const handleError = (error, res) => {
@@ -379,8 +391,10 @@ export const createRetroAchievementsRouter = ({
       }
 
       try {
+        const userRef =
+          profile.retroachievements_username || profile.retroachievements_ulid;
         const payload = await requestJson("API_GetGameInfoAndUserProgress.php", {
-          u: profile.retroachievements_ulid,
+          u: userRef,
           g: gameId,
           a: 1,
         });

@@ -15,6 +15,11 @@ vi.mock("@react-three/fiber", async () => {
   const React = await import("react");
 
   return {
+    useFrame: (callback: () => void) => {
+      React.useEffect(() => {
+        callback();
+      }, [callback]);
+    },
     Canvas: ({ children, onCreated }: {
       children?: ReactNode;
       onCreated?: (state: { gl: { domElement: HTMLCanvasElement } }) => void;
@@ -86,7 +91,12 @@ vi.mock("../src/features/retro/crt/RetroCrtPass", () => ({
 }));
 
 vi.mock("../src/features/retro/shelf/RetroShelf", () => ({
-  RetroShelf: () => null,
+  RetroShelf: ({ revealed }: { revealed: boolean }) => (
+    <div
+      data-testid="retro-shelf-preload"
+      data-revealed={String(revealed)}
+    />
+  ),
 }));
 
 vi.mock("../src/features/retro/ps2/RetroPs2ConsoleDisplay", () => ({
@@ -168,7 +178,7 @@ describe("RetroGamingPage semantic interface", () => {
   it("filters the semantic game list and resets selection", () => {
     render(<RetroGamingPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Filtrar anos 1990" }));
+    fireEvent.click(screen.getByRole("button", { name: "Filtrar console PS1" }));
     act(() => vi.advanceTimersByTime(240));
 
     expect(screen.getByRole("status")).toHaveTextContent("Castlevania");
@@ -249,17 +259,32 @@ describe("RetroGamingPage semantic interface", () => {
   });
 
   it("preloads the retro library behind a CRT boot screen when the mode opens", () => {
-    render(<RetroGamingPage />);
+    const onBootReady = vi.fn();
+    const onBootProgress = vi.fn();
+    render(
+      <RetroGamingPage
+        onBootReady={onBootReady}
+        onBootProgress={onBootProgress}
+      />,
+    );
+
+    expect(screen.getByTestId("retro-shelf-preload")).toHaveAttribute(
+      "data-revealed",
+      "false",
+    );
 
     expect(screen.getByRole("region", { name: "Inicializando modo retrô" }))
       .toBeInTheDocument();
 
     act(() => vi.advanceTimersByTime(3500));
+    act(() => vi.advanceTimersByTime(50));
     act(() => vi.advanceTimersByTime(620));
 
     expect(screen.queryByRole("region", { name: "Inicializando modo retrô" }))
       .not.toBeInTheDocument();
     expect(screen.getByTestId("retro-crt-screen")).toBeInTheDocument();
+    expect(onBootProgress).toHaveBeenCalledWith(100);
+    expect(onBootReady).toHaveBeenCalledTimes(1);
   });
 
   it("returns from details before leaving the retro page", () => {

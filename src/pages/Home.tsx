@@ -1863,21 +1863,21 @@ const Home: React.FC = () => {
               SteamIcon={SteamBrandIcon}
               DiscordIcon={DiscordBrandIcon}
               EpicIcon={EpicBrandIcon}
-              onLanguageChange={(next) => {
+              onLanguageChange={(next: any) => {
                 setLauncherLanguage(next);
                 playSound("select");
               }}
-              onEffectsVolumeChange={(next) => {
+              onEffectsVolumeChange={(next: number) => {
                 setEffectsVolume(next);
               }}
               onAchievementVolumeChange={setAchievementVolume}
               onNotificationVolumeChange={setNotificationVolume}
               onMusicVolumeChange={setMusicVolume}
-              onSoundThemeChange={(next) => {
+              onSoundThemeChange={(next: any) => {
                 setSoundTheme(next);
                 playSound("select");
               }}
-              onVisualThemeChange={(next) => {
+              onVisualThemeChange={(next: any) => {
                 setVisualTheme(next);
                 playSound("select");
               }}

@@ -182,7 +182,7 @@ describe("RetroAchievements backend router", () => {
       expect.objectContaining({ id: 10, unlocked: false, unlockedHardcore: false }),
     ]);
     expect(String(fetchImpl.mock.calls[0][0])).toContain(
-      "u=00003EMFWR7XB8SDPEHB3K56ZQ",
+      "u=MaxMilyin",
     );
   });
 
