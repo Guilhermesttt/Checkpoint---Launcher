@@ -14,14 +14,9 @@ import { useControllerLed } from "./hooks/useControllerLed";
 import { TooltipProvider } from "./components/ui/tooltip";
 import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
 import WhatsNewModal from "./components/WhatsNewModal";
-import { TransitionOverlay } from "./components/TransitionOverlay";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
-import { useLauncherTransition } from "./hooks/useLauncherTransition";
 import { isBackendHealthy } from "./services/api";
 import type { SoundTheme } from "./context/PreferencesContext";
-
-const loadRetroGamingPage = () => import("./pages/RetroGamingPage");
-const RetroGamingPage = React.lazy(loadRetroGamingPage);
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
   ps5: () =>
@@ -54,13 +49,9 @@ const menuMusicGain: Record<SoundTheme, number> = {
   cyberpunk: 16,
 };
 
-const retroMenuMusicLoader = () =>
-  import("./sounds/Emotion Engine.mp3").then((module) => module.default);
-const RETRO_MENU_MUSIC_GAIN = 0.85;
-
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
-  const { musicVolume, soundTheme, lowPerformanceMode, launcherMode, retroMusicEnabled } = usePreferences();
+  const { musicVolume, soundTheme, lowPerformanceMode } = usePreferences();
   useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState<boolean | null>(null);
 
@@ -96,21 +87,6 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  const [retroBootProgress, setRetroBootProgress] = React.useState(0);
-  const {
-    mountedMode,
-    phase: transitionPhase,
-    completeBoot,
-  } = useLauncherTransition({
-    requestedMode: launcherMode,
-    enabled: !loading && isIntroVisible === false,
-  });
-
-  React.useEffect(() => {
-    if (launcherMode !== "retro" || loading || isIntroVisible !== false) return;
-    void loadRetroGamingPage();
-  }, [launcherMode, loading, isIntroVisible]);
-
   const clearMusicFade = React.useCallback(() => {
     if (musicFadeRef.current) {
       window.clearInterval(musicFadeRef.current);
@@ -141,15 +117,10 @@ const AppContent: React.FC = () => {
   );
 
   const resolveActiveMusic = React.useCallback(async () => {
-    if (launcherMode === "retro") {
-      if (!retroMusicEnabled) return { src: null as string | null, gain: 1 };
-      const src = await retroMenuMusicLoader();
-      return { src, gain: RETRO_MENU_MUSIC_GAIN };
-    }
     const loader = menuMusicLoaders[soundTheme] ?? menuMusicLoaders.ps5;
     const src = await loader();
     return { src, gain: menuMusicGain[soundTheme] ?? 1 };
-  }, [launcherMode, retroMusicEnabled, soundTheme]);
+  }, [soundTheme]);
 
   const ensureMusicSource = React.useCallback(async () => {
     const { src: musicSrc, gain } = await resolveActiveMusic();
@@ -220,7 +191,7 @@ const AppContent: React.FC = () => {
       });
   }, [ensureMusicSource, fadeMusicTo, musicVolume, lowPerformanceMode]);
 
-  const activeMusicSignature = `${launcherMode}:${retroMusicEnabled}:${soundTheme}`;
+  const activeMusicSignature = soundTheme;
 
   React.useEffect(() => {
     const audio = musicRef.current;
@@ -420,38 +391,15 @@ const AppContent: React.FC = () => {
             />
           </AnimatePresence>
         ) : (
-          <TransitionOverlay
-            phase={transitionPhase}
-            bootProgress={retroBootProgress}
-          >
-            {mountedMode === "retro" ? (
-              <div className="absolute inset-0 z-50 bg-black">
-                <React.Suspense
-                  fallback={
-                    <div
-                      className="retro-route-loading"
-                      aria-label="Preparando sistema retro"
-                    />
-                  }
-                >
-                  <RetroGamingPage
-                    onBootReady={completeBoot}
-                    onBootProgress={setRetroBootProgress}
-                  />
-                </React.Suspense>
-              </div>
-            ) : (
-              <div className="absolute inset-0">
-                {!lowPerformanceMode && <MainVideoBackground />}
-                <Home />
-                <GamepadStatusOverlay />
-                <ControllerVirtualKeyboard />
-                {whatsNewRelease && (
-                  <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />
-                )}
-              </div>
+          <div className="absolute inset-0">
+            {!lowPerformanceMode && <MainVideoBackground />}
+            <Home />
+            <GamepadStatusOverlay />
+            <ControllerVirtualKeyboard />
+            {whatsNewRelease && (
+              <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />
             )}
-          </TransitionOverlay>
+          </div>
         )}
       </div>
     </MotionConfig>

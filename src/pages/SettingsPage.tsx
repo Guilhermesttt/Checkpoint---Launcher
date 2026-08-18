@@ -86,7 +86,10 @@ const RetroAchievementsSettingsCard: React.FC<{
   onDisconnect?: () => Promise<void>;
 }> = () => {
   return (
-    <article className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between">
+    <article
+      aria-label="RetroAchievements"
+      className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between"
+    >
       <div>
         <h4 className="text-sm font-semibold text-white">RetroAchievements</h4>
         <p className="text-xs text-white/50">Integre conquistas retrô à sua conta.</p>

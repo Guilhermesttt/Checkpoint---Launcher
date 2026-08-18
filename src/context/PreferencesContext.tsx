@@ -16,11 +16,8 @@ export type AchievementNotificationPosition =
   | "bottom-left"
   | "bottom-right";
 
-export type LauncherMode = "standard" | "retro";
-
 interface PreferencesContextValue {
   language: LauncherLanguage;
-  launcherMode: LauncherMode;
   effectsVolume: number;
   achievementVolume: number;
   notificationVolume: number;
@@ -31,8 +28,6 @@ interface PreferencesContextValue {
   soundTheme: SoundTheme;
   visualTheme: VisualTheme;
   setLanguage: (language: LauncherLanguage) => void;
-  setLauncherMode: (mode: LauncherMode) => void;
-  toggleLauncherMode: () => void;
   setEffectsVolume: (volume: number) => void;
   setAchievementVolume: (volume: number) => void;
   setNotificationVolume: (volume: number) => void;
@@ -54,12 +49,6 @@ interface PreferencesContextValue {
   setRestoreLastScreen: (value: boolean) => void;
   confirmBeforeExit: boolean;
   setConfirmBeforeExit: (value: boolean) => void;
-  retroMusicEnabled: boolean;
-  setRetroMusicEnabled: (value: boolean) => void;
-  retroCrtEnabled: boolean;
-  setRetroCrtEnabled: (value: boolean) => void;
-  retroReducedMotion: boolean;
-  setRetroReducedMotion: (value: boolean) => void;
   preferencesHydrated: boolean;
   t: (key: TranslationKey) => string;
 }
@@ -862,7 +851,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { user } = useAuth();
   const [language, setLanguage] = useState<LauncherLanguage>("pt-BR");
-  const [launcherMode, setLauncherModeState] = useState<LauncherMode>("standard");
   const [effectsVolume, setEffectsVolume] = useState(30);
   const [achievementVolume, setAchievementVolume] = useState(22);
   const [notificationVolume, setNotificationVolume] = useState(40);
@@ -879,9 +867,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true);
   const [restoreLastScreen, setRestoreLastScreen] = useState(false);
   const [confirmBeforeExit, setConfirmBeforeExit] = useState(true);
-  const [retroMusicEnabled, setRetroMusicEnabled] = useState(true);
-  const [retroCrtEnabled, setRetroCrtEnabled] = useState(true);
-  const [retroReducedMotion, setRetroReducedMotion] = useState(false);
   const [hydratedPreferencesUid, setHydratedPreferencesUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -891,7 +876,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     const savedLanguage = readPreference(user.uid, "language");
-    const savedLauncherMode = readPreference(user.uid, "launcher_mode");
     const savedEffectsVolumeRaw = readPreference(user.uid, "effects_volume");
     const savedAchievementVolumeRaw = readPreference(user.uid, "achievement_volume");
     const savedNotificationVolumeRaw = readPreference(user.uid, "notification_volume");
@@ -912,16 +896,10 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedMinimizeToTray = readPreference(user.uid, "minimize_to_tray");
     const savedRestoreLastScreen = readPreference(user.uid, "restore_last_screen");
     const savedConfirmBeforeExit = readPreference(user.uid, "confirm_before_exit");
-    const savedRetroMusicEnabled = readPreference(user.uid, "retro_music_enabled");
-    const savedRetroCrtEnabled = readPreference(user.uid, "retro_crt_enabled");
-    const savedRetroReducedMotion = readPreference(user.uid, "retro_reduced_motion");
     const savedAchievementNotifications = readPreference(user.uid, "achievement_notifications");
     const savedCustomAchievementNotifications = readPreference(user.uid, "custom_achievement_notifications");
     const savedAchievementNotificationPosition = readPreference(user.uid, "achievement_notification_position");
 
-    if (savedLauncherMode === "standard" || savedLauncherMode === "retro") {
-      setLauncherModeState(savedLauncherMode);
-    }
     if (savedOpenAtLogin !== null) {
       const shouldOpenAtLogin = savedOpenAtLogin === "true";
       setOpenAtLoginState(shouldOpenAtLogin);
@@ -948,9 +926,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedMinimizeToTray !== null) setMinimizeToTrayOnClose(savedMinimizeToTray === "true");
     if (savedRestoreLastScreen !== null) setRestoreLastScreen(savedRestoreLastScreen === "true");
     if (savedConfirmBeforeExit !== null) setConfirmBeforeExit(savedConfirmBeforeExit === "true");
-    if (savedRetroMusicEnabled !== null) setRetroMusicEnabled(savedRetroMusicEnabled === "true");
-    if (savedRetroCrtEnabled !== null) setRetroCrtEnabled(savedRetroCrtEnabled === "true");
-    if (savedRetroReducedMotion !== null) setRetroReducedMotion(savedRetroReducedMotion === "true");
     if (savedAchievementNotifications !== null) {
       setAchievementNotificationsEnabled(savedAchievementNotifications === "true");
     }
@@ -1005,7 +980,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
     writePreference(user.uid, "language", language);
-    writePreference(user.uid, "launcher_mode", launcherMode);
     writePreference(user.uid, "effects_volume", String(effectsVolume));
     writePreference(user.uid, "achievement_volume", String(achievementVolume));
     writePreference(user.uid, "notification_volume", String(notificationVolume));
@@ -1021,10 +995,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     writePreference(user.uid, "achievement_notifications", String(achievementNotificationsEnabled));
     writePreference(user.uid, "custom_achievement_notifications", String(customAchievementNotifications));
     writePreference(user.uid, "achievement_notification_position", achievementNotificationPosition);
-    writePreference(user.uid, "retro_music_enabled", String(retroMusicEnabled));
-    writePreference(user.uid, "retro_crt_enabled", String(retroCrtEnabled));
-    writePreference(user.uid, "retro_reduced_motion", String(retroReducedMotion));
-  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, retroCrtEnabled, retroMusicEnabled, retroReducedMotion, soundTheme, user?.uid, visualTheme]);
+  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -1067,7 +1038,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const value = useMemo<PreferencesContextValue>(
     () => ({
       language,
-      launcherMode,
       effectsVolume,
       achievementVolume,
       notificationVolume,
@@ -1078,9 +1048,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       soundTheme,
       visualTheme,
       setLanguage,
-      setLauncherMode: setLauncherModeState,
-      toggleLauncherMode: () =>
-        setLauncherModeState((current) => (current === "standard" ? "retro" : "standard")),
       setEffectsVolume: (volume) => setEffectsVolume(clampVolume(volume)),
       setAchievementVolume: (volume) => setAchievementVolume(clampVolume(volume)),
       setNotificationVolume: (volume) => setNotificationVolume(clampVolume(volume)),
@@ -1107,12 +1074,6 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setRestoreLastScreen,
       confirmBeforeExit,
       setConfirmBeforeExit,
-      retroMusicEnabled,
-      setRetroMusicEnabled,
-      retroCrtEnabled,
-      setRetroCrtEnabled,
-      retroReducedMotion,
-      setRetroReducedMotion,
       preferencesHydrated: hydratedPreferencesUid === user?.uid,
       t: (key) => {
         if (language === "pt-BR" || language === "en-US" || language === "es-ES") {
@@ -1125,7 +1086,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       },
     }),
-    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, launcherMode, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, retroCrtEnabled, retroMusicEnabled, retroReducedMotion, soundTheme, user?.uid, visualTheme],
+    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme],
   );
 
   return (

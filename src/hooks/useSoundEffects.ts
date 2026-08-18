@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { usePreferences, type SoundTheme } from "../context/PreferencesContext";
+import type { SoundTheme } from "../context/PreferencesContext";
 
 import ps5PlusNavigateSound from "../sounds/PS5_Plus/deck_ui_navigation.wav";
 import ps5PlusHoverSound from "../sounds/PS5_Plus/deck_ui_slider_down.wav";
@@ -325,12 +325,11 @@ export const useSoundEffects = (
   theme: SoundTheme = "ps5",
   notificationVolume = 0.4,
 ) => {
-  const { launcherMode } = usePreferences();
   const lastNavigateAtRef = useRef(0);
   const lastHoverAtRef = useRef(0);
   const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
   const activeNotificationAudiosRef = useRef(new Set<HTMLAudioElement>());
-  const sounds = launcherMode === "retro" ? retroSoundTheme : (soundThemes[theme] ?? soundThemes.ps5);
+  const sounds = soundThemes[theme] ?? soundThemes.ps5;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
   useEffect(() => {

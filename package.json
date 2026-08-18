@@ -28,7 +28,6 @@
     "db:lint": "npx supabase db lint --linked --level warning",
     "audit:ci": "npm audit --omit=dev --audit-level=high",
     "release:verify": "node scripts/verify-release.cjs",
-    "verify:retro-assets": "node scripts/verify-retro-assets.cjs",
     "release:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/smoke-installer.ps1",
     "preview": "vite preview",
     "server": "node ./server/index.mjs"
