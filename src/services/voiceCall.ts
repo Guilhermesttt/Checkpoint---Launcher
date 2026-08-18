@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import type { RoomCategory } from "../types/voice-governance";
 
 export interface CallInvitePayload {
   callerId: string;
@@ -7,6 +8,14 @@ export interface CallInvitePayload {
   chatId: string;
   hasVideo?: boolean;
   timestamp: number;
+  category?: RoomCategory;
+}
+
+export interface CallKickPayload {
+  adminId: string;
+  targetUserId: string;
+  chatId: string;
+  reason?: string;
 }
 
 export interface CallAnswerPayload {
@@ -29,6 +38,15 @@ export interface CallStatePayload {
   isSpeaking?: boolean;
   isSharingScreen?: boolean;
   isCameraOn?: boolean;
+}
+
+export interface CallPrivacyPayload {
+  adminId: string;
+  chatId: string;
+  isPrivate: boolean;
+  password?: string;
+  category?: RoomCategory;
+  roomName?: string;
 }
 
 export interface CallEndPayload {
@@ -129,6 +147,8 @@ export const subscribeToCallSession = (
     onSignal?: (signal: CallSignalPayload) => void;
     onState?: (state: CallStatePayload) => void;
     onEnd?: (end: CallEndPayload) => void;
+    onKicked?: (kick: CallKickPayload) => void;
+    onPrivacy?: (privacy: CallPrivacyPayload) => void;
   },
 ) => {
   const channelName = `call_session_${chatId}`;
@@ -152,6 +172,16 @@ export const subscribeToCallSession = (
     .on("broadcast", { event: "call:state" }, (e) => {
       if (e.payload && e.payload.senderId !== myUid) {
         callbacks.onState?.(e.payload as CallStatePayload);
+      }
+    })
+    .on("broadcast", { event: "call:kick" }, (e) => {
+      if (e.payload && e.payload.targetUserId === myUid) {
+        callbacks.onKicked?.(e.payload as CallKickPayload);
+      }
+    })
+    .on("broadcast", { event: "call:privacy" }, (e) => {
+      if (e.payload) {
+        callbacks.onPrivacy?.(e.payload as CallPrivacyPayload);
       }
     })
     .on("broadcast", { event: "call:end" }, (e) => {
@@ -223,6 +253,29 @@ export const sendCallState = async (
 };
 
 /**
+ * Expulsa um participante da chamada (Admin action)
+ */
+export const sendCallKick = async (
+  chatId: string,
+  targetUserId: string,
+  kickPayload: CallKickPayload,
+) => {
+  const sessionChannel = await getOrCreateChannel(`call_session_${chatId}`);
+  await sessionChannel.send({
+    type: "broadcast",
+    event: "call:kick",
+    payload: kickPayload,
+  });
+
+  const friendChannel = await getOrCreateChannel(`user_calls_${targetUserId}`);
+  await friendChannel.send({
+    type: "broadcast",
+    event: "call:kick",
+    payload: kickPayload,
+  });
+};
+
+/**
  * Encerra a chamada
  */
 export const sendCallEnd = async (
@@ -244,3 +297,19 @@ export const sendCallEnd = async (
     payload: endPayload,
   });
 };
+
+/**
+ * Envia atualização de privacidade e senha da sala (Admin action)
+ */
+export const sendCallPrivacyUpdate = async (
+  chatId: string,
+  privacyPayload: CallPrivacyPayload,
+) => {
+  const sessionChannel = await getOrCreateChannel(`call_session_${chatId}`);
+  await sessionChannel.send({
+    type: "broadcast",
+    event: "call:privacy",
+    payload: privacyPayload,
+  });
+};
+

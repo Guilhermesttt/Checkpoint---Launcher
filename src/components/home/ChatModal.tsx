@@ -17,6 +17,8 @@ import {
 import type { ChatMessage, SocialFriend } from "../../types/domain";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 import { CONTROLLER_KEYBOARD_VISIBILITY_EVENT } from "../../utils/controllerTextInput";
+import { CallInviteCard, parseCallInviteText } from "../voice/CallInviteCard";
+
 
 const LINK_PATTERN = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 const IMAGE_LINK_PATTERN = /^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg)(\?[^\s]*)?$/i;
@@ -544,6 +546,8 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                     ...inlineImageLinks,
                   ]),
                 );
+                const inviteMeta = parseCallInviteText(msg.text);
+
                 return (
                   <React.Fragment key={msg.id || index}>
                     {showDaySeparator ? (
@@ -559,58 +563,74 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                         <span className="h-px flex-1 bg-white/[0.06]" />
                       </div>
                     ) : null}
-                    <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[58%] rounded-[16px] px-4 py-2.5 text-sm shadow-[0_8px_24px_rgba(0,0,0,.2)] ${
-                          isMe
-                            ? "rounded-br-[5px] bg-white text-black"
-                            : "rounded-tl-none border border-white/5 bg-white/5 text-white/80"
-                        }`}
-                      >
-                        {visibleImages.length > 0 ? (
-                          <div className="mb-2 space-y-2">
-                            {visibleImages.map((imageUrl) => (
-                              <button
-                                type="button"
-                                key={imageUrl}
-                                onClick={() => {
-                                  playSound("select");
-                                  setViewingImage({
-                                    url: imageUrl,
-                                    text:
-                                      imageUrl === msg.attachmentUrl
-                                        ? msg.text
-                                        : msg.text.replace(imageUrl, "").trim(),
-                                    createdAt: msg.createdAt,
-                                  });
-                                }}
-                                aria-label="Visualizar imagem compartilhada"
-                                className={`block w-full rounded-2xl border px-3 py-3 text-left transition-all ${
-                                  isMe
-                                    ? "border-white/10 bg-black/25 hover:bg-black/35"
-                                    : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
-                                }`}
-                              >
-                                <img
-                                  src={imageUrl}
-                                  alt="Imagem compartilhada"
-                                  className="max-h-48 w-full rounded-xl object-cover"
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                        {msg.text ? (
-                          <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
-                        ) : null}
-                        <span className={`mt-1 block text-right text-[8px] uppercase tracking-wider ${isMe ? "text-black/45" : "text-white/30"}`}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </span>
+
+                    {inviteMeta ? (
+                      <div className={`flex ${isMe ? "justify-end" : "justify-start"} my-1.5`}>
+                        <CallInviteCard
+                          invite={inviteMeta}
+                          isSelf={isMe}
+                          onJoinCall={() => {
+                            onClose();
+                            if (onStartVoiceCall && friend) {
+                              onStartVoiceCall(friend, false);
+                            }
+                          }}
+                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[58%] rounded-[16px] px-4 py-2.5 text-sm shadow-[0_8px_24px_rgba(0,0,0,.2)] ${
+                            isMe
+                              ? "rounded-br-[5px] bg-white text-black"
+                              : "rounded-tl-none border border-white/5 bg-white/5 text-white/80"
+                          }`}
+                        >
+                          {visibleImages.length > 0 ? (
+                            <div className="mb-2 space-y-2">
+                              {visibleImages.map((imageUrl) => (
+                                <button
+                                  type="button"
+                                  key={imageUrl}
+                                  onClick={() => {
+                                    playSound("select");
+                                    setViewingImage({
+                                      url: imageUrl,
+                                      text:
+                                        imageUrl === msg.attachmentUrl
+                                          ? msg.text
+                                          : msg.text.replace(imageUrl, "").trim(),
+                                      createdAt: msg.createdAt,
+                                    });
+                                  }}
+                                  aria-label="Visualizar imagem compartilhada"
+                                  className={`block w-full rounded-2xl border px-3 py-3 text-left transition-all ${
+                                    isMe
+                                      ? "border-white/10 bg-black/25 hover:bg-black/35"
+                                      : "border-white/8 bg-white/[0.03] hover:bg-white/[0.06]"
+                                  }`}
+                                >
+                                  <img
+                                    src={imageUrl}
+                                    alt="Imagem compartilhada"
+                                    className="max-h-48 w-full rounded-xl object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                          {msg.text ? (
+                            <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p>
+                          ) : null}
+                          <span className={`mt-1 block text-right text-[8px] uppercase tracking-wider ${isMe ? "text-black/45" : "text-white/30"}`}>
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </React.Fragment>
                 );
               })

@@ -12,14 +12,19 @@ import {
   type CallInvitePayload,
   type CallSignalPayload,
   type CallStatePayload,
+  type CallKickPayload,
+  type CallPrivacyPayload,
   sendCallAnswer,
   sendCallEnd,
   sendCallInvite,
   sendCallSignal,
   sendCallState,
+  sendCallKick,
+  sendCallPrivacyUpdate,
   subscribeToCallSession,
   subscribeToUserIncomingCalls,
 } from "../services/voiceCall";
+import type { CallRoomConfig, RoomCategory } from "../types/voice-governance";
 import { getChatId } from "../services/chat";
 import { getTurnServers } from "../services/turnCredentials";
 import sfxJoin from "../sounds/Stoat_SFX/user_join_voice-DbrgaLbl.ogg";
@@ -112,6 +117,26 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localCameraStream, setLocalCameraStream] = useState<MediaStream | null>(null);
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [roomConfig, setRoomConfig] = useState<CallRoomConfig | null>(null);
+
+  const [remoteVolume, setRemoteVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("checkpoint_voice_remote_volume");
+      return saved !== null ? Math.max(0, Math.min(200, Number(saved))) : 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const setRemoteVolume = useCallback((val: number) => {
+    const clamped = Math.max(0, Math.min(200, Math.round(val)));
+    setRemoteVolumeState(clamped);
+    try {
+      localStorage.setItem("checkpoint_voice_remote_volume", String(clamped));
+    } catch {}
+  }, []);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
@@ -219,11 +244,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const voiceSensitivityRef = useRef(voiceSensitivity);
   voiceSensitivityRef.current = voiceSensitivity;
 
+  const isPttPressedRef = useRef(isPttPressed);
+  isPttPressedRef.current = isPttPressed;
+
   const inputModeRef = useRef(inputMode);
   inputModeRef.current = inputMode;
 
-  const isPttPressedRef = useRef(isPttPressed);
-  isPttPressedRef.current = isPttPressed;
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
+
+  const isDeafenedRef = useRef(isDeafened);
+  isDeafenedRef.current = isDeafened;
 
   // Microphone monitoring / sidetone ("Ouvir a própria voz")
   const [isMicMonitoring, setIsMicMonitoringState] = useState<boolean>(() => {
@@ -325,10 +356,202 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [isMicMonitoring, localStream, startMicMonitoring, stopMicMonitoring]);
 
-  // Settings setters with localStorage persistence
+  // VAD Engine Setup with RMS and 200ms Hold Timer + Strict AudioContext Cleanup
+  const setupVoiceAnalyzer = useCallback(
+    (stream: MediaStream, isLocal: boolean) => {
+      const targetPipelineRef = isLocal ? localPipelineRef : remotePipelineRef;
+      // Clean up any existing pipeline first
+      destroyAudioPipeline(targetPipelineRef.current);
+
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+
+        const ctx = new AudioCtx();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.15;
+        source.connect(analyser);
+
+        const pipeline: AudioPipeline = {
+          ctx,
+          source,
+          analyser,
+          animFrameId: null,
+          holdTimer: null,
+        };
+        targetPipelineRef.current = pipeline;
+
+        const timeData = new Float32Array(analyser.fftSize);
+        let currentlySpeaking = false;
+
+        const checkVolume = () => {
+          if (!targetPipelineRef.current.analyser || !targetPipelineRef.current.ctx) return;
+          if (targetPipelineRef.current.ctx.state === "suspended") {
+            void targetPipelineRef.current.ctx.resume().catch(() => {});
+          }
+
+          analyser.getFloatTimeDomainData(timeData);
+
+          // Calculate Root Mean Square (RMS)
+          let sumSquares = 0;
+          for (let i = 0; i < timeData.length; i += 1) {
+            sumSquares += timeData[i] * timeData[i];
+          }
+          const rms = Math.sqrt(sumSquares / timeData.length);
+          const rawVolume = Math.min(100, Math.round(rms * 700));
+
+          // Calibrated sensitivity threshold (smooth exponential curve from 1 to 30)
+          const sens = Math.max(0, Math.min(100, voiceSensitivityRef.current));
+          const sensitivityThreshold = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
+
+          const isPtt = inputModeRef.current === "push-to-talk";
+          const isPttActive = isPttPressedRef.current;
+
+          const isAboveThreshold = isLocal && isPtt
+            ? isPttActive && rawVolume >= 1
+            : rawVolume >= sensitivityThreshold;
+
+          if (isAboveThreshold) {
+            // Voice detected: clear hold timer and activate speaking
+            if (pipeline.holdTimer) {
+              window.clearTimeout(pipeline.holdTimer);
+              pipeline.holdTimer = null;
+            }
+            if (isLocal && !isMutedRef.current && !isDeafenedRef.current) {
+              const track = localStreamRef.current?.getAudioTracks()[0];
+              if (track && !track.enabled) {
+                track.enabled = true;
+              }
+            }
+            if (!currentlySpeaking) {
+              currentlySpeaking = true;
+              if (isLocal) {
+                setIsSpeakingLocal(true);
+                if (sessionRef.current?.chatId && user?.uid) {
+                  void sendCallState(sessionRef.current.chatId, {
+                    senderId: user.uid,
+                    chatId: sessionRef.current.chatId,
+                    isSpeaking: true,
+                  });
+                }
+              } else {
+                setIsSpeakingRemote(true);
+              }
+            }
+          } else if (currentlySpeaking && !pipeline.holdTimer) {
+            // Below threshold: hold speaking state for 250ms to eliminate syllable flickering
+            pipeline.holdTimer = window.setTimeout(() => {
+              currentlySpeaking = false;
+              pipeline.holdTimer = null;
+              if (isLocal) {
+                setIsSpeakingLocal(false);
+                if (inputModeRef.current === "voice-activity" || inputModeRef.current === "push-to-talk") {
+                  const track = localStreamRef.current?.getAudioTracks()[0];
+                  if (track) {
+                    track.enabled = false;
+                  }
+                }
+                if (sessionRef.current?.chatId && user?.uid) {
+                  void sendCallState(sessionRef.current.chatId, {
+                    senderId: user.uid,
+                    chatId: sessionRef.current.chatId,
+                    isSpeaking: false,
+                  });
+                }
+              } else {
+                setIsSpeakingRemote(false);
+              }
+            }, 250);
+          }
+
+          pipeline.animFrameId = requestAnimationFrame(checkVolume);
+        };
+
+        pipeline.animFrameId = requestAnimationFrame(checkVolume);
+      } catch (err) {
+        console.warn("[useVoiceCall] setupVoiceAnalyzer failed:", err);
+      }
+    },
+    [user?.uid],
+  );
+
+  // Auto-sync analyzers when localStream or remoteStream change
+  useEffect(() => {
+    if (localStream) {
+      setupVoiceAnalyzer(localStream, true);
+    } else {
+      destroyAudioPipeline(localPipelineRef.current);
+      setIsSpeakingLocal(false);
+    }
+  }, [localStream, setupVoiceAnalyzer]);
+
+  useEffect(() => {
+    if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+      setupVoiceAnalyzer(remoteStream, false);
+    } else {
+      destroyAudioPipeline(remotePipelineRef.current);
+      setIsSpeakingRemote(false);
+    }
+  }, [remoteStream, setupVoiceAnalyzer]);
+
+  // Dynamic Audio Constraints Applier (hot-swapping live track constraints)
+  const applyAudioProcessingConstraints = useCallback(
+    async (newEcho: boolean, newNoise: boolean, newAutoGain: boolean) => {
+      if (!localStreamRef.current) return;
+      const track = localStreamRef.current.getAudioTracks()[0];
+      if (!track) return;
+
+      try {
+        await track.applyConstraints({
+          echoCancellation: newEcho ? { ideal: true } : false,
+          noiseSuppression: newNoise ? { ideal: true } : false,
+          autoGainControl: newAutoGain ? { ideal: true } : false,
+        });
+      } catch (err) {
+        console.warn("[useVoiceCall] track.applyConstraints fallback to stream re-acquisition:", err);
+        try {
+          const currentDeviceId = selectedAudioInput !== "default" ? selectedAudioInput : undefined;
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined,
+              echoCancellation: newEcho ? { ideal: true } : false,
+              noiseSuppression: newNoise ? { ideal: true } : false,
+              autoGainControl: newAutoGain ? { ideal: true } : false,
+              channelCount: { ideal: 1 },
+              sampleRate: { ideal: 48000 },
+            },
+            video: false,
+          });
+
+          const newTrack = newStream.getAudioTracks()[0];
+          if (newTrack) {
+            newTrack.enabled = !isMutedRef.current && !isDeafenedRef.current;
+            if (peerConnectionRef.current) {
+              const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "audio");
+              if (sender) {
+                await sender.replaceTrack(newTrack);
+              }
+            }
+            track.stop();
+            localStreamRef.current = newStream;
+            setLocalStream(newStream);
+            setupVoiceAnalyzer(newStream, true);
+          }
+        } catch (fallbackErr) {
+          console.error("[useVoiceCall] Audio stream re-acquisition failed:", fallbackErr);
+        }
+      }
+    },
+    [selectedAudioInput, setupVoiceAnalyzer],
+  );
+
+  // Settings setters with localStorage persistence & dynamic live track updates
   const setVoiceSensitivity = useCallback((val: number) => {
     const clamped = Math.max(0, Math.min(100, val));
     setVoiceSensitivityState(clamped);
+    voiceSensitivityRef.current = clamped;
     try {
       localStorage.setItem("checkpoint_voice_sensitivity", String(clamped));
     } catch {}
@@ -339,21 +562,24 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     try {
       localStorage.setItem("checkpoint_voice_echo_cancellation", String(val));
     } catch {}
-  }, []);
+    void applyAudioProcessingConstraints(val, noiseSuppression, autoGainControl);
+  }, [applyAudioProcessingConstraints, autoGainControl, noiseSuppression]);
 
   const setNoiseSuppression = useCallback((val: boolean) => {
     setNoiseSuppressionState(val);
     try {
       localStorage.setItem("checkpoint_voice_noise_suppression", String(val));
     } catch {}
-  }, []);
+    void applyAudioProcessingConstraints(echoCancellation, val, autoGainControl);
+  }, [applyAudioProcessingConstraints, autoGainControl, echoCancellation]);
 
   const setAutoGainControl = useCallback((val: boolean) => {
     setAutoGainControlState(val);
     try {
       localStorage.setItem("checkpoint_voice_auto_gain", String(val));
     } catch {}
-  }, []);
+    void applyAudioProcessingConstraints(echoCancellation, noiseSuppression, val);
+  }, [applyAudioProcessingConstraints, echoCancellation, noiseSuppression]);
 
   // Enumerate connected devices & auto-detect default devices
   const refreshDevices = useCallback(async () => {
@@ -433,138 +659,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     },
     [autoGainControl, echoCancellation, noiseSuppression, selectedAudioInput],
   );
-
-  // VAD Engine Setup with RMS and 200ms Hold Timer + Strict AudioContext Cleanup
-  const setupVoiceAnalyzer = useCallback(
-    (stream: MediaStream, isLocal: boolean) => {
-      const targetPipelineRef = isLocal ? localPipelineRef : remotePipelineRef;
-      // Clean up any existing pipeline first
-      destroyAudioPipeline(targetPipelineRef.current);
-
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AudioCtx) return;
-
-        const ctx = new AudioCtx();
-        const source = ctx.createMediaStreamSource(stream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.15;
-        source.connect(analyser);
-
-        const pipeline: AudioPipeline = {
-          ctx,
-          source,
-          analyser,
-          animFrameId: null,
-          holdTimer: null,
-        };
-        targetPipelineRef.current = pipeline;
-
-        const timeData = new Float32Array(analyser.fftSize);
-        let currentlySpeaking = false;
-
-        const checkVolume = () => {
-          if (!targetPipelineRef.current.analyser || !targetPipelineRef.current.ctx) return;
-          if (targetPipelineRef.current.ctx.state === "suspended") {
-            void targetPipelineRef.current.ctx.resume().catch(() => {});
-          }
-
-          analyser.getFloatTimeDomainData(timeData);
-
-          // Calculate Root Mean Square (RMS)
-          let sumSquares = 0;
-          for (let i = 0; i < timeData.length; i += 1) {
-            sumSquares += timeData[i] * timeData[i];
-          }
-          const rms = Math.sqrt(sumSquares / timeData.length);
-          const rawVolume = Math.min(100, Math.round(rms * 700));
-
-          // Calibrated sensitivity threshold:
-          // Sensitivity 0   -> threshold 25 (requires loud speech)
-          // Sensitivity 35  -> threshold 8 (natural voice triggers instantly)
-          // Sensitivity 50  -> threshold 5 (easy trigger)
-          // Sensitivity 100 -> threshold 1 (whisper trigger)
-          const sens = voiceSensitivityRef.current;
-          const sensitivityThreshold = Math.max(1, Math.round(25 * Math.pow(1 - (sens / 100), 1.6)));
-
-          const isPtt = inputModeRef.current === "push-to-talk";
-          const isPttActive = isPttPressedRef.current;
-
-          const isAboveThreshold = isLocal && isPtt
-            ? isPttActive && rawVolume >= 1
-            : rawVolume >= sensitivityThreshold;
-
-          if (isAboveThreshold) {
-            // Voice detected: clear hold timer and activate speaking
-            if (pipeline.holdTimer) {
-              window.clearTimeout(pipeline.holdTimer);
-              pipeline.holdTimer = null;
-            }
-            if (!currentlySpeaking) {
-              currentlySpeaking = true;
-              if (isLocal) {
-                setIsSpeakingLocal(true);
-                if (sessionRef.current?.chatId && user?.uid) {
-                  void sendCallState(sessionRef.current.chatId, {
-                    senderId: user.uid,
-                    chatId: sessionRef.current.chatId,
-                    isSpeaking: true,
-                  });
-                }
-              } else {
-                setIsSpeakingRemote(true);
-              }
-            }
-          } else if (currentlySpeaking && !pipeline.holdTimer) {
-            // Below threshold: hold speaking state for 200ms to eliminate syllable flickering
-            pipeline.holdTimer = window.setTimeout(() => {
-              currentlySpeaking = false;
-              pipeline.holdTimer = null;
-              if (isLocal) {
-                setIsSpeakingLocal(false);
-                if (sessionRef.current?.chatId && user?.uid) {
-                  void sendCallState(sessionRef.current.chatId, {
-                    senderId: user.uid,
-                    chatId: sessionRef.current.chatId,
-                    isSpeaking: false,
-                  });
-                }
-              } else {
-                setIsSpeakingRemote(false);
-              }
-            }, 200);
-          }
-
-          pipeline.animFrameId = requestAnimationFrame(checkVolume);
-        };
-
-        pipeline.animFrameId = requestAnimationFrame(checkVolume);
-      } catch (err) {
-        console.warn("[useVoiceCall] setupVoiceAnalyzer failed:", err);
-      }
-    },
-    [user?.uid],
-  );
-
-  // Auto-sync analyzers when localStream or remoteStream change
-  useEffect(() => {
-    if (localStream) {
-      setupVoiceAnalyzer(localStream, true);
-    } else {
-      destroyAudioPipeline(localPipelineRef.current);
-      setIsSpeakingLocal(false);
-    }
-  }, [localStream, setupVoiceAnalyzer]);
-
-  useEffect(() => {
-    if (remoteStream && remoteStream.getAudioTracks().length > 0) {
-      setupVoiceAnalyzer(remoteStream, false);
-    } else {
-      destroyAudioPipeline(remotePipelineRef.current);
-      setIsSpeakingRemote(false);
-    }
-  }, [remoteStream, setupVoiceAnalyzer]);
 
   // Dynamic Device Switchers
   const changeAudioInputDevice = useCallback(
@@ -654,6 +748,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           cameraStreamRef.current.getVideoTracks().forEach((t) => t.stop());
         }
         cameraStreamRef.current = stream;
+        setLocalCameraStream(stream);
 
         if (sessionRef.current?.friendUid === "echo-bot") {
           setRemoteStream(stream);
@@ -847,6 +942,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
     setLocalStream(null);
     setRemoteStream(null);
+    setLocalCameraStream(null);
+    setLocalScreenStream(null);
     setIsSharingScreen(false);
     setIsRemoteSharingScreen(false);
     setIsCameraOn(false);
@@ -859,6 +956,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setIsSpeakingRemote(false);
     setCallState("idle");
     setSession(null);
+    setRoomConfig(null);
     setIncomingInvite(null);
     setCallDuration(0);
   }, []);
@@ -1101,6 +1199,36 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               });
             }
           },
+          onKicked: () => {
+            notify("Você foi expulso da chamada pelo administrador.", "error");
+            playRingtone("disconnect");
+            cleanUpCall();
+          },
+          onPrivacy: (privacy) => {
+            setRoomConfig((prev) => ({
+              roomName: privacy.roomName || prev?.roomName || "Canal de Voz",
+              category: privacy.category || prev?.category || "resenha_games",
+              isPrivate: privacy.isPrivate,
+              password: privacy.password,
+            }));
+            setSession((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    isPrivate: privacy.isPrivate,
+                    password: privacy.password,
+                    category: privacy.category || prev.category,
+                    roomName: privacy.roomName || prev.roomName,
+                  }
+                : null,
+            );
+            notify(
+              privacy.isPrivate
+                ? "🔒 A sala agora é privada."
+                : "🔓 A sala agora é pública.",
+              "info",
+            );
+          },
           onEnd: (endPayload) => {
             notify(
               endPayload.reason === "busy"
@@ -1243,6 +1371,36 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             });
           }
         },
+        onKicked: () => {
+          notify("Você foi expulso da chamada pelo administrador.", "error");
+          playRingtone("disconnect");
+          cleanUpCall();
+        },
+        onPrivacy: (privacy) => {
+          setRoomConfig((prev) => ({
+            roomName: privacy.roomName || prev?.roomName || "Canal de Voz",
+            category: privacy.category || prev?.category || "resenha_games",
+            isPrivate: privacy.isPrivate,
+            password: privacy.password,
+          }));
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isPrivate: privacy.isPrivate,
+                  password: privacy.password,
+                  category: privacy.category || prev.category,
+                  roomName: privacy.roomName || prev.roomName,
+                }
+              : null,
+          );
+          notify(
+            privacy.isPrivate
+              ? "🔒 A sala agora é privada."
+              : "🔓 A sala agora é pública.",
+            "info",
+          );
+        },
         onEnd: () => {
           notify("Chamada encerrada.", "info");
           playRingtone("disconnect");
@@ -1337,6 +1495,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cameraStreamRef.current.getTracks().forEach((track) => track.stop());
         cameraStreamRef.current = null;
       }
+      setLocalCameraStream(null);
       if (peerConnectionRef.current && session.friendUid !== "echo-bot") {
         const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "video");
         if (sender && !isSharingScreen) {
@@ -1363,6 +1522,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           audio: false,
         });
         cameraStreamRef.current = stream;
+        setLocalCameraStream(stream);
         const videoTrack = stream.getVideoTracks()[0];
 
         if (session.friendUid === "echo-bot") {
@@ -1449,6 +1609,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
 
         screenStreamRef.current = screenStream;
+        setLocalScreenStream(screenStream);
         const videoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
 
@@ -1522,6 +1683,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
     }
+    setLocalScreenStream(null);
 
     if (session?.friendUid === "echo-bot") {
       setRemoteStream(null);
@@ -1599,12 +1761,77 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [acquireAudioStream, cleanUpCall, inputMode, notify, playRingtone, setupVoiceAnalyzer]);
 
+  const kickParticipant = useCallback(
+    async (targetUserId: string) => {
+      if (!sessionRef.current?.chatId || !user?.uid) return;
+      try {
+        await sendCallKick(sessionRef.current.chatId, targetUserId, {
+          adminId: user.uid,
+          targetUserId,
+          chatId: sessionRef.current.chatId,
+          reason: "Expulso pelo administrador da sala",
+        });
+        notify("Participante expulso da chamada.", "info");
+      } catch (err) {
+        console.error("[useVoiceCall] Failed to kick participant:", err);
+      }
+    },
+    [notify, user?.uid],
+  );
+
+  // UPDATE ROOM PRIVACY / PASSWORD
+  const updateRoomPrivacy = useCallback(
+    async (isPrivate: boolean, password?: string) => {
+      if (!session?.chatId || !user?.uid) return;
+      const currentCategory = session.category || roomConfig?.category || "resenha_games";
+      const currentRoomName = session.roomName || roomConfig?.roomName || `Call com ${session.friendName}`;
+      const newConfig: CallRoomConfig = {
+        roomName: currentRoomName,
+        category: currentCategory,
+        isPrivate,
+        password: password || undefined,
+      };
+      setRoomConfig(newConfig);
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              isPrivate,
+              password: password || undefined,
+              roomName: currentRoomName,
+              category: currentCategory,
+            }
+          : null,
+      );
+      await sendCallPrivacyUpdate(session.chatId, {
+        adminId: user.uid,
+        chatId: session.chatId,
+        isPrivate,
+        password: password || undefined,
+        category: currentCategory,
+        roomName: currentRoomName,
+      });
+      notify(
+        isPrivate
+          ? "Privacidade atualizada: Sala Privada 🔒"
+          : "Privacidade atualizada: Sala Pública 🔓",
+        "success",
+      );
+    },
+    [notify, roomConfig, session, user?.uid],
+  );
+
   return {
     callState,
     session,
+    roomConfig,
     incomingInvite,
     localStream,
     remoteStream,
+    localCameraStream,
+    localScreenStream,
+    remoteVolume,
+    setRemoteVolume,
     isMuted,
     isDeafened,
     isSpeakingLocal,
@@ -1654,6 +1881,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     answerCall,
     rejectCall,
     hangUp,
+    kickParticipant,
+    updateRoomPrivacy,
     toggleMute,
     toggleDeafen,
     toggleCamera,

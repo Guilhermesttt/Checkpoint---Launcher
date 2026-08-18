@@ -81,7 +81,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                 isReconnecting
                   ? "border-amber-400"
                   : isSpeaking
-                  ? "border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.7)] scale-105"
+                  ? "border-white shadow-[0_0_15px_rgba(255,255,255,0.35)] scale-105"
                   : "border-white/10"
               }`}
             >
@@ -99,7 +99,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
             </div>
             <div
               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#121215] ${
-                isReconnecting ? "bg-amber-400 animate-ping" : "bg-emerald-500"
+                isReconnecting ? "bg-amber-400 animate-ping" : "bg-white"
               }`}
             />
           </div>
@@ -108,7 +108,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  isReconnecting ? "bg-amber-400 animate-bounce" : "bg-emerald-400 animate-pulse"
+                  isReconnecting ? "bg-amber-400 animate-bounce" : "bg-white animate-pulse"
                 }`}
               />
               <span

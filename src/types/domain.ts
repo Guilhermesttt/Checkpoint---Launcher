@@ -247,4 +247,9 @@ export interface VoiceCallSession {
   friendAvatar?: string;
   isInitiator: boolean;
   startedAt?: number;
+  category?: import("./voice-governance").RoomCategory;
+  roomName?: string;
+  isPrivate?: boolean;
+  password?: string;
+  inviteCode?: string;
 }
