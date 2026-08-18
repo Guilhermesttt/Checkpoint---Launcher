@@ -14,6 +14,7 @@
     "dev": "vite",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "electron:dev": "node scripts/electron-dev.cjs",
+    "electron:dev:2": "node scripts/start-electron-dev.cjs --profile=2",
     "build": "tsc -b && vite build",
     "dist": "node scripts/build-portable.cjs",
     "dist:windows": "node scripts/build-portable.cjs",

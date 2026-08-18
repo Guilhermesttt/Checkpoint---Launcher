@@ -24,7 +24,8 @@ console.log(`[start-electron-dev] Electron: ${electronPath}`);
 console.log(`[start-electron-dev] CWD: ${projectRoot}`);
 console.log(`[start-electron-dev] ELECTRON_START_URL: ${env.ELECTRON_START_URL}`);
 
-const child = spawn(electronPath, ["."], {
+const extraArgs = process.argv.slice(2);
+const child = spawn(electronPath, [".", ...extraArgs], {
   cwd: projectRoot,
   env,
   stdio: "inherit",

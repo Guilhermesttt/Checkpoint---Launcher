@@ -236,7 +236,17 @@ const windowBehaviorController = createWindowBehaviorController({
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
 
-const hasSingleInstanceLock = IS_SMOKE_TEST || app.requestSingleInstanceLock();
+const profileArg = process.argv.find((arg) => arg.startsWith("--profile="))?.split("=")[1] || process.env.CHECKPOINT_PROFILE;
+if (profileArg) {
+  try {
+    const customUserData = path.join(app.getPath("appData"), `checkpoint-profile-${profileArg}`);
+    app.setPath("userData", customUserData);
+  } catch (err) {
+    console.warn("[electron/main] Failed to set custom userData for profile:", err);
+  }
+}
+
+const hasSingleInstanceLock = IS_SMOKE_TEST || Boolean(profileArg) || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 }
