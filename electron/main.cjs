@@ -1,6 +1,9 @@
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage } = require("electron");
 
 const crypto = require("node:crypto");
+app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization");
+app.commandLine.appendSwitch("enable-accelerated-video-decode");
+app.commandLine.appendSwitch("enable-accelerated-mjpeg-decode");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -69,6 +72,11 @@ const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_IN
 app.commandLine.appendSwitch("js-flags", "--max-old-space-size=256");
 app.commandLine.appendSwitch("renderer-process-limit", "2");
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
+
+// ── Hardware WebRTC Encoding (H.264 via NVENC/QuickSync/VideoToolbox) ────────
+// Reduz uso de CPU durante screen share com jogo rodando em paralelo
+app.commandLine.appendSwitch("enable-features", "WebRtcHWEncoding,WebRtcHWDecoding,WebRtcHideLocalIpsWithMdns");
+app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enabled/");
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
@@ -876,13 +884,22 @@ const isSafeOpenExternalUrl = (rawUrl) => {
 
 const configureHidAccess = (electronSession) => {
   const SONY_VENDOR_ID = 0x054c;
+  const ALLOWED_PERMISSIONS = new Set([
+    "hid",
+    "media",
+    "mediaKeySystem",
+    "display-capture",
+    "notifications",
+  ]);
 
   electronSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(permission === "hid");
+    callback(ALLOWED_PERMISSIONS.has(permission));
   });
 
   if (typeof electronSession.setPermissionCheckHandler === "function") {
-    electronSession.setPermissionCheckHandler((_webContents, permission) => permission === "hid");
+    electronSession.setPermissionCheckHandler((_webContents, permission) =>
+      ALLOWED_PERMISSIONS.has(permission),
+    );
   }
 
   if (typeof electronSession.setDevicePermissionHandler === "function") {
@@ -2417,6 +2434,58 @@ registerSecureIpcHandler("retro:thegamesdb-screenshots", async (_event, request)
   theGamesDb.getGameScreenshots(request || {}));
 
 
+registerSecureIpcHandler("media:get-screen-sources", async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ["window", "screen"],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  });
+  return sources.map((source) => ({
+    id: source.id,
+    name: source.name,
+    thumbnail: source.thumbnail.toDataURL(),
+    appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+  }));
+});
+
+// ─── Push-to-Talk (PTT) ─────────────────────────────────────────────────────
+let pttShortcut = null;
+
+const unregisterPtt = () => {
+  if (pttShortcut) {
+    try { globalShortcut.unregister(pttShortcut); } catch {}
+    pttShortcut = null;
+  }
+};
+
+ipcMain.handle("ptt:register", (_event, accelerator) => {
+  unregisterPtt();
+  if (!accelerator) return false;
+  try {
+    const ok = globalShortcut.register(accelerator, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("ptt:press");
+      }
+    });
+    if (ok) pttShortcut = accelerator;
+    return ok;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle("ptt:unregister", () => {
+  unregisterPtt();
+  return true;
+});
+
+// PTT key-up detection via renderer keyup (for non-modifier keys)
+ipcMain.on("ptt:release", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("ptt:release");
+  }
+});
+
 registerSecureIpcHandler("mods:select-game-directory", async (_event, gameTitle) =>
   selectModGameDirectory({
     dialog,
@@ -2636,6 +2705,24 @@ registerSecureIpcHandler("system:request-app-quit", () =>
 
 registerSecureIpcHandler("system:confirm-app-quit", () => {
   windowBehaviorController.confirmAppQuit();
+});
+
+registerSecureIpcHandler("window:fullscreen-toggle", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return next;
+});
+
+registerSecureIpcHandler("window:fullscreen-set", (_event, flag) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  mainWindow.setFullScreen(Boolean(flag));
+  return mainWindow.isFullScreen();
+});
+
+registerSecureIpcHandler("window:fullscreen-get", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  return mainWindow.isFullScreen();
 });
 
 registerSecureIpcHandler("launcher:open-executable", async (

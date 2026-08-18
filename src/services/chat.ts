@@ -280,7 +280,9 @@ export const sendChatImage = async (
   });
 };
 
-export const setChatTyping = async (friendUid: string, typing: boolean) => {
+const typingThrottleMap = new Map<string, { lastSentTime: number; isCurrentlyTyping: boolean; timeoutId: number | null }>();
+
+const sendTypingPayload = async (friendUid: string, typing: boolean) => {
   const session = (await supabase.auth.getSession()).data.session;
   if (!session?.user) return;
   const uid = session.user.id;
@@ -311,6 +313,40 @@ export const setChatTyping = async (friendUid: string, typing: boolean) => {
     event: "typing",
     payload: { senderId: uid, typing },
   });
+};
+
+export const setChatTyping = async (friendUid: string, typing: boolean) => {
+  const now = Date.now();
+  const state = typingThrottleMap.get(friendUid);
+
+  if (!typing) {
+    if (state?.timeoutId) {
+      window.clearTimeout(state.timeoutId);
+    }
+    if (state?.isCurrentlyTyping) {
+      typingThrottleMap.set(friendUid, { lastSentTime: now, isCurrentlyTyping: false, timeoutId: null });
+      await sendTypingPayload(friendUid, false);
+    }
+    return;
+  }
+
+  // Throttle de ~2s: não reenvia se já foi enviado há menos de 2000ms
+  if (state?.isCurrentlyTyping && now - state.lastSentTime < 2000) {
+    if (state.timeoutId) window.clearTimeout(state.timeoutId);
+    const timeoutId = window.setTimeout(() => {
+      void setChatTyping(friendUid, false);
+    }, 3500);
+    typingThrottleMap.set(friendUid, { ...state, timeoutId });
+    return;
+  }
+
+  if (state?.timeoutId) window.clearTimeout(state.timeoutId);
+  const timeoutId = window.setTimeout(() => {
+    void setChatTyping(friendUid, false);
+  }, 3500);
+
+  typingThrottleMap.set(friendUid, { lastSentTime: now, isCurrentlyTyping: true, timeoutId });
+  await sendTypingPayload(friendUid, true);
 };
 
 export const cleanupExpiredChatMessages = async (friendUid: string) => {

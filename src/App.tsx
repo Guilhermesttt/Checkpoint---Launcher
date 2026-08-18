@@ -12,6 +12,7 @@ import { GamepadProvider } from "./context/GamepadContext";
 import { GamepadStatusOverlay } from "./components/ui/GamepadStatusOverlay";
 import { useControllerLed } from "./hooks/useControllerLed";
 import { TooltipProvider } from "./components/ui/tooltip";
+import { VoiceCallProvider } from "./context/VoiceCallContext";
 import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard";
 import WhatsNewModal from "./components/WhatsNewModal";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
@@ -412,7 +413,9 @@ const App: React.FC = () => (
       <PreferencesProvider>
         <GamepadProvider>
           <TooltipProvider>
-            <AppContent />
+            <VoiceCallProvider>
+              <AppContent />
+            </VoiceCallProvider>
           </TooltipProvider>
         </GamepadProvider>
       </PreferencesProvider>

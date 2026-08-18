@@ -57,6 +57,7 @@ import { useGamePresence } from '../hooks/useGamePresence';
 import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
 import { useAccountConnections } from '../hooks/useAccountConnections';
 import { buildLocalFriendProfile, useFriendsSystem } from '../hooks/useFriendsSystem';
+import { useVoiceCallContext } from '../context/VoiceCallContext';
 import SpotifyPage from '../components/spotify/SpotifyPage';
 import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
@@ -463,6 +464,8 @@ const Home: React.FC = () => {
     setLocalSocialStateLoaded,
     setIsAddFriendModalOpen,
   });
+
+  const { startCall, startTestCall } = useVoiceCallContext();
 
   const [overlayAchievements, setOverlayAchievements] = useState<{
     loading: boolean;
@@ -1949,6 +1952,8 @@ const Home: React.FC = () => {
                 playSound("select");
                 setActiveChatFriend(friend);
               }}
+              onStartVoiceCall={(friend, withVideo) => void startCall(friend, withVideo)}
+              onStartTestCall={startTestCall}
             />
           ) : activeCategory === "FEED" ? (
             <React.Suspense fallback={
@@ -2408,6 +2413,7 @@ const Home: React.FC = () => {
         onClose={() => setActiveChatFriend(null)}
         friend={activeChatFriend}
         playSound={playSound}
+        onStartVoiceCall={(friend, withVideo) => void startCall(friend, withVideo)}
       />
 
       <AnimatePresence>

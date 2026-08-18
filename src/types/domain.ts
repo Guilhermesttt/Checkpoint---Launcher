@@ -227,3 +227,24 @@ export interface PriceAlert {
   title: string;
   source: "Steam" | "Epic" | "Manual";
 }
+
+export type CallState = "idle" | "ringing-out" | "ringing-in" | "connecting" | "active";
+
+export interface VoiceCallParticipant {
+  uid: string;
+  name: string;
+  avatar?: string;
+  isMuted?: boolean;
+  isDeafened?: boolean;
+  isSpeaking?: boolean;
+  isSharingScreen?: boolean;
+}
+
+export interface VoiceCallSession {
+  chatId: string;
+  friendUid: string;
+  friendName: string;
+  friendAvatar?: string;
+  isInitiator: boolean;
+  startedAt?: number;
+}

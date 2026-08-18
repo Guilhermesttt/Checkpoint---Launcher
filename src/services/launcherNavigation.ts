@@ -34,6 +34,7 @@ export const SETTINGS_TABS = [
   "account",
   "connections",
   "controller",
+  "voice",
   "notifications",
 ] as const;
 

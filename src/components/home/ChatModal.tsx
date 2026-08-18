@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ImagePlus, MessageSquare, Send, X } from "lucide-react";
+import { ImagePlus, MessageSquare, Phone, Send, Video, X } from "lucide-react";
 import ModalShell from "../ui/ModalShell";
 import { useNotification } from "../NotificationCenter";
 import {
@@ -26,10 +26,11 @@ export interface ChatModalProps {
   onClose: () => void;
   friend: SocialFriend | null;
   playSound: (type: SoundEffectType) => void;
+  onStartVoiceCall?: (friend: SocialFriend, withVideo?: boolean) => void;
 }
 
 export const ChatModal: React.FC<ChatModalProps> = React.memo(
-  ({ isOpen, onClose, friend, playSound }) => {
+  ({ isOpen, onClose, friend, playSound, onStartVoiceCall }) => {
     const { notify } = useNotification();
     const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
     const optimisticRef = useRef<Map<string, ChatMessage>>(new Map());
@@ -434,17 +435,48 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                playSound("back");
-                onClose();
-              }}
-              aria-label="Fechar conversa"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
+
+            <div className="flex items-center gap-2">
+              {onStartVoiceCall && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound("select");
+                      onStartVoiceCall(friend, false);
+                    }}
+                    aria-label="Iniciar chamada de voz"
+                    title="Iniciar chamada de voz"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <Phone className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound("select");
+                      onStartVoiceCall(friend, true);
+                    }}
+                    aria-label="Compartilhar tela / Vídeo"
+                    title="Compartilhar tela / Vídeo"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  playSound("back");
+                  onClose();
+                }}
+                aria-label="Fechar conversa"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}

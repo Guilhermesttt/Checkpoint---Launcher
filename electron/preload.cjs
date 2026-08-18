@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   importRetroArtwork: (imageUrl) => ipcRenderer.invoke("retro:import-artwork", imageUrl),
   searchTheGamesDb: (request) => ipcRenderer.invoke("retro:search-thegamesdb", request),
   getTheGamesDbScreenshots: (request) => ipcRenderer.invoke("retro:thegamesdb-screenshots", request),
+  getScreenSources: () => ipcRenderer.invoke("media:get-screen-sources"),
   selectModGameDirectory: (gameTitle) =>
     ipcRenderer.invoke("mods:select-game-directory", gameTitle),
   getNexusStatus: () => ipcRenderer.invoke("nexus:get-status"),
@@ -144,4 +145,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
   removeRealtimeAchievementUnlock: (handler) => {
     ipcRenderer.removeListener("achievement:realtime-unlock", handler);
   },
+  // ─ Push-to-Talk ─────────────────────────────────────────────────────────────
+  registerPushToTalk: (accelerator) => ipcRenderer.invoke("ptt:register", accelerator),
+  unregisterPushToTalk: () => ipcRenderer.invoke("ptt:unregister"),
+  sendPttRelease: () => ipcRenderer.send("ptt:release"),
+  onPttPress: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("ptt:press", handler);
+    return () => ipcRenderer.removeListener("ptt:press", handler);
+  },
+  onPttRelease: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("ptt:release", handler);
+    return () => ipcRenderer.removeListener("ptt:release", handler);
+  },
+  // ─ Fullscreen APIs ──────────────────────────────────────────────────────────
+  toggleFullScreen: () => ipcRenderer.invoke("window:fullscreen-toggle"),
+  setFullScreen: (flag) => ipcRenderer.invoke("window:fullscreen-set", flag),
+  isFullScreen: () => ipcRenderer.invoke("window:fullscreen-get"),
 });

@@ -24,6 +24,12 @@ declare global {
         images: string[];
       }>>;
       getTheGamesDbScreenshots: (request: { gameId: number }) => Promise<{ screenshots: string[] }>;
+      getScreenSources?: () => Promise<Array<{
+        id: string;
+        name: string;
+        thumbnail: string;
+        appIcon: string | null;
+      }>>;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
       loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
@@ -600,6 +606,16 @@ declare global {
       removeRealtimeAchievementUnlock: (
         handler: RealtimeAchievementHandler
       ) => void;
+      // ─ Push-to-Talk ─────────────────────────────────────────────────────────
+      registerPushToTalk?: (accelerator: string) => Promise<boolean>;
+      unregisterPushToTalk?: () => Promise<boolean>;
+      sendPttRelease?: () => void;
+      onPttPress?: (callback: () => void) => () => void;
+      onPttRelease?: (callback: () => void) => () => void;
+      // ─ Fullscreen ────────────────────────────────────────────────────────────
+      toggleFullScreen?: () => Promise<boolean>;
+      setFullScreen?: (flag: boolean) => Promise<boolean>;
+      isFullScreen?: () => Promise<boolean>;
     };
   }
 

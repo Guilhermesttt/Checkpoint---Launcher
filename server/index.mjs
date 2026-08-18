@@ -1335,6 +1335,48 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+let cachedTurnCredentials = null;
+let turnCacheExpiry = 0;
+const TURN_CACHE_TTL_MS = 10 * 60 * 1000;
+
+const FALLBACK_STUN_SERVERS = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+];
+
+app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser, async (_req, res) => {
+  const meteredApiKey = (process.env.METERED_API_KEY || "").trim();
+  const meteredAppName = (process.env.METERED_APP_NAME || "").trim();
+
+  if (!meteredApiKey || !meteredAppName) {
+    return res.json({ iceServers: FALLBACK_STUN_SERVERS });
+  }
+
+  const now = Date.now();
+  if (cachedTurnCredentials && now < turnCacheExpiry) {
+    return res.json({ iceServers: cachedTurnCredentials });
+  }
+
+  try {
+    const url = `https://${meteredAppName}.metered.live/api/v1/turn/credentials?apiKey=${meteredApiKey}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) {
+      throw new Error(`Metered API retornou status ${response.status}`);
+    }
+    const servers = await response.json();
+    if (Array.isArray(servers) && servers.length > 0) {
+      cachedTurnCredentials = servers;
+      turnCacheExpiry = now + TURN_CACHE_TTL_MS;
+      return res.json({ iceServers: servers });
+    }
+    return res.json({ iceServers: FALLBACK_STUN_SERVERS });
+  } catch (error) {
+    console.warn("[TURN] Falha ao obter credenciais Metered no backend, usando STUN fallback:", error?.message);
+    return res.json({ iceServers: FALLBACK_STUN_SERVERS });
+  }
+});
+
 app.get("/api/gaming/news", steamPublicLimiter, async (_req, res) => {
   try {
     const result = await getGamingNews();

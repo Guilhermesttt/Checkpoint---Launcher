@@ -2,27 +2,37 @@ import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSpotify } from "@fortawesome/free-brands-svg-icons";
 import {
+  Activity,
   Bell,
+  Camera,
+  Check,
   CheckCircle2,
   Gamepad2,
   Globe,
+  Headphones,
   KeyRound,
   Languages,
   Lock,
   LogOut,
+  Mic,
+  MicOff,
+  MonitorUp,
   Palette,
+  Radio,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   User,
   Volume2,
+  VolumeX,
   Zap,
 } from "lucide-react";
 import { SystemPageShell } from "../components/ui/SystemPageShell";
 import { Switch } from "../components/ui/switch";
 import { AppUpdateSection, SettingsHeader } from "../components/settings/AppUpdateSection";
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../context/PreferencesContext";
+import { useVoiceCallContext } from "../context/VoiceCallContext";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGamepad } from "../context/GamepadContext";
 import { useControllerLedStatus } from "../hooks/useControllerLed";
@@ -60,12 +70,12 @@ const CONTROLLER_COPY = {
 } as const;
 
 const SETTINGS_SHELL_COPY = {
-  "pt-BR": { preferences: "Preferências do Launcher", general: "Geral", personalization: "Personalização", account: "Conta & Segurança", connections: "Contas & Privacidade", controller: "Controle & Hardware", notifications: "Notificações & Overlay", quit: "Sair do Aplicativo", encrypted: "Sessão Encriptada", encryptedHint: "Conexão protegida com token Supabase JWT de alta segurança.", spotifyDock: "Player disponível na aba Spotify", privacy: "Privacidade do Perfil", privacyHint: "Escolha o que outros jogadores podem ver ao encontrar seu perfil.", public: "Perfil Público", publicHint: "Todos podem abrir seus detalhes, jogos e atividade.", private: "Perfil Privado", privateHint: "Somente você e amigos aceitos veem os detalhes.", saving: "Salvando privacidade...", saved: "Privacidade atualizada.", controllerHint: "Status da navegação e iluminação do controle conectado." },
-  "en-US": { preferences: "Launcher preferences", general: "General", personalization: "Personalization", account: "Account & Security", connections: "Accounts & Privacy", controller: "Controller & Hardware", notifications: "Notifications & Overlay", quit: "Quit Application", encrypted: "Encrypted session", encryptedHint: "Connection protected with a secure Supabase JWT.", spotifyDock: "Player available in the Spotify tab", privacy: "Profile Privacy", privacyHint: "Choose what other players can see when they find your profile.", public: "Public Profile", publicHint: "Anyone can open your details, games, and activity.", private: "Private Profile", privateHint: "Only you and accepted friends can see the details.", saving: "Saving privacy...", saved: "Privacy updated.", controllerHint: "Navigation and lighting status for the connected controller." },
-  "es-ES": { preferences: "Preferencias del launcher", general: "General", personalization: "Personalización", account: "Cuenta y seguridad", connections: "Cuentas y privacidad", controller: "Mando y hardware", notifications: "Notificaciones y overlay", quit: "Salir de la aplicación", encrypted: "Sesión cifrada", encryptedHint: "Conexión protegida con un JWT seguro de Supabase.", spotifyDock: "Player disponible en la pestaña Spotify", privacy: "Privacidad del perfil", privacyHint: "Elige qué pueden ver otros jugadores al encontrar tu perfil.", public: "Perfil público", publicHint: "Todos pueden abrir tus detalles, juegos y actividad.", private: "Perfil privado", privateHint: "Solo tú y tus amigos aceptados pueden ver los detalles.", saving: "Guardando privacidad...", saved: "Privacidad actualizada.", controllerHint: "Estado de navegación e iluminación del mando conectado." },
-  "fr-FR": { preferences: "Préférences du launcher", general: "Général", personalization: "Personnalisation", account: "Compte et sécurité", connections: "Comptes et confidentialité", controller: "Manette et matériel", notifications: "Notifications et overlay", quit: "Quitter l'application", encrypted: "Session chiffrée", encryptedHint: "Connexion protégée par un JWT Supabase sécurisé.", spotifyDock: "Lecteur disponible dans l'onglet Spotify", privacy: "Confidentialité du profil", privacyHint: "Choisissez ce que les autres joueurs voient en trouvant votre profil.", public: "Profil public", publicHint: "Tout le monde peut ouvrir vos détails, jeux et activité.", private: "Profil privé", privateHint: "Seuls vous et vos amis acceptés voyez les détails.", saving: "Enregistrement...", saved: "Confidentialité mise à jour.", controllerHint: "État de navigation et d'éclairage de la manette connectée." },
-  "de-DE": { preferences: "Launcher-Einstellungen", general: "Allgemein", personalization: "Personalisierung", account: "Konto und Sicherheit", connections: "Konten und Datenschutz", controller: "Controller und Hardware", notifications: "Benachrichtigungen und Overlay", quit: "Anwendung beenden", encrypted: "Verschlüsselte Sitzung", encryptedHint: "Verbindung durch ein sicheres Supabase-JWT geschützt.", spotifyDock: "Player im Spotify-Tab verfügbar", privacy: "Profil-Datenschutz", privacyHint: "Lege fest, was andere Spieler in deinem Profil sehen.", public: "Öffentliches Profil", publicHint: "Alle können Details, Spiele und Aktivitäten öffnen.", private: "Privates Profil", privateHint: "Nur du und bestätigte Freunde sehen die Details.", saving: "Datenschutz wird gespeichert...", saved: "Datenschutz aktualisiert.", controllerHint: "Navigations- und Beleuchtungsstatus des verbundenen Controllers." },
-  "it-IT": { preferences: "Preferenze del launcher", general: "Generale", personalization: "Personalizzazione", account: "Account e sicurezza", connections: "Account e privacy", controller: "Controller e hardware", notifications: "Notifiche e overlay", quit: "Esci dall'applicazione", encrypted: "Sessione crittografata", encryptedHint: "Connessione protetta da un JWT Supabase sicuro.", spotifyDock: "Player disponibile nella scheda Spotify", privacy: "Privacy del profilo", privacyHint: "Scegli cosa possono vedere gli altri giocatori nel tuo profilo.", public: "Profilo pubblico", publicHint: "Tutti possono aprire dettagli, giochi e attività.", private: "Profilo privato", privateHint: "Solo tu e gli amici accettati vedete i dettagli.", saving: "Salvataggio privacy...", saved: "Privacy aggiornata.", controllerHint: "Stato di navigazione e illuminazione del controller collegato." },
+  "pt-BR": { preferences: "Preferências do Launcher", general: "Geral", personalization: "Personalização", account: "Conta & Segurança", connections: "Contas & Privacidade", controller: "Controle & Hardware", voice: "Voz & Vídeo", notifications: "Notificações & Overlay", quit: "Sair do Aplicativo", encrypted: "Sessão Encriptada", encryptedHint: "Conexão protegida com token Supabase JWT de alta segurança.", spotifyDock: "Player disponível na aba Spotify", privacy: "Privacidade do Perfil", privacyHint: "Escolha o que outros jogadores podem ver ao encontrar seu perfil.", public: "Perfil Público", publicHint: "Todos podem abrir seus detalhes, jogos e atividade.", private: "Perfil Privado", privateHint: "Somente você e amigos aceitos veem os detalhes.", saving: "Salvando privacidade...", saved: "Privacidade atualizada.", controllerHint: "Status da navegação e iluminação do controle conectado." },
+  "en-US": { preferences: "Launcher preferences", general: "General", personalization: "Personalization", account: "Account & Security", connections: "Accounts & Privacy", controller: "Controller & Hardware", voice: "Voice & Video", notifications: "Notifications & Overlay", quit: "Quit Application", encrypted: "Encrypted session", encryptedHint: "Connection protected with a secure Supabase JWT.", spotifyDock: "Player available in the Spotify tab", privacy: "Profile Privacy", privacyHint: "Choose what other players can see when they find your profile.", public: "Public Profile", publicHint: "Anyone can open your details, games, and activity.", private: "Private Profile", privateHint: "Only you and accepted friends can see the details.", saving: "Saving privacy...", saved: "Privacy updated.", controllerHint: "Navigation and lighting status for the connected controller." },
+  "es-ES": { preferences: "Preferencias del launcher", general: "General", personalization: "Personalización", account: "Cuenta y seguridad", connections: "Cuentas y privacidad", controller: "Mando y hardware", voice: "Voz y vídeo", notifications: "Notificaciones y overlay", quit: "Salir de la aplicación", encrypted: "Sesión cifrada", encryptedHint: "Conexión protegida con un JWT seguro de Supabase.", spotifyDock: "Player disponible en la pestaña Spotify", privacy: "Privacidad del perfil", privacyHint: "Elige qué pueden ver otros jugadores al encontrar tu perfil.", public: "Perfil público", publicHint: "Todos pueden abrir tus detalles, juegos y actividad.", private: "Perfil privado", privateHint: "Solo tú y tus amigos aceptados pueden ver los detalles.", saving: "Guardando privacidad...", saved: "Privacidad actualizada.", controllerHint: "Estado de navegación e iluminación del mando conectado." },
+  "fr-FR": { preferences: "Préférences du launcher", general: "Général", personalization: "Personnalisation", account: "Compte et sécurité", connections: "Comptes et confidentialité", controller: "Manette et matériel", voice: "Voix & vidéo", notifications: "Notifications et overlay", quit: "Quitter l'application", encrypted: "Session chiffrée", encryptedHint: "Connexion protégée par un JWT Supabase sécurisé.", spotifyDock: "Lecteur disponible dans l'onglet Spotify", privacy: "Confidentialité du profil", privacyHint: "Choisissez ce que les autres joueurs voient en trouvant votre profil.", public: "Profil public", publicHint: "Tout le monde peut ouvrir vos détails, jeux et activité.", private: "Profil privé", privateHint: "Seuls vous et vos amis acceptés voyez les détails.", saving: "Enregistrement...", saved: "Confidentialité mise à jour.", controllerHint: "État de navigation et d'éclairage de la manette connectée." },
+  "de-DE": { preferences: "Launcher-Einstellungen", general: "Allgemein", personalization: "Personnalierung", account: "Konto und Sicherheit", connections: "Konten und Datenschutz", controller: "Controller und Hardware", voice: "Sprache & Video", notifications: "Benachrichtigungen und Overlay", quit: "Anwendung beenden", encrypted: "Verschlüsselte Sitzung", encryptedHint: "Verbindung durch ein sicheres Supabase-JWT geschützt.", spotifyDock: "Player im Spotify-Tab verfügbar", privacy: "Profil-Datenschutz", privacyHint: "Lege fest, was andere Spieler in deinem Profil sehen.", public: "Öffentliches Profil", publicHint: "Alle können Details, Spiele und Aktivitäten öffnen.", private: "Privates Profil", privateHint: "Nur du und bestätigte Freunde sehen die Details.", saving: "Datenschutz wird gespeichert...", saved: "Datenschutz aktualisiert.", controllerHint: "Navigations- und Beleuchtungsstatus des verbundenen Controllers." },
+  "it-IT": { preferences: "Preferenze del launcher", general: "Generale", personalization: "Personalizzazione", account: "Account e sicurezza", connections: "Account e privacy", controller: "Controller e hardware", voice: "Voce & Video", notifications: "Notifiche e overlay", quit: "Esci dall'applicazione", encrypted: "Sessione crittografata", encryptedHint: "Connessione protetta da un JWT Supabase sicuro.", spotifyDock: "Player disponibile nella scheda Spotify", privacy: "Privacy del profilo", privacyHint: "Scegli cosa possono vedere gli altri giocatori nel tuo profilo.", public: "Profilo pubblico", publicHint: "Tutti possono aprire dettagli, giochi e attività.", private: "Profilo privato", privateHint: "Solo tu e gli amici accettati vedete i dettagli.", saving: "Salvataggio privacy...", saved: "Privacy aggiornata.", controllerHint: "Stato di navigazione e illuminazione del controller collegato." },
 } as const;
 
 const SETTINGS_DETAIL_COPY = {
@@ -412,6 +422,159 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   const [privacyStatus, setPrivacyStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [privacyError, setPrivacyError] = React.useState("");
 
+  let voiceCallContext: ReturnType<typeof useVoiceCallContext> | null = null;
+  try {
+    voiceCallContext = useVoiceCallContext();
+  } catch {
+    // optional outside provider
+  }
+  const [isRecordingPttKey, setIsRecordingPttKey] = React.useState(false);
+  const [isTestingMic, setIsTestingMic] = React.useState(false);
+  const [testMicVolume, setTestMicVolume] = React.useState(0);
+  const [isVideoPreviewOn, setIsVideoPreviewOn] = React.useState(false);
+  const videoPreviewRef = React.useRef<HTMLVideoElement | null>(null);
+  const videoPreviewStreamRef = React.useRef<MediaStream | null>(null);
+
+  // Live mic test with complete AudioContext and MediaStream lifecycle cleanup
+  React.useEffect(() => {
+    if (!isTestingMic || activeTab !== "voice") {
+      setTestMicVolume(0);
+      return;
+    }
+
+    let isCancelled = false;
+    let ctx: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+    let stream: MediaStream | null = null;
+    let animId: number | null = null;
+
+    const startTest = async () => {
+      try {
+        const targetId = voiceCallContext?.selectedAudioInput;
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: targetId && targetId !== "default" ? { exact: targetId } : undefined,
+            echoCancellation: voiceCallContext?.echoCancellation ?? true,
+            noiseSuppression: voiceCallContext?.noiseSuppression ?? true,
+            autoGainControl: voiceCallContext?.autoGainControl ?? true,
+          },
+          video: false,
+        });
+
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+
+        ctx = new AudioCtx();
+        source = ctx.createMediaStreamSource(stream);
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.25;
+        source.connect(analyser);
+
+        const data = new Float32Array(analyser.fftSize);
+
+        const tick = () => {
+          if (isCancelled || !analyser) return;
+          analyser.getFloatTimeDomainData(data);
+          let sumSquares = 0;
+          for (let i = 0; i < data.length; i += 1) {
+            sumSquares += data[i] * data[i];
+          }
+          const rms = Math.sqrt(sumSquares / data.length);
+          const level = Math.min(100, Math.round(rms * 700));
+          setTestMicVolume(level);
+          animId = requestAnimationFrame(tick);
+        };
+
+        animId = requestAnimationFrame(tick);
+      } catch (err) {
+        console.warn("[SettingsPage] Mic test failed:", err);
+        setIsTestingMic(false);
+      }
+    };
+
+    void startTest();
+
+    return () => {
+      isCancelled = true;
+      if (animId) cancelAnimationFrame(animId);
+      if (source) {
+        try { source.disconnect(); } catch {}
+      }
+      if (analyser) {
+        try { analyser.disconnect(); } catch {}
+      }
+      if (ctx && ctx.state !== "closed") {
+        void ctx.close().catch(() => {});
+      }
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+      setTestMicVolume(0);
+    };
+  }, [activeTab, isTestingMic, voiceCallContext?.autoGainControl, voiceCallContext?.echoCancellation, voiceCallContext?.noiseSuppression, voiceCallContext?.selectedAudioInput]);
+
+  // Video preview with lifecycle cleanup
+  React.useEffect(() => {
+    if (!isVideoPreviewOn || activeTab !== "voice") {
+      if (videoPreviewStreamRef.current) {
+        videoPreviewStreamRef.current.getTracks().forEach((t) => t.stop());
+        videoPreviewStreamRef.current = null;
+      }
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = null;
+      }
+      return;
+    }
+
+    let isCancelled = false;
+    const startVideo = async () => {
+      try {
+        const targetId = voiceCallContext?.selectedVideoInput;
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: targetId && targetId !== "default" ? { exact: targetId } : undefined,
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30 },
+          },
+          audio: false,
+        });
+
+        if (isCancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        videoPreviewStreamRef.current = stream;
+        if (videoPreviewRef.current) {
+          videoPreviewRef.current.srcObject = stream;
+        }
+      } catch {
+        setIsVideoPreviewOn(false);
+      }
+    };
+
+    void startVideo();
+
+    return () => {
+      isCancelled = true;
+      if (videoPreviewStreamRef.current) {
+        videoPreviewStreamRef.current.getTracks().forEach((t) => t.stop());
+        videoPreviewStreamRef.current = null;
+      }
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = null;
+      }
+    };
+  }, [activeTab, isVideoPreviewOn, voiceCallContext?.selectedVideoInput]);
+
   React.useEffect(() => {
     setProfileVisibility(userProfile?.profileVisibility ?? "public");
   }, [userProfile?.profileVisibility]);
@@ -578,6 +741,17 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                 }`}
             >
               <Gamepad2 className="h-4 w-4 shrink-0" /> {shellCopy.controller}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectTab("voice")}
+              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all cursor-pointer ${activeTab === "voice"
+                ? "bg-white text-black shadow-lg"
+                : "text-white/60 hover:bg-white/6 hover:text-white"
+                }`}
+            >
+              <Mic className="h-4 w-4 shrink-0" /> {shellCopy.voice}
             </button>
 
             <button
@@ -761,6 +935,95 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     onChange={onMusicVolumeChange}
                     t={t}
                   />
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Mic className="h-5 w-5 text-white/70" />}
+                  title="Voz & Comunicação"
+                  description="Configure o modo de captura do microfone, atalhos de Push-to-Talk e status de rede."
+                />
+                <div className="space-y-3.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white">Modo de Entrada de Áudio</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
+                        {voiceCallContext?.inputMode === "push-to-talk"
+                          ? "O microfone só transmite áudio enquanto a tecla configurada estiver pressionada."
+                          : "O microfone transmite automaticamente ao detectar sua voz."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => voiceCallContext?.setInputMode?.("voice-activity")}
+                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          voiceCallContext?.inputMode !== "push-to-talk"
+                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        Atividade de Voz
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => voiceCallContext?.setInputMode?.("push-to-talk")}
+                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                          voiceCallContext?.inputMode === "push-to-talk"
+                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                        }`}
+                      >
+                        Push-to-Talk
+                      </button>
+                    </div>
+                  </div>
+
+                  {voiceCallContext?.inputMode === "push-to-talk" && (
+                    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div>
+                        <p className="text-xs font-bold text-white">Atalho Global de Push-to-Talk</p>
+                        <p className="mt-0.5 text-[10px] font-medium text-white/40">
+                          Funciona mesmo durante jogos em tela cheia via atalho nativo do Windows.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRecordingPttKey(true);
+                          const onKey = (e: KeyboardEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+                            voiceCallContext?.setPushToTalkKey?.(key);
+                            setIsRecordingPttKey(false);
+                            window.removeEventListener("keydown", onKey, true);
+                          };
+                          window.addEventListener("keydown", onKey, true);
+                        }}
+                        className={`cursor-pointer min-w-[100px] px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
+                          isRecordingPttKey
+                            ? "bg-amber-500/30 text-amber-300 border border-amber-500 animate-pulse"
+                            : "bg-white/10 text-white border border-white/15 hover:bg-white/20"
+                        }`}
+                      >
+                        {isRecordingPttKey ? "Pressione uma tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white">Conexão ICE / TURN (NAT & CGNAT)</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
+                        Roteamento WebRTC resiliente com suporte a redes residenciais e provedores locais.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+                      Metered.ca TURN Ativo
+                    </span>
+                  </div>
                 </div>
               </section>
 
@@ -1065,6 +1328,340 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                 </div>
               </div>
             </section>
+          )}
+
+          {/* TAB: VOZ & VÍDEO */}
+          {activeTab === "voice" && (
+            <div className="space-y-6">
+              {/* Dispositivos de Áudio */}
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                {(() => {
+                  const defaultInputLabel =
+                    voiceCallContext?.audioInputDevices.find((d) => d.deviceId === "default" && d.label)?.label ||
+                    voiceCallContext?.audioInputDevices[0]?.label ||
+                    "";
+                  const defaultOutputLabel =
+                    voiceCallContext?.audioOutputDevices.find((d) => d.deviceId === "default" && d.label)?.label ||
+                    voiceCallContext?.audioOutputDevices[0]?.label ||
+                    "";
+                  const defaultVideoLabel =
+                    voiceCallContext?.videoInputDevices.find((d) => d.deviceId === "default" && d.label)?.label ||
+                    voiceCallContext?.videoInputDevices[0]?.label ||
+                    "";
+
+                  return (
+                    <>
+                      <SettingsHeader
+                        icon={<Mic className="h-5 w-5 text-white/70" />}
+                        title="Dispositivos de Entrada e Saída"
+                        description="Selecione seus dispositivos de microfone, fones e câmera para chamadas e transmissões."
+                      />
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {/* Microfone */}
+                        <div className="rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-3">
+                          <label className="text-xs font-bold text-white flex items-center gap-2">
+                            <Mic className="h-4 w-4 text-white/70" />
+                            Microfone de Entrada
+                          </label>
+                          <select
+                            value={voiceCallContext?.selectedAudioInput || "default"}
+                            onChange={(e) => voiceCallContext?.changeAudioInputDevice(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-[#161720] px-3 py-2 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                          >
+                            <option value="default">
+                              {defaultInputLabel && defaultInputLabel !== "default"
+                                ? `Padrão do Sistema (${defaultInputLabel.replace(/^Padrão - /i, "")})`
+                                : "Padrão do Sistema (Detectado)"}
+                            </option>
+                            {voiceCallContext?.audioInputDevices.map((d) => (
+                              <option key={d.deviceId} value={d.deviceId}>
+                                {d.label || `Microfone (${d.deviceId.slice(0, 8)}...)`}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Teste de Microfone */}
+                          <div className="pt-2 border-t border-white/6 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-white/60 flex items-center gap-1">
+                                <Activity className="h-3.5 w-3.5 text-white/70" />
+                                Volume do Microfone
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setIsTestingMic((prev) => !prev)}
+                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                  isTestingMic
+                                    ? "bg-rose-500 text-white shadow-md"
+                                    : "bg-white text-black hover:bg-white/90"
+                                }`}
+                              >
+                                {isTestingMic ? "Parar Teste" : "Testar Microfone"}
+                              </button>
+                            </div>
+                            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-75"
+                                style={{ width: `${testMicVolume}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Retorno de Microfone (Ouvir própria voz) */}
+                          <label className="flex items-center justify-between pt-2 border-t border-white/6 cursor-pointer">
+                            <span className="text-xs font-bold text-white/80 flex items-center gap-1.5">
+                              <Headphones className="h-3.5 w-3.5 text-white/70" />
+                              Ouvir minha própria voz (Retorno)
+                            </span>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(voiceCallContext?.isMicMonitoring)}
+                              onChange={(e) => voiceCallContext?.setIsMicMonitoring(e.target.checked)}
+                              className="h-4 w-4 rounded accent-white cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {/* Alto-Falante */}
+                        <div className="rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-3">
+                          <label className="text-xs font-bold text-white flex items-center gap-2">
+                            <Headphones className="h-4 w-4 text-white/70" />
+                            Dispositivo de Saída (Alto-Falante)
+                          </label>
+                          <select
+                            value={voiceCallContext?.selectedAudioOutput || "default"}
+                            onChange={(e) => voiceCallContext?.changeAudioOutputDevice(e.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-[#161720] px-3 py-2 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                          >
+                            <option value="default">
+                              {defaultOutputLabel && defaultOutputLabel !== "default"
+                                ? `Padrão do Sistema (${defaultOutputLabel.replace(/^Padrão - /i, "")})`
+                                : "Padrão do Sistema (Detectado)"}
+                            </option>
+                            {voiceCallContext?.audioOutputDevices.map((d) => (
+                              <option key={d.deviceId} value={d.deviceId}>
+                                {d.label || `Alto-Falante (${d.deviceId.slice(0, 8)}...)`}
+                              </option>
+                            ))}
+                          </select>
+
+                          <div className="pt-2 border-t border-white/6 flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-white/60">Teste de Saída</span>
+                            <button
+                              type="button"
+                              onClick={() => playSound("select")}
+                              className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                            >
+                              Testar Som
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Câmera & Preview */}
+                      <div className="mt-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-white flex items-center gap-2">
+                            <Camera className="h-4 w-4 text-white/70" />
+                            Câmera de Vídeo
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsVideoPreviewOn((prev) => !prev)}
+                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                              isVideoPreviewOn
+                                ? "bg-white text-black shadow-md font-black"
+                                : "bg-white/10 text-white hover:bg-white/20"
+                            }`}
+                          >
+                            {isVideoPreviewOn ? "Fechar Preview" : "Testar Vídeo"}
+                          </button>
+                        </div>
+
+                        <select
+                          value={voiceCallContext?.selectedVideoInput || "default"}
+                          onChange={(e) => voiceCallContext?.changeVideoInputDevice(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-[#161720] px-3 py-2 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                        >
+                          <option value="default">
+                            {defaultVideoLabel && defaultVideoLabel !== "default"
+                              ? `Padrão do Sistema (${defaultVideoLabel.replace(/^Padrão - /i, "")})`
+                              : "Padrão do Sistema (Detectado)"}
+                          </option>
+                          {voiceCallContext?.videoInputDevices.map((d) => (
+                            <option key={d.deviceId} value={d.deviceId}>
+                              {d.label || `Câmera (${d.deviceId.slice(0, 8)}...)`}
+                            </option>
+                          ))}
+                        </select>
+
+                        {isVideoPreviewOn && (
+                          <div className="relative aspect-video w-full max-w-sm rounded-xl overflow-hidden bg-black/80 border border-white/10 mt-2">
+                            <video
+                              ref={videoPreviewRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
+              </section>
+
+              {/* Sensibilidade e Processamento */}
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Activity className="h-5 w-5 text-white/70" />}
+                  title="Sensibilidade e Processamento de Áudio"
+                  description="Ajuste o limiar de ativação por voz (VAD) e filtros de redução de ruído ambiente."
+                />
+                <div className="space-y-4">
+                  {/* Slider de Sensibilidade */}
+                  <div className="rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-white">
+                      <span>Sensibilidade da Atividade de Voz</span>
+                      <span className="font-mono text-white/80">{voiceCallContext?.voiceSensitivity ?? 35}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={voiceCallContext?.voiceSensitivity ?? 35}
+                      onChange={(e) => voiceCallContext?.setVoiceSensitivity(Number(e.target.value))}
+                      className="w-full accent-white cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/30">
+                      <span>Menos Sensível (Corta ruídos)</span>
+                      <span>Mais Sensível (Sussurros)</span>
+                    </div>
+                  </div>
+
+                  {/* Toggles de Processamento */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div>
+                        <p className="text-xs font-bold text-white">Cancelamento de Eco</p>
+                        <p className="text-[10px] font-medium text-white/40">Evita retorno dos alto-falantes</p>
+                      </div>
+                      <Switch
+                        checked={voiceCallContext?.echoCancellation ?? true}
+                        onCheckedChange={(checked) => voiceCallContext?.setEchoCancellation(checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div>
+                        <p className="text-xs font-bold text-white">Supressão de Ruído</p>
+                        <p className="text-[10px] font-medium text-white/40">Filtra vento e teclado</p>
+                      </div>
+                      <Switch
+                        checked={voiceCallContext?.noiseSuppression ?? true}
+                        onCheckedChange={(checked) => voiceCallContext?.setNoiseSuppression(checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div>
+                        <p className="text-xs font-bold text-white">Ganho Automático</p>
+                        <p className="text-[10px] font-medium text-white/40">Nivela volume da voz</p>
+                      </div>
+                      <Switch
+                        checked={voiceCallContext?.autoGainControl ?? true}
+                        onCheckedChange={(checked) => voiceCallContext?.setAutoGainControl(checked)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Modo de Entrada & Auto-Teste Echo */}
+              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+                <SettingsHeader
+                  icon={<Radio className="h-5 w-5 text-white/70" />}
+                  title="Modo de Transmissão & Auto-Teste"
+                  description="Escolha entre falar livremente ou usar tecla de atalho Push-to-Talk."
+                />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/8">
+                    <button
+                      type="button"
+                      onClick={() => voiceCallContext?.setInputMode("voice-activity")}
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        voiceCallContext?.inputMode === "voice-activity"
+                          ? "bg-white text-black font-black shadow-lg"
+                          : "text-white/60 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      Atividade de Voz
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => voiceCallContext?.setInputMode("push-to-talk")}
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        voiceCallContext?.inputMode === "push-to-talk"
+                          ? "bg-white text-black font-black shadow-lg"
+                          : "text-white/60 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      Push-to-Talk
+                    </button>
+                  </div>
+
+                  {voiceCallContext?.inputMode === "push-to-talk" && (
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-white/6 bg-white/[0.035]">
+                      <div>
+                        <p className="text-xs font-bold text-white">Atalho de Teclado Global (PTT)</p>
+                        <p className="text-[10px] font-medium text-white/40">
+                          Funciona mesmo com jogos e outros aplicativos em foco.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRecordingPttKey(true);
+                          const onKey = (e: KeyboardEvent) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+                            voiceCallContext?.setPushToTalkKey(key);
+                            setIsRecordingPttKey(false);
+                            window.removeEventListener("keydown", onKey, true);
+                          };
+                          window.addEventListener("keydown", onKey, true);
+                        }}
+                        className={`px-4 py-2 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
+                          isRecordingPttKey
+                            ? "bg-white/20 text-white border-white/40 animate-pulse"
+                            : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                        }`}
+                      >
+                        {isRecordingPttKey ? "Pressione a tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-white/6 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-white">Auto-Teste de Chamada (Echo Bot)</p>
+                      <p className="text-[10px] font-medium text-white/40">
+                        Inicie uma sessão de teste local para verificar áudio, vídeo e compartilhamento de tela.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => voiceCallContext?.startTestCall()}
+                      className="px-4 py-2 rounded-xl bg-white text-black font-black text-xs uppercase tracking-wider hover:bg-white/90 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 cursor-pointer"
+                    >
+                      Iniciar Auto-Teste
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
           )}
 
           {/* TAB 6: NOTIFICAÇÕES & OVERLAY */}

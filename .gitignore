@@ -40,3 +40,5 @@ public/download
 *.p12
 *.pem
 *.key
+
+.test-profile

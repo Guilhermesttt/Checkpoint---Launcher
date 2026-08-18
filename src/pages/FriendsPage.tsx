@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Gamepad2, MessageSquare, Search, Trash2, User, UserCheck, Users, X } from "lucide-react";
+import { Gamepad2, MessageSquare, Phone, Search, Trash2, User, UserCheck, Users, Video, X } from "lucide-react";
 import { SystemPageShell } from "../components/ui/SystemPageShell";
 import ModalShell from "../components/ui/ModalShell";
 import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
@@ -41,6 +41,8 @@ export interface FriendsPageProps {
   onRejectRequest: (uid: string) => void;
   onAddFriendClick: () => void;
   onOpenChat: (friend: SocialFriend) => void;
+  onStartVoiceCall?: (friend: SocialFriend, withVideo?: boolean) => void;
+  onStartTestCall?: () => void;
 }
 
 export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
@@ -63,6 +65,8 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
   onRejectRequest,
   onAddFriendClick,
   onOpenChat,
+  onStartVoiceCall,
+  onStartTestCall,
 }) => {
   const copy = FRIENDS_COPY[language] || FRIENDS_COPY["pt-BR"];
   const [friendSearch, setFriendSearch] = useState("");
@@ -137,6 +141,17 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             >
               + {t("addFriendTitle")}
             </button>
+            {onStartTestCall && (
+              <button
+                type="button"
+                onClick={onStartTestCall}
+                title="Testar microfone, áudio e compartilhamento de tela"
+                className="cursor-pointer flex items-center justify-center gap-1.5 h-8 rounded-xl border border-white/10 bg-white/[0.06] px-3 text-xs font-bold uppercase tracking-wider text-white/80 transition-all hover:bg-white/10 hover:text-white active:scale-95"
+              >
+                <Phone className="h-3 w-3" />
+                <span>Testar Chamada & Tela</span>
+              </button>
+            )}
             {!discordConnected && (
               <button
                 type="button"
@@ -407,7 +422,28 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     </div>
 
                     <div className="flex shrink-0 items-center justify-end gap-2">
-
+                      {friend.source === "checkpoint" && onStartVoiceCall && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onStartVoiceCall(friend, false)}
+                            title="Ligar (Voz)"
+                            aria-label="Ligar por voz"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-all hover:bg-white/10 hover:text-white"
+                          >
+                            <Phone className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onStartVoiceCall(friend, true)}
+                            title="Compartilhar Tela / Vídeo"
+                            aria-label="Compartilhar tela ou vídeo"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition-all hover:bg-white/10 hover:text-white"
+                          >
+                            <Video className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
 
                       {friend.source === "checkpoint" && (
                         <button

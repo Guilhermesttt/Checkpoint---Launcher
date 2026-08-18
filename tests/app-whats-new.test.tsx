@@ -17,6 +17,7 @@ vi.mock("../src/auth/AuthProvider", () => ({
 }));
 vi.mock("../src/components/NotificationCenter", () => ({
   NotificationProvider: ({ children }: { children: React.ReactNode }) => children,
+  useNotification: () => ({ notify: vi.fn(), notifications: [] }),
 }));
 vi.mock("../src/context/PreferencesContext", () => ({
   PreferencesProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -29,6 +30,13 @@ vi.mock("../src/context/GamepadContext", () => ({
 vi.mock("../src/components/MainVideoBackground", () => ({ default: () => null }));
 vi.mock("../src/components/ui/GamepadStatusOverlay", () => ({ GamepadStatusOverlay: () => null }));
 vi.mock("../src/components/ui/ControllerVirtualKeyboard", () => ({ default: () => null }));
+vi.mock("../src/context/VoiceCallContext", () => ({
+  VoiceCallProvider: ({ children }: { children: React.ReactNode }) => children,
+  useVoiceCallContext: () => ({
+    startCall: vi.fn(),
+    callState: "idle",
+  }),
+}));
 vi.mock("../src/hooks/useControllerLed", () => ({ useControllerLed: vi.fn() }));
 vi.mock("../src/services/api", () => ({ isBackendHealthy: vi.fn().mockResolvedValue(true) }));
 
