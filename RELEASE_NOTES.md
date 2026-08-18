@@ -1,3 +1,16 @@
+## Checkpoint Launcher — v3.1.0
+
+Lançamento: 18 de agosto de 2026.
+
+- **Chamadas de Voz e Vídeo WebRTC**: Comunicação peer-to-peer em tempo real com áudio 48kHz, cancelamento de eco, supressão de ruído e sinalização via WebSocket.
+- **Detecção de Voz (VAD) Calibrada**: Ativação instantânea no volume de fala natural com anel verde luminoso e estabilidade de conversação.
+- **Compartilhamento de Tela e Janelas**: Transmissão fluida de tela inteira ou janelas com áudio do sistema/jogo isolado para evitar eco.
+- **Retorno de Microfone (Sidetone)**: Monitoramento direto da própria voz em tempo real nos fones.
+- **Detecção Inteligente de Dispositivos**: Enumeração dinâmica e identificação automática do hardware padrão conectado.
+- **Identidade Visual e Efeitos Sonoros**: Interface limpa e minimalista no estilo Discord com efeitos sonoros integrados.
+
+---
+
 ## Checkpoint Launcher — v3.0.8
 
 Lançamento: 7 de agosto de 2026.

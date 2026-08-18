@@ -1,5 +1,5 @@
 export interface ReleaseHighlight {
-  id: "spotify" | "controller" | "stability" | "platforms" | "search" | "mods";
+  id: "spotify" | "controller" | "stability" | "platforms" | "search" | "mods" | "voice";
   title: string;
   description: string;
 }
@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.0.8",
-  title: "Gestão Avançada de Mods e Social",
-  description: "Novo detector de conflitos de mods, perfis customizados, melhorias na atualização do app e central de amigos aprimorada.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.0.8",
+  version: "3.1.0",
+  title: "Chamadas de Voz e Transmissão de Tela",
+  description: "Sistema completo de chamadas de voz e vídeo peer-to-peer, transmissão de tela com áudio integrado, retorno de microfone e detecção inteligente de hardware.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.0",
   highlights: [
     {
-      id: "mods",
-      title: "Detector de Conflitos e Perfis de Mods",
-      description: "Gerencie perfis de modding e detecte automaticamente conflitos entre mods instalados.",
+      id: "voice",
+      title: "Chamadas de Voz e Vídeo WebRTC",
+      description: "Converse com seus amigos em tempo real com baixa latência, cancelamento de eco, supressão de ruído e interface limpa estilo Discord.",
+    },
+    {
+      id: "platforms",
+      title: "Transmissão de Tela com Áudio",
+      description: "Compartilhe janelas ou sua tela inteira com áudio direto do jogo isolado e sem feedback acústico.",
     },
     {
       id: "stability",
-      title: "Atualizações Mais Confiáveis",
-      description: "Novo sistema de tratamento de erros e relatórios claros no processo de atualização do launcher.",
-    },
-    {
-      id: "search",
-      title: "Navegação e Social Aprimorados",
-      description: "Navegação em breadcrumbs interativa, melhorias na aba de amigos e na exibição dos detalhes de jogos.",
+      title: "Retorno de Microfone e Detecção de Dispositivos",
+      description: "Monitore sua voz em tempo real e alterne facilmente entre fones e microfones detectados automaticamente pelo launcher.",
     },
   ],
 };
