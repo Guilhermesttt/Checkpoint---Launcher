@@ -406,6 +406,13 @@ const Home: React.FC = () => {
     language: launcherLanguage,
   });
 
+  let voiceCallContext: ReturnType<typeof useVoiceCallContext> | null = null;
+  try {
+    voiceCallContext = useVoiceCallContext();
+  } catch {
+    // optional outside provider
+  }
+
   const connectRetroAchievements = useCallback(async (username: string) => {
     setRetroAchievementsConnecting(true);
     setRetroAchievementsError(undefined);
@@ -1513,6 +1520,47 @@ const Home: React.FC = () => {
         }).finally(() => setOverlayChatSending(false));
         return;
       }
+      if (action.kind === "voice-call") {
+        const found = socialFriends.find((candidate) => candidate.id === action.friendId || candidate.id === `cp-friend:${action.friendId}`);
+        const friendUid = action.friendUid || (action.friendId?.startsWith("cp-friend:") ? action.friendId.replace("cp-friend:", "") : action.friendId) || "";
+        const targetFriend: SocialFriend = found || {
+          id: `cp-friend:${friendUid}`,
+          name: action.friendName || "Amigo",
+          avatar: action.friendAvatar,
+          status: "online",
+          source: "checkpoint",
+        };
+        if (targetFriend.id && voiceCallContext) {
+          void voiceCallContext.startCall(targetFriend);
+        }
+        return;
+      }
+      if (action.kind === "voice-accept") {
+        if (voiceCallContext) {
+          void voiceCallContext.answerCall();
+        }
+        return;
+      }
+      if (action.kind === "voice-reject") {
+        if (voiceCallContext) {
+          void voiceCallContext.rejectCall();
+        }
+        return;
+      }
+      if (action.kind === "voice-hangup") {
+        if (voiceCallContext) {
+          void voiceCallContext.hangUp();
+        }
+        return;
+      }
+      if (action.kind === "voice-mute") {
+        voiceCallContext?.toggleMute();
+        return;
+      }
+      if (action.kind === "voice-deafen") {
+        voiceCallContext?.toggleDeafen();
+        return;
+      }
       if (action.kind !== "send-message" || !overlayChatFriendUid || overlayChatSending) return;
       const text = action.text.trim();
       if (!text) return;
@@ -1539,7 +1587,7 @@ const Home: React.FC = () => {
         setOverlayChatError(error instanceof Error ? error.message : "Não foi possível enviar a mensagem.");
       }).finally(() => setOverlayChatSending(false));
     });
-  }, [notify, overlayChatFriendUid, overlayChatSending, selectCategory, setActiveChatFriend, socialFriends, spotifyPlayer, user?.uid]);
+  }, [notify, overlayChatFriendUid, overlayChatSending, selectCategory, setActiveChatFriend, socialFriends, spotifyPlayer, user?.uid, voiceCallContext]);
 
   const onSelectHandler = useCallback(
     (index: number, openGame?: Game) => {

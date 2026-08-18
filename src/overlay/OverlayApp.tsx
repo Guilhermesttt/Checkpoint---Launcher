@@ -16,6 +16,10 @@ import {
   ExternalLink,
   ZoomIn,
   Maximize2,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  PhoneIncoming,
 } from "lucide-react";
 
 interface AchievementToast {
@@ -30,13 +34,14 @@ interface AchievementToast {
 
 interface SocialToast {
   id: string;
-  kind: "friend-playing" | "friend-request" | "friend-accepted" | "message" | "capture" | "hint";
+  kind: "friend-playing" | "friend-request" | "friend-accepted" | "message" | "capture" | "hint" | "incoming-call";
   title: string;
   subtitle?: string;
   avatar?: string;
   message?: string;
   gameTitle?: string;
   screenshotUrl?: string;
+  callerUid?: string;
 }
 
 interface OverlayChatMessage {
@@ -300,26 +305,55 @@ const OverlayApp: React.FC = () => {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -30, scale: 0.95 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-3.5 rounded-2xl border border-white/10 bg-black/85 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+              className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/85 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-                {toast.avatar ? (
-                  <img src={toast.avatar} alt="" className="h-full w-full object-cover" />
-                ) : toast.screenshotUrl ? (
-                  <Camera className="h-4.5 w-4.5 text-cyan-300" />
-                ) : (
-                  <Sparkles className="h-4.5 w-4.5 text-white/70" />
-                )}
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
+                  {toast.avatar ? (
+                    <img src={toast.avatar} alt="" className="h-full w-full object-cover" />
+                  ) : toast.kind === "incoming-call" ? (
+                    <PhoneIncoming className="h-5 w-5 text-emerald-400 animate-bounce" />
+                  ) : toast.screenshotUrl ? (
+                    <Camera className="h-4.5 w-4.5 text-cyan-300" />
+                  ) : (
+                    <Sparkles className="h-4.5 w-4.5 text-white/70" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h4 className="truncate text-xs font-bold text-white">{toast.title}</h4>
+                  {toast.subtitle && (
+                    <p className="truncate text-[10px] font-medium text-white/50 mt-0.5">{toast.subtitle}</p>
+                  )}
+                  {toast.message && (
+                    <p className="line-clamp-1 text-[10px] font-medium text-white/70 mt-0.5">{toast.message}</p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="truncate text-xs font-bold text-white">{toast.title}</h4>
-                {toast.subtitle && (
-                  <p className="truncate text-[10px] font-medium text-white/50 mt-0.5">{toast.subtitle}</p>
-                )}
-                {toast.message && (
-                  <p className="line-clamp-1 text-[10px] font-medium text-white/70 mt-0.5">{toast.message}</p>
-                )}
-              </div>
+
+              {toast.kind === "incoming-call" && (
+                <div className="flex items-center gap-2 pt-1 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      (window as any).achievementOverlay?.panelAction?.({ kind: "voice-accept" });
+                      setSocialToasts((prev) => prev.filter((t) => t.id !== toast.id));
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs py-2 px-3 transition-colors shadow-lg shadow-emerald-500/20"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" /> Atender
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      (window as any).achievementOverlay?.panelAction?.({ kind: "voice-reject" });
+                      setSocialToasts((prev) => prev.filter((t) => t.id !== toast.id));
+                    }}
+                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 font-bold text-xs py-2 px-3 transition-colors"
+                  >
+                    <PhoneOff className="h-3.5 w-3.5" /> Recusar
+                  </button>
+                </div>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -548,13 +582,30 @@ const OverlayApp: React.FC = () => {
                             </div>
                           </div>
                           {friend.canChat && (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectChat(friend.id)}
-                              className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/15 transition-all"
-                            >
-                              <MessageSquare className="h-3.5 w-3.5" /> Chat
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  (window as any).achievementOverlay?.panelAction?.({
+                                    kind: "voice-call",
+                                    friendId: friend.id,
+                                    friendName: friend.name,
+                                    friendAvatar: friend.avatar,
+                                  });
+                                }}
+                                className="flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-2.5 py-1.5 text-xs font-bold transition-all"
+                                title="Ligar para amigo"
+                              >
+                                <Phone className="h-3.5 w-3.5" /> Ligar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectChat(friend.id)}
+                                className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-white/15 transition-all"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" /> Chat
+                              </button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -592,6 +643,22 @@ const OverlayApp: React.FC = () => {
                               </p>
                             </div>
                           </div>
+
+                          {/* Call Button in Chat Header */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              (window as any).achievementOverlay?.panelAction?.({
+                                kind: "voice-call",
+                                friendId: panelData.chat?.friendId,
+                                friendName: panelData.chat?.friendName,
+                                friendAvatar: panelData.chat?.friendAvatar,
+                              });
+                            }}
+                            className="flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 px-3 py-1.5 text-xs font-bold transition-all shadow-md shadow-emerald-500/10"
+                          >
+                            <Phone className="h-3.5 w-3.5" /> Ligar
+                          </button>
                         </div>
 
                         {/* Messages Feed */}

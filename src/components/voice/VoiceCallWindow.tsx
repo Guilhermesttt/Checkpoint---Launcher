@@ -212,20 +212,46 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     };
   }, [isSettingsOpen, localStream]);
 
-  // Attach remote stream to audio/video elements
+  // Attach remote stream to audio/video elements with resilience to minimize/visibilitychange
   useEffect(() => {
-    if (remoteStream) {
-      if (videoRef.current) {
-        videoRef.current.srcObject = remoteStream;
-      }
-      if (audioRef.current) {
-        audioRef.current.srcObject = remoteStream;
-        // Apply sinkId if available
-        if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (audioRef.current as any).setSinkId === "function") {
-          void (audioRef.current as any).setSinkId(selectedAudioOutput).catch(() => {});
+    const syncStream = () => {
+      if (remoteStream) {
+        if (videoRef.current) {
+          if (videoRef.current.srcObject !== remoteStream) {
+            videoRef.current.srcObject = remoteStream;
+          }
+          videoRef.current.play().catch(() => {});
+        }
+        if (audioRef.current) {
+          if (audioRef.current.srcObject !== remoteStream) {
+            audioRef.current.srcObject = remoteStream;
+          }
+          if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (audioRef.current as any).setSinkId === "function") {
+            void (audioRef.current as any).setSinkId(selectedAudioOutput).catch(() => {});
+          }
+          audioRef.current.play().catch(() => {});
         }
       }
-    }
+    };
+
+    syncStream();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncStream();
+      }
+    };
+
+    const handleFocus = () => {
+      syncStream();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [remoteStream, isRemoteSharingScreen, isRemoteCameraOn, selectedAudioOutput]);
 
   // Handle deafen and echo prevention on audio/video elements
@@ -337,7 +363,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               // Remote Screen Share Video Feed
               <div className="relative h-full w-full flex items-center justify-center rounded-2xl overflow-hidden bg-black/90 border border-white/10 shadow-2xl">
                 <video
-                  ref={videoRef}
+                  ref={(el) => {
+                    videoRef.current = el;
+                    if (el && remoteStream) {
+                      if (el.srcObject !== remoteStream) {
+                        el.srcObject = remoteStream;
+                      }
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted

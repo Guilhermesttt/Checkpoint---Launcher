@@ -590,6 +590,12 @@ declare global {
         | { kind: "spotify-previous" }
         | { kind: "spotify-seek"; positionMs: number }
         | { kind: "spotify-volume"; volume: number }
+        | { kind: "voice-call"; friendId?: string; friendUid?: string; friendName?: string; friendAvatar?: string }
+        | { kind: "voice-accept" }
+        | { kind: "voice-reject" }
+        | { kind: "voice-hangup" }
+        | { kind: "voice-mute" }
+        | { kind: "voice-deafen" }
       ) => void) => () => void;
 
       // ─ Real-time achievement push events (main → renderer) ─────────────────

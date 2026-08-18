@@ -29,9 +29,54 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     notify,
   });
 
+  // Persistent audio playback for remote participant even when window is minimized/closed
+  const remoteAudioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  React.useEffect(() => {
+    if (remoteAudioRef.current && voiceCall.remoteStream) {
+      if (remoteAudioRef.current.srcObject !== voiceCall.remoteStream) {
+        remoteAudioRef.current.srcObject = voiceCall.remoteStream;
+      }
+      const isEchoTest = voiceCall.session?.friendUid === "echo-bot";
+      remoteAudioRef.current.muted = voiceCall.isDeafened || isEchoTest;
+
+      if (
+        voiceCall.selectedAudioOutput &&
+        voiceCall.selectedAudioOutput !== "default" &&
+        typeof (remoteAudioRef.current as any).setSinkId === "function"
+      ) {
+        void (remoteAudioRef.current as any).setSinkId(voiceCall.selectedAudioOutput).catch(() => {});
+      }
+      remoteAudioRef.current.play().catch(() => {});
+    }
+  }, [
+    voiceCall.remoteStream,
+    voiceCall.isDeafened,
+    voiceCall.session?.friendUid,
+    voiceCall.selectedAudioOutput,
+  ]);
+
+  // Notify in-game overlay when an incoming call arrives
+  React.useEffect(() => {
+    if (voiceCall.callState === "ringing-in" && voiceCall.incomingInvite) {
+      if ((window as any).electronAPI?.sendOverlaySocial) {
+        (window as any).electronAPI.sendOverlaySocial({
+          kind: "incoming-call",
+          title: "Chamada de Voz",
+          subtitle: `${voiceCall.incomingInvite.callerName} está te ligando...`,
+          avatar: voiceCall.incomingInvite.callerAvatar,
+          message: "Abra o overlay (F8) para atender ou recusar",
+        });
+      }
+    }
+  }, [voiceCall.callState, voiceCall.incomingInvite]);
+
   return (
     <VoiceCallContext.Provider value={voiceCall}>
       {children}
+
+      {/* Global persistent audio element */}
+      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
 
       {/* Incoming Call Popup */}
       <IncomingCallModal

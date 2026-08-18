@@ -4287,6 +4287,21 @@
           unread.textContent = String(Math.min(99, friend.unread));
           card.appendChild(unread);
         }
+        if (friend.canChat) {
+          const callBtn = document.createElement("button");
+          callBtn.className = "chat-button";
+          callBtn.style.cssText = "margin-right: 6px; background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35);";
+          callBtn.textContent = "Ligar";
+          callBtn.addEventListener("click", () => {
+            window.achievementOverlay.panelAction({
+              kind: "voice-call",
+              friendId: friend.id,
+              friendName: friend.name,
+              friendAvatar: friend.avatar,
+            });
+          });
+          card.appendChild(callBtn);
+        }
         const chat = document.createElement("button");
         chat.className = "chat-button";
         chat.textContent = friend.canChat ? "Chat" : overlayT("unavailable");
