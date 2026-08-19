@@ -9,21 +9,25 @@ import {
   MonitorOff,
   Maximize2,
   PhoneOff,
-  Radio,
+  Phone,
 } from "lucide-react";
-import type { VoiceCallSession } from "../../types/domain";
+import type { UserProfile, VoiceCallSession, CallState } from "../../types/domain";
 
 interface VoiceCallBarProps {
   session: VoiceCallSession | null;
+  userProfile?: UserProfile | null;
   duration: number;
   isMuted: boolean;
   isDeafened: boolean;
-  isSpeaking: boolean;
+  isSpeakingLocal?: boolean;
+  isSpeakingRemote?: boolean;
+  remoteSpeakingStates?: Map<string, boolean>;
   isSharingScreen: boolean;
   isReconnecting?: boolean;
   inputMode?: "voice-activity" | "push-to-talk";
   pushToTalkKey?: string;
   isPttPressed?: boolean;
+  callState?: CallState;
   onToggleMute: () => void;
   onToggleDeafen: () => void;
   onToggleScreenShare: () => void;
@@ -39,15 +43,19 @@ const formatDuration = (secs: number) => {
 
 export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
   session,
+  userProfile,
   duration,
   isMuted,
   isDeafened,
-  isSpeaking,
+  isSpeakingLocal = false,
+  isSpeakingRemote = false,
+  remoteSpeakingStates,
   isSharingScreen,
   isReconnecting = false,
   inputMode = "voice-activity",
   pushToTalkKey = "F8",
   isPttPressed = false,
+  callState = "active",
   onToggleMute,
   onToggleDeafen,
   onToggleScreenShare,
@@ -55,6 +63,35 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
   onHangUp,
 }) => {
   if (!session) return null;
+
+  const isRingingOut = callState === "ringing-out";
+  const isConnecting = callState === "connecting";
+
+  // Determine active speaker info and avatar
+  let displayAvatar: string | null | undefined = session.friendAvatar;
+  let displayName = session.friendName || "Voz";
+  let isCurrentlySpeaking = false;
+
+  if (isSpeakingRemote) {
+    isCurrentlySpeaking = true;
+    if (session.participants && remoteSpeakingStates) {
+      const activeRemote = session.participants.find((p) => remoteSpeakingStates.get(p.uid));
+      if (activeRemote) {
+        displayAvatar = activeRemote.avatar;
+        displayName = activeRemote.name;
+      }
+    }
+  } else if (isSpeakingLocal) {
+    isCurrentlySpeaking = true;
+    if (userProfile?.photoURL) {
+      displayAvatar = userProfile.photoURL;
+    }
+    if (userProfile?.displayName) {
+      displayName = `${userProfile.displayName} (Você)`;
+    } else {
+      displayName = "Você";
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -69,7 +106,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
             : "border-white/10 bg-[#121215]/95"
         }`}
       >
-        {/* Connection Status & Friend */}
+        {/* Connection Status & Friend / Speaker */}
         <div
           onClick={onOpenWindow}
           className="flex items-center gap-3 cursor-pointer group"
@@ -80,26 +117,34 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
               className={`h-9 w-9 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
                 isReconnecting
                   ? "border-amber-400"
-                  : isSpeaking
-                  ? "border-white shadow-[0_0_15px_rgba(255,255,255,0.35)] scale-105"
+                  : isRingingOut
+                  ? "border-amber-400/40 opacity-50"
+                  : isCurrentlySpeaking
+                  ? "border-white ring-2 ring-white/40 shadow-[0_0_15px_rgba(255,255,255,0.4)] scale-105"
                   : "border-white/10"
               }`}
             >
-              {session.friendAvatar ? (
+              {displayAvatar ? (
                 <img
-                  src={session.friendAvatar}
-                  alt={session.friendName}
+                  src={displayAvatar}
+                  alt={displayName}
                   className="h-full w-full object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-white/10 text-xs font-bold text-white border border-white/10">
-                  {session.friendName.slice(0, 2).toUpperCase()}
+                  {displayName.slice(0, 2).toUpperCase()}
                 </div>
               )}
             </div>
             <div
               className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#121215] ${
-                isReconnecting ? "bg-amber-400 animate-ping" : "bg-white"
+                isReconnecting
+                  ? "bg-amber-400 animate-ping"
+                  : isRingingOut
+                  ? "bg-amber-400"
+                  : isCurrentlySpeaking
+                  ? "bg-white"
+                  : "bg-white/60"
               }`}
             />
           </div>
@@ -108,15 +153,35 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
             <div className="flex items-center gap-1.5">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  isReconnecting ? "bg-amber-400 animate-bounce" : "bg-white animate-pulse"
+                  isReconnecting
+                    ? "bg-amber-400 animate-bounce"
+                    : isRingingOut
+                    ? "bg-amber-400 animate-ping"
+                    : isCurrentlySpeaking
+                    ? "bg-white animate-pulse"
+                    : "bg-white/60"
                 }`}
               />
               <span
                 className={`text-[10px] font-black uppercase tracking-wider ${
-                  isReconnecting ? "text-amber-400" : "text-white/80"
+                  isReconnecting
+                    ? "text-amber-400"
+                    : isRingingOut
+                    ? "text-amber-300"
+                    : isCurrentlySpeaking
+                    ? "text-white"
+                    : "text-white/70"
                 }`}
               >
-                {isReconnecting ? "Reconectando..." : "Voz Conectada"}
+                {isReconnecting
+                  ? "Reconectando..."
+                  : isRingingOut
+                  ? "Chamando..."
+                  : isConnecting
+                  ? "Conectando..."
+                  : isCurrentlySpeaking
+                  ? "Voz Ativa"
+                  : "Voz Conectada"}
               </span>
               {inputMode === "push-to-talk" && (
                 <span
@@ -131,10 +196,10 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-white group-hover:text-white/80 transition-colors">
-                {session.friendName}
+              <span className="text-xs font-bold text-white group-hover:text-white/80 transition-colors truncate max-w-[140px]">
+                {displayName}
               </span>
-              <span className="text-[10px] font-mono text-white/40">
+              <span className="text-[10px] font-mono text-white/40 shrink-0">
                 • {formatDuration(duration)}
               </span>
             </div>
@@ -212,3 +277,4 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
     </AnimatePresence>
   );
 };
+

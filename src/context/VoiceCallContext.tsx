@@ -203,32 +203,37 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         onReject={voiceCall.rejectCall}
       />
 
-      {/* Persistent Bottom Call Bar (visible when call is active and main window is closed) */}
-      {voiceCall.callState === "active" && !voiceCall.isVoiceWindowOpen && (
-        <VoiceCallBar
-          session={voiceCall.session}
-          duration={voiceCall.callDuration}
-          isMuted={voiceCall.isMuted}
-          isDeafened={voiceCall.isDeafened}
-          isSpeaking={voiceCall.isSpeakingLocal || voiceCall.isSpeakingRemote}
-          isSharingScreen={voiceCall.isSharingScreen}
-          isReconnecting={voiceCall.isReconnecting}
-          inputMode={voiceCall.inputMode}
-          pushToTalkKey={voiceCall.pushToTalkKey}
-          isPttPressed={voiceCall.isPttPressed}
-          onToggleMute={voiceCall.toggleMute}
-          onToggleDeafen={voiceCall.toggleDeafen}
-          onToggleScreenShare={() => {
-            if (voiceCall.isSharingScreen) {
-              void voiceCall.stopScreenShare();
-            } else {
-              voiceCall.setIsScreenPickerOpen(true);
-            }
-          }}
-          onOpenWindow={() => voiceCall.setIsVoiceWindowOpen(true)}
-          onHangUp={voiceCall.hangUp}
-        />
-      )}
+      {/* Persistent Bottom Call Bar (visible when in call and main window is closed) */}
+      {(voiceCall.callState === "active" || voiceCall.callState === "ringing-out" || voiceCall.callState === "connecting") &&
+        !voiceCall.isVoiceWindowOpen && (
+          <VoiceCallBar
+            session={voiceCall.session}
+            userProfile={userProfile}
+            duration={voiceCall.callDuration}
+            callState={voiceCall.callState}
+            isMuted={voiceCall.isMuted}
+            isDeafened={voiceCall.isDeafened}
+            isSpeakingLocal={voiceCall.isSpeakingLocal}
+            isSpeakingRemote={voiceCall.isSpeakingRemote}
+            remoteSpeakingStates={voiceCall.remoteSpeakingStates}
+            isSharingScreen={voiceCall.isSharingScreen}
+            isReconnecting={voiceCall.isReconnecting}
+            inputMode={voiceCall.inputMode}
+            pushToTalkKey={voiceCall.pushToTalkKey}
+            isPttPressed={voiceCall.isPttPressed}
+            onToggleMute={voiceCall.toggleMute}
+            onToggleDeafen={voiceCall.toggleDeafen}
+            onToggleScreenShare={() => {
+              if (voiceCall.isSharingScreen) {
+                void voiceCall.stopScreenShare();
+              } else {
+                voiceCall.setIsScreenPickerOpen(true);
+              }
+            }}
+            onOpenWindow={() => voiceCall.setIsVoiceWindowOpen(true)}
+            onHangUp={voiceCall.hangUp}
+          />
+        )}
 
       {/* Expanded Main Call Window */}
       <VoiceCallWindow
