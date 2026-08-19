@@ -12,14 +12,14 @@ describe("modal completo de novidades", () => {
 
   afterEach(cleanup);
 
-  it("apresenta os tres destaques da versao 3.1.0", () => {
+  it("apresenta os tres destaques da versao 3.1.2", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={vi.fn()} />);
 
-    expect(screen.getByText("Chamadas de Voz e Transmissão de Tela")).toBeInTheDocument();
-    expect(screen.getByText("VERSÃO 3.1.0")).toBeInTheDocument();
+    expect(screen.getByText("Áudio WebRTC Instantâneo, Barramento U2U e Overlays")).toBeInTheDocument();
+    expect(screen.getByText("VERSÃO 3.1.2")).toBeInTheDocument();
     expect(screen.getAllByTestId("release-highlight")).toHaveLength(3);
-    expect(screen.getByText("Chamadas de Voz e Vídeo WebRTC")).toBeInTheDocument();
-    expect(screen.getByText("Transmissão de Tela com Áudio")).toBeInTheDocument();
+    expect(screen.getByText("Áudio WebRTC Sem Latência")).toBeInTheDocument();
+    expect(screen.getByText("Barramento Global U2U em Tempo Real")).toBeInTheDocument();
   });
 
   it("confirma as novidades pelo botao principal", async () => {
@@ -42,7 +42,7 @@ describe("modal completo de novidades", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Ver notas completas" }));
     expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.0",
+      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.2",
     );
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar novidades" }));

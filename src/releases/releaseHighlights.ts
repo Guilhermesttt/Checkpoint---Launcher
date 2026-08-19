@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.1.1",
-  title: "Processamento de Áudio com IA e Ganho Real",
-  description: "Supressão de ruído avançada por rede neural (RNNoise WASM), amplificação real de ganho via Web Audio, foco em câmera e notificações globais de chat.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.1",
+  version: "3.1.2",
+  title: "Áudio WebRTC Instantâneo, Barramento U2U e Overlays",
+  description: "Reprodução automática de áudio WebRTC em DOM nativo, barramento WebSocket U2U em tempo real, edição de canais de voz e overlays reativos instantâneos.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.2",
   highlights: [
     {
       id: "voice",
-      title: "Supressão de Ruído por IA (RNNoise)",
-      description: "Filtre ruídos de teclado mecânico, ventiladores e ambiente com processamento neural em tempo real.",
+      title: "Áudio WebRTC Sem Latência",
+      description: "Captura ontrack e reprodução automática imediata via DOM AutoPlay e Soft Limiter profissional.",
     },
     {
       id: "stability",
-      title: "Ganho Real de Microfone (0–200%)",
-      description: "Amplificação de volume transmitida diretamente para a chamada com compressor anti-clipping integrado.",
+      title: "Barramento Global U2U em Tempo Real",
+      description: "Status de amigos (Jogando/Online), mensagens diretas e convites trafegam por via rápida WebSocket (<50ms).",
     },
     {
       id: "platforms",
-      title: "Notificações de Chat e Foco em Câmera",
-      description: "Notificações instantâneas de novas mensagens e visualização da câmera em tela cheia no modo focado.",
+      title: "Edição de Canais & Overlays Reativos",
+      description: "Personalização de canais criados (tema, nome, ícone), simulador de chamadas e pop-ups instantâneos.",
     },
   ],
 };

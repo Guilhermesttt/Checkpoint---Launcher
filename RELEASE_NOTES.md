@@ -1,3 +1,15 @@
+## Checkpoint Launcher — v3.1.2
+
+Lançamento: 19 de agosto de 2026.
+
+- **Áudio WebRTC Sem Latência e DOM AutoPlay**: Captura direta de faixas no `ontrack` com reprodução automática em elementos de áudio dedicados no DOM e Soft Limiter Web Audio integrado para volume limpo e sem estalos.
+- **Barramento Global de Eventos U2U em Tempo Real (WebSocket Event Bus)**: Status de presença de amigos (Jogando/Online), mensagens diretas e convites trafegam por via rápida WebSocket com latência inferior a 50ms, mantendo o banco de dados em segundo plano como histórico persistente.
+- **Edição de Canais de Voz Pós-Criação**: Permite que o anfitrião personalize nome, ícone, imagem e tema de cor tanto pela lista de canais quanto diretamente pela barra superior da chamada ativa.
+- **Simulação e Teste de Chamada Recebida**: Novo botão na aba de canais para testar o modal e som de chamada recebida com 1 clique.
+- **Overlays e Notificações Reativas**: Atualização e exibição instantânea de pop-ups in-game e toasts visuais no exato milissegundo em que amigos entram em jogos ou enviam mensagens.
+
+---
+
 ## Checkpoint Launcher — v3.1.1
 
 Lançamento: 18 de agosto de 2026.

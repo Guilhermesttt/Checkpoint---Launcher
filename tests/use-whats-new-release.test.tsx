@@ -20,18 +20,18 @@ describe("novidades por versao", () => {
     });
   };
 
-  it("abre a versao 3.1.0 em uma instalacao nova", async () => {
-    exposeVersion(Promise.resolve("3.1.0"));
+  it("abre a versao 3.1.2 em uma instalacao nova", async () => {
+    exposeVersion(Promise.resolve("3.1.2"));
 
     const { result } = renderHook(() => useWhatsNewRelease(true));
 
-    await waitFor(() => expect(result.current.release?.version).toBe("3.1.0"));
+    await waitFor(() => expect(result.current.release?.version).toBe("3.1.2"));
     expect(result.current.release?.highlights).toHaveLength(3);
   });
 
   it("nao abre uma versao que o usuario ja confirmou", async () => {
-    localStorage.setItem("checkpoint:last-seen-release", "3.1.0");
-    exposeVersion(Promise.resolve("3.1.0"));
+    localStorage.setItem("checkpoint:last-seen-release", "3.1.2");
+    exposeVersion(Promise.resolve("3.1.2"));
 
     const { result } = renderHook(() => useWhatsNewRelease(true));
 
@@ -40,7 +40,7 @@ describe("novidades por versao", () => {
   });
 
   it("espera a introducao terminar antes de consultar a versao", async () => {
-    exposeVersion(Promise.resolve("3.1.0"));
+    exposeVersion(Promise.resolve("3.1.2"));
 
     const { result, rerender } = renderHook(
       ({ enabled }) => useWhatsNewRelease(enabled),
@@ -51,7 +51,7 @@ describe("novidades por versao", () => {
     expect(window.electronAPI?.getVersion).not.toHaveBeenCalled();
 
     rerender({ enabled: true });
-    await waitFor(() => expect(result.current.release?.version).toBe("3.1.0"));
+    await waitFor(() => expect(result.current.release?.version).toBe("3.1.2"));
   });
 
   it("usa a versao publica do catalogo quando o IPC falha", async () => {
@@ -59,16 +59,16 @@ describe("novidades por versao", () => {
 
     const { result } = renderHook(() => useWhatsNewRelease(true));
 
-    await waitFor(() => expect(result.current.release?.version).toBe("3.1.0"));
+    await waitFor(() => expect(result.current.release?.version).toBe("3.1.2"));
   });
 
   it("fecha durante a sessao mesmo quando o armazenamento falha", async () => {
-    exposeVersion(Promise.resolve("3.1.0"));
+    exposeVersion(Promise.resolve("3.1.2"));
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("armazenamento bloqueado");
     });
     const { result } = renderHook(() => useWhatsNewRelease(true));
-    await waitFor(() => expect(result.current.release?.version).toBe("3.1.0"));
+    await waitFor(() => expect(result.current.release?.version).toBe("3.1.2"));
 
     act(() => result.current.dismiss());
 
