@@ -347,17 +347,14 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       {/* Zero-latency DOM <audio autoPlay> elements for all remote streams */}
       <div style={{ display: "none" }} aria-hidden="true">
-        {voiceCall.remoteStream && (
+        {Array.from(
+          new Map([
+            ...(voiceCall.remoteStream ? [[voiceCall.session?.friendUid || "main", voiceCall.remoteStream] as const] : []),
+            ...Array.from(voiceCall.remoteStreams.entries()),
+          ]).entries(),
+        ).map(([peerId, st]) => (
           <RemoteAudioElement
-            key={`stream-${voiceCall.session?.friendUid || "main"}`}
-            stream={voiceCall.remoteStream}
-            outputDeviceId={voiceCall.selectedAudioOutput}
-            volume={voiceCall.isDeafened ? 0 : voiceCall.remoteVolume}
-          />
-        )}
-        {Array.from(voiceCall.remoteStreams.entries()).map(([peerId, st]) => (
-          <RemoteAudioElement
-            key={`mesh-stream-${peerId}`}
+            key={`audio-stream-${peerId}-${st.id}`}
             stream={st}
             outputDeviceId={voiceCall.selectedAudioOutput}
             volume={voiceCall.isDeafened ? 0 : voiceCall.remoteVolume}

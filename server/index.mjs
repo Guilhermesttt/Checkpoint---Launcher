@@ -1344,6 +1344,30 @@ const FALLBACK_STUN_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" },
+  { urls: "stun:global.stun.twilio.com:3478" },
+  {
+    urls: "turn:openrelay.metered.ca:80",
+    username: "openrelay",
+    credential: "openrelay",
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443",
+    username: "openrelay",
+    credential: "openrelay",
+  },
+  {
+    urls: "turn:openrelay.metered.ca:443?transport=tcp",
+    username: "openrelay",
+    credential: "openrelay",
+  },
+  {
+    urls: "turns:openrelay.metered.ca:443?transport=tcp",
+    username: "openrelay",
+    credential: "openrelay",
+  },
 ];
 
 app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser, async (_req, res) => {

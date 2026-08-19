@@ -1328,12 +1328,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       };
 
       pc.ontrack = (event) => {
-        let stream = event.streams && event.streams[0];
+        let stream = remoteStreamsRef.current.get(targetPeerUid);
         if (!stream) {
-          stream = remoteStreamsRef.current.get(targetPeerUid) || new MediaStream();
-          if (event.track && !stream.getTracks().includes(event.track)) {
-            stream.addTrack(event.track);
-          }
+          stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream();
+        }
+        if (event.track && !stream.getTracks().includes(event.track)) {
+          stream.addTrack(event.track);
         }
         remoteStreamsRef.current.set(targetPeerUid, stream);
         setRemoteStreams(new Map(remoteStreamsRef.current));
@@ -1342,15 +1342,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setupVoiceAnalyzer(stream, false, targetPeerUid);
 
         const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
-        setIsRemoteSharingScreen(hasVideo);
+        if (hasVideo) {
+          setIsRemoteCameraOn(true);
+        }
 
         stream.onaddtrack = () => {
           setRemoteStreams(new Map(remoteStreamsRef.current));
-          setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
+          const hasVid = stream.getVideoTracks().some((t) => t.enabled);
+          if (hasVid) setIsRemoteCameraOn(true);
         };
         stream.onremovetrack = () => {
           setRemoteStreams(new Map(remoteStreamsRef.current));
-          setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
         };
       };
 
@@ -1551,20 +1553,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           };
         });
 
-        // Ensure peer connection exists in receiver/callee mode
+        // Ensure peer connection exists in receiver/callee mode (waiting for newcomer's offer)
         if (user?.uid && joined.uid !== user.uid) {
-          const pc = await createPeerConnectionForPeer(chatId, joined.uid, false);
-          // If the connection is still in stable state with no signaling ongoing, initiate offer if needed
-          if (pc.signalingState === "stable" && !pc.currentRemoteDescription && !pc.currentLocalDescription) {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            await sendCallSignal(chatId, {
-              senderId: user.uid,
-              chatId,
-              targetUid: joined.uid,
-              signal: offer,
-            });
-          }
+          await createPeerConnectionForPeer(chatId, joined.uid, false);
         }
       },
       onMemberLeft: (left: CallMemberLeftPayload) => {

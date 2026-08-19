@@ -72,39 +72,48 @@ const activeChannels = new Map<string, any>();
 const channelPromises = new Map<string, Promise<any>>();
 
 export const getVoiceRoomTopic = (chatId: string): string => {
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId);
-  return isUuid ? `voice:room:${chatId}` : `call_session_${chatId}`;
+  const cleanId = String(chatId || "").trim();
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+  return isUuid ? `voice:room:${cleanId}` : `call_session_${cleanId}`;
 };
 
 export const getOrCreateChannel = async (channelName: string): Promise<any> => {
-  const channel = activeChannels.get(channelName);
-  if (channel && channel.state === "joined") {
+  const cleanChannelName = String(channelName || "").trim();
+  const channel = activeChannels.get(cleanChannelName);
+  if (channel && (channel.state === "joined" || channel.status === "SUBSCRIBED")) {
     return channel;
   }
 
-  if (channelPromises.has(channelName)) {
-    return channelPromises.get(channelName);
+  if (channelPromises.has(cleanChannelName)) {
+    return channelPromises.get(cleanChannelName);
   }
 
-  const newChannel = channel || supabase.channel(channelName);
-  activeChannels.set(channelName, newChannel);
+  const newChannel = channel || supabase.channel(cleanChannelName, {
+    config: { broadcast: { self: false } },
+  });
+  activeChannels.set(cleanChannelName, newChannel);
 
   const subPromise = new Promise<any>((resolve) => {
+    let resolved = false;
     const timer = setTimeout(() => {
-      channelPromises.delete(channelName);
-      resolve(newChannel);
-    }, 3000);
+      if (!resolved) {
+        resolved = true;
+        channelPromises.delete(cleanChannelName);
+        resolve(newChannel);
+      }
+    }, 2500);
 
     newChannel.subscribe((status: string) => {
-      if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      if (!resolved && (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
+        resolved = true;
         clearTimeout(timer);
-        channelPromises.delete(channelName);
+        channelPromises.delete(cleanChannelName);
         resolve(newChannel);
       }
     });
   });
 
-  channelPromises.set(channelName, subPromise);
+  channelPromises.set(cleanChannelName, subPromise);
   return subPromise;
 };
 
@@ -118,16 +127,21 @@ export const subscribeToUserIncomingCalls = (
     onEnd: (end: CallEndPayload) => void;
   },
 ) => {
-  const channelName = `user_calls_${myUid}`;
+  const cleanUid = String(myUid || "").replace(/^cp-friend:/, "").trim();
+  const channelName = `user_calls_${cleanUid}`;
   let channel = activeChannels.get(channelName);
   if (channel) {
-    supabase.removeChannel(channel);
+    try {
+      supabase.removeChannel(channel);
+    } catch { }
     activeChannels.delete(channelName);
   }
 
-  channel = supabase.channel(channelName)
+  channel = supabase.channel(channelName, {
+    config: { broadcast: { self: false } },
+  })
     .on("broadcast", { event: "call:invite" }, (e) => {
-      if (e.payload && typeof e.payload === "object" && e.payload.callerId && e.payload.callerId !== myUid) {
+      if (e.payload && typeof e.payload === "object" && e.payload.callerId && e.payload.callerId !== cleanUid) {
         callbacks.onInvite(e.payload as CallInvitePayload);
       }
     })
@@ -140,25 +154,62 @@ export const subscribeToUserIncomingCalls = (
 
   activeChannels.set(channelName, channel);
 
+  // Also listen on inbox channel as fallback
+  const inboxChannelName = `user_inbox_${cleanUid}`;
+  const inboxChannel = supabase.channel(inboxChannelName, {
+    config: { broadcast: { self: false } },
+  })
+    .on("broadcast", { event: "call:invite" }, (e) => {
+      if (e.payload && typeof e.payload === "object" && e.payload.callerId && e.payload.callerId !== cleanUid) {
+        callbacks.onInvite(e.payload as CallInvitePayload);
+      }
+    })
+    .on("broadcast", { event: "call:end" }, (e) => {
+      if (e.payload && typeof e.payload === "object") {
+        callbacks.onEnd(e.payload as CallEndPayload);
+      }
+    })
+    .subscribe();
+
   return () => {
-    supabase.removeChannel(channel);
+    try {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(inboxChannel);
+    } catch { }
     activeChannels.delete(channelName);
   };
 };
 
 /**
- * Envia um convite de chamada para o amigo
+ * Envia um convite de chamada para o amigo por múltiplos canais para entrega garantida
  */
 export const sendCallInvite = async (
   targetFriendUid: string,
   invite: CallInvitePayload,
 ) => {
-  const channel = await getOrCreateChannel(`user_calls_${targetFriendUid}`);
-  await channel.send({
-    type: "broadcast",
-    event: "call:invite",
-    payload: invite,
-  });
+  const cleanUid = String(targetFriendUid || "").replace(/^cp-friend:/, "").trim();
+  
+  try {
+    const channelCalls = await getOrCreateChannel(`user_calls_${cleanUid}`);
+    await channelCalls.send({
+      type: "broadcast",
+      event: "call:invite",
+      payload: invite,
+    });
+  } catch (err) {
+    console.warn("[sendCallInvite] user_calls channel send warning:", err);
+  }
+
+  try {
+    const channelInbox = await getOrCreateChannel(`user_inbox_${cleanUid}`);
+    await channelInbox.send({
+      type: "broadcast",
+      event: "call:invite",
+      payload: invite,
+    });
+  } catch (err) {
+    console.warn("[sendCallInvite] user_inbox channel send warning:", err);
+  }
 };
 
 /**
