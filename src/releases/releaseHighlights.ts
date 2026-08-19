@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.1.0",
-  title: "Chamadas de Voz e Transmissão de Tela",
-  description: "Sistema completo de chamadas de voz e vídeo peer-to-peer, transmissão de tela com áudio integrado, retorno de microfone e detecção inteligente de hardware.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.0",
+  version: "3.1.1",
+  title: "Processamento de Áudio com IA e Ganho Real",
+  description: "Supressão de ruído avançada por rede neural (RNNoise WASM), amplificação real de ganho via Web Audio, foco em câmera e notificações globais de chat.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.1",
   highlights: [
     {
       id: "voice",
-      title: "Chamadas de Voz e Vídeo WebRTC",
-      description: "Converse com seus amigos em tempo real com baixa latência, cancelamento de eco, supressão de ruído e interface limpa estilo Discord.",
-    },
-    {
-      id: "platforms",
-      title: "Transmissão de Tela com Áudio",
-      description: "Compartilhe janelas ou sua tela inteira com áudio direto do jogo isolado e sem feedback acústico.",
+      title: "Supressão de Ruído por IA (RNNoise)",
+      description: "Filtre ruídos de teclado mecânico, ventiladores e ambiente com processamento neural em tempo real.",
     },
     {
       id: "stability",
-      title: "Retorno de Microfone e Detecção de Dispositivos",
-      description: "Monitore sua voz em tempo real e alterne facilmente entre fones e microfones detectados automaticamente pelo launcher.",
+      title: "Ganho Real de Microfone (0–200%)",
+      description: "Amplificação de volume transmitida diretamente para a chamada com compressor anti-clipping integrado.",
+    },
+    {
+      id: "platforms",
+      title: "Notificações de Chat e Foco em Câmera",
+      description: "Notificações instantâneas de novas mensagens e visualização da câmera em tela cheia no modo focado.",
     },
   ],
 };

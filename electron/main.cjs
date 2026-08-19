@@ -960,23 +960,24 @@ const fetchHealth = async () => {
 
 const waitForServer = async () => {
   const BASE_MS = 500;
-  const MAX_DELAY_MS = 8_000;
-  const TOTAL_TIMEOUT_MS = 65_000;
+  const MAX_DELAY_MS = 5_000;
+  const TOTAL_TIMEOUT_MS = 30_000;
   const deadline = Date.now() + TOTAL_TIMEOUT_MS;
 
   let attempt = 0;
   while (Date.now() < deadline) {
     if (await fetchHealth()) return;
-    // Exponential backoff com jitter ±20% para evitar thundering herd no Render
     const base = Math.min(BASE_MS * 2 ** attempt, MAX_DELAY_MS);
     const jitter = base * (0.8 + Math.random() * 0.4);
     await sleep(Math.round(jitter));
     attempt++;
   }
 
-  throw new Error(
-    `Backend nao respondeu em ${APP_URL}/health apos ${TOTAL_TIMEOUT_MS / 1000}s. Verifique sua conexao com a internet.`,
-  );
+  const isDev = !!process.env.ELECTRON_START_URL;
+  const message = isDev
+    ? `Servidor de desenvolvimento nao respondeu em ${TOTAL_TIMEOUT_MS / 1000}s. Verifique se o Vite esta rodando (npm run dev).`
+    : `Backend nao respondeu em ${APP_URL}/health apos ${TOTAL_TIMEOUT_MS / 1000}s. Verifique sua conexao com a internet.`;
+  throw new Error(message);
 };
 
 
@@ -1063,11 +1064,13 @@ const createWindow = async () => {
       mainWindow.show();
     }
   });
+  // Fallback: if ready-to-show didn't fire (e.g., renderer crash), show anyway after 1.5s
   setTimeout(() => {
     if (!IS_AUTO_START && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn("[main] ready-to-show nao disparou, forçando exibicao da janela");
       mainWindow.show();
     }
-  }, 2500);
+  }, 1500);
 
   mainWindow.webContents.on(
     "did-fail-load",
@@ -1182,14 +1185,19 @@ const createWindow = async () => {
       autoUpdater.checkForUpdates().catch((err) => {
         console.error("[AutoUpdater] Erro ao buscar atualizações automáticas:", err);
       });
-    }, 5000); // aguarda 5s após abrir a janela principal para não sobrecarregar a inicialização
+    }, 10_000); // aguarda 10s após abrir a janela principal para não sobrecarregar a inicialização
 
-    // Checa por atualizações a cada 2 horas
-    setInterval(() => {
+    // Checa por atualizações a cada 4 horas (reduzido de 2h para reduzir chamadas)
+    const updateCheckInterval = setInterval(() => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        clearInterval(updateCheckInterval);
+        return;
+      }
       autoUpdater.checkForUpdates().catch((err) => {
         console.error("[AutoUpdater] Erro ao buscar atualizações periódicas:", err);
       });
-    }, 2 * 60 * 60 * 1000);
+    }, 4 * 60 * 60 * 1000);
+    updateCheckInterval.unref?.();
   }
 };
 
@@ -1313,7 +1321,8 @@ const revealOverlayForToast = () => {
 const sendOverlayEvent = (channel, payload) => {
   createOverlayWindow();
   if (!overlayWindow || overlayWindow.isDestroyed()) {
-    throw new Error("Overlay indisponivel.");
+    console.warn("[overlay] Janela de overlay nao disponivel para:", channel);
+    return;
   }
 
   if (channel === "overlay:social" || channel === "achievement:unlock") {
@@ -1334,7 +1343,10 @@ const sendOverlayEvent = (channel, payload) => {
 
   if (!overlayReady || overlayWindow.webContents.isLoadingMainFrame()) {
     pendingOverlayEvents.push({ channel, payload });
-    if (pendingOverlayEvents.length > 32) pendingOverlayEvents.shift();
+    if (pendingOverlayEvents.length > 100) {
+      console.warn("[overlay] Fila de eventos do overflow, removendo mais antigos");
+      pendingOverlayEvents.shift();
+    }
     return;
   }
 
@@ -1345,7 +1357,11 @@ const sendOverlayEvent = (channel, payload) => {
   } catch (error) {
     console.warn("[overlay] Nao foi possivel reafirmar a ordem da janela:", error);
   }
-  overlayWindow.webContents.send(channel, payload);
+  try {
+    overlayWindow.webContents.send(channel, payload);
+  } catch (sendError) {
+    console.error("[overlay] Falha ao enviar evento para renderer:", sendError);
+  }
 };
 
 const setOverlayPanelOpen = (open) => {
@@ -1905,6 +1921,22 @@ const showNativeAchievementNotification = (payload) => {
     return false;
   }
   const achievement = payload?.achievement || {};
+  let iconPath = "";
+  try {
+    const candidate = path.join(__dirname, "..", "assets", "icon.png");
+    if (fs.existsSync(candidate)) {
+      iconPath = candidate;
+    } else if (app.isPackaged) {
+      const asarPath = path.join(process.resourcesPath, "assets", "icon.png");
+      if (fs.existsSync(asarPath)) iconPath = asarPath;
+    } else {
+      const devPath = path.join(app.getAppPath(), "assets", "icon.png");
+      if (fs.existsSync(devPath)) iconPath = devPath;
+    }
+  } catch {
+    // ignore icon resolution errors
+  }
+
   const notification = new Notification({
     title: String(achievement.name || payload?.achievementId || getOverlayEventCopy().firstKill).slice(0, 160),
     body: String(
@@ -1912,17 +1944,30 @@ const showNativeAchievementNotification = (payload) => {
       || nativeAchievementFallbackCopy[overlayPanelState.language]
       || nativeAchievementFallbackCopy["pt-BR"],
     ).slice(0, 500),
-    icon: path.join(app.getAppPath(), "assets", "icon.png"),
+    icon: iconPath || undefined,
     silent: true,
   });
   activeNativeNotifications.add(notification);
   notification.on("close", () => activeNativeNotifications.delete(notification));
   notification.on("click", () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
   });
-  notification.show();
+  notification.on("show", () => {
+    console.info("[overlay] Notificacao nativa exibida:", notification.title);
+  });
+  notification.on("error", (err) => {
+    console.warn("[overlay] Erro na notificacao nativa:", err);
+  });
+  try {
+    notification.show();
+  } catch (err) {
+    console.error("[overlay] Falha ao mostrar notificacao nativa:", err);
+    activeNativeNotifications.delete(notification);
+    return false;
+  }
   return true;
 };
 
@@ -2516,7 +2561,7 @@ const scheduleEpicStoreWindowShutdown = () => {
     if (epicStoreSearchWindow && !epicStoreSearchWindow.isDestroyed()) {
       epicStoreSearchWindow.destroy();
     }
-  }, 30_000);
+  }, 15_000);
   epicStoreIdleTimer.unref?.();
 };
 
@@ -2551,15 +2596,23 @@ const ensureEpicStoreSearchWindow = async () => {
     if (epicStoreSearchWindow === searchWindow) {
       epicStoreSearchWindow = null;
       epicStoreReadyPromise = null;
+      if (epicStoreIdleTimer) {
+        clearTimeout(epicStoreIdleTimer);
+        epicStoreIdleTimer = null;
+      }
     }
   });
-  epicStoreReadyPromise = searchWindow.loadURL(
-    "https://store.epicgames.com/pt-BR/browse?sortBy=relevancy&sortDir=DESC&count=12",
-  ).catch((error) => {
+  try {
+    epicStoreReadyPromise = searchWindow.loadURL(
+      "https://store.epicgames.com/pt-BR/browse?sortBy=relevancy&sortDir=DESC&count=12",
+    );
+    await epicStoreReadyPromise;
+  } catch (error) {
     if (!searchWindow.isDestroyed()) searchWindow.destroy();
+    epicStoreSearchWindow = null;
+    epicStoreReadyPromise = null;
     throw error;
-  });
-  await epicStoreReadyPromise;
+  }
   return searchWindow;
 };
 

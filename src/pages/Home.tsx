@@ -77,6 +77,7 @@ import {
   setChatTyping,
   subscribeToChatMessages,
   subscribeToFriendTyping,
+  subscribeToNewMessages,
 } from "../services/chat";
 import {
   fetchSteamAchievementDetails,
@@ -629,8 +630,30 @@ const Home: React.FC = () => {
       return;
     }
     void establishChatConnection();
-    return () => closeChatConnection();
-  }, [user?.uid]);
+    const unsub = subscribeToNewMessages((msg) => {
+      if (msg.senderId && msg.senderId !== user.uid) {
+        if (activeChatFriend?.id !== msg.senderId) {
+          playSound("chatReceived");
+          const friend = socialFriends.find(
+            (f) => f.id === msg.senderId || f.id.endsWith(`:${msg.senderId}`),
+          );
+          const senderName = friend?.name || "Amigo";
+          notify(
+            `${senderName}: ${msg.text || (msg.attachmentType ? "Enviou uma mídia" : "Nova mensagem")}`,
+            "info",
+            {
+              title: "Nova Mensagem",
+              imageUrl: friend?.avatar || undefined,
+            },
+          );
+        }
+      }
+    });
+    return () => {
+      unsub();
+      closeChatConnection();
+    };
+  }, [user?.uid, activeChatFriend?.id, socialFriends, playSound, notify]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1878,24 +1901,24 @@ const Home: React.FC = () => {
             </div>
 
             <ProfileDropdown
-                userDisplay={userDisplay}
-                email={user?.email || undefined}
-                avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}
-                language={launcherLanguage}
-                playSound={playSound}
-                onOpenProfile={() => {
-                  selectCategory("PROFILE");
-                  playSound("select");
-                }}
-                onOpenSettings={() => {
-                  selectCategory("SETTINGS");
-                  playSound("select");
-                }}
-                onLogout={() => {
-                  playSound("back");
-                  setSignOutModalOpen(true);
-                }}
-              />
+              userDisplay={userDisplay}
+              email={user?.email || undefined}
+              avatarUrl={userProfile?.photoURL || user?.photoURL || userProfile?.discordAvatar || userProfile?.steamAvatar || undefined}
+              language={launcherLanguage}
+              playSound={playSound}
+              onOpenProfile={() => {
+                selectCategory("PROFILE");
+                playSound("select");
+              }}
+              onOpenSettings={() => {
+                selectCategory("SETTINGS");
+                playSound("select");
+              }}
+              onLogout={() => {
+                playSound("back");
+                setSignOutModalOpen(true);
+              }}
+            />
           </div>
         </motion.div>
 

@@ -106,7 +106,12 @@ export function useFriendsSystem({
           const currentFriends = socialFriendsRef.current;
           const currentActiveChat = activeChatFriendRef.current;
 
-          const senderFriend = currentFriends.find((f) => f.id === `cp-friend:${msg.senderId}`);
+          const senderFriend = currentFriends.find(
+            (f) =>
+              f.id === `cp-friend:${msg.senderId}` ||
+              f.id === msg.senderId ||
+              f.id.endsWith(`:${msg.senderId}`),
+          );
           const senderName = senderFriend?.name || "Amigo";
           const avatarUrl = senderFriend?.avatar || "";
           const isImage = Boolean(
@@ -115,7 +120,12 @@ export function useFriendsSystem({
             || msg.attachmentPath,
           );
 
-          if (currentActiveChat?.id !== `cp-friend:${msg.senderId}`) {
+          const isActiveChat =
+            currentActiveChat?.id === `cp-friend:${msg.senderId}` ||
+            currentActiveChat?.id === msg.senderId ||
+            currentActiveChat?.id?.endsWith(`:${msg.senderId}`);
+
+          if (!isActiveChat) {
             const displayContent = isImage ? "📷 Enviou uma imagem" : msg.text;
             
             // Toast in-app notification

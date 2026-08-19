@@ -509,13 +509,13 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
       isCancelled = true;
       if (animId) cancelAnimationFrame(animId);
       if (source) {
-        try { source.disconnect(); } catch {}
+        try { source.disconnect(); } catch { }
       }
       if (analyser) {
-        try { analyser.disconnect(); } catch {}
+        try { analyser.disconnect(); } catch { }
       }
       if (ctx && ctx.state !== "closed") {
-        void ctx.close().catch(() => {});
+        void ctx.close().catch(() => { });
       }
       if (stream) {
         stream.getTracks().forEach((t) => t.stop());
@@ -962,22 +962,20 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       <button
                         type="button"
                         onClick={() => voiceCallContext?.setInputMode?.("voice-activity")}
-                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          voiceCallContext?.inputMode !== "push-to-talk"
+                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode !== "push-to-talk"
                             ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                             : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         Atividade de Voz
                       </button>
                       <button
                         type="button"
                         onClick={() => voiceCallContext?.setInputMode?.("push-to-talk")}
-                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                          voiceCallContext?.inputMode === "push-to-talk"
+                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode === "push-to-talk"
                             ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                             : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         Push-to-Talk
                       </button>
@@ -1006,11 +1004,10 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                           };
                           window.addEventListener("keydown", onKey, true);
                         }}
-                        className={`cursor-pointer min-w-[100px] px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${
-                          isRecordingPttKey
+                        className={`cursor-pointer min-w-[100px] px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${isRecordingPttKey
                             ? "bg-amber-500/30 text-amber-300 border border-amber-500 animate-pulse"
                             : "bg-white/10 text-white border border-white/15 hover:bg-white/20"
-                        }`}
+                          }`}
                       >
                         {isRecordingPttKey ? "Pressione uma tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
                       </button>
@@ -1184,8 +1181,8 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                         <FontAwesomeIcon icon={faSpotify} className="h-4.5 w-4.5 text-white/70" />
                       </div>
                       <div className="min-w-0">
-                      <p className="text-xs font-bold text-white whitespace-nowrap">Spotify</p>
-                      <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">{shellCopy.spotifyDock}</p>
+                        <p className="text-xs font-bold text-white whitespace-nowrap">Spotify</p>
+                        <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">{shellCopy.spotifyDock}</p>
                       </div>
                     </div>
                   </article>
@@ -1394,11 +1391,10 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                               <button
                                 type="button"
                                 onClick={() => setIsTestingMic((prev) => !prev)}
-                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                                  isTestingMic
+                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${isTestingMic
                                     ? "bg-rose-500 text-white shadow-md"
                                     : "bg-white text-black hover:bg-white/90"
-                                }`}
+                                  }`}
                               >
                                 {isTestingMic ? "Parar Teste" : "Testar Microfone"}
                               </button>
@@ -1490,11 +1486,10 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                           <button
                             type="button"
                             onClick={() => setIsVideoPreviewOn((prev) => !prev)}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                              isVideoPreviewOn
+                            className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${isVideoPreviewOn
                                 ? "bg-white text-black shadow-md font-black"
                                 : "bg-white/10 text-white hover:bg-white/20"
-                            }`}
+                              }`}
                           >
                             {isVideoPreviewOn ? "Fechar Preview" : "Testar Vídeo"}
                           </button>
@@ -1607,7 +1602,23 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                   </div>
 
                   {/* Toggles de Processamento */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3.5 col-span-1 sm:col-span-2 lg:col-span-3">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-white">Supressão de Ruído Avançada (IA)</p>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            RNNoise WASM
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-medium text-white/40">Filtra teclado mecânico, ruídos de fundo e ventiladores via rede neural em tempo real</p>
+                      </div>
+                      <Switch
+                        checked={voiceCallContext?.advancedNoiseSuppression ?? true}
+                        onCheckedChange={(checked) => void voiceCallContext?.setAdvancedNoiseSuppression?.(checked)}
+                      />
+                    </div>
+
                     <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
                       <div>
                         <p className="text-xs font-bold text-white">Cancelamento de Eco</p>
@@ -1621,8 +1632,8 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
 
                     <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
                       <div>
-                        <p className="text-xs font-bold text-white">Supressão de Ruído</p>
-                        <p className="text-[10px] font-medium text-white/40">Filtra vento e teclado</p>
+                        <p className="text-xs font-bold text-white">Supressão Nativa</p>
+                        <p className="text-[10px] font-medium text-white/40">Filtro padrão do Chromium</p>
                       </div>
                       <Switch
                         checked={voiceCallContext?.noiseSuppression ?? true}
@@ -1667,22 +1678,20 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     <button
                       type="button"
                       onClick={() => voiceCallContext?.setInputMode("voice-activity")}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        voiceCallContext?.inputMode === "voice-activity"
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${voiceCallContext?.inputMode === "voice-activity"
                           ? "bg-white text-black font-black shadow-lg"
                           : "text-white/60 hover:text-white hover:bg-white/5"
-                      }`}
+                        }`}
                     >
                       Atividade de Voz
                     </button>
                     <button
                       type="button"
                       onClick={() => voiceCallContext?.setInputMode("push-to-talk")}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                        voiceCallContext?.inputMode === "push-to-talk"
+                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${voiceCallContext?.inputMode === "push-to-talk"
                           ? "bg-white text-black font-black shadow-lg"
                           : "text-white/60 hover:text-white hover:bg-white/5"
-                      }`}
+                        }`}
                     >
                       Push-to-Talk
                     </button>
@@ -1710,11 +1719,10 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                           };
                           window.addEventListener("keydown", onKey, true);
                         }}
-                        className={`px-4 py-2 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${
-                          isRecordingPttKey
+                        className={`px-4 py-2 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${isRecordingPttKey
                             ? "bg-white/20 text-white border-white/40 animate-pulse"
                             : "bg-white/10 text-white border-white/20 hover:bg-white/20"
-                        }`}
+                          }`}
                       >
                         {isRecordingPttKey ? "Pressione a tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
                       </button>

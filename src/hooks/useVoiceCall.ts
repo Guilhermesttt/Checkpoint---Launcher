@@ -32,6 +32,7 @@ import {
 import type { CallRoomConfig, RoomCategory, VoiceRoomParticipant } from "../types/voice-governance";
 import { getChatId } from "../services/chat";
 import { getTurnServers } from "../services/turnCredentials";
+import { buildProcessedAudioTrack } from "../services/audio/audioProcessing";
 import { createVoiceRoom, joinVoiceRoom, leaveVoiceRoom } from "../services/voiceRooms";
 import sfxJoin from "../sounds/Stoat_SFX/user_join_voice-DbrgaLbl.ogg";
 import sfxLeave from "../sounds/Stoat_SFX/user_leave_voice-CBZjEE14.ogg";
@@ -48,7 +49,7 @@ const playSfx = (src: string, volume = 1.0) => {
   try {
     const audio = new Audio(src);
     audio.volume = volume;
-    void audio.play().catch(() => {});
+    void audio.play().catch(() => { });
   } catch {
     // ignore
   }
@@ -67,7 +68,8 @@ interface AudioPipeline {
   ctx: AudioContext | null;
   source: MediaStreamAudioSourceNode | null;
   analyser: AnalyserNode | null;
-  animFrameId: number | null;
+  silentGain: GainNode | null;
+  intervalId: number | null;
   holdTimer: number | null;
 }
 
@@ -75,37 +77,44 @@ const createEmptyPipeline = (): AudioPipeline => ({
   ctx: null,
   source: null,
   analyser: null,
-  animFrameId: null,
+  silentGain: null,
+  intervalId: null,
   holdTimer: null,
 });
 
 const destroyAudioPipeline = (pipeline: AudioPipeline) => {
-  if (pipeline.animFrameId) {
-    cancelAnimationFrame(pipeline.animFrameId);
-    pipeline.animFrameId = null;
+  if (pipeline.intervalId) {
+    window.clearInterval(pipeline.intervalId);
+    pipeline.intervalId = null;
   }
   if (pipeline.holdTimer) {
     window.clearTimeout(pipeline.holdTimer);
     pipeline.holdTimer = null;
   }
+  if (pipeline.silentGain) {
+    try {
+      pipeline.silentGain.disconnect();
+    } catch { }
+    pipeline.silentGain = null;
+  }
   if (pipeline.source) {
     try {
       pipeline.source.disconnect();
-    } catch {}
+    } catch { }
     pipeline.source = null;
   }
   if (pipeline.analyser) {
     try {
       pipeline.analyser.disconnect();
-    } catch {}
+    } catch { }
     pipeline.analyser = null;
   }
   if (pipeline.ctx) {
     try {
       if (pipeline.ctx.state !== "closed") {
-        void pipeline.ctx.close().catch(() => {});
+        void pipeline.ctx.close().catch(() => { });
       }
-    } catch {}
+    } catch { }
     pipeline.ctx = null;
   }
 };
@@ -146,7 +155,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setRemoteVolumeState(clamped);
     try {
       localStorage.setItem("checkpoint_voice_remote_volume", String(clamped));
-    } catch {}
+    } catch { }
   }, []);
 
   const [isMuted, setIsMuted] = useState(false);
@@ -293,10 +302,26 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     const clamped = Math.max(0, Math.min(200, val));
     setMicGainState(clamped);
     micGainRef.current = clamped;
+    // Apply to live Web Audio GainNode — no need to rebuild the AudioContext.
+    if (activeGainNodeRef.current) {
+      activeGainNodeRef.current.gain.value = clamped / 100;
+    }
     try {
       localStorage.setItem("checkpoint_voice_mic_gain", String(clamped));
-    } catch {}
+    } catch { }
   }, []);
+
+  // Advanced noise suppression via RNNoise WASM (separate from native getUserMedia constraint)
+  const [advancedNoiseSuppression, setAdvancedNoiseSuppressionState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("checkpoint_voice_advanced_ns") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  const advancedNoiseSuppressionRef = useRef(advancedNoiseSuppression);
+  advancedNoiseSuppressionRef.current = advancedNoiseSuppression;
 
   // Noise Gate (silencia ruído de fundo automaticamente no VAD)
   const [noiseGateEnabled, setNoiseGateEnabledState] = useState<boolean>(() => {
@@ -315,7 +340,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     noiseGateEnabledRef.current = val;
     try {
       localStorage.setItem("checkpoint_voice_noise_gate", String(val));
-    } catch {}
+    } catch { }
+    if (!val && inputModeRef.current === "voice-activity" && localStreamRef.current) {
+      const track = localStreamRef.current.getAudioTracks()[0];
+      if (track && !isMutedRef.current && !isDeafenedRef.current) {
+        track.enabled = true;
+      }
+    }
   }, []);
 
   // Calibração de Ruído Ambiente
@@ -343,21 +374,21 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     if (micMonitoringPipelineRef.current.source) {
       try {
         micMonitoringPipelineRef.current.source.disconnect();
-      } catch {}
+      } catch { }
       micMonitoringPipelineRef.current.source = null;
     }
     if (micMonitoringPipelineRef.current.gain) {
       try {
         micMonitoringPipelineRef.current.gain.disconnect();
-      } catch {}
+      } catch { }
       micMonitoringPipelineRef.current.gain = null;
     }
     if (micMonitoringPipelineRef.current.ctx) {
       try {
         if (micMonitoringPipelineRef.current.ctx.state !== "closed") {
-          void micMonitoringPipelineRef.current.ctx.close().catch(() => {});
+          void micMonitoringPipelineRef.current.ctx.close().catch(() => { });
         }
-      } catch {}
+      } catch { }
       micMonitoringPipelineRef.current.ctx = null;
     }
   }, []);
@@ -384,7 +415,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setIsMicMonitoringState(val);
       try {
         localStorage.setItem("checkpoint_voice_mic_monitoring", String(val));
-      } catch {}
+      } catch { }
       if (!val) {
         stopMicMonitoring();
       } else if (localStreamRef.current) {
@@ -401,6 +432,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  /** Raw stream from getUserMedia — source of the audio processing chain. Never goes to WebRTC directly. */
+  const rawStreamRef = useRef<MediaStream | null>(null);
+  /** Live GainNode in the active processing chain — updated in real time by setMicGain. */
+  const activeGainNodeRef = useRef<GainNode | null>(null);
+  /** Cleanup function for the active audio processing chain (gain+compressor+RNNoise). */
+  const audioProcCleanupRef = useRef<(() => void) | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<VoiceCallSession | null>(null);
@@ -429,6 +466,47 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [isMicMonitoring, localStream, startMicMonitoring, stopMicMonitoring]);
 
+  /**
+   * Wraps a raw getUserMedia stream in the real audio processing chain.
+   * Stores rawStream, gainNode and cleanup in their respective refs.
+   * Returns the *processed* MediaStream (what goes to WebRTC and VAD).
+   */
+  const applyAudioProcessingChain = useCallback(
+    async (rawStream: MediaStream): Promise<MediaStream> => {
+      // Destroy any previously active chain first.
+      if (audioProcCleanupRef.current) {
+        try {
+          audioProcCleanupRef.current();
+        } catch {
+          /* ignore */
+        }
+        audioProcCleanupRef.current = null;
+      }
+      activeGainNodeRef.current = null;
+      // Stop the old raw stream (but NOT the current localStream which may be the old processed stream).
+      if (rawStreamRef.current && rawStreamRef.current !== rawStream) {
+        rawStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      rawStreamRef.current = rawStream;
+
+      try {
+        const result = await buildProcessedAudioTrack(
+          rawStream,
+          micGainRef.current,
+          advancedNoiseSuppressionRef.current,
+        );
+        audioProcCleanupRef.current = result.cleanup;
+        activeGainNodeRef.current = result.gainNode;
+        return result.processedStream;
+      } catch (err) {
+        // If the chain itself fails entirely, fall back to the raw stream so the call doesn't die.
+        console.error("[useVoiceCall] buildProcessedAudioTrack failed, using raw stream:", err);
+        return rawStream;
+      }
+    },
+    [], // intentionally empty — uses refs only, no captured state
+  );
+
   // VAD Engine Setup with RMS and 250ms Hold Timer per peer/stream
   const setupVoiceAnalyzer = useCallback(
     (stream: MediaStream, isLocal: boolean, peerId = "local") => {
@@ -451,15 +529,24 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if (!AudioCtx) return;
 
         const ctx = new AudioCtx();
-        const source = ctx.createMediaStreamSource(stream);
+        // Use raw hardware stream for local VAD so noise-gating the output track doesn't kill voice detection
+        const sourceStream = isLocal && rawStreamRef.current ? rawStreamRef.current : stream;
+        const source = ctx.createMediaStreamSource(sourceStream);
         const analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.15;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.35;
+
+        // Keep Chromium Web Audio rendering clock active with a silent gain sink
+        const silentGain = ctx.createGain();
+        silentGain.gain.value = 0;
         source.connect(analyser);
+        analyser.connect(silentGain);
+        silentGain.connect(ctx.destination);
 
         targetPipeline.ctx = ctx;
         targetPipeline.source = source;
         targetPipeline.analyser = analyser;
+        targetPipeline.silentGain = silentGain;
 
         const timeData = new Float32Array(analyser.fftSize);
         let currentlySpeaking = false;
@@ -467,7 +554,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         const checkVolume = () => {
           if (!targetPipeline.analyser || !targetPipeline.ctx) return;
           if (targetPipeline.ctx.state === "suspended") {
-            void targetPipeline.ctx.resume().catch(() => {});
+            void targetPipeline.ctx.resume().catch(() => { });
           }
 
           analyser.getFloatTimeDomainData(timeData);
@@ -477,18 +564,26 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             sumSquares += timeData[i] * timeData[i];
           }
           const rms = Math.sqrt(sumSquares / timeData.length);
-          const gainMultiplier = (isLocal ? micGainRef.current : 100) / 100;
-          const rawVolume = Math.min(100, Math.round(rms * 700 * gainMultiplier));
+          const gainMultiplier = isLocal ? (micGainRef.current / 100) : 1;
+          const rawVolume = Math.min(100, Math.round(rms * 850 * gainMultiplier));
 
-          const sens = Math.max(0, Math.min(100, voiceSensitivityRef.current));
-          const sensitivityThreshold = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
+          const sens = Math.max(1, Math.min(100, voiceSensitivityRef.current));
+          // Open threshold: level needed to START speaking (at 50% sens -> ~6, at 35% -> ~9)
+          const openThreshold = Math.max(2, Math.round(1 + 24 * Math.pow((100 - sens) / 100, 1.6)));
+          // Close threshold (hysteresis): softer level needed to STAY speaking (60% of open threshold)
+          const closeThreshold = Math.max(1, Math.round(openThreshold * 0.6));
 
           const isPtt = inputModeRef.current === "push-to-talk";
           const isPttActive = isPttPressedRef.current;
+          const isMutedLocally = isLocal && (isMutedRef.current || isDeafenedRef.current);
 
-          const isAboveThreshold = isLocal && isPtt
-            ? isPttActive && rawVolume >= 1
-            : rawVolume >= sensitivityThreshold;
+          const isAboveThreshold = isMutedLocally
+            ? false
+            : isLocal && isPtt
+              ? isPttActive && rawVolume >= 1
+              : currentlySpeaking
+                ? rawVolume >= closeThreshold
+                : rawVolume >= openThreshold;
 
           if (isAboveThreshold) {
             if (targetPipeline.holdTimer) {
@@ -521,13 +616,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               }
             }
           } else if (currentlySpeaking && !targetPipeline.holdTimer) {
+            // Hangover decay timer (450ms) to allow natural pauses between syllables and words without chopping
             targetPipeline.holdTimer = window.setTimeout(() => {
               currentlySpeaking = false;
               targetPipeline.holdTimer = null;
               if (isLocal) {
                 setIsSpeakingLocal(false);
-                // Se o Noise Gate estiver ativo ou em PTT, corta o áudio durante o silêncio
-                if (noiseGateEnabledRef.current || inputModeRef.current === "voice-activity" || inputModeRef.current === "push-to-talk") {
+                // Se estiver em PTT ou com Noise Gate ativo, corta o áudio durante o silêncio
+                const shouldMuteTrack =
+                  inputModeRef.current === "push-to-talk"
+                    ? !isPttPressedRef.current
+                    : noiseGateEnabledRef.current;
+
+                if (shouldMuteTrack) {
                   const track = localStreamRef.current?.getAudioTracks()[0];
                   if (track) {
                     track.enabled = false;
@@ -547,13 +648,11 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                   return updated;
                 });
               }
-            }, 250);
+            }, 450);
           }
-
-          targetPipeline.animFrameId = requestAnimationFrame(checkVolume);
         };
 
-        targetPipeline.animFrameId = requestAnimationFrame(checkVolume);
+        targetPipeline.intervalId = window.setInterval(checkVolume, 25);
       } catch (err) {
         console.warn("[useVoiceCall] setupVoiceAnalyzer failed:", err);
       }
@@ -574,12 +673,11 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   // Dynamic Audio Constraints Applier
   const applyAudioProcessingConstraints = useCallback(
     async (newEcho: boolean, newNoise: boolean, newAutoGain: boolean) => {
-      if (!localStreamRef.current) return;
-      const track = localStreamRef.current.getAudioTracks()[0];
-      if (!track) return;
+      const rawTrack = rawStreamRef.current?.getAudioTracks()[0];
+      if (!rawTrack) return;
 
       try {
-        await track.applyConstraints({
+        await rawTrack.applyConstraints({
           echoCancellation: newEcho ? { ideal: true } : false,
           noiseSuppression: newNoise ? { ideal: true } : false,
           autoGainControl: newAutoGain ? { ideal: true } : false,
@@ -588,7 +686,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         console.warn("[useVoiceCall] track.applyConstraints fallback:", err);
         try {
           const currentDeviceId = selectedAudioInput !== "default" ? selectedAudioInput : undefined;
-          const newStream = await navigator.mediaDevices.getUserMedia({
+          const newRawStream = await navigator.mediaDevices.getUserMedia({
             audio: {
               deviceId: currentDeviceId ? { exact: currentDeviceId } : undefined,
               echoCancellation: newEcho ? { ideal: true } : false,
@@ -601,7 +699,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             video: false,
           });
 
-          const newTrack = newStream.getAudioTracks()[0];
+          const processedStream = await applyAudioProcessingChain(newRawStream);
+          const newTrack = processedStream.getAudioTracks()[0];
           if (newTrack) {
             newTrack.enabled = !isMutedRef.current && !isDeafenedRef.current;
             // Replace track across all active peers in Mesh
@@ -611,17 +710,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                 void sender.replaceTrack(newTrack);
               }
             });
-            track.stop();
-            localStreamRef.current = newStream;
-            setLocalStream(newStream);
-            setupVoiceAnalyzer(newStream, true);
+            localStreamRef.current = processedStream;
+            setLocalStream(processedStream);
+            setupVoiceAnalyzer(processedStream, true);
           }
         } catch (fallbackErr) {
           console.error("[useVoiceCall] Audio stream re-acquisition failed:", fallbackErr);
         }
       }
     },
-    [selectedAudioInput, setupVoiceAnalyzer],
+    [applyAudioProcessingChain, selectedAudioInput, setupVoiceAnalyzer],
   );
 
   // Settings setters
@@ -631,14 +729,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     voiceSensitivityRef.current = clamped;
     try {
       localStorage.setItem("checkpoint_voice_sensitivity", String(clamped));
-    } catch {}
+    } catch { }
   }, []);
 
   const setEchoCancellation = useCallback((val: boolean) => {
     setEchoCancellationState(val);
     try {
       localStorage.setItem("checkpoint_voice_echo_cancellation", String(val));
-    } catch {}
+    } catch { }
     void applyAudioProcessingConstraints(val, noiseSuppression, autoGainControl);
   }, [applyAudioProcessingConstraints, autoGainControl, noiseSuppression]);
 
@@ -646,7 +744,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setNoiseSuppressionState(val);
     try {
       localStorage.setItem("checkpoint_voice_noise_suppression", String(val));
-    } catch {}
+    } catch { }
     void applyAudioProcessingConstraints(echoCancellation, val, autoGainControl);
   }, [applyAudioProcessingConstraints, autoGainControl, echoCancellation]);
 
@@ -654,9 +752,48 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setAutoGainControlState(val);
     try {
       localStorage.setItem("checkpoint_voice_auto_gain", String(val));
-    } catch {}
+    } catch { }
     void applyAudioProcessingConstraints(echoCancellation, noiseSuppression, val);
   }, [applyAudioProcessingConstraints, echoCancellation, noiseSuppression]);
+
+  const setAdvancedNoiseSuppression = useCallback(
+    async (val: boolean) => {
+      setAdvancedNoiseSuppressionState(val);
+      advancedNoiseSuppressionRef.current = val;
+      try {
+        localStorage.setItem("checkpoint_voice_advanced_ns", String(val));
+      } catch { }
+
+      // Rebuild the processing chain if we have an active rawStream and call is not idle
+      if (rawStreamRef.current && callState !== "idle") {
+        try {
+          const processedStream = await applyAudioProcessingChain(rawStreamRef.current);
+          const newTrack = processedStream.getAudioTracks()[0];
+          if (newTrack) {
+            if (inputMode === "push-to-talk" && !isPttPressed) {
+              newTrack.enabled = false;
+            } else if (isMuted || isDeafened) {
+              newTrack.enabled = false;
+            }
+
+            peerConnectionsRef.current.forEach((pc) => {
+              const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+              if (sender) {
+                void sender.replaceTrack(newTrack);
+              }
+            });
+
+            localStreamRef.current = processedStream;
+            setLocalStream(processedStream);
+            setupVoiceAnalyzer(processedStream, true);
+          }
+        } catch (err) {
+          console.error("[useVoiceCall] setAdvancedNoiseSuppression error:", err);
+        }
+      }
+    },
+    [applyAudioProcessingChain, callState, inputMode, isDeafened, isMuted, isPttPressed, setupVoiceAnalyzer],
+  );
 
   // Audio acquisition helper com diagnóstico de erros específicos
   const acquireAudioStream = useCallback(
@@ -727,15 +864,18 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if (deviceObj?.label) {
           localStorage.setItem("checkpoint_voice_input_device_label", deviceObj.label);
         }
-      } catch {}
+      } catch { }
 
       if (callState === "idle") return;
 
       try {
-        const newStream = await acquireAudioStream(deviceId);
-        if (!newStream) return;
+        const newRawStream = await acquireAudioStream(deviceId);
+        if (!newRawStream) return;
 
-        const newTrack = newStream.getAudioTracks()[0];
+        // Build the new processing chain (destroys the old one inside applyAudioProcessingChain).
+        const processedStream = await applyAudioProcessingChain(newRawStream);
+
+        const newTrack = processedStream.getAudioTracks()[0];
         if (!newTrack) return;
 
         if (inputMode === "push-to-talk" && !isPttPressed) {
@@ -752,20 +892,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
         });
 
-        if (localStreamRef.current) {
-          localStreamRef.current.getAudioTracks().forEach((t) => t.stop());
-        }
-
-        localStreamRef.current = newStream;
-        setLocalStream(newStream);
-        setupVoiceAnalyzer(newStream, true);
+        // The old localStream (processed) can now be released; raw stream is kept alive as source.
+        localStreamRef.current = processedStream;
+        setLocalStream(processedStream);
+        setupVoiceAnalyzer(processedStream, true);
         notify("Dispositivo de microfone alterado.", "info");
       } catch (err) {
         console.error("[useVoiceCall] changeAudioInputDevice error:", err);
         notify("Erro ao trocar de microfone.", "error");
       }
     },
-    [acquireAudioStream, audioInputDevices, callState, inputMode, isDeafened, isMuted, isPttPressed, notify, setupVoiceAnalyzer],
+    [acquireAudioStream, applyAudioProcessingChain, audioInputDevices, callState, inputMode, isDeafened, isMuted, isPttPressed, notify, setupVoiceAnalyzer],
   );
 
   const changeAudioOutputDevice = useCallback(
@@ -773,7 +910,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setSelectedAudioOutputState(deviceId);
       try {
         localStorage.setItem("checkpoint_voice_output_device", deviceId);
-      } catch {}
+      } catch { }
       notify("Dispositivo de saída alterado.", "info");
     },
     [notify],
@@ -803,7 +940,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               const matched = inputs.find((d) => d.label === savedLabel);
               if (matched) return matched.deviceId;
             }
-          } catch {}
+          } catch { }
           return "default";
         }
         return prev;
@@ -847,7 +984,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setSelectedAudioInputState("default");
       try {
         localStorage.setItem("checkpoint_voice_input_device", "default");
-      } catch {}
+      } catch { }
       void changeAudioInputDevice("default");
     };
 
@@ -862,7 +999,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setSelectedVideoInputState(deviceId);
       try {
         localStorage.setItem("checkpoint_voice_video_device", deviceId);
-      } catch {}
+      } catch { }
 
       if (!isCameraOn || callState === "idle") return;
 
@@ -912,7 +1049,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setInputModeState(mode);
       try {
         localStorage.setItem("checkpoint_voice_input_mode", mode);
-      } catch {}
+      } catch { }
       if (localStreamRef.current) {
         const track = localStreamRef.current.getAudioTracks()[0];
         if (track) {
@@ -927,7 +1064,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setPushToTalkKeyState(key);
     try {
       localStorage.setItem("checkpoint_ptt_key", key);
-    } catch {}
+    } catch { }
   }, []);
 
   // Global PTT shortcut registration with Electron
@@ -1076,6 +1213,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setRemoteStatesMap(new Map());
 
     // Stop local media tracks
+    // First destroy the audio processing chain so the AudioContext is closed cleanly.
+    if (audioProcCleanupRef.current) {
+      try {
+        audioProcCleanupRef.current();
+      } catch { }
+      audioProcCleanupRef.current = null;
+    }
+    activeGainNodeRef.current = null;
+    // Stop the raw source stream (getUserMedia).
+    if (rawStreamRef.current) {
+      rawStreamRef.current.getTracks().forEach((track) => track.stop());
+      rawStreamRef.current = null;
+    }
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
@@ -1093,7 +1243,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     peerConnectionsRef.current.forEach((pc) => {
       try {
         pc.close();
-      } catch {}
+      } catch { }
     });
     peerConnectionsRef.current.clear();
     remoteStreamsRef.current.clear();
@@ -1299,7 +1449,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             for (const cand of pending) {
               try {
                 await pc.addIceCandidate(new RTCIceCandidate(cand));
-              } catch {}
+              } catch { }
             }
             pendingCandidatesRef.current.delete(senderId);
 
@@ -1321,7 +1471,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           if (pc.remoteDescription) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
-            } catch {}
+            } catch { }
           } else {
             const list = pendingCandidatesRef.current.get(senderId) || [];
             list.push(cand);
@@ -1383,7 +1533,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if (pc) {
           try {
             pc.close();
-          } catch {}
+          } catch { }
           peerConnectionsRef.current.delete(left.uid);
         }
         remoteStreamsRef.current.delete(left.uid);
@@ -1423,12 +1573,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setSession((prev) =>
           prev
             ? {
-                ...prev,
-                isPrivate: privacy.isPrivate,
-                password: privacy.password,
-                category: privacy.category || prev.category,
-                roomName: privacy.roomName || prev.roomName,
-              }
+              ...prev,
+              isPrivate: privacy.isPrivate,
+              password: privacy.password,
+              category: privacy.category || prev.category,
+              roomName: privacy.roomName || prev.roomName,
+            }
             : null,
         );
         notify(
@@ -1506,13 +1656,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           startedAt: Date.now(),
         });
 
-        const audioStream = await acquireAudioStream();
-        if (audioStream) {
-          localStreamRef.current = audioStream;
-          setLocalStream(audioStream);
-          setupVoiceAnalyzer(audioStream, true);
+        const rawAudioStream = await acquireAudioStream();
+        if (rawAudioStream) {
+          const processedStream = await applyAudioProcessingChain(rawAudioStream);
+          localStreamRef.current = processedStream;
+          setLocalStream(processedStream);
+          setupVoiceAnalyzer(processedStream, true);
           if (inputMode === "push-to-talk") {
-            const track = audioStream.getAudioTracks()[0];
+            const track = processedStream.getAudioTracks()[0];
             if (track) track.enabled = false;
           }
         } else {
@@ -1569,7 +1720,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cleanUpCall();
       }
     },
-    [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
+    [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
   );
 
   // ANSWER CALL (Callee 1:1)
@@ -1594,13 +1745,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         startedAt: Date.now(),
       });
 
-      const audioStream = await acquireAudioStream();
-      if (audioStream) {
-        localStreamRef.current = audioStream;
-        setLocalStream(audioStream);
-        setupVoiceAnalyzer(audioStream, true);
+      const rawAudioStream = await acquireAudioStream();
+      if (rawAudioStream) {
+        const processedStream = await applyAudioProcessingChain(rawAudioStream);
+        localStreamRef.current = processedStream;
+        setLocalStream(processedStream);
+        setupVoiceAnalyzer(processedStream, true);
         if (inputMode === "push-to-talk") {
-          const track = audioStream.getAudioTracks()[0];
+          const track = processedStream.getAudioTracks()[0];
           if (track) track.enabled = false;
         }
       } else {
@@ -1628,7 +1780,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao atender chamada.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, setupVoiceAnalyzer, user]);
+  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, setupVoiceAnalyzer, user]);
 
   // JOIN ROOM (Persistente / Multi-Participante)
   const joinRoom = useCallback(
@@ -1673,13 +1825,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           isPrivate: room.isPrivate,
         });
 
-        const audioStream = await acquireAudioStream();
-        if (audioStream) {
-          localStreamRef.current = audioStream;
-          setLocalStream(audioStream);
-          setupVoiceAnalyzer(audioStream, true);
+        const rawAudioStream = await acquireAudioStream();
+        if (rawAudioStream) {
+          const processedStream = await applyAudioProcessingChain(rawAudioStream);
+          localStreamRef.current = processedStream;
+          setLocalStream(processedStream);
+          setupVoiceAnalyzer(processedStream, true);
           if (inputMode === "push-to-talk") {
-            const track = audioStream.getAudioTracks()[0];
+            const track = processedStream.getAudioTracks()[0];
             if (track) track.enabled = false;
           }
         } else {
@@ -1731,7 +1884,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cleanUpCall();
       }
     },
-    [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
+    [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
   );
 
   // CREATE AND JOIN ROOM (Criação de Sala Persistente)
@@ -1833,7 +1986,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if (sender && !isSharingScreen) {
           try {
             pc.removeTrack(sender);
-          } catch {}
+          } catch { }
         }
       });
 
@@ -1920,10 +2073,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           screenStream = await (navigator.mediaDevices as any).getUserMedia({
             audio: options.withAudio
               ? {
-                  mandatory: {
-                    chromeMediaSource: "desktop",
-                  },
-                }
+                mandatory: {
+                  chromeMediaSource: "desktop",
+                },
+              }
               : false,
             video: {
               mandatory: {
@@ -2020,11 +2173,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setIsScreenPickerOpen(false);
         playSfx(sfxStreamStart);
 
-        void sendCallState(session.chatId, {
-          senderId: user.uid,
-          chatId: session.chatId,
-          isSharingScreen: true,
-        });
+        if (user?.uid) {
+          void sendCallState(session.chatId, {
+            senderId: user.uid,
+            chatId: session.chatId,
+            isSharingScreen: true,
+          });
+        }
 
         videoTrack.onended = () => {
           void stopScreenShare();
@@ -2061,7 +2216,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if (videoSender) {
           try {
             pc.removeTrack(videoSender);
-          } catch {}
+          } catch { }
         }
 
         try {
@@ -2073,7 +2228,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             targetUid: peerId,
             signal: offer,
           });
-        } catch {}
+        } catch { }
       }
 
       void sendCallState(session.chatId, {
@@ -2101,13 +2256,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         startedAt: Date.now(),
       });
 
-      const audioStream = await acquireAudioStream();
-      if (audioStream) {
-        localStreamRef.current = audioStream;
-        setLocalStream(audioStream);
-        setupVoiceAnalyzer(audioStream, true);
+      const rawAudioStream = await acquireAudioStream();
+      if (rawAudioStream) {
+        const processedStream = await applyAudioProcessingChain(rawAudioStream);
+        localStreamRef.current = processedStream;
+        setLocalStream(processedStream);
+        setupVoiceAnalyzer(processedStream, true);
         if (inputMode === "push-to-talk") {
-          const track = audioStream.getAudioTracks()[0];
+          const track = processedStream.getAudioTracks()[0];
           if (track) track.enabled = false;
         }
       } else {
@@ -2127,7 +2283,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao acessar microfone para o teste.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, cleanUpCall, inputMode, notify, playRingtone, setupVoiceAnalyzer]);
+  }, [acquireAudioStream, applyAudioProcessingChain, cleanUpCall, inputMode, notify, playRingtone, setupVoiceAnalyzer]);
 
   // KICK PARTICIPANT (Admin Action)
   const kickParticipant = useCallback(
@@ -2164,12 +2320,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setSession((prev) =>
         prev
           ? {
-              ...prev,
-              isPrivate,
-              password: password || undefined,
-              roomName: currentRoomName,
-              category: currentCategory,
-            }
+            ...prev,
+            isPrivate,
+            password: password || undefined,
+            roomName: currentRoomName,
+            category: currentCategory,
+          }
           : null,
       );
       await sendCallPrivacyUpdate(session.chatId, {
@@ -2195,7 +2351,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) throw new Error("AudioContext não suportado");
 
-      let tempStream = localStreamRef.current;
+      let tempStream = rawStreamRef.current || localStreamRef.current;
       let shouldStopTemp = false;
 
       if (!tempStream || !tempStream.getAudioTracks().some((t) => t.readyState === "live")) {
@@ -2243,7 +2399,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         source.disconnect();
         analyser.disconnect();
         if (ctx.state !== "closed") await ctx.close();
-      } catch {}
+      } catch { }
 
       if (shouldStopTemp && tempStream) {
         tempStream.getTracks().forEach((t) => t.stop());
@@ -2260,7 +2416,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
       try {
         localStorage.setItem("checkpoint_voice_noise_floor", String(noiseFloor));
-      } catch {}
+      } catch { }
 
       notify(`Microfone calibrado! Ruído medido: ${noiseFloor}%. Sensibilidade ajustada para ${recommendedSensitivity}%.`, "success");
       return { noiseFloor, recommendedSensitivity };
@@ -2334,6 +2490,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setEchoCancellation,
     noiseSuppression,
     setNoiseSuppression,
+    advancedNoiseSuppression,
+    setAdvancedNoiseSuppression,
     autoGainControl,
     setAutoGainControl,
     calibrateNoiseFloor,

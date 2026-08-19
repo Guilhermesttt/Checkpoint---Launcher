@@ -90,14 +90,19 @@ interface VoiceCallWindowProps {
   onChangeEchoCancellation?: (val: boolean) => void;
   noiseSuppression?: boolean;
   onChangeNoiseSuppression?: (val: boolean) => void;
+  advancedNoiseSuppression?: boolean;
+  onChangeAdvancedNoiseSuppression?: (val: boolean) => void;
   autoGainControl?: boolean;
   onChangeAutoGainControl?: (val: boolean) => void;
   onToggleMute: () => void;
   onToggleDeafen: () => void;
   onToggleCamera?: () => void;
-  onToggleScreenShare: () => void;
+  onToggleScreenShare?: () => void;
+  onHangUp?: () => void;
   onKickParticipant?: (targetUserId: string) => void;
   onUpdateRoomPrivacy?: (isPrivate: boolean, password?: string) => Promise<void> | void;
+  socialFriends?: SocialFriend[];
+  roomConfig?: CallRoomConfig | null;
   notify?: (msg: string, type: "success" | "error" | "info") => void;
   remoteSpeakingStates?: Map<string, boolean>;
   remoteStreams?: Map<string, MediaStream>;
@@ -164,7 +169,7 @@ const VideoRenderer: React.FC<{
       if (video.srcObject !== stream) {
         video.srcObject = stream;
       }
-      video.play().catch(() => {});
+      video.play().catch(() => { });
     } else {
       video.srcObject = null;
     }
@@ -229,6 +234,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   onChangeEchoCancellation,
   noiseSuppression = true,
   onChangeNoiseSuppression,
+  advancedNoiseSuppression = true,
+  onChangeAdvancedNoiseSuppression,
   autoGainControl = true,
   onChangeAutoGainControl,
   onToggleMute,
@@ -240,7 +247,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   socialFriends = [],
   roomConfig,
   onUpdateRoomPrivacy,
-  notify = () => {},
+  notify = () => { },
   remoteSpeakingStates,
   remoteStreams,
   remoteStatesMap,
@@ -372,15 +379,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       if (source) {
         try {
           source.disconnect();
-        } catch {}
+        } catch { }
       }
       if (analyser) {
         try {
           analyser.disconnect();
-        } catch {}
+        } catch { }
       }
       if (ctx && ctx.state !== "closed") {
-        void ctx.close().catch(() => {});
+        void ctx.close().catch(() => { });
       }
       setMicVolumeLevel(0);
     };
@@ -655,11 +662,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsPrivacyModalOpen(true)}
-                    className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${
-                      session?.isPrivate || roomConfig?.isPrivate
-                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
-                        : "bg-white/5 border-white/8 text-white/70 hover:bg-white/10 hover:text-white"
-                    }`}
+                    className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${session?.isPrivate || roomConfig?.isPrivate
+                      ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
+                      : "bg-white/5 border-white/8 text-white/70 hover:bg-white/10 hover:text-white"
+                      }`}
                     title={
                       session?.isPrivate || roomConfig?.isPrivate
                         ? "Chamada Privada (requer senha) - Clique para gerenciar"
@@ -701,11 +707,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                 <button
                   type="button"
                   onClick={() => setFocusedFeedId(null)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    !isFocusedMode
-                      ? "bg-white text-black shadow-sm"
-                      : "text-white/60 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${!isFocusedMode
+                    ? "bg-white text-black shadow-sm"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                    }`}
                   title="Visualização em Grade (Todos os participantes)"
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
@@ -719,11 +724,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       if (firstVideo) setFocusedFeedId(firstVideo.id);
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    isFocusedMode
-                      ? "bg-white text-black shadow-sm"
-                      : "text-white/60 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isFocusedMode
+                    ? "bg-white text-black shadow-sm"
+                    : "text-white/60 hover:text-white hover:bg-white/10"
+                    }`}
                   title="Modo Foco / Destaque"
                 >
                   <Pin className="h-3.5 w-3.5" />
@@ -778,27 +782,29 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         layout
                         onClick={() => handleToggleFocus(feed.id)}
                         onContextMenu={(e) => handleFeedContextMenu(e, feed)}
-                        className={`group relative flex items-center justify-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 shrink-0 w-36 sm:w-44 h-20 sm:h-24 bg-black/60 border ${
-                          isCurrent
-                            ? "border-white ring-2 ring-white/40 shadow-[0_0_20px_rgba(255,255,255,0.25)]"
-                            : feed.isSpeaking
+                        className={`group relative flex items-center justify-center rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 shrink-0 w-36 sm:w-44 h-20 sm:h-24 bg-black/60 border ${isCurrent
+                          ? "border-white ring-2 ring-white/40 shadow-[0_0_20px_rgba(255,255,255,0.25)]"
+                          : feed.isSpeaking
                             ? "border-white/80 ring-2 ring-white/30 hover:border-white"
                             : "border-white/10 hover:border-white/30 hover:bg-white/5"
-                        }`}
+                          }`}
                         title={`Clique para focar em ${feed.title}`}
                       >
                         {feed.type === "video" && feed.stream ? (
                           <div className="h-full w-full bg-black/80">
                             <VideoRenderer stream={feed.stream} fitMode="cover" />
                           </div>
+                        ) : feed.cameraStream ? (
+                          <div className="h-full w-full bg-black/80">
+                            <VideoRenderer stream={feed.cameraStream} fitMode="cover" muted={feed.isLocal} />
+                          </div>
                         ) : (
                           <div className="flex flex-col items-center justify-center p-2 gap-1.5 text-center">
                             <div
-                              className={`h-9 w-9 rounded-full overflow-hidden border transition-all duration-150 ${
-                                feed.isSpeaking
-                                  ? "border-white ring-2 ring-white/60 scale-105"
-                                  : "border-white/15"
-                              }`}
+                              className={`h-9 w-9 rounded-full overflow-hidden border transition-all duration-150 ${feed.isSpeaking
+                                ? "border-white ring-2 ring-white/60 scale-105"
+                                : "border-white/15"
+                                }`}
                             >
                               {feed.avatar ? (
                                 <img src={feed.avatar} alt="" className="h-full w-full object-cover" />
@@ -859,12 +865,13 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   onContextMenu={(e) => handleFeedContextMenu(e, focusedFeed)}
                   className="group relative flex-1 w-full rounded-2xl overflow-hidden bg-black/90 border border-white/10 shadow-2xl flex items-center justify-center"
                 >
-                  {focusedFeed.type === "video" && focusedFeed.stream ? (
+                  {(focusedFeed.type === "video" && focusedFeed.stream) || Boolean(focusedFeed.cameraStream) ? (
                     // Video Feed Stage (Screen Share or Camera)
                     <div className="relative h-full w-full flex items-center justify-center">
                       <VideoRenderer
-                        stream={focusedFeed.stream}
+                        stream={focusedFeed.stream || focusedFeed.cameraStream!}
                         fitMode={videoFitMode}
+                        muted={focusedFeed.isLocal}
                         onVideoElement={(el) => {
                           activeVideoElRef.current = el;
                         }}
@@ -891,11 +898,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setIsVolumeSliderOpen((prev) => !prev)}
-                                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer ${
-                                  isVolumeSliderOpen
-                                    ? "bg-white text-black"
-                                    : "text-white/70 hover:text-white hover:bg-white/10"
-                                }`}
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer ${isVolumeSliderOpen
+                                  ? "bg-white text-black"
+                                  : "text-white/70 hover:text-white hover:bg-white/10"
+                                  }`}
                                 title={`Ajustar volume de ${focusedFeed.title} (${remoteVolume}%)`}
                               >
                                 {remoteVolume === 0 ? (
@@ -994,11 +1000,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       <div className="relative">
                         {/* Big Glowing Speaking Ring */}
                         <div
-                          className={`relative h-36 w-36 rounded-full overflow-hidden border-4 transition-all duration-150 ${
-                            focusedFeed.isSpeaking
-                              ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04]"
-                              : "border-white/15"
-                          }`}
+                          className={`relative h-36 w-36 rounded-full overflow-hidden border-4 transition-all duration-150 ${focusedFeed.isSpeaking
+                            ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04]"
+                            : "border-white/15"
+                            }`}
                         >
                           {focusedFeed.avatar ? (
                             <img src={focusedFeed.avatar} alt="" className="h-full w-full object-cover" />
@@ -1070,13 +1075,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               /* GRID VIEW MODE (Discord Style Balanced Equal Tiles)                      */
               /* ========================================================================= */
               <div
-                className={`grid gap-5 w-full h-full max-w-5xl items-center justify-center ${
-                  activeFeeds.length <= 2
-                    ? "grid-cols-1 sm:grid-cols-2 max-w-3xl"
-                    : activeFeeds.length === 3
+                className={`grid gap-5 w-full h-full max-w-5xl items-center justify-center ${activeFeeds.length <= 2
+                  ? "grid-cols-1 sm:grid-cols-2 max-w-3xl"
+                  : activeFeeds.length === 3
                     ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
                     : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3"
-                }`}
+                  }`}
               >
                 {isRoomSession && activeFeeds.length === 1 && (
                   <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.015] p-8 text-center space-y-3 min-h-[220px] max-h-[360px]">
@@ -1106,17 +1110,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       layout
                       onDoubleClick={() => handleToggleFocus(feed.id)}
                       onContextMenu={(e) => handleFeedContextMenu(e, feed)}
-                      className={`group relative flex flex-col items-center justify-center rounded-3xl border transition-all duration-300 w-full h-full min-h-[220px] max-h-[360px] overflow-hidden ${
-                        feed.type === "video" || hasCameraFill
-                          ? "bg-black/90 border-white/10 shadow-xl p-0"
-                          : "bg-white/[0.025] hover:bg-white/[0.045] border-white/8 hover:border-white/15 backdrop-blur-md p-6"
-                      } ${
-                        hasCameraFill && feed.isSpeaking
+                      className={`group relative flex flex-col items-center justify-center rounded-3xl border transition-all duration-300 w-full h-full min-h-[220px] max-h-[360px] overflow-hidden ${feed.type === "video" || hasCameraFill
+                        ? "bg-black/90 border-white/10 shadow-xl p-0"
+                        : "bg-white/[0.025] hover:bg-white/[0.045] border-white/8 hover:border-white/15 backdrop-blur-md p-6"
+                        } ${hasCameraFill && feed.isSpeaking
                           ? "border-white ring-2 ring-white/40 shadow-[0_0_25px_rgba(255,255,255,0.3)]"
                           : !hasCameraFill && feed.isSpeaking
-                          ? "border-white/30 bg-white/[0.04]"
-                          : ""
-                      }`}
+                            ? "border-white/30 bg-white/[0.04]"
+                            : ""
+                        }`}
                     >
                       {hasCameraFill ? (
                         // ── Camera ON: fills entire card rectangle (Discord-style video tile) ──
@@ -1152,11 +1154,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                           {feed.isLocal && inputMode === "push-to-talk" && (
                             <div className="absolute top-2 right-2 pointer-events-none">
                               <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                                  isPttPressed
-                                    ? "bg-white/20 text-white border-white/40 animate-pulse"
-                                    : "bg-black/60 text-white/50 border-white/10"
-                                }`}
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${isPttPressed
+                                  ? "bg-white/20 text-white border-white/40 animate-pulse"
+                                  : "bg-black/60 text-white/50 border-white/10"
+                                  }`}
                               >
                                 PTT [{pushToTalkKey}]
                               </span>
@@ -1238,11 +1239,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <div className="flex flex-col items-center justify-center text-center">
                           <div className="relative mb-3">
                             <div
-                              className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-150 ${
-                                feed.isSpeaking
-                                  ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05]"
-                                  : "border-white/10"
-                              }`}
+                              className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-150 ${feed.isSpeaking
+                                ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05]"
+                                : "border-white/10"
+                                }`}
                             >
                               {feed.avatar ? (
                                 <img src={feed.avatar} alt="" className="h-full w-full object-cover" />
@@ -1266,11 +1266,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             <h4 className="text-sm sm:text-base font-black text-white tracking-tight">{feed.title}</h4>
                             {feed.isLocal && inputMode === "push-to-talk" && (
                               <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                                  isPttPressed
-                                    ? "bg-white/20 text-white border-white/40 animate-pulse"
-                                    : "bg-white/5 text-white/50 border-white/10"
-                                }`}
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${isPttPressed
+                                  ? "bg-white/20 text-white border-white/40 animate-pulse"
+                                  : "bg-white/5 text-white/50 border-white/10"
+                                  }`}
                               >
                                 PTT [{pushToTalkKey}]
                               </span>
@@ -1456,26 +1455,49 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     </div>
 
                     {/* 2. Sensibilidade de Atividade de Voz Card */}
-                    <div className="p-4 rounded-2xl border border-white/8 bg-white/[0.025] space-y-2">
-                      <div className="flex items-center justify-between text-[11px] font-bold">
-                        <span className="text-white/70">Sensibilidade de Voz (VAD)</span>
-                        <span className="font-mono text-white/90 bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
-                          {voiceSensitivity}%
-                        </span>
+                    {typeof micGain === "number" && onChangeMicGain && (
+                      <div className="space-y-2 bg-black/30 p-3 rounded-xl border border-white/6">
+                        <div className="flex items-center justify-between text-[11px] font-bold">
+                          <span className="text-white/60 flex items-center gap-1">
+                            <Volume2 className="h-3 w-3 text-white/70" />
+                            Volume do Microfone
+                          </span>
+                          <span className="font-mono text-white/80">{micGain}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={200}
+                          value={micGain}
+                          onChange={(e) => onChangeMicGain(Number(e.target.value))}
+                          className="w-full accent-white cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/30">
+                          <span>Mudo (0%)</span>
+                          <span onClick={() => onChangeMicGain(100)} className="cursor-pointer hover:text-white/60">
+                            Normal (100%)
+                          </span>
+                          <span>Amplificado (200%)</span>
+                        </div>
+                        {micGain > 130 && (
+                          <p className="text-[10px] text-amber-400/80 flex items-center gap-1">
+                            Acima de 130% pode captar mais ruído de fundo junto com a voz.
+                          </p>
+                        )}
                       </div>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={voiceSensitivity}
-                        onChange={(e) => onChangeVoiceSensitivity?.(Number(e.target.value))}
-                        className="w-full accent-white cursor-pointer"
-                      />
-                      <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/30">
-                        <span>Menos Sensível (0%)</span>
-                        <span>Mais Sensível (100%)</span>
-                      </div>
-                    </div>
+                    )}
+
+                    {onCalibrateNoise && (
+                      <button
+                        type="button"
+                        disabled={isCalibratingNoise}
+                        onClick={() => void onCalibrateNoise()}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                      >
+                        <Activity className="h-3.5 w-3.5" />
+                        <span>{isCalibratingNoise ? "Calibrando... (fique em silêncio)" : "Calibrar ruído ambiente automaticamente"}</span>
+                      </button>
+                    )}
 
                     {/* 3. Toggles de Processamento de Áudio Card */}
                     <div className="p-4 rounded-2xl border border-white/8 bg-white/[0.025] space-y-2.5">
@@ -1486,11 +1508,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <button
                           type="button"
                           onClick={() => onChangeEchoCancellation?.(!echoCancellation)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                            echoCancellation
-                              ? "bg-white text-black font-black shadow-sm border-white"
-                              : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                          }`}
+                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${echoCancellation
+                            ? "bg-white text-black font-black shadow-sm border-white"
+                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
+                            }`}
                         >
                           <span>Anti-Eco</span>
                           {echoCancellation && <Check className="h-3.5 w-3.5" />}
@@ -1499,27 +1520,53 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <button
                           type="button"
                           onClick={() => onChangeNoiseSuppression?.(!noiseSuppression)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                            noiseSuppression
-                              ? "bg-white text-black font-black shadow-sm border-white"
-                              : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                          }`}
+                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${noiseSuppression
+                            ? "bg-white text-black font-black shadow-sm border-white"
+                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
+                            }`}
                         >
-                          <span>Supressão Ruído</span>
+                          <span>Supressão Nativa</span>
                           {noiseSuppression && <Check className="h-3.5 w-3.5" />}
                         </button>
 
                         <button
                           type="button"
                           onClick={() => onChangeAutoGainControl?.(!autoGainControl)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
-                            autoGainControl
-                              ? "bg-white text-black font-black shadow-sm border-white"
-                              : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                          }`}
+                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${autoGainControl
+                            ? "bg-white text-black font-black shadow-sm border-white"
+                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
+                            }`}
                         >
                           <span>Ganho Auto</span>
                           {autoGainControl && <Check className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+
+                      {/* Sub-card: Supressão IA (RNNoise WASM) */}
+                      <div className="pt-2 border-t border-white/6 flex items-center justify-between">
+                        <div className="space-y-0.5 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-white/90">
+                              Supressão de Ruído IA
+                            </span>
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              RNNoise
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-white/40">
+                            Filtro neural em tempo real para eliminar teclado, cliques e ruído ambiente.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onChangeAdvancedNoiseSuppression?.(!advancedNoiseSuppression)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${advancedNoiseSuppression ? "bg-emerald-500" : "bg-white/10"
+                            }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${advancedNoiseSuppression ? "translate-x-5" : "translate-x-0"
+                              }`}
+                          />
                         </button>
                       </div>
                     </div>
@@ -1533,22 +1580,20 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <button
                           type="button"
                           onClick={() => setInputMode?.("voice-activity")}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            inputMode === "voice-activity"
-                              ? "bg-white text-black font-black shadow-sm"
-                              : "text-white/50 hover:text-white hover:bg-white/5"
-                          }`}
+                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${inputMode === "voice-activity"
+                            ? "bg-white text-black font-black shadow-sm"
+                            : "text-white/50 hover:text-white hover:bg-white/5"
+                            }`}
                         >
                           Atividade de Voz
                         </button>
                         <button
                           type="button"
                           onClick={() => setInputMode?.("push-to-talk")}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            inputMode === "push-to-talk"
-                              ? "bg-white text-black font-black shadow-sm"
-                              : "text-white/50 hover:text-white hover:bg-white/5"
-                          }`}
+                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${inputMode === "push-to-talk"
+                            ? "bg-white text-black font-black shadow-sm"
+                            : "text-white/50 hover:text-white hover:bg-white/5"
+                            }`}
                         >
                           Push-to-Talk
                         </button>
@@ -1577,11 +1622,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               };
                               window.addEventListener("keydown", onKey, true);
                             }}
-                            className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer ${
-                              isRecordingKey
-                                ? "bg-white/20 text-white border-white/40 animate-pulse"
-                                : "bg-white/10 text-white border-white/20 hover:bg-white/20"
-                            }`}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer ${isRecordingKey
+                              ? "bg-white/20 text-white border-white/40 animate-pulse"
+                              : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                              }`}
                           >
                             {isRecordingKey ? "Pressione tecla..." : pushToTalkKey}
                           </button>
@@ -1611,11 +1655,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             <button
               type="button"
               onClick={onToggleMute}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${
-                isMuted
-                  ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
-                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
-              }`}
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isMuted
+                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
+                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                }`}
               title={isMuted ? "Desmutar microfone" : "Mutar microfone"}
             >
               {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
@@ -1626,11 +1669,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               <button
                 type="button"
                 onClick={onToggleCamera}
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${
-                  isCameraOn
-                    ? "bg-white text-black shadow-md scale-105"
-                    : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
-                }`}
+                className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isCameraOn
+                  ? "bg-white text-black shadow-md scale-105"
+                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                  }`}
                 title={isCameraOn ? "Desligar câmera" : "Ligar câmera"}
               >
                 {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
@@ -1641,11 +1683,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             <button
               type="button"
               onClick={onToggleScreenShare}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${
-                isSharingScreen
-                  ? "bg-white text-black shadow-md scale-105"
-                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
-              }`}
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isSharingScreen
+                ? "bg-white text-black shadow-md scale-105"
+                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                }`}
               title={isSharingScreen ? "Parar transmissão" : "Transmitir tela ou jogo"}
             >
               {isSharingScreen ? <MonitorOff className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
@@ -1655,11 +1696,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             <button
               type="button"
               onClick={onToggleDeafen}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${
-                isDeafened
-                  ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
-                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
-              }`}
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isDeafened
+                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
+                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                }`}
               title={isDeafened ? "Desativar silêncio total" : "Silenciar tudo (Deafen)"}
             >
               {isDeafened ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
@@ -1669,11 +1709,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             <button
               type="button"
               onClick={() => setIsSettingsOpen((prev) => !prev)}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${
-                isSettingsOpen
-                  ? "bg-white text-black shadow-md"
-                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
-              }`}
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isSettingsOpen
+                ? "bg-white text-black shadow-md"
+                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                }`}
               title="Ajustes de voz & entrada"
             >
               <Settings className="h-5 w-5" />

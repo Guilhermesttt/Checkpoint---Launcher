@@ -1,3 +1,15 @@
+## Checkpoint Launcher — v3.1.1
+
+Lançamento: 18 de agosto de 2026.
+
+- **Supressão de Ruído Avançada por IA (RNNoise WASM)**: Processamento neural de áudio em tempo real via AudioWorklet com remoção profunda de ruídos de fundo, cliques mecânicos e ventiladores.
+- **Ganho de Microfone Real WebRTC**: O slider de volume de entrada (0–200%) agora amplifica a faixa de áudio efetivamente transmitida aos participantes, com compressor dinâmico anti-clipping e ganho de compensação (+3.2 dB).
+- **Detecção de Voz (VAD) Aprimorada**: O detector de atividade de voz agora lê a stream de hardware bruta com multiplicador de ganho, garantindo que o corte automático do Noise Gate não bloqueie a captura ao voltar a falar.
+- **Visualização em Palco Focado para Câmera**: Correção no modo Spotlight do painel de chamadas para renderizar o feed de vídeo da webcam em tela cheia ao focar.
+- **Notificações Globais de Chat**: Sistema de notificação sonora e toast visual com avatar e nome do remetente ao receber novas mensagens de amigos com o chat fechado.
+
+---
+
 ## Checkpoint Launcher — v3.1.0
 
 Lançamento: 18 de agosto de 2026.
