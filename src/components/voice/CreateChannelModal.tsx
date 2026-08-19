@@ -25,6 +25,8 @@ interface CreateChannelModalProps {
   isOpen: boolean;
   onClose: () => void;
   userProfile: UserProfile | null;
+  initialConfig?: Partial<CallRoomConfig> | null;
+  isEditing?: boolean;
   onCreateChannel: (config: CallRoomConfig) => void;
 }
 
@@ -76,6 +78,8 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
   isOpen,
   onClose,
   userProfile,
+  initialConfig,
+  isEditing = false,
   onCreateChannel,
 }) => {
   const [roomName, setRoomName] = useState("");
@@ -90,9 +94,30 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 
   const fallbackDefaultName = `Canal de ${userProfile?.displayName || "Voz"}`;
 
+  useEffect(() => {
+    if (isOpen) {
+      if (initialConfig) {
+        setRoomName(initialConfig.roomName || "");
+        setCategory(initialConfig.category || "resenha_games");
+        setSelectedIcon(initialConfig.icon || "🎮");
+        setCustomAvatarUrl(initialConfig.avatarUrl || "");
+        setThemeColor(initialConfig.themeColor || THEME_COLORS[0].value);
+        setIsPrivate(Boolean(initialConfig.isPrivate));
+        setPassword(initialConfig.password || "");
+      } else {
+        setRoomName("");
+        setCategory("resenha_games");
+        setSelectedIcon("🎮");
+        setCustomAvatarUrl("");
+        setThemeColor(THEME_COLORS[0].value);
+        setIsPrivate(false);
+        setPassword("");
+      }
+      setError(null);
+    }
+  }, [isOpen, initialConfig]);
+
   // Trava o scroll do body enquanto o modal está aberto e permite fechar com Esc.
-  // Isso é o que garante o "padrão de modal" além do backdrop: sem isso o conteúdo
-  // por trás continua rolando/respondendo ao teclado junto com o modal.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -175,11 +200,13 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
               </div>
               <div>
                 <h3 className="text-sm font-black text-white tracking-tight uppercase flex items-center gap-2">
-                  <span>Criar Canal de Voz</span>
+                  <span>{isEditing ? "Editar Aparência do Canal" : "Criar Canal de Voz"}</span>
                   <Sparkles className="h-3.5 w-3.5 text-white/80" />
                 </h3>
                 <p className="text-[11px] text-white/40">
-                  Personalize nome, foto, cor e visibilidade do seu canal
+                  {isEditing
+                    ? "Altere o nome, ícone, cor e visibilidade do canal"
+                    : "Personalize nome, foto, cor e visibilidade do seu canal"}
                 </p>
               </div>
             </div>
@@ -413,8 +440,17 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
               onClick={handleCreate}
               className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-white/90 font-black text-xs shadow-[0_4px_20px_rgba(255,255,255,0.15)] transition hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Plus className="h-4 w-4" />
-              <span>Criar Canal</span>
+              {isEditing ? (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  <span>Salvar Alterações</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  <span>Criar Canal</span>
+                </>
+              )}
             </button>
           </div>
         </motion.div>

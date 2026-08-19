@@ -501,6 +501,9 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           onOpenActiveWindow={() => {
             voiceCall.setIsVoiceWindowOpen(true);
           }}
+          onSimulateIncomingCall={() => {
+            voiceCall.simulateIncomingCall(true);
+          }}
           notify={notify}
         />
       )}

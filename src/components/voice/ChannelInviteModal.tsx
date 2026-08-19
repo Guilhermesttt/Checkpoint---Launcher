@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, UserPlus, Check, X, Users, Radio, Send } from "lucide-react";
 import type { SocialFriend, UserProfile, VoiceCallSession } from "../../types/domain";
 import { sendChatMessage } from "../../services/chat";
+import { sendCallInvite } from "../../services/voiceCall";
 
 interface ChannelInviteModalProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const ChannelInviteModal: React.FC<ChannelInviteModalProps> = ({
   // Filter out friends who are the current remote participant in 1:1 call if applicable
   const availableFriends = useMemo(() => {
     return friends.filter((friend) => {
-      const rawId = friend.id.split(":")[1] || friend.id;
+      const rawId = friend.id.includes(":") ? friend.id.split(":")[1] : friend.id;
       return rawId !== session?.friendUid;
     });
   }, [friends, session?.friendUid]);
@@ -45,17 +46,30 @@ export const ChannelInviteModal: React.FC<ChannelInviteModalProps> = ({
 
   const handleSendInvite = async (friend: SocialFriend) => {
     if (!session) return;
-    const friendUid = friend.id.split(":")[1] || friend.id;
+    const friendUid = friend.id.includes(":") ? friend.id.split(":")[1] : friend.id;
     setSendingId(friendUid);
 
     try {
+      const avatarUrl = userProfile?.photoURL?.startsWith("data:") ? null : (userProfile?.photoURL || null);
+      
+      // 1. Send realtime call invite popup if online
+      void sendCallInvite(friendUid, {
+        callerId: userProfile?.uid || "",
+        callerName: userProfile?.displayName || "Jogador",
+        callerAvatar: avatarUrl,
+        chatId: session.chatId,
+        hasVideo: false,
+        timestamp: Date.now(),
+      }).catch(() => {});
+
+      // 2. Send structured chat message for interactive invite card in DM
       const invitePayload = {
         __type: "call_invite",
         chatId: session.chatId,
         roomName: session.roomName || `Call de ${userProfile?.displayName || "Voz"}`,
         category: session.category || "resenha_games",
         callerName: userProfile?.displayName || "Jogador",
-        callerAvatar: userProfile?.photoURL || null,
+        callerAvatar: avatarUrl,
         isPrivate: Boolean(session.isPrivate),
         createdAt: Date.now(),
       };

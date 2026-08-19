@@ -299,6 +299,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         socialFriends={socialFriends}
         roomConfig={voiceCall.roomConfig}
         onUpdateRoomPrivacy={voiceCall.updateRoomPrivacy}
+        onUpdateRoomAppearance={voiceCall.updateRoomAppearance}
         notify={notify}
         remoteSpeakingStates={voiceCall.remoteSpeakingStates}
         remoteStreams={voiceCall.remoteStreams}

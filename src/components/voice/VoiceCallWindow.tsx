@@ -39,12 +39,14 @@ import {
   MessageSquare,
   Lock,
   Unlock,
+  Palette,
 } from "lucide-react";
 import type { SocialFriend, UserProfile, VoiceCallSession, CallState } from "../../types/domain";
 import type { CallRoomConfig } from "../../types/voice-governance";
 import { ParticipantContextMenu } from "./ParticipantContextMenu";
 import { ChannelInviteModal } from "./ChannelInviteModal";
 import { CallPrivacyPanel } from "./CallPrivacyPanel";
+import { CreateChannelModal } from "./CreateChannelModal";
 
 interface VoiceCallWindowProps {
   isOpen: boolean;
@@ -103,6 +105,7 @@ interface VoiceCallWindowProps {
   onHangUp?: () => void;
   onKickParticipant?: (targetUserId: string) => void;
   onUpdateRoomPrivacy?: (isPrivate: boolean, password?: string) => Promise<void> | void;
+  onUpdateRoomAppearance?: (config: CallRoomConfig) => Promise<void> | void;
   socialFriends?: SocialFriend[];
   roomConfig?: CallRoomConfig | null;
   notify?: (msg: string, type: "success" | "error" | "info") => void;
@@ -251,6 +254,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   socialFriends = [],
   roomConfig,
   onUpdateRoomPrivacy,
+  onUpdateRoomAppearance,
   notify = () => { },
   remoteSpeakingStates,
   remoteStreams,
@@ -272,6 +276,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   const [isVolumeSliderOpen, setIsVolumeSliderOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [isEditAppearanceModalOpen, setIsEditAppearanceModalOpen] = useState(false);
 
   // Focus & Display Controls (Discord style Spotlight / Grid)
   const [focusedFeedId, setFocusedFeedId] = useState<CallFeedId | null>(null);
@@ -705,6 +710,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <span>Pública</span>
                       </>
                     )}
+                  </button>
+
+                  {/* Edit Appearance Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsEditAppearanceModalOpen(true)}
+                    className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/12 border border-white/8 text-white/80 hover:text-white transition cursor-pointer"
+                    title="Editar aparência e configurações do canal (Nome, Ícone, Cor)"
+                  >
+                    <Palette className="h-3 w-3 text-white/70" />
+                    <span>Editar Canal</span>
                   </button>
                 </h2>
                 <p className="text-[11px] text-white/40">Chamada Direta Checkpoint</p>
@@ -1874,6 +1890,29 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               }
             }}
           />
+
+          {/* Edit Channel Appearance Modal */}
+          {isEditAppearanceModalOpen && (
+            <CreateChannelModal
+              isOpen={isEditAppearanceModalOpen}
+              onClose={() => setIsEditAppearanceModalOpen(false)}
+              userProfile={userProfile}
+              isEditing={true}
+              initialConfig={{
+                roomName: session?.roomName || roomConfig?.roomName || session?.friendName,
+                category: session?.category || roomConfig?.category || "resenha_games",
+                icon: session?.icon || roomConfig?.icon || "🎮",
+                avatarUrl: session?.avatarUrl || roomConfig?.avatarUrl,
+                themeColor: session?.themeColor || roomConfig?.themeColor || "#8B5CF6",
+                isPrivate: Boolean(session?.isPrivate || roomConfig?.isPrivate),
+                password: session?.password || roomConfig?.password,
+              }}
+              onCreateChannel={(updatedConfig) => {
+                void onUpdateRoomAppearance?.(updatedConfig);
+                setIsEditAppearanceModalOpen(false);
+              }}
+            />
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

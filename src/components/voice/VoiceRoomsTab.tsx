@@ -14,13 +14,15 @@ import {
   KeyRound,
   Trash2,
   PhoneCall,
+  PhoneIncoming,
+  Palette,
   Volume2,
   RefreshCw,
   X,
 } from "lucide-react";
 import type { VoiceRoom, RoomCategory, CallRoomConfig } from "../../types/voice-governance";
 import type { UserProfile } from "../../types/domain";
-import { listPublicVoiceRooms, getMyVoiceRooms, closeVoiceRoom } from "../../services/voiceRooms";
+import { listPublicVoiceRooms, getMyVoiceRooms, closeVoiceRoom, updateVoiceRoom } from "../../services/voiceRooms";
 import { CreateChannelModal } from "./CreateChannelModal";
 
 interface VoiceRoomsTabProps {
@@ -29,6 +31,7 @@ interface VoiceRoomsTabProps {
   onJoinRoom: (roomId: string, password?: string, fromInvite?: boolean) => Promise<void>;
   onCreateRoom: (config: CallRoomConfig) => Promise<void>;
   onOpenActiveWindow?: () => void;
+  onSimulateIncomingCall?: () => void;
   notify: (msg: string, type: "success" | "error" | "info") => void;
 }
 
@@ -57,6 +60,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
   onJoinRoom,
   onCreateRoom,
   onOpenActiveWindow,
+  onSimulateIncomingCall,
   notify,
 }) => {
   const [publicRooms, setPublicRooms] = useState<VoiceRoom[]>([]);
@@ -65,6 +69,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<VoiceRoom | null>(null);
 
   // Password Modal State for entering private/password-protected rooms
   const [passwordModalRoom, setPasswordModalRoom] = useState<VoiceRoom | null>(null);
@@ -174,6 +179,19 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-white" : ""}`} />
           </button>
+
+          {/* Test Incoming Call Simulation Button */}
+          {onSimulateIncomingCall && (
+            <button
+              type="button"
+              onClick={onSimulateIncomingCall}
+              className="flex items-center gap-2 h-10 px-3.5 rounded-xl bg-white/5 hover:bg-white/12 border border-white/10 text-white font-bold text-xs transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              title="Testar modal e toque de chamada recebida"
+            >
+              <PhoneIncoming className="h-4 w-4 text-emerald-400 animate-pulse" />
+              <span className="hidden sm:inline">Testar Chamada</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -309,14 +327,27 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteRoom(room.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-rose-500/20 text-white/40 hover:text-rose-400 transition cursor-pointer shrink-0"
-                        title="Encerrar canal permanentemente"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingRoom(room);
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition cursor-pointer"
+                          title="Editar aparência e configurações da sala"
+                        >
+                          <Palette className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteRoom(room.id, e)}
+                          className="p-1.5 rounded-lg hover:bg-rose-500/20 text-white/40 hover:text-rose-400 transition cursor-pointer"
+                          title="Encerrar canal permanentemente"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -497,6 +528,36 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
           void fetchRooms();
         }}
       />
+
+      {/* Modal de Edição de Canal */}
+      {editingRoom && (
+        <CreateChannelModal
+          isOpen={Boolean(editingRoom)}
+          onClose={() => setEditingRoom(null)}
+          userProfile={userProfile}
+          isEditing={true}
+          initialConfig={{
+            roomName: editingRoom.name,
+            category: editingRoom.category,
+            icon: editingRoom.icon,
+            avatarUrl: editingRoom.avatarUrl,
+            themeColor: editingRoom.themeColor,
+            isPrivate: editingRoom.isPrivate,
+            password: editingRoom.hasPassword ? "" : undefined,
+          }}
+          onCreateChannel={async (config) => {
+            try {
+              await updateVoiceRoom(editingRoom.id, config);
+              notify("Aparência e configurações da sala atualizadas!", "success");
+              void fetchRooms();
+            } catch (err: any) {
+              notify(err?.message || "Erro ao atualizar sala.", "error");
+            } finally {
+              setEditingRoom(null);
+            }
+          }}
+        />
+      )}
 
       {/* Modal de Senha para Salas Protegidas */}
       {passwordModalRoom && (

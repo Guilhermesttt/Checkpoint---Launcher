@@ -2431,6 +2431,71 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [notify, roomConfig, session, user?.uid],
   );
 
+  // UPDATE FULL ROOM APPEARANCE & CONFIG
+  const updateRoomAppearance = useCallback(
+    async (newConfig: CallRoomConfig) => {
+      if (!session?.chatId || !user?.uid) return;
+      setRoomConfig((prev) => (prev ? { ...prev, ...newConfig } : newConfig));
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              roomName: newConfig.roomName,
+              category: newConfig.category,
+              icon: newConfig.icon,
+              avatarUrl: newConfig.avatarUrl,
+              themeColor: newConfig.themeColor,
+              isPrivate: newConfig.isPrivate,
+              password: newConfig.password,
+            }
+          : null,
+      );
+
+      await sendCallPrivacyUpdate(session.chatId, {
+        adminId: user.uid,
+        chatId: session.chatId,
+        isPrivate: Boolean(newConfig.isPrivate),
+        password: newConfig.password,
+        category: newConfig.category,
+        roomName: newConfig.roomName,
+      });
+
+      notify("Aparência e configurações do canal atualizadas!", "success");
+    },
+    [notify, session?.chatId, user?.uid],
+  );
+
+  // SIMULATE INCOMING CALL (Para testes)
+  const simulateIncomingCall = useCallback(
+    (hasVideo = true) => {
+      if (callState !== "idle") {
+        cleanUpCall();
+      }
+      const sampleAvatars = [
+        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
+      ];
+      const randomAvatar = sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
+      setIncomingInvite({
+        callerId: "ghost_tester_uid",
+        callerName: "Ghost Rider (Simulação)",
+        callerAvatar: randomAvatar,
+        chatId: "simulated_call_test",
+        hasVideo,
+        timestamp: Date.now(),
+      });
+      setCallState("ringing-in");
+      playRingtone("call");
+      if (audioRingIntervalRef.current) clearInterval(audioRingIntervalRef.current);
+      audioRingIntervalRef.current = window.setInterval(() => {
+        playRingtone("call");
+      }, 3000);
+      notify("Simulação de chamada recebida disparada!", "info");
+    },
+    [callState, cleanUpCall, notify, playRingtone],
+  );
+
   // Calibração de Ruído Ambiente (Mede o ruído por 2s e sugere sensibilidade)
   const calibrateNoiseFloor = useCallback(async (): Promise<{ noiseFloor: number; recommendedSensitivity: number }> => {
     setIsCalibratingNoise(true);
@@ -2594,6 +2659,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     hangUp,
     kickParticipant,
     updateRoomPrivacy,
+    updateRoomAppearance,
+    simulateIncomingCall,
     toggleMute,
     toggleDeafen,
     toggleCamera,

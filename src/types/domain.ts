@@ -252,6 +252,9 @@ export interface VoiceCallSession {
   roomName?: string;
   isPrivate?: boolean;
   password?: string;
+  icon?: string;
+  avatarUrl?: string;
+  themeColor?: string;
   inviteCode?: string;
   participants?: VoiceCallParticipant[];
 }

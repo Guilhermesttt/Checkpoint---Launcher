@@ -57,6 +57,49 @@ export const createVoiceRoom = async (config: {
 };
 
 /**
+ * Atualiza configurações e aparência de uma sala existente
+ */
+export const updateVoiceRoom = async (
+  roomId: string,
+  config: {
+    name?: string;
+    roomName?: string;
+    category?: RoomCategory;
+    isPrivate?: boolean;
+    password?: string;
+    icon?: string;
+    avatarUrl?: string;
+    themeColor?: string;
+  },
+): Promise<VoiceRoom | null> => {
+  try {
+    const finalName = (config.name || config.roomName || "").trim();
+    const headers = await getAuthHeaders();
+    const res = await fetch(apiUrl(`/api/voice/rooms/${roomId}`), {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        name: finalName,
+        category: config.category,
+        isPrivate: config.isPrivate,
+        password: config.password,
+        icon: config.icon,
+        avatarUrl: config.avatarUrl,
+        themeColor: config.themeColor,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return (data.room || null) as VoiceRoom | null;
+    }
+  } catch (err) {
+    console.warn("[voiceRooms] updateVoiceRoom error:", err);
+  }
+  return null;
+};
+
+/**
  * Lista as salas públicas ativas no backend
  */
 export const listPublicVoiceRooms = async (filters?: {

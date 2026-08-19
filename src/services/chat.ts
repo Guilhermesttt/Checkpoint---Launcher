@@ -229,7 +229,7 @@ export const sendChatMessage = async (
   const text = String(rawText || "").trim();
   if (!senderId) throw new Error("Sessao expirada. Entre novamente.");
   if (!receiverId || receiverId === senderId) throw new Error("Destinatario invalido.");
-  if ((!text && !attachment?.attachmentPath) || text.length > 2_000) {
+  if ((!text && !attachment?.attachmentPath) || text.length > 50_000) {
     throw new Error("Mensagem invalida.");
   }
 
