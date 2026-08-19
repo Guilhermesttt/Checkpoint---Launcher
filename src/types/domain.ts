@@ -247,9 +247,11 @@ export interface VoiceCallSession {
   friendAvatar?: string;
   isInitiator: boolean;
   startedAt?: number;
+  hostUid?: string;
   category?: import("./voice-governance").RoomCategory;
   roomName?: string;
   isPrivate?: boolean;
   password?: string;
   inviteCode?: string;
+  participants?: VoiceCallParticipant[];
 }

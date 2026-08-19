@@ -71,6 +71,9 @@ export interface CallRoomConfig {
   category: RoomCategory;
   isPrivate: boolean;
   password?: string;
+  icon?: string;
+  avatarUrl?: string;
+  themeColor?: string;
 }
 
 export interface CallInviteMeta {
@@ -89,4 +92,33 @@ export interface ContextMenuState {
   y: number;
   targetFeed: CallFeed | null;
 }
+
+export interface VoiceRoomParticipant {
+  uid: string;
+  name: string;
+  avatar?: string | null;
+  joinedAt?: string;
+}
+
+export interface VoiceRoom {
+  id: string;
+  hostUid: string;
+  name: string;
+  category: RoomCategory;
+  isPrivate: boolean;
+  hasPassword?: boolean;
+  maxParticipants: number;
+  status: "active" | "ended";
+  createdAt: string;
+  updatedAt?: string;
+  participantsCount: number;
+  participants: VoiceRoomParticipant[];
+  isHost?: boolean;
+  icon?: string;
+  avatarUrl?: string;
+  themeColor?: string;
+}
+
+export type PublicVoiceRoom = VoiceRoom;
+
 

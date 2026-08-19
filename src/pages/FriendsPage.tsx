@@ -8,6 +8,10 @@ import { searchCheckpointFriends } from "../services/checkpointFriends";
 import type { CheckpointFriendRequest, SocialFriend, UserProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import { FriendsSubTabs, type SocialSubTab } from "../components/social/FriendsSubTabs";
+import { VoiceRoomsTab } from "../components/voice/VoiceRoomsTab";
+import { useVoiceCallContext } from "../context/VoiceCallContext";
+import { useAuth } from "../auth/AuthProvider";
+import { useNotification } from "../components/NotificationCenter";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -71,6 +75,9 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
   const copy = FRIENDS_COPY[language] || FRIENDS_COPY["pt-BR"];
   const [friendSearch, setFriendSearch] = useState("");
   const [activeSubTab, setActiveSubTab] = useState<SocialSubTab>("AMIGOS");
+  const voiceCall = useVoiceCallContext();
+  const { userProfile } = useAuth();
+  const { notify } = useNotification();
   const presenceFriends = friends.filter((friend) => friend.source === "checkpoint");
   const onlineCount = presenceFriends.filter((friend) => friend.status !== "offline").length;
   const playingCount = presenceFriends.filter((friend) => friend.status === "playing").length;
@@ -478,6 +485,24 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
               }))}
           </div>
         </>
+      )}
+
+      {/* ABA CANAIS DE VOZ (SALAS) */}
+      {activeSubTab === "SALAS" && (
+        <VoiceRoomsTab
+          userProfile={userProfile}
+          currentRoomId={voiceCall.session?.chatId}
+          onJoinRoom={async (roomId, password) => {
+            await voiceCall.joinRoom(roomId, password);
+          }}
+          onCreateRoom={async (config) => {
+            await voiceCall.createAndJoinRoom(config);
+          }}
+          onOpenActiveWindow={() => {
+            voiceCall.setIsVoiceWindowOpen(true);
+          }}
+          notify={notify}
+        />
       )}
     </SystemPageShell>
   );

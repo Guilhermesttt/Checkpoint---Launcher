@@ -74,58 +74,91 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [userProfile?.checkpointFriends]);
 
 
-  // Persistent audio playback for remote participant with Web Audio API Soft-Limiter
+  // Persistent audio playback for remote participants with Web Audio API Soft-Limiter
   const remoteAudioRef = React.useRef<HTMLAudioElement | null>(null);
-  const peerAudioNodeRef = React.useRef<any>(null);
+  const peerAudioNodesMapRef = React.useRef<Map<string, any>>(new Map());
   const audioContextRef = React.useRef<AudioContext | null>(null);
 
+  // Sync audio output device changes (setSinkId)
   React.useEffect(() => {
-    if (voiceCall.remoteStream && voiceCall.remoteStream.getAudioTracks().length > 0) {
-      const isEchoTest = voiceCall.session?.friendUid === "echo-bot";
-      const isMutedLocally = voiceCall.isDeafened || isEchoTest;
-      const targetVolume = isMutedLocally ? 0 : (voiceCall.remoteVolume ?? 100);
+    const targetOutput = voiceCall.selectedAudioOutput;
+    if (!targetOutput) return;
 
-      // Keep standard audio element muted if we manage it through Web Audio API
-      if (remoteAudioRef.current) {
-        if (remoteAudioRef.current.srcObject !== voiceCall.remoteStream) {
-          remoteAudioRef.current.srcObject = voiceCall.remoteStream;
-        }
-        remoteAudioRef.current.muted = true; // prevent double playback
+    if (remoteAudioRef.current && typeof (remoteAudioRef.current as any).setSinkId === "function") {
+      void (remoteAudioRef.current as any).setSinkId(targetOutput === "default" ? "" : targetOutput).catch(() => {});
+    }
+    if (audioContextRef.current && typeof (audioContextRef.current as any).setSinkId === "function") {
+      void (audioContextRef.current as any).setSinkId(targetOutput === "default" ? "" : targetOutput).catch(() => {});
+    }
+    peerAudioNodesMapRef.current.forEach((node) => {
+      if (node && typeof node.setSinkId === "function") {
+        void node.setSinkId(targetOutput);
       }
+    });
+  }, [voiceCall.selectedAudioOutput]);
 
+  React.useEffect(() => {
+    const isEchoTest = voiceCall.session?.friendUid === "echo-bot";
+    const isMutedLocally = voiceCall.isDeafened || isEchoTest;
+    const globalVolume = isMutedLocally ? 0 : (voiceCall.remoteVolume ?? 100);
+
+    // Collect all active remote audio streams (support both Map and singular fallback)
+    const activeStreams = new Map<string, MediaStream>();
+    if (voiceCall.remoteStreams && voiceCall.remoteStreams instanceof Map && voiceCall.remoteStreams.size > 0) {
+      voiceCall.remoteStreams.forEach((st: MediaStream, peerId: string) => {
+        if (st && st.getAudioTracks().length > 0) {
+          activeStreams.set(peerId, st);
+        }
+      });
+    } else if (voiceCall.remoteStream && voiceCall.remoteStream.getAudioTracks().length > 0) {
+      activeStreams.set(voiceCall.session?.friendUid || "main-remote", voiceCall.remoteStream);
+    }
+
+    if (activeStreams.size > 0) {
       try {
         if (!audioContextRef.current || audioContextRef.current.state === "closed") {
           audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
             latencyHint: "interactive",
           });
+          if (voiceCall.selectedAudioOutput && typeof (audioContextRef.current as any).setSinkId === "function") {
+            void (audioContextRef.current as any).setSinkId(voiceCall.selectedAudioOutput === "default" ? "" : voiceCall.selectedAudioOutput).catch(() => {});
+          }
         }
 
         if (audioContextRef.current.state === "suspended") {
           void audioContextRef.current.resume();
         }
 
-        // Lazy load / instantiate PeerAudioNode
-        if (!peerAudioNodeRef.current) {
-          import("../services/audio/PeerAudioNode").then(({ PeerAudioNode }) => {
-            if (audioContextRef.current && voiceCall.remoteStream) {
-              peerAudioNodeRef.current = new PeerAudioNode(
-                audioContextRef.current,
-                voiceCall.remoteStream,
-                targetVolume
-              );
+        // Clean up nodes for peers that are no longer active
+        peerAudioNodesMapRef.current.forEach((node, peerId) => {
+          if (!activeStreams.has(peerId)) {
+            node.destroy?.();
+            peerAudioNodesMapRef.current.delete(peerId);
+          }
+        });
+
+        // Initialize or update nodes for active streams
+        import("../services/audio/PeerAudioNode").then(({ PeerAudioNode }) => {
+          if (!audioContextRef.current) return;
+          activeStreams.forEach((stream, peerId) => {
+            const existing = peerAudioNodesMapRef.current.get(peerId);
+            if (!existing) {
+              const newNode = new PeerAudioNode(audioContextRef.current!, stream, globalVolume);
+              if (voiceCall.selectedAudioOutput) {
+                void newNode.setSinkId(voiceCall.selectedAudioOutput);
+              }
+              peerAudioNodesMapRef.current.set(peerId, newNode);
+            } else {
+              existing.setVolume(globalVolume);
             }
-          }).catch(() => {});
-        } else {
-          peerAudioNodeRef.current.setVolume(targetVolume);
-        }
+          });
+        }).catch(() => {});
       } catch (err) {
         console.warn("[VoiceCallContext] Web Audio pipeline error:", err);
       }
     } else {
-      if (peerAudioNodeRef.current) {
-        peerAudioNodeRef.current.destroy?.();
-        peerAudioNodeRef.current = null;
-      }
+      peerAudioNodesMapRef.current.forEach((node) => node.destroy?.());
+      peerAudioNodesMapRef.current.clear();
     }
 
     return () => {
@@ -133,9 +166,11 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [
     voiceCall.remoteStream,
+    voiceCall.remoteStreams,
     voiceCall.isDeafened,
     voiceCall.session?.friendUid,
     voiceCall.remoteVolume,
+    voiceCall.selectedAudioOutput,
   ]);
 
   // Notify in-game overlay when an incoming call arrives
@@ -257,6 +292,16 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         roomConfig={voiceCall.roomConfig}
         onUpdateRoomPrivacy={voiceCall.updateRoomPrivacy}
         notify={notify}
+        remoteSpeakingStates={voiceCall.remoteSpeakingStates}
+        remoteStreams={voiceCall.remoteStreams}
+        remoteStatesMap={voiceCall.remoteStatesMap}
+        micGain={voiceCall.micGain}
+        onChangeMicGain={voiceCall.setMicGain}
+        noiseGateEnabled={voiceCall.noiseGateEnabled}
+        onChangeNoiseGateEnabled={voiceCall.setNoiseGateEnabled}
+        onCalibrateNoise={voiceCall.calibrateNoiseFloor}
+        isCalibratingNoise={voiceCall.isCalibratingNoise}
+        currentNoiseFloor={voiceCall.currentNoiseFloor}
       />
 
       {/* Screen / Window Picker Modal */}

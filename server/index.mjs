@@ -265,6 +265,7 @@ const steamAchievementSummaryLimiter = rateLimit({
   keyGenerator: (req) => String(req.firebaseUser?.uid || "unauthenticated"),
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { keyGeneratorIpFallback: false },
 });
 
 const setBoundedCacheEntry = (cache, key, value, maxEntries = MAX_ACHIEVEMENT_CACHE_ENTRIES) => {
@@ -1374,6 +1375,513 @@ app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser,
   } catch (error) {
     console.warn("[TURN] Falha ao obter credenciais Metered no backend, usando STUN fallback:", error?.message);
     return res.json({ iceServers: FALLBACK_STUN_SERVERS });
+  }
+});
+
+// ─── Voice Rooms Governance & State Endpoints ─────────────────────────────────
+
+function hashVoiceRoomPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyVoiceRoomPassword(password, storedHash) {
+  if (!storedHash || !storedHash.includes(":")) return false;
+  const [salt, originalHash] = storedHash.split(":");
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(originalHash, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+// Criar sala de voz
+app.post("/api/voice/rooms", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const uid = req.firebaseUser.uid;
+  const {
+    name,
+    category = "resenha_games",
+    isPrivate = false,
+    password = "",
+    maxParticipants = 4,
+    icon = "🎮",
+    avatarUrl,
+    themeColor = "#8B5CF6",
+  } = req.body || {};
+
+  const trimmedName = typeof name === "string" ? name.trim() : "";
+  if (!trimmedName || trimmedName.length > 80) {
+    return res.status(400).json({ error: "O nome da sala deve ter entre 1 e 80 caracteres." });
+  }
+
+  const validCategories = ["resenha_games", "gameplay_foco", "estudos_foco", "casual_chat"];
+  const finalCategory = validCategories.includes(category) ? category : "resenha_games";
+  const finalMax = Math.max(2, Math.min(4, Number(maxParticipants) || 4));
+
+  try {
+    // Regra: 1 sala pública ativa por conta no v1
+    if (!isPrivate) {
+      const { data: existingPublic, error: checkError } = await supabaseAdmin
+        .from("voice_rooms")
+        .select("id")
+        .eq("host_uid", uid)
+        .eq("is_private", false)
+        .eq("status", "active")
+        .limit(1);
+
+      if (checkError) {
+        console.warn("[VoiceRooms] Erro ao checar sala pública existente:", checkError);
+      } else if (existingPublic && existingPublic.length > 0) {
+        return res.status(409).json({ error: "Você já possui uma sala pública ativa. Encerre-a antes de criar outra." });
+      }
+    }
+
+    let passwordHash = null;
+    if (isPrivate && typeof password === "string" && password.trim().length > 0) {
+      passwordHash = hashVoiceRoomPassword(password.trim());
+    }
+
+    const { data: room, error: insertError } = await supabaseAdmin
+      .from("voice_rooms")
+      .insert({
+        host_uid: uid,
+        room_name: trimmedName,
+        category: finalCategory,
+        is_private: Boolean(isPrivate),
+        password_hash: passwordHash,
+        icon: typeof icon === "string" ? icon : "🎮",
+        avatar_url: typeof avatarUrl === "string" && avatarUrl.trim() ? avatarUrl.trim() : null,
+        theme_color: typeof themeColor === "string" ? themeColor : "#8B5CF6",
+        max_participants: finalMax,
+        status: "active",
+      })
+      .select("id, host_uid, room_name, category, is_private, icon, avatar_url, theme_color, max_participants, status, created_at, updated_at")
+      .single();
+
+    if (insertError || !room) {
+      console.error("[VoiceRooms] Erro ao criar sala:", insertError);
+      return res.status(500).json({ error: "Não foi possível criar a sala de voz." });
+    }
+
+    res.status(201).json({
+      room: {
+        id: room.id,
+        hostUid: room.host_uid,
+        name: room.room_name,
+        category: room.category,
+        isPrivate: room.is_private,
+        hasPassword: Boolean(passwordHash),
+        icon: room.icon || "🎮",
+        avatarUrl: room.avatar_url || undefined,
+        themeColor: room.theme_color || "#8B5CF6",
+        maxParticipants: room.max_participants,
+        status: room.status,
+        createdAt: room.created_at,
+        updatedAt: room.updated_at,
+        participantsCount: 0,
+        participants: [],
+      },
+    });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao criar sala:", err);
+    res.status(500).json({ error: "Erro interno ao processar criação de sala." });
+  }
+});
+
+// Listar salas públicas ativas
+app.get("/api/voice/rooms/public", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const { category, search } = req.query || {};
+
+  try {
+    let query = supabaseAdmin
+      .from("voice_rooms")
+      .select(`
+        id,
+        host_uid,
+        room_name,
+        category,
+        is_private,
+        icon,
+        avatar_url,
+        theme_color,
+        max_participants,
+        status,
+        created_at,
+        updated_at,
+        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+      `)
+      .eq("is_private", false)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (category && typeof category === "string" && category !== "all") {
+      query = query.eq("category", category);
+    }
+    if (search && typeof search === "string" && search.trim()) {
+      query = query.ilike("room_name", `%${search.trim()}%`);
+    }
+
+    const { data: rooms, error } = await query;
+    if (error) {
+      console.error("[VoiceRooms] Erro ao listar salas públicas:", error);
+      return res.status(500).json({ error: "Erro ao carregar salas públicas." });
+    }
+
+    const formatted = (rooms || []).map((r) => {
+      const activeMembers = (r.members || [])
+        .filter((m) => !m.removed_at)
+        .map((m) => ({
+          uid: m.user_id,
+          name: m.display_name,
+          avatar: m.avatar_url,
+          joinedAt: m.joined_at,
+        }));
+
+      return {
+        id: r.id,
+        hostUid: r.host_uid,
+        name: r.room_name,
+        category: r.category,
+        isPrivate: false,
+        hasPassword: false,
+        icon: r.icon || "🎮",
+        avatarUrl: r.avatar_url || undefined,
+        themeColor: r.theme_color || "#8B5CF6",
+        maxParticipants: r.max_participants,
+        status: r.status,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        participantsCount: activeMembers.length,
+        participants: activeMembers,
+      };
+    });
+
+    res.json({ rooms: formatted });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao listar salas públicas:", err);
+    res.status(500).json({ error: "Erro interno ao listar salas públicas." });
+  }
+});
+
+// Listar minhas salas (host ou participante)
+app.get("/api/voice/rooms/my", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const uid = req.firebaseUser.uid;
+
+  try {
+    const { data: hostedRooms, error: hostError } = await supabaseAdmin
+      .from("voice_rooms")
+      .select(`
+        id,
+        host_uid,
+        room_name,
+        category,
+        is_private,
+        password_hash,
+        icon,
+        avatar_url,
+        theme_color,
+        max_participants,
+        status,
+        created_at,
+        updated_at,
+        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+      `)
+      .eq("host_uid", uid)
+      .eq("status", "active")
+      .order("updated_at", { ascending: false });
+
+    if (hostError) {
+      console.error("[VoiceRooms] Erro ao buscar minhas salas:", hostError);
+      return res.status(500).json({ error: "Erro ao buscar salas do usuário." });
+    }
+
+    const formatted = (hostedRooms || []).map((r) => {
+      const activeMembers = (r.members || [])
+        .filter((m) => !m.removed_at)
+        .map((m) => ({
+          uid: m.user_id,
+          name: m.display_name,
+          avatar: m.avatar_url,
+          joinedAt: m.joined_at,
+        }));
+
+      return {
+        id: r.id,
+        hostUid: r.host_uid,
+        name: r.room_name,
+        category: r.category,
+        isPrivate: r.is_private,
+        hasPassword: Boolean(r.password_hash),
+        icon: r.icon || "🎮",
+        avatarUrl: r.avatar_url || undefined,
+        themeColor: r.theme_color || "#8B5CF6",
+        maxParticipants: r.max_participants,
+        status: r.status,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        participantsCount: activeMembers.length,
+        participants: activeMembers,
+        isHost: true,
+      };
+    });
+
+    res.json({ rooms: formatted });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao buscar minhas salas:", err);
+    res.status(500).json({ error: "Erro interno ao buscar suas salas." });
+  }
+});
+
+// Obter detalhes de uma sala
+app.get("/api/voice/rooms/:roomId", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const { roomId } = req.params;
+  const uid = req.firebaseUser.uid;
+
+  try {
+    const { data: room, error } = await supabaseAdmin
+      .from("voice_rooms")
+      .select(`
+        id,
+        host_uid,
+        room_name,
+        category,
+        is_private,
+        password_hash,
+        max_participants,
+        status,
+        created_at,
+        updated_at,
+        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+      `)
+      .eq("id", roomId)
+      .single();
+
+    if (error || !room) {
+      return res.status(404).json({ error: "Sala de voz não encontrada ou encerrada." });
+    }
+
+    const activeMembers = (room.members || [])
+      .filter((m) => !m.removed_at)
+      .map((m) => ({
+        uid: m.user_id,
+        name: m.display_name,
+        avatar: m.avatar_url,
+        joinedAt: m.joined_at,
+      }));
+
+    res.json({
+      room: {
+        id: room.id,
+        hostUid: room.host_uid,
+        name: room.room_name,
+        category: room.category,
+        isPrivate: room.is_private,
+        hasPassword: Boolean(room.password_hash),
+        maxParticipants: room.max_participants,
+        status: room.status,
+        createdAt: room.created_at,
+        updatedAt: room.updated_at,
+        participantsCount: activeMembers.length,
+        participants: activeMembers,
+        isHost: room.host_uid === uid,
+      },
+    });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao obter sala:", err);
+    res.status(500).json({ error: "Erro ao carregar detalhes da sala." });
+  }
+});
+
+// Entrar em uma sala (Join com validação de senha server-side e trava de 4 pessoas)
+app.post("/api/voice/rooms/:roomId/join", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const { roomId } = req.params;
+  const uid = req.firebaseUser.uid;
+  const { password, fromInvite = false, displayName, avatarUrl } = req.body || {};
+
+  try {
+    const { data: room, error: roomError } = await supabaseAdmin
+      .from("voice_rooms")
+      .select("*")
+      .eq("id", roomId)
+      .eq("status", "active")
+      .single();
+
+    if (roomError || !room) {
+      return res.status(404).json({ error: "Sala não encontrada ou já encerrada." });
+    }
+
+    // Buscar membros atualmente ativos
+    const { data: activeMembers, error: membersError } = await supabaseAdmin
+      .from("voice_room_members")
+      .select("user_id, display_name, avatar_url, joined_at")
+      .eq("room_id", roomId)
+      .is("removed_at", null);
+
+    if (membersError) {
+      console.error("[VoiceRooms] Erro ao buscar membros:", membersError);
+      return res.status(500).json({ error: "Erro ao verificar membros da sala." });
+    }
+
+    const currentMembers = activeMembers || [];
+    const isAlreadyMember = currentMembers.some((m) => m.user_id === uid);
+
+    // Se não for membro ativo atual, checar limite estrito de participantes (4 no v1)
+    if (!isAlreadyMember && currentMembers.length >= room.max_participants) {
+      return res.status(409).json({ error: `Sala cheia (${currentMembers.length}/${room.max_participants}).` });
+    }
+
+    // Validação de senha para salas privadas (bypass se for o host ou vier de convite direto aceito)
+    if (room.is_private && room.host_uid !== uid && !fromInvite) {
+      if (room.password_hash) {
+        const inputPassword = typeof password === "string" ? password.trim() : "";
+        if (!inputPassword || !verifyVoiceRoomPassword(inputPassword, room.password_hash)) {
+          return res.status(403).json({ error: "Senha incorreta para esta sala." });
+        }
+      }
+    }
+
+    // Registrar ou reativar membro
+    const name = displayName || req.firebaseUser.name || "Jogador";
+    const avatar = avatarUrl || req.firebaseUser.picture || null;
+
+    const { error: upsertError } = await supabaseAdmin
+      .from("voice_room_members")
+      .upsert({
+        room_id: roomId,
+        user_id: uid,
+        display_name: name,
+        avatar_url: avatar,
+        joined_at: new Date().toISOString(),
+        removed_at: null,
+      }, { onConflict: "room_id, user_id" });
+
+    if (upsertError) {
+      console.error("[VoiceRooms] Erro ao registrar membro:", upsertError);
+      return res.status(500).json({ error: "Não foi possível ingressar na sala." });
+    }
+
+    // Retornar lista atualizada de peers para Mesh WebRTC
+    const updatedMembersList = [
+      ...currentMembers.filter((m) => m.user_id !== uid),
+      { uid, name, avatar, joinedAt: new Date().toISOString() },
+    ].map((m) => ({
+      uid: m.uid || m.user_id,
+      name: m.name || m.display_name,
+      avatar: m.avatar || m.avatar_url,
+      joinedAt: m.joinedAt || m.joined_at,
+    }));
+
+    res.json({
+      success: true,
+      room: {
+        id: room.id,
+        hostUid: room.host_uid,
+        name: room.room_name,
+        category: room.category,
+        isPrivate: room.is_private,
+        hasPassword: Boolean(room.password_hash),
+        maxParticipants: room.max_participants,
+        status: room.status,
+        createdAt: room.created_at,
+        updatedAt: room.updated_at,
+      },
+      participants: updatedMembersList,
+    });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao entrar na sala:", err);
+    res.status(500).json({ error: "Erro interno ao entrar na sala." });
+  }
+});
+
+// Sair de uma sala
+app.post("/api/voice/rooms/:roomId/leave", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const { roomId } = req.params;
+  const uid = req.firebaseUser.uid;
+
+  try {
+    const { error } = await supabaseAdmin
+      .from("voice_room_members")
+      .update({ removed_at: new Date().toISOString() })
+      .eq("room_id", roomId)
+      .eq("user_id", uid);
+
+    if (error) {
+      console.warn("[VoiceRooms] Erro ao marcar saída de membro:", error);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao sair da sala:", err);
+    res.status(500).json({ error: "Erro ao registrar saída da sala." });
+  }
+});
+
+// Encerrar / Deletar sala (Apenas Host)
+app.delete("/api/voice/rooms/:roomId", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: "Banco de dados não configurado no servidor." });
+  }
+
+  const { roomId } = req.params;
+  const uid = req.firebaseUser.uid;
+
+  try {
+    const { data: room, error: fetchError } = await supabaseAdmin
+      .from("voice_rooms")
+      .select("id, host_uid")
+      .eq("id", roomId)
+      .single();
+
+    if (fetchError || !room) {
+      return res.status(404).json({ error: "Sala não encontrada." });
+    }
+
+    if (room.host_uid !== uid) {
+      return res.status(403).json({ error: "Apenas o host pode encerrar esta sala." });
+    }
+
+    const now = new Date().toISOString();
+    await supabaseAdmin
+      .from("voice_rooms")
+      .update({ status: "ended", ended_at: now })
+      .eq("id", roomId);
+
+    await supabaseAdmin
+      .from("voice_room_members")
+      .update({ removed_at: now })
+      .eq("room_id", roomId)
+      .is("removed_at", null);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[VoiceRooms] Exception ao encerrar sala:", err);
+    res.status(500).json({ error: "Erro ao encerrar sala." });
   }
 });
 

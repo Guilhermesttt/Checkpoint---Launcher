@@ -5,6 +5,7 @@ import type {
   SocialFriend,
   UserProfile,
   VoiceCallSession,
+  VoiceCallParticipant,
 } from "../types/domain";
 import {
   type CallAnswerPayload,
@@ -14,6 +15,8 @@ import {
   type CallStatePayload,
   type CallKickPayload,
   type CallPrivacyPayload,
+  type CallMemberJoinedPayload,
+  type CallMemberLeftPayload,
   sendCallAnswer,
   sendCallEnd,
   sendCallInvite,
@@ -21,12 +24,15 @@ import {
   sendCallState,
   sendCallKick,
   sendCallPrivacyUpdate,
+  sendCallMemberJoined,
+  sendCallMemberLeft,
   subscribeToCallSession,
   subscribeToUserIncomingCalls,
 } from "../services/voiceCall";
-import type { CallRoomConfig, RoomCategory } from "../types/voice-governance";
+import type { CallRoomConfig, RoomCategory, VoiceRoomParticipant } from "../types/voice-governance";
 import { getChatId } from "../services/chat";
 import { getTurnServers } from "../services/turnCredentials";
+import { createVoiceRoom, joinVoiceRoom, leaveVoiceRoom } from "../services/voiceRooms";
 import sfxJoin from "../sounds/Stoat_SFX/user_join_voice-DbrgaLbl.ogg";
 import sfxLeave from "../sounds/Stoat_SFX/user_leave_voice-CBZjEE14.ogg";
 import sfxMute from "../sounds/Stoat_SFX/mute-CuCJ24EB.ogg";
@@ -116,10 +122,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const [incomingInvite, setIncomingInvite] = useState<CallInvitePayload | null>(null);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localCameraStream, setLocalCameraStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [roomConfig, setRoomConfig] = useState<CallRoomConfig | null>(null);
+
+  // Multi-peer Mesh streams & remote state maps
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [remoteSpeakingStates, setRemoteSpeakingStates] = useState<Map<string, boolean>>(new Map());
+  const [remoteStatesMap, setRemoteStatesMap] = useState<Map<string, CallStatePayload>>(new Map());
 
   const [remoteVolume, setRemoteVolumeState] = useState<number>(() => {
     try {
@@ -141,7 +152,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
   const [isSpeakingLocal, setIsSpeakingLocal] = useState(false);
-  const [isSpeakingRemote, setIsSpeakingRemote] = useState(false);
+  const isSpeakingRemote = Array.from(remoteSpeakingStates.values()).some(Boolean);
 
   const [isRemoteMuted, setIsRemoteMuted] = useState(false);
   const [isRemoteDeafened, setIsRemoteDeafened] = useState(false);
@@ -256,7 +267,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const isDeafenedRef = useRef(isDeafened);
   isDeafenedRef.current = isDeafened;
 
-  // Microphone monitoring / sidetone ("Ouvir a própria voz")
+  // Microphone monitoring / sidetone
   const [isMicMonitoring, setIsMicMonitoringState] = useState<boolean>(() => {
     try {
       return localStorage.getItem("checkpoint_voice_mic_monitoring") === "true";
@@ -264,6 +275,63 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       return false;
     }
   });
+
+  // Microphone Gain (0 - 200%, default 100%)
+  const [micGain, setMicGainState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("checkpoint_voice_mic_gain");
+      return saved ? Math.max(0, Math.min(200, Number(saved))) : 100;
+    } catch {
+      return 100;
+    }
+  });
+
+  const micGainRef = useRef(micGain);
+  micGainRef.current = micGain;
+
+  const setMicGain = useCallback((val: number) => {
+    const clamped = Math.max(0, Math.min(200, val));
+    setMicGainState(clamped);
+    micGainRef.current = clamped;
+    try {
+      localStorage.setItem("checkpoint_voice_mic_gain", String(clamped));
+    } catch {}
+  }, []);
+
+  // Noise Gate (silencia ruído de fundo automaticamente no VAD)
+  const [noiseGateEnabled, setNoiseGateEnabledState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("checkpoint_voice_noise_gate") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  const noiseGateEnabledRef = useRef(noiseGateEnabled);
+  noiseGateEnabledRef.current = noiseGateEnabled;
+
+  const setNoiseGateEnabled = useCallback((val: boolean) => {
+    setNoiseGateEnabledState(val);
+    noiseGateEnabledRef.current = val;
+    try {
+      localStorage.setItem("checkpoint_voice_noise_gate", String(val));
+    } catch {}
+  }, []);
+
+  // Calibração de Ruído Ambiente
+  const [isCalibratingNoise, setIsCalibratingNoise] = useState(false);
+  const [currentNoiseFloor, setCurrentNoiseFloor] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem("checkpoint_voice_noise_floor");
+      return saved ? Number(saved) : 5;
+    } catch {
+      return 5;
+    }
+  });
+
+  // Diagnóstico de erro de dispositivo
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+  const clearDeviceError = useCallback(() => setDeviceError(null), []);
 
   const micMonitoringPipelineRef = useRef<{
     ctx: AudioContext | null;
@@ -302,7 +370,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const ctx = new AudioCtx();
       const source = ctx.createMediaStreamSource(stream);
       const gain = ctx.createGain();
-      gain.gain.value = 0.85; // Natural monitoring volume
+      gain.gain.value = 0.85;
       source.connect(gain);
       gain.connect(ctx.destination);
       micMonitoringPipelineRef.current = { ctx, source, gain };
@@ -326,7 +394,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [startMicMonitoring, stopMicMonitoring],
   );
 
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  // Multi-peer Mesh Refs
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
+  const remotePipelinesRef = useRef<Map<string, AudioPipeline>>(new Map());
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
@@ -335,9 +408,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const callStateRef = useRef<CallState>(callState);
   callStateRef.current = callState;
 
-  // Dedicated Audio Pipelines for local and remote streams (ensuring full cleanup)
+  // Local audio analyzer pipeline
   const localPipelineRef = useRef<AudioPipeline>(createEmptyPipeline());
-  const remotePipelineRef = useRef<AudioPipeline>(createEmptyPipeline());
 
   const unsubscribeSessionRef = useRef<(() => void) | null>(null);
   const callDurationTimerRef = useRef<number | null>(null);
@@ -346,8 +418,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const pttReleaseTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimerRef = useRef<number | null>(null);
+  const isAcquiringMediaRef = useRef(false);
 
-  // Keep mic monitoring in sync with local stream availability
+  // Sync mic monitoring with local stream
   useEffect(() => {
     if (isMicMonitoring && localStream) {
       startMicMonitoring(localStream);
@@ -356,12 +429,22 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [isMicMonitoring, localStream, startMicMonitoring, stopMicMonitoring]);
 
-  // VAD Engine Setup with RMS and 200ms Hold Timer + Strict AudioContext Cleanup
+  // VAD Engine Setup with RMS and 250ms Hold Timer per peer/stream
   const setupVoiceAnalyzer = useCallback(
-    (stream: MediaStream, isLocal: boolean) => {
-      const targetPipelineRef = isLocal ? localPipelineRef : remotePipelineRef;
-      // Clean up any existing pipeline first
-      destroyAudioPipeline(targetPipelineRef.current);
+    (stream: MediaStream, isLocal: boolean, peerId = "local") => {
+      let targetPipeline: AudioPipeline;
+      if (isLocal) {
+        destroyAudioPipeline(localPipelineRef.current);
+        localPipelineRef.current = createEmptyPipeline();
+        targetPipeline = localPipelineRef.current;
+      } else {
+        const existing = remotePipelinesRef.current.get(peerId);
+        if (existing) {
+          destroyAudioPipeline(existing);
+        }
+        targetPipeline = createEmptyPipeline();
+        remotePipelinesRef.current.set(peerId, targetPipeline);
+      }
 
       try {
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -374,35 +457,29 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         analyser.smoothingTimeConstant = 0.15;
         source.connect(analyser);
 
-        const pipeline: AudioPipeline = {
-          ctx,
-          source,
-          analyser,
-          animFrameId: null,
-          holdTimer: null,
-        };
-        targetPipelineRef.current = pipeline;
+        targetPipeline.ctx = ctx;
+        targetPipeline.source = source;
+        targetPipeline.analyser = analyser;
 
         const timeData = new Float32Array(analyser.fftSize);
         let currentlySpeaking = false;
 
         const checkVolume = () => {
-          if (!targetPipelineRef.current.analyser || !targetPipelineRef.current.ctx) return;
-          if (targetPipelineRef.current.ctx.state === "suspended") {
-            void targetPipelineRef.current.ctx.resume().catch(() => {});
+          if (!targetPipeline.analyser || !targetPipeline.ctx) return;
+          if (targetPipeline.ctx.state === "suspended") {
+            void targetPipeline.ctx.resume().catch(() => {});
           }
 
           analyser.getFloatTimeDomainData(timeData);
 
-          // Calculate Root Mean Square (RMS)
           let sumSquares = 0;
           for (let i = 0; i < timeData.length; i += 1) {
             sumSquares += timeData[i] * timeData[i];
           }
           const rms = Math.sqrt(sumSquares / timeData.length);
-          const rawVolume = Math.min(100, Math.round(rms * 700));
+          const gainMultiplier = (isLocal ? micGainRef.current : 100) / 100;
+          const rawVolume = Math.min(100, Math.round(rms * 700 * gainMultiplier));
 
-          // Calibrated sensitivity threshold (smooth exponential curve from 1 to 30)
           const sens = Math.max(0, Math.min(100, voiceSensitivityRef.current));
           const sensitivityThreshold = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
 
@@ -414,10 +491,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             : rawVolume >= sensitivityThreshold;
 
           if (isAboveThreshold) {
-            // Voice detected: clear hold timer and activate speaking
-            if (pipeline.holdTimer) {
-              window.clearTimeout(pipeline.holdTimer);
-              pipeline.holdTimer = null;
+            if (targetPipeline.holdTimer) {
+              window.clearTimeout(targetPipeline.holdTimer);
+              targetPipeline.holdTimer = null;
             }
             if (isLocal && !isMutedRef.current && !isDeafenedRef.current) {
               const track = localStreamRef.current?.getAudioTracks()[0];
@@ -437,17 +513,21 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                   });
                 }
               } else {
-                setIsSpeakingRemote(true);
+                setRemoteSpeakingStates((prev) => {
+                  const updated = new Map(prev);
+                  updated.set(peerId, true);
+                  return updated;
+                });
               }
             }
-          } else if (currentlySpeaking && !pipeline.holdTimer) {
-            // Below threshold: hold speaking state for 250ms to eliminate syllable flickering
-            pipeline.holdTimer = window.setTimeout(() => {
+          } else if (currentlySpeaking && !targetPipeline.holdTimer) {
+            targetPipeline.holdTimer = window.setTimeout(() => {
               currentlySpeaking = false;
-              pipeline.holdTimer = null;
+              targetPipeline.holdTimer = null;
               if (isLocal) {
                 setIsSpeakingLocal(false);
-                if (inputModeRef.current === "voice-activity" || inputModeRef.current === "push-to-talk") {
+                // Se o Noise Gate estiver ativo ou em PTT, corta o áudio durante o silêncio
+                if (noiseGateEnabledRef.current || inputModeRef.current === "voice-activity" || inputModeRef.current === "push-to-talk") {
                   const track = localStreamRef.current?.getAudioTracks()[0];
                   if (track) {
                     track.enabled = false;
@@ -461,15 +541,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                   });
                 }
               } else {
-                setIsSpeakingRemote(false);
+                setRemoteSpeakingStates((prev) => {
+                  const updated = new Map(prev);
+                  updated.set(peerId, false);
+                  return updated;
+                });
               }
             }, 250);
           }
 
-          pipeline.animFrameId = requestAnimationFrame(checkVolume);
+          targetPipeline.animFrameId = requestAnimationFrame(checkVolume);
         };
 
-        pipeline.animFrameId = requestAnimationFrame(checkVolume);
+        targetPipeline.animFrameId = requestAnimationFrame(checkVolume);
       } catch (err) {
         console.warn("[useVoiceCall] setupVoiceAnalyzer failed:", err);
       }
@@ -477,7 +561,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [user?.uid],
   );
 
-  // Auto-sync analyzers when localStream or remoteStream change
+  // Auto-sync analyzers when localStream changes
   useEffect(() => {
     if (localStream) {
       setupVoiceAnalyzer(localStream, true);
@@ -487,16 +571,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [localStream, setupVoiceAnalyzer]);
 
-  useEffect(() => {
-    if (remoteStream && remoteStream.getAudioTracks().length > 0) {
-      setupVoiceAnalyzer(remoteStream, false);
-    } else {
-      destroyAudioPipeline(remotePipelineRef.current);
-      setIsSpeakingRemote(false);
-    }
-  }, [remoteStream, setupVoiceAnalyzer]);
-
-  // Dynamic Audio Constraints Applier (hot-swapping live track constraints)
+  // Dynamic Audio Constraints Applier
   const applyAudioProcessingConstraints = useCallback(
     async (newEcho: boolean, newNoise: boolean, newAutoGain: boolean) => {
       if (!localStreamRef.current) return;
@@ -510,7 +585,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           autoGainControl: newAutoGain ? { ideal: true } : false,
         });
       } catch (err) {
-        console.warn("[useVoiceCall] track.applyConstraints fallback to stream re-acquisition:", err);
+        console.warn("[useVoiceCall] track.applyConstraints fallback:", err);
         try {
           const currentDeviceId = selectedAudioInput !== "default" ? selectedAudioInput : undefined;
           const newStream = await navigator.mediaDevices.getUserMedia({
@@ -521,6 +596,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               autoGainControl: newAutoGain ? { ideal: true } : false,
               channelCount: { ideal: 1 },
               sampleRate: { ideal: 48000 },
+              sampleSize: { ideal: 16 },
             },
             video: false,
           });
@@ -528,12 +604,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           const newTrack = newStream.getAudioTracks()[0];
           if (newTrack) {
             newTrack.enabled = !isMutedRef.current && !isDeafenedRef.current;
-            if (peerConnectionRef.current) {
-              const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "audio");
+            // Replace track across all active peers in Mesh
+            peerConnectionsRef.current.forEach((pc) => {
+              const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
               if (sender) {
-                await sender.replaceTrack(newTrack);
+                void sender.replaceTrack(newTrack);
               }
-            }
+            });
             track.stop();
             localStreamRef.current = newStream;
             setLocalStream(newStream);
@@ -547,7 +624,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [selectedAudioInput, setupVoiceAnalyzer],
   );
 
-  // Settings setters with localStorage persistence & dynamic live track updates
+  // Settings setters
   const setVoiceSensitivity = useCallback((val: number) => {
     const clamped = Math.max(0, Math.min(100, val));
     setVoiceSensitivityState(clamped);
@@ -581,7 +658,128 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     void applyAudioProcessingConstraints(echoCancellation, noiseSuppression, val);
   }, [applyAudioProcessingConstraints, echoCancellation, noiseSuppression]);
 
-  // Enumerate connected devices & auto-detect default devices
+  // Audio acquisition helper com diagnóstico de erros específicos
+  const acquireAudioStream = useCallback(
+    async (deviceId?: string): Promise<MediaStream | null> => {
+      if (!navigator?.mediaDevices?.getUserMedia) return null;
+      isAcquiringMediaRef.current = true;
+      const targetDeviceId = deviceId || (selectedAudioInput !== "default" ? selectedAudioInput : undefined);
+
+      const constraints: MediaStreamConstraints = {
+        audio: {
+          deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined,
+          echoCancellation: echoCancellation ? { ideal: true } : false,
+          noiseSuppression: noiseSuppression ? { ideal: true } : false,
+          autoGainControl: autoGainControl ? { ideal: true } : false,
+          channelCount: { ideal: 1 },
+          sampleRate: { ideal: 48000 },
+          sampleSize: { ideal: 16 },
+        },
+        video: false,
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setDeviceError(null);
+        isAcquiringMediaRef.current = false;
+        return stream;
+      } catch (err: any) {
+        console.warn("[useVoiceCall] getUserMedia primary failed:", err);
+        let errorMsg = "Erro ao acessar o microfone.";
+        if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+          errorMsg = "Permissão de microfone negada. Verifique as configurações de privacidade do Windows.";
+        } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+          errorMsg = "Nenhum microfone encontrado. Conecte um microfone e tente novamente.";
+        } else if (err?.name === "NotReadableError" || err?.name === "TrackStartError") {
+          errorMsg = "O microfone está em uso exclusivo por outro aplicativo (ex: Discord, OBS) ou o driver travou.";
+        } else if (err?.name === "OverconstrainedError") {
+          errorMsg = "As configurações de áudio solicitadas não são suportadas pelo driver.";
+        }
+        setDeviceError(errorMsg);
+        notify(errorMsg, "error");
+
+        // Fallback genérico com constraints relaxadas
+        try {
+          const fallbackStream = await navigator.mediaDevices.getUserMedia({
+            audio: targetDeviceId ? { deviceId: { ideal: targetDeviceId } } : true,
+            video: false,
+          });
+          setDeviceError(null);
+          isAcquiringMediaRef.current = false;
+          notify("Microfone iniciado em modo de compatibilidade básica.", "info");
+          return fallbackStream;
+        } catch {
+          isAcquiringMediaRef.current = false;
+          return null;
+        }
+      }
+    },
+    [autoGainControl, echoCancellation, noiseSuppression, notify, selectedAudioInput],
+  );
+
+  // Device Switchers com salvamento de label
+  const changeAudioInputDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedAudioInputState(deviceId);
+      try {
+        localStorage.setItem("checkpoint_voice_input_device", deviceId);
+        const deviceObj = audioInputDevices.find((d) => d.deviceId === deviceId);
+        if (deviceObj?.label) {
+          localStorage.setItem("checkpoint_voice_input_device_label", deviceObj.label);
+        }
+      } catch {}
+
+      if (callState === "idle") return;
+
+      try {
+        const newStream = await acquireAudioStream(deviceId);
+        if (!newStream) return;
+
+        const newTrack = newStream.getAudioTracks()[0];
+        if (!newTrack) return;
+
+        if (inputMode === "push-to-talk" && !isPttPressed) {
+          newTrack.enabled = false;
+        } else if (isMuted || isDeafened) {
+          newTrack.enabled = false;
+        }
+
+        // Replace track across all peers in Mesh
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+          if (sender) {
+            void sender.replaceTrack(newTrack);
+          }
+        });
+
+        if (localStreamRef.current) {
+          localStreamRef.current.getAudioTracks().forEach((t) => t.stop());
+        }
+
+        localStreamRef.current = newStream;
+        setLocalStream(newStream);
+        setupVoiceAnalyzer(newStream, true);
+        notify("Dispositivo de microfone alterado.", "info");
+      } catch (err) {
+        console.error("[useVoiceCall] changeAudioInputDevice error:", err);
+        notify("Erro ao trocar de microfone.", "error");
+      }
+    },
+    [acquireAudioStream, audioInputDevices, callState, inputMode, isDeafened, isMuted, isPttPressed, notify, setupVoiceAnalyzer],
+  );
+
+  const changeAudioOutputDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedAudioOutputState(deviceId);
+      try {
+        localStorage.setItem("checkpoint_voice_output_device", deviceId);
+      } catch {}
+      notify("Dispositivo de saída alterado.", "info");
+    },
+    [notify],
+  );
+
+  // Enumerate connected devices with Label persistence
   const refreshDevices = useCallback(async () => {
     if (!navigator?.mediaDevices?.enumerateDevices) return;
     try {
@@ -594,11 +792,21 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       setAudioOutputDevices(outputs);
       setVideoInputDevices(videos);
 
-      // Auto-validate device selection against available devices
       setSelectedAudioInputState((prev) => {
         if (prev === "default") return "default";
         const exists = inputs.some((d) => d.deviceId === prev);
-        return exists ? prev : "default";
+        if (!exists) {
+          // Tenta encontrar o microfone pelo label salvo se mudou de porta USB
+          try {
+            const savedLabel = localStorage.getItem("checkpoint_voice_input_device_label");
+            if (savedLabel) {
+              const matched = inputs.find((d) => d.label === savedLabel);
+              if (matched) return matched.deviceId;
+            }
+          } catch {}
+          return "default";
+        }
+        return prev;
       });
 
       setSelectedAudioOutputState((prev) => {
@@ -627,99 +835,27 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [refreshDevices]);
 
-  // Professional Audio acquisition helper with high quality constraints
-  const acquireAudioStream = useCallback(
-    async (deviceId?: string): Promise<MediaStream | null> => {
-      if (!navigator?.mediaDevices?.getUserMedia) return null;
-      const targetDeviceId = deviceId || (selectedAudioInput !== "default" ? selectedAudioInput : undefined);
+  // Hot-Swap e Auto-Fallback quando o microfone é desconectado no meio de uma chamada
+  useEffect(() => {
+    if (callState === "idle" || !localStreamRef.current) return;
+    const currentTrack = localStreamRef.current.getAudioTracks()[0];
+    if (!currentTrack) return;
 
-      const constraints: MediaStreamConstraints = {
-        audio: {
-          deviceId: targetDeviceId ? { exact: targetDeviceId } : undefined,
-          echoCancellation: echoCancellation ? { ideal: true } : false,
-          noiseSuppression: noiseSuppression ? { ideal: true } : false,
-          autoGainControl: autoGainControl ? { ideal: true } : false,
-          channelCount: { ideal: 1 },
-          sampleRate: { ideal: 48000 },
-          sampleSize: { ideal: 16 },
-        },
-        video: false,
-      };
-
+    const handleTrackEnded = () => {
+      console.warn("[useVoiceCall] Audio track ended unexpectedly! Falling back to default device...");
+      notify("Microfone desconectado. Alternando automaticamente para o dispositivo padrão...", "info");
+      setSelectedAudioInputState("default");
       try {
-        return await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (err) {
-        console.warn("[useVoiceCall] getUserMedia with constraints failed, trying fallback:", err);
-        try {
-          return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        } catch {
-          return null;
-        }
-      }
-    },
-    [autoGainControl, echoCancellation, noiseSuppression, selectedAudioInput],
-  );
-
-  // Dynamic Device Switchers
-  const changeAudioInputDevice = useCallback(
-    async (deviceId: string) => {
-      setSelectedAudioInputState(deviceId);
-      try {
-        localStorage.setItem("checkpoint_voice_input_device", deviceId);
+        localStorage.setItem("checkpoint_voice_input_device", "default");
       } catch {}
+      void changeAudioInputDevice("default");
+    };
 
-      if (callState === "idle") return;
-
-      try {
-        const newStream = await acquireAudioStream(deviceId);
-        if (!newStream) return;
-
-        const newTrack = newStream.getAudioTracks()[0];
-        if (!newTrack) return;
-
-        if (inputMode === "push-to-talk" && !isPttPressed) {
-          newTrack.enabled = false;
-        } else if (isMuted || isDeafened) {
-          newTrack.enabled = false;
-        }
-
-        // Replace track in active WebRTC peer connection
-        if (peerConnectionRef.current) {
-          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "audio");
-          if (sender) {
-            await sender.replaceTrack(newTrack);
-          }
-        }
-
-        // Stop old track
-        if (localStreamRef.current) {
-          localStreamRef.current.getAudioTracks().forEach((t) => t.stop());
-        }
-
-        localStreamRef.current = newStream;
-        setLocalStream(newStream);
-
-        // Reconnect audio pipeline
-        setupVoiceAnalyzer(newStream, true);
-        notify("Dispositivo de microfone alterado.", "info");
-      } catch (err) {
-        console.error("[useVoiceCall] changeAudioInputDevice error:", err);
-        notify("Erro ao trocar de microfone.", "error");
-      }
-    },
-    [acquireAudioStream, callState, inputMode, isDeafened, isMuted, isPttPressed, notify, setupVoiceAnalyzer],
-  );
-
-  const changeAudioOutputDevice = useCallback(
-    async (deviceId: string) => {
-      setSelectedAudioOutputState(deviceId);
-      try {
-        localStorage.setItem("checkpoint_voice_output_device", deviceId);
-      } catch {}
-      notify("Dispositivo de saída alterado.", "info");
-    },
-    [notify],
-  );
+    currentTrack.addEventListener("ended", handleTrackEnded);
+    return () => {
+      currentTrack.removeEventListener("ended", handleTrackEnded);
+    };
+  }, [callState, changeAudioInputDevice, notify]);
 
   const changeVideoInputDevice = useCallback(
     async (deviceId: string) => {
@@ -755,12 +891,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return;
         }
 
-        if (peerConnectionRef.current) {
-          const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "video");
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
           if (sender) {
-            await sender.replaceTrack(newVideoTrack);
+            void sender.replaceTrack(newVideoTrack);
           }
-        }
+        });
+
         notify("Câmera alterada.", "info");
       } catch (err) {
         console.error("[useVoiceCall] changeVideoInputDevice error:", err);
@@ -793,7 +930,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     } catch {}
   }, []);
 
-  // Register global PTT shortcut with Electron
+  // Global PTT shortcut registration with Electron
   useEffect(() => {
     if (inputMode === "push-to-talk" && pushToTalkKey) {
       window.electronAPI?.registerPushToTalk?.(pushToTalkKey).catch(console.error);
@@ -829,7 +966,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }, 150);
   }, [inputMode]);
 
-  // Global IPC PTT events from Electron
+  // Global IPC PTT events
   useEffect(() => {
     if (inputMode !== "push-to-talk") return;
     const unsubPress = window.electronAPI?.onPttPress?.(() => {
@@ -844,12 +981,24 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
   }, [handlePttDown, handlePttUp, inputMode]);
 
-  // Local window PTT keyboard events
+  // Local window PTT keyboard events (com proteção de foco para inputs/textareas)
   useEffect(() => {
     if (inputMode !== "push-to-talk") return;
 
+    const isInputField = (el: EventTarget | null) => {
+      if (!el || !(el instanceof HTMLElement)) return false;
+      return (
+        el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.isContentEditable ||
+        el.getAttribute("role") === "textbox"
+      );
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (isInputField(e.target)) return; // Ignora se o usuário estiver digitando
+
       if (
         e.key.toUpperCase() === pushToTalkKey.toUpperCase() ||
         e.code.toUpperCase() === pushToTalkKey.toUpperCase()
@@ -859,6 +1008,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isInputField(e.target)) return;
+
       if (
         e.key.toUpperCase() === pushToTalkKey.toUpperCase() ||
         e.code.toUpperCase() === pushToTalkKey.toUpperCase()
@@ -876,7 +1027,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
   }, [handlePttDown, handlePttUp, inputMode, pushToTalkKey]);
 
-  // Play Stoat SFX sounds
+  // SFX sounds
   const playRingtone = useCallback((type: "call" | "ringout" | "connect" | "disconnect") => {
     switch (type) {
       case "connect":
@@ -894,7 +1045,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, []);
 
-  // Complete Cleanup Helper (Media, AudioContexts, AnalyserNodes, Timers, WebRTC)
+  // Complete Cleanup Helper (Full Mesh P2P, AudioPipelines, Timers, Media Streams)
   const cleanUpCall = useCallback(() => {
     if (callDurationTimerRef.current) {
       window.clearInterval(callDurationTimerRef.current);
@@ -915,10 +1066,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     reconnectAttemptsRef.current = 0;
     setIsReconnecting(false);
 
-    // Destroy audio analysis pipelines cleanly
+    // Destroy local audio pipeline
     destroyAudioPipeline(localPipelineRef.current);
-    destroyAudioPipeline(remotePipelineRef.current);
 
+    // Destroy all remote audio pipelines
+    remotePipelinesRef.current.forEach((pipeline) => destroyAudioPipeline(pipeline));
+    remotePipelinesRef.current.clear();
+    setRemoteSpeakingStates(new Map());
+    setRemoteStatesMap(new Map());
+
+    // Stop local media tracks
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;
@@ -931,16 +1088,29 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
+
+    // Close all WebRTC PeerConnections in Mesh
+    peerConnectionsRef.current.forEach((pc) => {
+      try {
+        pc.close();
+      } catch {}
+    });
+    peerConnectionsRef.current.clear();
+    remoteStreamsRef.current.clear();
+    pendingCandidatesRef.current.clear();
+
     if (unsubscribeSessionRef.current) {
       unsubscribeSessionRef.current();
       unsubscribeSessionRef.current = null;
     }
 
+    // Se estiver em uma sala persistente, registra a saída no backend
+    if (sessionRef.current?.chatId && /^[0-9a-f-]{36}$/i.test(sessionRef.current.chatId)) {
+      void leaveVoiceRoom(sessionRef.current.chatId);
+    }
+
     setLocalStream(null);
+    setRemoteStreams(new Map());
     setRemoteStream(null);
     setLocalCameraStream(null);
     setLocalScreenStream(null);
@@ -953,7 +1123,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setIsMuted(false);
     setIsDeafened(false);
     setIsSpeakingLocal(false);
-    setIsSpeakingRemote(false);
     setCallState("idle");
     setSession(null);
     setRoomConfig(null);
@@ -961,29 +1130,47 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setCallDuration(0);
   }, []);
 
-  // Cleanup on unmount of the hook
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cleanUpCall();
     };
   }, [cleanUpCall]);
 
-  // Create & setup PeerConnection with dynamic TURN and auto-reconnection
-  const createPeerConnection = useCallback(
-    async (chatId: string, isInitiator: boolean) => {
+  // Create & setup a PeerConnection for a specific peer in the Full Mesh
+  const createPeerConnectionForPeer = useCallback(
+    async (chatId: string, targetPeerUid: string, isInitiator: boolean) => {
+      const existing = peerConnectionsRef.current.get(targetPeerUid);
+      if (existing && existing.signalingState !== "closed") {
+        return existing;
+      }
+
       const iceServers = await getTurnServers();
       const pc = new RTCPeerConnection({
         iceServers,
         iceCandidatePoolSize: 2,
         bundlePolicy: "max-bundle",
       });
-      peerConnectionRef.current = pc;
+
+      peerConnectionsRef.current.set(targetPeerUid, pc);
+
+      // Attach local tracks
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current!));
+      }
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, cameraStreamRef.current!));
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, screenStreamRef.current!));
+      }
 
       pc.onicecandidate = (event) => {
         if (event.candidate && user?.uid) {
           void sendCallSignal(chatId, {
             senderId: user.uid,
             chatId,
+            targetUid: targetPeerUid,
             signal: { candidate: event.candidate.toJSON() },
           });
         }
@@ -992,33 +1179,35 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       pc.ontrack = (event) => {
         if (event.streams && event.streams[0]) {
           const stream = event.streams[0];
-          setRemoteStream(stream);
-          setupVoiceAnalyzer(stream, false);
+          remoteStreamsRef.current.set(targetPeerUid, stream);
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          setRemoteStream(stream); // Fallback for 1:1
+
+          setupVoiceAnalyzer(stream, false, targetPeerUid);
 
           const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
           setIsRemoteSharingScreen(hasVideo);
 
           stream.onaddtrack = () => {
+            setRemoteStreams(new Map(remoteStreamsRef.current));
             setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
           };
           stream.onremovetrack = () => {
+            setRemoteStreams(new Map(remoteStreamsRef.current));
             setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
           };
         }
       };
 
-      // Reconnection helper with backoff & ICE restart
-      const attemptReconnect = async () => {
+      // Reconnection helper for this peer
+      const attemptPeerReconnect = async () => {
         if (!pc || pc.signalingState === "closed") return;
         if (reconnectAttemptsRef.current >= 3) {
-          notify("Conexão de voz perdida.", "error");
-          cleanUpCall();
-          playRingtone("disconnect");
+          notify("Conexão perdida com participante.", "error");
           return;
         }
         reconnectAttemptsRef.current += 1;
         setIsReconnecting(true);
-        notify(`Reconectando chamada de voz... (tentativa ${reconnectAttemptsRef.current}/3)`, "info");
 
         try {
           if (isInitiator) {
@@ -1028,12 +1217,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               await sendCallSignal(chatId, {
                 senderId: user.uid,
                 chatId,
+                targetUid: targetPeerUid,
                 signal: offer,
               });
             }
           }
         } catch (err) {
-          console.error("[useVoiceCall] ICE restart error:", err);
+          console.error("[useVoiceCall] ICE restart error for peer:", targetPeerUid, err);
         }
       };
 
@@ -1042,11 +1232,11 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = window.setTimeout(() => {
             if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-              void attemptReconnect();
+              void attemptPeerReconnect();
             }
           }, 3500);
         } else if (pc.iceConnectionState === "failed") {
-          void attemptReconnect();
+          void attemptPeerReconnect();
         } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
           if (reconnectTimerRef.current) {
             window.clearTimeout(reconnectTimerRef.current);
@@ -1070,16 +1260,197 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             }, 1000);
           }
         } else if (pc.connectionState === "failed") {
-          void attemptReconnect();
+          void attemptPeerReconnect();
         }
       };
 
       return pc;
     },
-    [cleanUpCall, notify, playRingtone, setupVoiceAnalyzer, user?.uid],
+    [notify, playRingtone, setupVoiceAnalyzer, user?.uid],
   );
 
-  // Handle incoming call listener on user_calls_${myUid}
+  // Unified Session Handlers Builder (Elimina duplicação e aplica autorização estrita)
+  const createUnifiedSessionHandlers = useCallback(
+    (chatId: string) => ({
+      onAnswer: async (answerPayload: CallAnswerPayload) => {
+        if (answerPayload.accepted) {
+          setCallState("connecting");
+          if (audioRingIntervalRef.current) {
+            clearInterval(audioRingIntervalRef.current);
+            audioRingIntervalRef.current = null;
+          }
+        } else {
+          notify("O usuário recusou a chamada.", "info");
+          playRingtone("disconnect");
+          cleanUpCall();
+        }
+      },
+      onSignal: async ({ senderId, signal }: CallSignalPayload) => {
+        if (!senderId || !signal) return;
+        const pc = peerConnectionsRef.current.get(senderId) || (await createPeerConnectionForPeer(chatId, senderId, false));
+
+        if ("sdp" in signal && signal.type) {
+          const sdpInit = signal as RTCSessionDescriptionInit;
+          if (["offer", "answer", "pranswer", "rollback"].includes(sdpInit.type) && pc.signalingState !== "closed") {
+            await pc.setRemoteDescription(new RTCSessionDescription(sdpInit));
+
+            // Flush pending ICE candidates for this peer
+            const pending = pendingCandidatesRef.current.get(senderId) || [];
+            for (const cand of pending) {
+              try {
+                await pc.addIceCandidate(new RTCIceCandidate(cand));
+              } catch {}
+            }
+            pendingCandidatesRef.current.delete(senderId);
+
+            if (sdpInit.type === "offer") {
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              if (user?.uid) {
+                await sendCallSignal(chatId, {
+                  senderId: user.uid,
+                  chatId,
+                  targetUid: senderId,
+                  signal: answer,
+                });
+              }
+            }
+          }
+        } else if ("candidate" in signal && (signal as any).candidate) {
+          const cand = (signal as any).candidate;
+          if (pc.remoteDescription) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            } catch {}
+          } else {
+            const list = pendingCandidatesRef.current.get(senderId) || [];
+            list.push(cand);
+            pendingCandidatesRef.current.set(senderId, list);
+          }
+        }
+      },
+      onState: (remoteState: CallStatePayload) => {
+        setRemoteStatesMap((prev) => {
+          const updated = new Map(prev);
+          updated.set(remoteState.senderId, remoteState);
+          return updated;
+        });
+
+        if (typeof remoteState.isSpeaking === "boolean") {
+          setRemoteSpeakingStates((prev) => {
+            const updated = new Map(prev);
+            updated.set(remoteState.senderId, remoteState.isSpeaking!);
+            return updated;
+          });
+        }
+        if (typeof remoteState.isMuted === "boolean") {
+          setIsRemoteMuted(remoteState.isMuted);
+        }
+        if (typeof remoteState.isDeafened === "boolean") {
+          setIsRemoteDeafened(remoteState.isDeafened);
+        }
+        if (typeof remoteState.isCameraOn === "boolean") {
+          setIsRemoteCameraOn(remoteState.isCameraOn);
+        }
+        if (typeof remoteState.isSharingScreen === "boolean") {
+          setIsRemoteSharingScreen((prev) => {
+            if (prev !== remoteState.isSharingScreen) {
+              playSfx(remoteState.isSharingScreen ? sfxStreamStart : sfxStreamEnd);
+            }
+            return Boolean(remoteState.isSharingScreen);
+          });
+        }
+      },
+      onMemberJoined: async (joined: CallMemberJoinedPayload) => {
+        notify(`${joined.name} entrou na sala.`, "info");
+        playRingtone("connect");
+
+        // Se já estivermos na chamada, iniciamos a conexão Mesh para o novo participante
+        if (user?.uid && joined.uid !== user.uid) {
+          const pc = await createPeerConnectionForPeer(chatId, joined.uid, true);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await sendCallSignal(chatId, {
+            senderId: user.uid,
+            chatId,
+            targetUid: joined.uid,
+            signal: offer,
+          });
+        }
+      },
+      onMemberLeft: (left: CallMemberLeftPayload) => {
+        const pc = peerConnectionsRef.current.get(left.uid);
+        if (pc) {
+          try {
+            pc.close();
+          } catch {}
+          peerConnectionsRef.current.delete(left.uid);
+        }
+        remoteStreamsRef.current.delete(left.uid);
+        setRemoteStreams(new Map(remoteStreamsRef.current));
+
+        const pipeline = remotePipelinesRef.current.get(left.uid);
+        if (pipeline) {
+          destroyAudioPipeline(pipeline);
+          remotePipelinesRef.current.delete(left.uid);
+        }
+
+        setRemoteSpeakingStates((prev) => {
+          const updated = new Map(prev);
+          updated.delete(left.uid);
+          return updated;
+        });
+
+        notify("Um participante saiu da sala.", "info");
+        playRingtone("disconnect");
+      },
+      onKicked: (kick: CallKickPayload) => {
+        // Validação de autorização: apenas aceita kick se vier do host registrado
+        const currentHost = sessionRef.current?.hostUid || (sessionRef.current?.isInitiator ? user?.uid : sessionRef.current?.friendUid);
+        if (kick.adminId === currentHost || !currentHost) {
+          notify(kick.reason || "Você foi expulso da sala pelo administrador.", "error");
+          playRingtone("disconnect");
+          cleanUpCall();
+        }
+      },
+      onPrivacy: (privacy: CallPrivacyPayload) => {
+        setRoomConfig((prev) => ({
+          roomName: privacy.roomName || prev?.roomName || "Canal de Voz",
+          category: privacy.category || prev?.category || "resenha_games",
+          isPrivate: privacy.isPrivate,
+          password: privacy.password,
+        }));
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                isPrivate: privacy.isPrivate,
+                password: privacy.password,
+                category: privacy.category || prev.category,
+                roomName: privacy.roomName || prev.roomName,
+              }
+            : null,
+        );
+        notify(
+          privacy.isPrivate ? "🔒 A sala agora é privada." : "🔓 A sala agora é pública.",
+          "info",
+        );
+      },
+      onEnd: (endPayload: CallEndPayload) => {
+        notify(
+          endPayload.reason === "busy"
+            ? "O usuário está em outra chamada."
+            : "Chamada encerrada.",
+          "info",
+        );
+        playRingtone("disconnect");
+        cleanUpCall();
+      },
+    }),
+    [cleanUpCall, createPeerConnectionForPeer, notify, playRingtone, user?.uid],
+  );
+
+  // Incoming call listener on user_calls_${myUid}
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -1116,7 +1487,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
   }, [callState, cleanUpCall, notify, playRingtone, user?.uid]);
 
-  // INITIATE CALL (Caller)
+  // INITIATE CALL (1:1 Friend Call)
   const startCall = useCallback(
     async (friend: SocialFriend, withVideo = false) => {
       if (!user?.uid || callState !== "idle") return;
@@ -1130,6 +1501,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           friendUid,
           friendName: friend.name,
           friendAvatar: friend.avatar,
+          hostUid: user.uid,
           isInitiator: true,
           startedAt: Date.now(),
         });
@@ -1147,99 +1519,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setIsMuted(true);
         }
 
-        const pc = await createPeerConnection(chatId, true);
-        if (audioStream) {
-          audioStream.getTracks().forEach((track) => pc.addTrack(track, audioStream));
-        }
-
+        const pc = await createPeerConnectionForPeer(chatId, friendUid, true);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
         if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
-        unsubscribeSessionRef.current = subscribeToCallSession(chatId, user.uid, {
-          onAnswer: async (answerPayload) => {
-            if (answerPayload.accepted) {
-              setCallState("connecting");
-              if (audioRingIntervalRef.current) {
-                clearInterval(audioRingIntervalRef.current);
-                audioRingIntervalRef.current = null;
-              }
-            } else {
-              notify(`${friend.name} recusou a chamada.`, "info");
-              playRingtone("disconnect");
-              cleanUpCall();
-            }
-          },
-          onSignal: async ({ signal }) => {
-            if ("sdp" in signal && pc.signalingState !== "closed") {
-              await pc.setRemoteDescription(new RTCSessionDescription(signal as RTCSessionDescriptionInit));
-            } else if ("candidate" in signal && pc.remoteDescription) {
-              await pc.addIceCandidate(new RTCIceCandidate((signal as any).candidate));
-            }
-          },
-          onState: (remoteState) => {
-            if (typeof remoteState.isSpeaking === "boolean") {
-              setIsSpeakingRemote(remoteState.isSpeaking);
-            }
-            if (typeof remoteState.isMuted === "boolean") {
-              setIsRemoteMuted(remoteState.isMuted);
-            }
-            if (typeof remoteState.isDeafened === "boolean") {
-              setIsRemoteDeafened(remoteState.isDeafened);
-            }
-            if (typeof remoteState.isCameraOn === "boolean") {
-              setIsRemoteCameraOn(remoteState.isCameraOn);
-            }
-            if (typeof remoteState.isSharingScreen === "boolean") {
-              setIsRemoteSharingScreen((prev) => {
-                if (prev !== remoteState.isSharingScreen) {
-                  playSfx(remoteState.isSharingScreen ? sfxStreamStart : sfxStreamEnd);
-                }
-                return Boolean(remoteState.isSharingScreen);
-              });
-            }
-          },
-          onKicked: () => {
-            notify("Você foi expulso da chamada pelo administrador.", "error");
-            playRingtone("disconnect");
-            cleanUpCall();
-          },
-          onPrivacy: (privacy) => {
-            setRoomConfig((prev) => ({
-              roomName: privacy.roomName || prev?.roomName || "Canal de Voz",
-              category: privacy.category || prev?.category || "resenha_games",
-              isPrivate: privacy.isPrivate,
-              password: privacy.password,
-            }));
-            setSession((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    isPrivate: privacy.isPrivate,
-                    password: privacy.password,
-                    category: privacy.category || prev.category,
-                    roomName: privacy.roomName || prev.roomName,
-                  }
-                : null,
-            );
-            notify(
-              privacy.isPrivate
-                ? "🔒 A sala agora é privada."
-                : "🔓 A sala agora é pública.",
-              "info",
-            );
-          },
-          onEnd: (endPayload) => {
-            notify(
-              endPayload.reason === "busy"
-                ? `${friend.name} está em outra chamada.`
-                : "Chamada encerrada.",
-              "info",
-            );
-            playRingtone("disconnect");
-            cleanUpCall();
-          },
-        });
+        unsubscribeSessionRef.current = subscribeToCallSession(
+          chatId,
+          user.uid,
+          createUnifiedSessionHandlers(chatId),
+        );
 
         await sendCallInvite(friendUid, {
           callerId: user.uid,
@@ -1253,6 +1542,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         await sendCallSignal(chatId, {
           senderId: user.uid,
           chatId,
+          targetUid: friendUid,
           signal: offer,
         });
 
@@ -1279,10 +1569,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cleanUpCall();
       }
     },
-    [acquireAudioStream, callState, cleanUpCall, createPeerConnection, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
+    [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
   );
 
-  // ANSWER CALL (Callee)
+  // ANSWER CALL (Callee 1:1)
   const answerCall = useCallback(async () => {
     if (!user?.uid || !incomingInvite || callState !== "ringing-in") return;
     const { callerId, callerName, callerAvatar, chatId } = incomingInvite;
@@ -1299,6 +1589,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         friendUid: callerId,
         friendName: callerName,
         friendAvatar: callerAvatar || undefined,
+        hostUid: callerId,
         isInitiator: false,
         startedAt: Date.now(),
       });
@@ -1316,97 +1607,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setIsMuted(true);
       }
 
-      const pc = await createPeerConnection(chatId, false);
-      if (audioStream) {
-        audioStream.getTracks().forEach((track) => pc.addTrack(track, audioStream));
-      }
-
-      const pendingCandidates: RTCIceCandidateInit[] = [];
+      await createPeerConnectionForPeer(chatId, callerId, false);
 
       if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
-      unsubscribeSessionRef.current = subscribeToCallSession(chatId, user.uid, {
-        onSignal: async ({ signal }) => {
-          if ("sdp" in signal && signal.type === "offer") {
-            await pc.setRemoteDescription(new RTCSessionDescription(signal as RTCSessionDescriptionInit));
-            for (const cand of pendingCandidates) {
-              await pc.addIceCandidate(new RTCIceCandidate(cand));
-            }
-            pendingCandidates.length = 0;
-
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            await sendCallSignal(chatId, {
-              senderId: user.uid,
-              chatId,
-              signal: answer,
-            });
-          } else if ("candidate" in signal) {
-            if (pc.remoteDescription) {
-              await pc.addIceCandidate(new RTCIceCandidate((signal as any).candidate));
-            } else {
-              pendingCandidates.push((signal as any).candidate);
-            }
-          }
-        },
-        onState: (remoteState) => {
-          if (typeof remoteState.isSpeaking === "boolean") {
-            setIsSpeakingRemote(remoteState.isSpeaking);
-          }
-          if (typeof remoteState.isMuted === "boolean") {
-            setIsRemoteMuted(remoteState.isMuted);
-          }
-          if (typeof remoteState.isDeafened === "boolean") {
-            setIsRemoteDeafened(remoteState.isDeafened);
-          }
-          if (typeof remoteState.isCameraOn === "boolean") {
-            setIsRemoteCameraOn(remoteState.isCameraOn);
-          }
-          if (typeof remoteState.isSharingScreen === "boolean") {
-            setIsRemoteSharingScreen((prev) => {
-              if (prev !== remoteState.isSharingScreen) {
-                playSfx(remoteState.isSharingScreen ? sfxStreamStart : sfxStreamEnd);
-              }
-              return Boolean(remoteState.isSharingScreen);
-            });
-          }
-        },
-        onKicked: () => {
-          notify("Você foi expulso da chamada pelo administrador.", "error");
-          playRingtone("disconnect");
-          cleanUpCall();
-        },
-        onPrivacy: (privacy) => {
-          setRoomConfig((prev) => ({
-            roomName: privacy.roomName || prev?.roomName || "Canal de Voz",
-            category: privacy.category || prev?.category || "resenha_games",
-            isPrivate: privacy.isPrivate,
-            password: privacy.password,
-          }));
-          setSession((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  isPrivate: privacy.isPrivate,
-                  password: privacy.password,
-                  category: privacy.category || prev.category,
-                  roomName: privacy.roomName || prev.roomName,
-                }
-              : null,
-          );
-          notify(
-            privacy.isPrivate
-              ? "🔒 A sala agora é privada."
-              : "🔓 A sala agora é pública.",
-            "info",
-          );
-        },
-        onEnd: () => {
-          notify("Chamada encerrada.", "info");
-          playRingtone("disconnect");
-          cleanUpCall();
-        },
-      });
+      unsubscribeSessionRef.current = subscribeToCallSession(
+        chatId,
+        user.uid,
+        createUnifiedSessionHandlers(chatId),
+      );
 
       await sendCallAnswer(chatId, callerId, {
         responderId: user.uid,
@@ -1420,7 +1628,125 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao atender chamada.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, callState, cleanUpCall, createPeerConnection, incomingInvite, inputMode, notify, playRingtone, setupVoiceAnalyzer, user]);
+  }, [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, setupVoiceAnalyzer, user]);
+
+  // JOIN ROOM (Persistente / Multi-Participante)
+  const joinRoom = useCallback(
+    async (roomId: string, password?: string, fromInvite = false) => {
+      if (!user?.uid || callState !== "idle") return;
+
+      try {
+        setCallState("connecting");
+        const displayName = userProfile?.displayName || user.displayName || "Jogador";
+        const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
+
+        const joinResult = await joinVoiceRoom(roomId, {
+          password,
+          fromInvite,
+          displayName,
+          avatarUrl,
+        });
+
+        const room = joinResult.room;
+        const otherParticipants = joinResult.participants.filter((p) => p.uid !== user.uid);
+
+        setSession({
+          chatId: room.id,
+          friendUid: room.hostUid,
+          friendName: room.name,
+          hostUid: room.hostUid,
+          isInitiator: room.hostUid === user.uid,
+          startedAt: Date.now(),
+          category: room.category,
+          roomName: room.name,
+          isPrivate: room.isPrivate,
+          participants: joinResult.participants.map((p) => ({
+            uid: p.uid,
+            name: p.name,
+            avatar: p.avatar || undefined,
+          })),
+        });
+
+        setRoomConfig({
+          roomName: room.name,
+          category: room.category,
+          isPrivate: room.isPrivate,
+        });
+
+        const audioStream = await acquireAudioStream();
+        if (audioStream) {
+          localStreamRef.current = audioStream;
+          setLocalStream(audioStream);
+          setupVoiceAnalyzer(audioStream, true);
+          if (inputMode === "push-to-talk") {
+            const track = audioStream.getAudioTracks()[0];
+            if (track) track.enabled = false;
+          }
+        } else {
+          setIsMuted(true);
+        }
+
+        if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
+        unsubscribeSessionRef.current = subscribeToCallSession(
+          room.id,
+          user.uid,
+          createUnifiedSessionHandlers(room.id),
+        );
+
+        // Notifica a sala que entramos
+        await sendCallMemberJoined(room.id, {
+          uid: user.uid,
+          name: displayName,
+          avatar: avatarUrl || null,
+          chatId: room.id,
+        });
+
+        // Inicia conexões WebRTC Mesh com todos os membros já presentes
+        for (const peer of otherParticipants) {
+          const pc = await createPeerConnectionForPeer(room.id, peer.uid, true);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await sendCallSignal(room.id, {
+            senderId: user.uid,
+            chatId: room.id,
+            targetUid: peer.uid,
+            signal: offer,
+          });
+        }
+
+        setCallState("active");
+        setIsVoiceWindowOpen(true);
+        playRingtone("connect");
+
+        if (!callDurationTimerRef.current) {
+          callDurationTimerRef.current = window.setInterval(() => {
+            setCallDuration((prev) => prev + 1);
+          }, 1000);
+        }
+
+        notify(`Conectado à sala "${room.name}"!`, "success");
+      } catch (err: any) {
+        console.error("[useVoiceCall] joinRoom failed:", err);
+        notify(err?.message || "Não foi possível entrar na sala de voz.", "error");
+        cleanUpCall();
+      }
+    },
+    [acquireAudioStream, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
+  );
+
+  // CREATE AND JOIN ROOM (Criação de Sala Persistente)
+  const createAndJoinRoom = useCallback(
+    async (config: CallRoomConfig | { name?: string; roomName?: string; category?: RoomCategory; isPrivate?: boolean; password?: string; icon?: string; avatarUrl?: string; themeColor?: string }) => {
+      try {
+        const newRoom = await createVoiceRoom(config);
+        await joinRoom(newRoom.id, config.password, true);
+      } catch (err: any) {
+        console.error("[useVoiceCall] createAndJoinRoom failed:", err);
+        notify(err?.message || "Erro ao criar canal de voz.", "error");
+      }
+    },
+    [joinRoom, notify],
+  );
 
   // REJECT CALL
   const rejectCall = useCallback(async () => {
@@ -1440,10 +1766,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   // HANGUP / DISCONNECT
   const hangUp = useCallback(async () => {
     if (session && user?.uid) {
-      await sendCallEnd(session.chatId, session.friendUid, {
+      await sendCallEnd(session.chatId, session.friendUid || "room-all", {
         senderId: user.uid,
         chatId: session.chatId,
         reason: "hangup",
+      });
+      await sendCallMemberLeft(session.chatId, {
+        uid: user.uid,
+        chatId: session.chatId,
       });
     }
     playRingtone("disconnect");
@@ -1496,12 +1826,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cameraStreamRef.current = null;
       }
       setLocalCameraStream(null);
-      if (peerConnectionRef.current && session.friendUid !== "echo-bot") {
-        const sender = peerConnectionRef.current.getSenders().find((s) => s.track?.kind === "video");
+
+      // Remove video track from all peers
+      peerConnectionsRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "video");
         if (sender && !isSharingScreen) {
-          peerConnectionRef.current.removeTrack(sender);
+          try {
+            pc.removeTrack(sender);
+          } catch {}
         }
-      }
+      });
+
       setIsCameraOn(false);
       if (session.chatId && user?.uid) {
         void sendCallState(session.chatId, {
@@ -1531,8 +1866,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return;
         }
 
-        if (peerConnectionRef.current && user?.uid) {
-          const pc = peerConnectionRef.current;
+        // Add track to all peers and renegotiate
+        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
           const sender = pc.getSenders().find((s) => s.track?.kind === "video");
           if (sender) {
             await sender.replaceTrack(videoTrack);
@@ -1541,11 +1876,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          await sendCallSignal(session.chatId, {
-            senderId: user.uid,
-            chatId: session.chatId,
-            signal: offer,
-          });
+          if (user?.uid) {
+            await sendCallSignal(session.chatId, {
+              senderId: user.uid,
+              chatId: session.chatId,
+              targetUid: peerId,
+              signal: offer,
+            });
+          }
         }
 
         setIsCameraOn(true);
@@ -1563,7 +1901,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [isCameraOn, isSharingScreen, notify, selectedVideoInput, session?.chatId, session?.friendUid, user?.uid]);
 
-  // START SCREEN SHARE
+  // START SCREEN SHARE (Com contentHint detail e bitrate otimizado)
   const startScreenShare = useCallback(
     async (opts?: string | ScreenShareOptions) => {
       if (!session?.chatId) return;
@@ -1613,8 +1951,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         const videoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
 
+        // Otimização de nitidez: prioriza texto/UI legível
+        if (videoTrack && "contentHint" in videoTrack) {
+          (videoTrack as any).contentHint = "detail";
+        }
+
         if (session.friendUid === "echo-bot") {
-          // Desativa faixa de áudio de tela no loopback para evitar eco/feedback acústico
           if (screenAudioTrack) {
             screenAudioTrack.enabled = false;
           }
@@ -1629,31 +1971,50 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return;
         }
 
-        if (!peerConnectionRef.current || !user?.uid) return;
-        const pc = peerConnectionRef.current;
+        // Add track and set explicit bitrates on all peers
+        const targetBitrate = res === "720p" ? 2_500_000 : fps === 60 ? 6_000_000 : 4_500_000;
 
-        const sender = pc.getSenders().find((s) => s.track?.kind === "video");
-        if (sender) {
-          await sender.replaceTrack(videoTrack);
-        } else {
-          pc.addTrack(videoTrack, screenStream);
-        }
+        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+          if (sender) {
+            await sender.replaceTrack(videoTrack);
+          } else {
+            pc.addTrack(videoTrack, screenStream);
+          }
 
-        // Se houver áudio do sistema, envia para a conexão WebRTC sem reproduzir localmente
-        if (screenAudioTrack) {
-          const audioSender = pc.getSenders().find((s) => s.track === screenAudioTrack);
-          if (!audioSender) {
-            pc.addTrack(screenAudioTrack, screenStream);
+          if (screenAudioTrack) {
+            const audioSender = pc.getSenders().find((s) => s.track === screenAudioTrack);
+            if (!audioSender) {
+              pc.addTrack(screenAudioTrack, screenStream);
+            }
+          }
+
+          // Apply bitrate and degradation preferences
+          try {
+            const videoSender = pc.getSenders().find((s) => s.track === videoTrack);
+            if (videoSender && videoSender.getParameters) {
+              const params = videoSender.getParameters();
+              if (params.encodings && params.encodings.length > 0) {
+                params.encodings[0].maxBitrate = targetBitrate;
+                (params as any).degradationPreference = "maintain-resolution";
+                await videoSender.setParameters(params);
+              }
+            }
+          } catch (e) {
+            console.warn("[useVoiceCall] setParameters on screen sender warning:", e);
+          }
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (user?.uid) {
+            await sendCallSignal(session.chatId, {
+              senderId: user.uid,
+              chatId: session.chatId,
+              targetUid: peerId,
+              signal: offer,
+            });
           }
         }
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await sendCallSignal(session.chatId, {
-          senderId: user.uid,
-          chatId: session.chatId,
-          signal: offer,
-        });
 
         setIsSharingScreen(true);
         setIsScreenPickerOpen(false);
@@ -1693,20 +2054,27 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       return;
     }
 
-    if (peerConnectionRef.current && session?.chatId && user?.uid) {
-      const senders = peerConnectionRef.current.getSenders();
-      const videoSender = senders.find((s) => s.track?.kind === "video");
-      if (videoSender) {
-        peerConnectionRef.current.removeTrack(videoSender);
-      }
+    if (session?.chatId && user?.uid) {
+      for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track?.kind === "video");
+        if (videoSender) {
+          try {
+            pc.removeTrack(videoSender);
+          } catch {}
+        }
 
-      const offer = await peerConnectionRef.current.createOffer();
-      await peerConnectionRef.current.setLocalDescription(offer);
-      await sendCallSignal(session.chatId, {
-        senderId: user.uid,
-        chatId: session.chatId,
-        signal: offer,
-      });
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await sendCallSignal(session.chatId, {
+            senderId: user.uid,
+            chatId: session.chatId,
+            targetUid: peerId,
+            signal: offer,
+          });
+        } catch {}
+      }
 
       void sendCallState(session.chatId, {
         senderId: user.uid,
@@ -1719,7 +2087,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setIsSharingScreen(false);
   }, [session?.chatId, session?.friendUid, user?.uid]);
 
-  // START TEST CALL (Loopback / Echo Bot)
+  // START TEST CALL (Loopback Echo Bot)
   const startTestCall = useCallback(async () => {
     try {
       cleanUpCall();
@@ -1761,6 +2129,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   }, [acquireAudioStream, cleanUpCall, inputMode, notify, playRingtone, setupVoiceAnalyzer]);
 
+  // KICK PARTICIPANT (Admin Action)
   const kickParticipant = useCallback(
     async (targetUserId: string) => {
       if (!sessionRef.current?.chatId || !user?.uid) return;
@@ -1812,14 +2181,97 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         roomName: currentRoomName,
       });
       notify(
-        isPrivate
-          ? "Privacidade atualizada: Sala Privada 🔒"
-          : "Privacidade atualizada: Sala Pública 🔓",
+        isPrivate ? "Privacidade atualizada: Sala Privada 🔒" : "Privacidade atualizada: Sala Pública 🔓",
         "success",
       );
     },
     [notify, roomConfig, session, user?.uid],
   );
+
+  // Calibração de Ruído Ambiente (Mede o ruído por 2s e sugere sensibilidade)
+  const calibrateNoiseFloor = useCallback(async (): Promise<{ noiseFloor: number; recommendedSensitivity: number }> => {
+    setIsCalibratingNoise(true);
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) throw new Error("AudioContext não suportado");
+
+      let tempStream = localStreamRef.current;
+      let shouldStopTemp = false;
+
+      if (!tempStream || !tempStream.getAudioTracks().some((t) => t.readyState === "live")) {
+        tempStream = await acquireAudioStream();
+        shouldStopTemp = true;
+      }
+
+      if (!tempStream) throw new Error("Microfone inacessível para calibração");
+
+      const ctx = new AudioCtx();
+      const source = ctx.createMediaStreamSource(tempStream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.3;
+      source.connect(analyser);
+
+      const timeData = new Float32Array(analyser.fftSize);
+      let samplesCount = 0;
+      let totalRms = 0;
+
+      const startTime = performance.now();
+      const durationMs = 2000;
+
+      await new Promise<void>((resolve) => {
+        const sampleInterval = setInterval(() => {
+          if (performance.now() - startTime >= durationMs) {
+            clearInterval(sampleInterval);
+            resolve();
+            return;
+          }
+
+          analyser.getFloatTimeDomainData(timeData);
+          let sumSquares = 0;
+          for (let i = 0; i < timeData.length; i += 1) {
+            sumSquares += timeData[i] * timeData[i];
+          }
+          const rms = Math.sqrt(sumSquares / timeData.length);
+          const rawVol = Math.min(100, Math.round(rms * 700));
+          totalRms += rawVol;
+          samplesCount += 1;
+        }, 50);
+      });
+
+      try {
+        source.disconnect();
+        analyser.disconnect();
+        if (ctx.state !== "closed") await ctx.close();
+      } catch {}
+
+      if (shouldStopTemp && tempStream) {
+        tempStream.getTracks().forEach((t) => t.stop());
+      }
+
+      const avgNoiseFloor = samplesCount > 0 ? Math.round(totalRms / samplesCount) : 5;
+      const noiseFloor = Math.max(1, Math.min(50, avgNoiseFloor));
+
+      // Calcula sensibilidade recomendada: se o ruído for 15, sensibilidade = 76%
+      const recommendedSensitivity = Math.max(10, Math.min(90, Math.round(100 - (noiseFloor * 1.6))));
+
+      setCurrentNoiseFloor(noiseFloor);
+      setVoiceSensitivity(recommendedSensitivity);
+
+      try {
+        localStorage.setItem("checkpoint_voice_noise_floor", String(noiseFloor));
+      } catch {}
+
+      notify(`Microfone calibrado! Ruído medido: ${noiseFloor}%. Sensibilidade ajustada para ${recommendedSensitivity}%.`, "success");
+      return { noiseFloor, recommendedSensitivity };
+    } catch (err: any) {
+      console.warn("[useVoiceCall] calibrateNoiseFloor error:", err);
+      notify("Não foi possível calibrar o ruído ambiente.", "error");
+      throw err;
+    } finally {
+      setIsCalibratingNoise(false);
+    }
+  }, [acquireAudioStream, notify, setVoiceSensitivity]);
 
   return {
     callState,
@@ -1828,6 +2280,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     incomingInvite,
     localStream,
     remoteStream,
+    remoteStreams,
     localCameraStream,
     localScreenStream,
     remoteVolume,
@@ -1836,6 +2289,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     isDeafened,
     isSpeakingLocal,
     isSpeakingRemote,
+    remoteSpeakingStates,
+    remoteStatesMap,
     isRemoteMuted,
     isRemoteDeafened,
     isCameraOn,
@@ -1866,7 +2321,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     changeAudioOutputDevice,
     changeVideoInputDevice,
     refreshDevices,
-    // Audio processing controls
+    deviceError,
+    clearDeviceError,
+    // Audio processing and calibration controls
+    micGain,
+    setMicGain,
+    noiseGateEnabled,
+    setNoiseGateEnabled,
     voiceSensitivity,
     setVoiceSensitivity,
     echoCancellation,
@@ -1875,8 +2336,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setNoiseSuppression,
     autoGainControl,
     setAutoGainControl,
+    calibrateNoiseFloor,
+    isCalibratingNoise,
+    currentNoiseFloor,
     // Actions
     startCall,
+    joinRoom,
+    createAndJoinRoom,
     startTestCall,
     answerCall,
     rejectCall,

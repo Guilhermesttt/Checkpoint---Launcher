@@ -46,6 +46,20 @@ export class PeerAudioNode {
     }
   }
 
+  /**
+   * Redireciona o fluxo para o dispositivo de saída de áudio selecionado (se suportado pelo navegador)
+   */
+  public async setSinkId(deviceId: string): Promise<void> {
+    if (this.isDestroyed || this.ctx.state === 'closed') return;
+    try {
+      if (typeof (this.ctx as any).setSinkId === "function") {
+        await (this.ctx as any).setSinkId(deviceId === "default" ? "" : deviceId);
+      }
+    } catch (err) {
+      console.warn("[PeerAudioNode] setSinkId error:", err);
+    }
+  }
+
   public destroy(): void {
     if (this.isDestroyed) return;
     this.isDestroyed = true;

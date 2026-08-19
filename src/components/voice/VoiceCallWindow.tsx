@@ -97,11 +97,18 @@ interface VoiceCallWindowProps {
   onToggleCamera?: () => void;
   onToggleScreenShare: () => void;
   onKickParticipant?: (targetUserId: string) => void;
-  onHangUp: () => void;
-  socialFriends?: SocialFriend[];
-  roomConfig?: CallRoomConfig | null;
   onUpdateRoomPrivacy?: (isPrivate: boolean, password?: string) => Promise<void> | void;
   notify?: (msg: string, type: "success" | "error" | "info") => void;
+  remoteSpeakingStates?: Map<string, boolean>;
+  remoteStreams?: Map<string, MediaStream>;
+  remoteStatesMap?: Map<string, any>;
+  micGain?: number;
+  onChangeMicGain?: (val: number) => void;
+  noiseGateEnabled?: boolean;
+  onChangeNoiseGateEnabled?: (val: boolean) => void;
+  onCalibrateNoise?: () => Promise<any>;
+  isCalibratingNoise?: boolean;
+  currentNoiseFloor?: number;
 }
 
 export type CallFeedId =
@@ -110,7 +117,8 @@ export type CallFeedId =
   | "remote-user"
   | "local-screen"
   | "local-camera"
-  | "local-user";
+  | "local-user"
+  | string;
 
 export interface CallFeed {
   id: CallFeedId;
@@ -233,8 +241,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   roomConfig,
   onUpdateRoomPrivacy,
   notify = () => {},
+  remoteSpeakingStates,
+  remoteStreams,
+  remoteStatesMap,
+  micGain,
+  onChangeMicGain,
+  noiseGateEnabled,
+  onChangeNoiseGateEnabled,
+  onCalibrateNoise,
+  isCalibratingNoise,
+  currentNoiseFloor,
 }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const activeVideoElRef = useRef<HTMLVideoElement | null>(null);
 
@@ -369,21 +386,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     };
   }, [isSettingsOpen, localStream]);
 
-  // Attach remote stream to persistent audio receiver
-  useEffect(() => {
-    if (audioRef.current && remoteStream) {
-      if (audioRef.current.srcObject !== remoteStream) {
-        audioRef.current.srcObject = remoteStream;
-      }
-      if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (audioRef.current as any).setSinkId === "function") {
-        void (audioRef.current as any).setSinkId(selectedAudioOutput).catch(() => {});
-      }
-      const isEchoTest = session?.friendUid === "echo-bot";
-      audioRef.current.muted = isDeafened || isEchoTest;
-      audioRef.current.volume = Math.max(0, Math.min(1, remoteVolume / 100));
-      audioRef.current.play().catch(() => {});
-    }
-  }, [remoteStream, selectedAudioOutput, isDeafened, session?.friendUid, remoteVolume]);
+
 
   const defaultInputLabel =
     audioInputDevices.find((d) => d.deviceId === "default" && d.label)?.label ||
@@ -401,34 +404,77 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     "";
 
   // Build the list of active feeds for Grid & Focus mode
+  const isRoomSession = Boolean(session?.roomName || (session?.participants && session.participants.length > 0));
+
   const activeFeeds: CallFeed[] = useMemo(() => {
     if (!session) return [];
     const feeds: CallFeed[] = [];
 
-    // 2. Remote Camera: embedded in remote-user voice card (not a separate tile)
-    // 3. Remote Participant Voice Card — camera stream injected directly
-    feeds.push({
-      id: "remote-user",
-      type: "voice",
-      title: session.friendName,
-      subtitle: isSpeakingRemote ? "Falando..." : "Conectado",
-      avatar: session.friendAvatar,
-      // Embed camera stream so it shows inside the avatar circle
-      cameraStream: isRemoteCameraOn && !isRemoteSharingScreen ? remoteStream : null,
-      isLocal: false,
-      isSpeaking: isSpeakingRemote,
-      isMuted: isRemoteMuted,
-      isDeafened: isRemoteDeafened,
-      isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
-    });
+    const isRoom = Boolean(session.roomName || (session.participants && session.participants.length > 0));
+    const remoteParticipants = (session.participants || []).filter((p) => p.uid !== userProfile?.uid);
 
-    // 4. Remote Screen Share Feed (kept as separate full tile)
+    if (isRoom) {
+      // 1. Participantes remotos reais da sala
+      remoteParticipants.forEach((p) => {
+        const stream = remoteStreams?.get(p.uid) || (p.uid === session.friendUid ? remoteStream : null);
+        const isSpeaking = remoteSpeakingStates?.get(p.uid) ?? false;
+        const remoteState = remoteStatesMap?.get(p.uid);
+
+        feeds.push({
+          id: `remote-user:${p.uid}`,
+          type: "voice",
+          title: p.name,
+          subtitle: isSpeaking ? "Falando..." : "Conectado",
+          avatar: p.avatar,
+          stream,
+          cameraStream: remoteState?.isCameraOn && !remoteState?.isSharingScreen ? stream : null,
+          isLocal: false,
+          isSpeaking,
+          isMuted: remoteState?.isMuted ?? false,
+          isDeafened: remoteState?.isDeafened ?? false,
+          isCamera: remoteState?.isCameraOn ?? false,
+        });
+
+        if (remoteState?.isSharingScreen && stream) {
+          feeds.push({
+            id: `remote-screen:${p.uid}`,
+            type: "video",
+            stream,
+            title: `Tela de ${p.name}`,
+            subtitle: "Transmissão de Tela",
+            tag: "AO VIVO",
+            isLocal: false,
+            isSpeaking,
+            isMuted: remoteState?.isMuted ?? false,
+            isDeafened: remoteState?.isDeafened ?? false,
+            isScreen: true,
+          });
+        }
+      });
+    } else if (session.friendUid && session.friendUid !== userProfile?.uid) {
+      // 2. Chamada 1:1 direta ou auto-teste echo-bot
+      feeds.push({
+        id: "remote-user",
+        type: "voice",
+        title: session.friendName,
+        subtitle: isSpeakingRemote ? "Falando..." : "Conectado",
+        avatar: session.friendAvatar,
+        cameraStream: isRemoteCameraOn && !isRemoteSharingScreen ? remoteStream : null,
+        isLocal: false,
+        isSpeaking: isSpeakingRemote,
+        isMuted: isRemoteMuted,
+        isDeafened: isRemoteDeafened,
+        isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
+      });
+    }
+
+    // 3. Remote Screen Share Feed
     if (isRemoteSharingScreen && remoteStream) {
       feeds.push({
         id: "remote-screen",
         type: "video",
         stream: remoteStream,
-        title: `Tela de ${session.friendName}`,
+        title: isRoom ? "Transmissão da Sala" : `Tela de ${session.friendName}`,
         subtitle: "Transmissão de Tela",
         tag: "AO VIVO",
         isLocal: false,
@@ -439,7 +485,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       });
     }
 
-    // 5. Local Screen Share Feed
+    // 4. Local Screen Share Feed
     if (isSharingScreen && localScreenStream) {
       feeds.push({
         id: "local-screen",
@@ -456,14 +502,13 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       });
     }
 
-    // 6. Local Participant Voice Card — camera stream injected directly
+    // 5. Local Participant Voice Card
     feeds.push({
       id: "local-user",
       type: "voice",
       title: userProfile?.displayName || "Você",
       subtitle: isSpeakingLocal ? "Falando..." : "Conectado",
       avatar: userProfile?.photoURL,
-      // Embed camera stream so it shows inside the avatar circle
       cameraStream: isCameraOn ? localCameraStream : null,
       isLocal: true,
       isSpeaking: isSpeakingLocal,
@@ -490,6 +535,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     localCameraStream,
     userProfile?.displayName,
     userProfile?.photoURL,
+    userProfile?.uid,
   ]);
 
   // Remap focused feed cleanup: local-camera and remote-camera no longer exist as separate feeds
@@ -580,9 +626,6 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
           className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
         >
-          {/* Invisible Remote Audio Receiver */}
-          <audio ref={audioRef} autoPlay playsInline />
-
           {/* Top Bar Header */}
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/8 bg-black/35 backdrop-blur-md z-20">
             {/* Left Info: Friend & Duration & Focus Indicator & Category */}
@@ -1035,6 +1078,26 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3"
                 }`}
               >
+                {isRoomSession && activeFeeds.length === 1 && (
+                  <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.015] p-8 text-center space-y-3 min-h-[220px] max-h-[360px]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-white/50 border border-white/10">
+                      <UserPlus className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-white/70">Aguardando participantes</p>
+                      <p className="text-[10px] text-white/40 max-w-[200px]">
+                        Convide amigos para conversar neste canal
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsInviteModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition cursor-pointer"
+                    >
+                      Convidar Amigos
+                    </button>
+                  </div>
+                )}
                 {activeFeeds.map((feed) => {
                   const hasCameraFill = feed.type === "voice" && Boolean(feed.cameraStream);
                   return (

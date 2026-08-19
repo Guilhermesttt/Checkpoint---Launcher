@@ -458,6 +458,9 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
             echoCancellation: voiceCallContext?.echoCancellation ?? true,
             noiseSuppression: voiceCallContext?.noiseSuppression ?? true,
             autoGainControl: voiceCallContext?.autoGainControl ?? true,
+            channelCount: { ideal: 1 },
+            sampleRate: { ideal: 48000 },
+            sampleSize: { ideal: 16 },
           },
           video: false,
         });
@@ -487,7 +490,8 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
             sumSquares += data[i] * data[i];
           }
           const rms = Math.sqrt(sumSquares / data.length);
-          const level = Math.min(100, Math.round(rms * 700));
+          const gainMultiplier = (voiceCallContext?.micGain ?? 100) / 100;
+          const level = Math.min(100, Math.round(rms * 700 * gainMultiplier));
           setTestMicVolume(level);
           animId = requestAnimationFrame(tick);
         };
@@ -1380,12 +1384,12 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                             ))}
                           </select>
 
-                          {/* Teste de Microfone */}
+                          {/* Teste de Microfone com VU Meter e Marcador de Limiar */}
                           <div className="pt-2 border-t border-white/6 space-y-2">
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-bold text-white/60 flex items-center gap-1">
                                 <Activity className="h-3.5 w-3.5 text-white/70" />
-                                Volume do Microfone
+                                Nível de Entrada (VU Meter)
                               </span>
                               <button
                                 type="button"
@@ -1399,12 +1403,30 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                                 {isTestingMic ? "Parar Teste" : "Testar Microfone"}
                               </button>
                             </div>
-                            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                            <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/10">
                               <div
-                                className="h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-75"
+                                className="h-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-all duration-75"
                                 style={{ width: `${testMicVolume}%` }}
                               />
+                              {/* Marcador de Limiar de Ativação do VAD */}
+                              {(() => {
+                                const sens = voiceCallContext?.voiceSensitivity ?? 35;
+                                const thresholdRms = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
+                                const markerPos = Math.min(95, Math.max(5, thresholdRms * 3.3));
+                                return (
+                                  <div
+                                    className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_6px_rgba(245,158,11,0.9)]"
+                                    style={{ left: `${markerPos}%` }}
+                                    title="Ponto de Ativação por Voz (Limiar)"
+                                  />
+                                );
+                              })()}
                             </div>
+                            <p className="text-[9px] text-white/40 flex items-center justify-between">
+                              <span>0%</span>
+                              <span className="text-amber-400 font-bold">| Ponto de Ativação</span>
+                              <span>100%</span>
+                            </p>
                           </div>
 
                           {/* Retorno de Microfone (Ouvir própria voz) */}
@@ -1512,14 +1534,37 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                 })()}
               </section>
 
-              {/* Sensibilidade e Processamento */}
+              {/* Sensibilidade, Calibração e Processamento */}
               <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
                 <SettingsHeader
                   icon={<Activity className="h-5 w-5 text-white/70" />}
                   title="Sensibilidade e Processamento de Áudio"
-                  description="Ajuste o limiar de ativação por voz (VAD) e filtros de redução de ruído ambiente."
+                  description="Calibre o ruído ambiente automaticamente e ajuste filtros de cancelamento e ganho."
                 />
                 <div className="space-y-4">
+                  {/* Calibração Automática de Ruído Ambiente */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl border border-white/8 bg-white/[0.02]">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-bold text-white flex items-center gap-2">
+                        <span>Calibração de Ruído Ambiente</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/80">
+                          Piso medido: {voiceCallContext?.currentNoiseFloor ?? 5}%
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-white/50">
+                        Mede 2 segundos de silêncio para ajustar o limiar de ativação ideal para o seu quarto/ambiente.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={voiceCallContext?.isCalibratingNoise}
+                      onClick={() => void voiceCallContext?.calibrateNoiseFloor()}
+                      className="px-4 py-2 rounded-xl bg-white text-black font-black text-xs uppercase tracking-wider hover:bg-white/90 shadow-md transition disabled:opacity-50 cursor-pointer shrink-0"
+                    >
+                      {voiceCallContext?.isCalibratingNoise ? "Medindo Ruído (2s)..." : "Calibrar Microfone"}
+                    </button>
+                  </div>
+
                   {/* Slider de Sensibilidade */}
                   <div className="rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-2">
                     <div className="flex items-center justify-between text-xs font-bold text-white">
@@ -1540,9 +1585,30 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     </div>
                   </div>
 
+                  {/* Slider de Ganho Manual de Microfone (Gain Boost) */}
+                  <div className="rounded-2xl border border-white/6 bg-white/[0.035] p-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-white">
+                      <span>Ganho do Microfone (Volume de Entrada)</span>
+                      <span className="font-mono text-white/80">{voiceCallContext?.micGain ?? 100}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={200}
+                      value={voiceCallContext?.micGain ?? 100}
+                      onChange={(e) => voiceCallContext?.setMicGain(Number(e.target.value))}
+                      className="w-full accent-white cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] font-bold uppercase tracking-wider text-white/30">
+                      <span>0% (Mudo)</span>
+                      <span>100% (Padrão)</span>
+                      <span>200% (Boost Máximo)</span>
+                    </div>
+                  </div>
+
                   {/* Toggles de Processamento */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
                       <div>
                         <p className="text-xs font-bold text-white">Cancelamento de Eco</p>
                         <p className="text-[10px] font-medium text-white/40">Evita retorno dos alto-falantes</p>
@@ -1553,7 +1619,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       />
                     </div>
 
-                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
                       <div>
                         <p className="text-xs font-bold text-white">Supressão de Ruído</p>
                         <p className="text-[10px] font-medium text-white/40">Filtra vento e teclado</p>
@@ -1564,7 +1630,18 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       />
                     </div>
 
-                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
+                      <div>
+                        <p className="text-xs font-bold text-white">Gate de Ruído</p>
+                        <p className="text-[10px] font-medium text-white/40">Corta áudio no silêncio</p>
+                      </div>
+                      <Switch
+                        checked={voiceCallContext?.noiseGateEnabled ?? true}
+                        onCheckedChange={(checked) => voiceCallContext?.setNoiseGateEnabled(checked)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
                       <div>
                         <p className="text-xs font-bold text-white">Ganho Automático</p>
                         <p className="text-[10px] font-medium text-white/40">Nivela volume da voz</p>

@@ -1,7 +1,6 @@
-import React from "react";
-import { Users, MessageSquare, UserPlus } from "lucide-react";
+import { Users, MessageSquare, UserPlus, Radio } from "lucide-react";
 
-export type SocialSubTab = "AMIGOS" | "CHAT" | "SOLICITAÇÕES";
+export type SocialSubTab = "AMIGOS" | "CHAT" | "SALAS" | "SOLICITAÇÕES";
 
 interface FriendsSubTabsProps {
   activeTab: SocialSubTab;
@@ -9,6 +8,7 @@ interface FriendsSubTabsProps {
   incomingRequestsCount: number;
   totalFriendsCount: number;
   unreadCount?: number;
+  activeRoomsCount?: number;
 }
 
 export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
@@ -17,10 +17,12 @@ export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
   incomingRequestsCount,
   totalFriendsCount,
   unreadCount = 0,
+  activeRoomsCount = 0,
 }) => {
   const tabs: { id: SocialSubTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: "AMIGOS", label: "Amigos", icon: <Users className="h-3.5 w-3.5" /> },
     { id: "CHAT", label: "Chat & Conversas", icon: <MessageSquare className="h-3.5 w-3.5" />, badge: unreadCount },
+    { id: "SALAS", label: "Canais de Voz", icon: <Radio className="h-3.5 w-3.5" />, badge: activeRoomsCount },
     { id: "SOLICITAÇÕES", label: "Solicitações", icon: <UserPlus className="h-3.5 w-3.5" />, badge: incomingRequestsCount },
   ];
 
