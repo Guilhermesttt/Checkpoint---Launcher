@@ -1442,33 +1442,51 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         if ("sdp" in signal && signal.type) {
           const sdpInit = signal as RTCSessionDescriptionInit;
           if (["offer", "answer", "pranswer", "rollback"].includes(sdpInit.type) && pc.signalingState !== "closed") {
-            await pc.setRemoteDescription(new RTCSessionDescription(sdpInit));
+            try {
+              const isOffer = sdpInit.type === "offer";
+              const isCollision = isOffer && pc.signalingState !== "stable";
 
-            // Flush pending ICE candidates for this peer
-            const pending = pendingCandidatesRef.current.get(senderId) || [];
-            for (const cand of pending) {
-              try {
-                await pc.addIceCandidate(new RTCIceCandidate(cand));
-              } catch { }
-            }
-            pendingCandidatesRef.current.delete(senderId);
-
-            if (sdpInit.type === "offer") {
-              const answer = await pc.createAnswer();
-              await pc.setLocalDescription(answer);
-              if (user?.uid) {
-                await sendCallSignal(chatId, {
-                  senderId: user.uid,
-                  chatId,
-                  targetUid: senderId,
-                  signal: answer,
-                });
+              if (isCollision) {
+                // Deterministic tie-breaking: peer with lexicographically higher UID is polite and yields
+                const isPolite = (user?.uid || "") > senderId;
+                if (!isPolite) {
+                  console.warn("[WebRTC] Offer collision: impolite peer ignoring remote offer from", senderId);
+                  return;
+                }
+                console.warn("[WebRTC] Offer collision: polite peer rolling back local offer to accept remote offer from", senderId);
+                await pc.setLocalDescription({ type: "rollback" });
               }
+
+              await pc.setRemoteDescription(new RTCSessionDescription(sdpInit));
+
+              // Flush pending ICE candidates for this peer
+              const pending = pendingCandidatesRef.current.get(senderId) || [];
+              for (const cand of pending) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch { }
+              }
+              pendingCandidatesRef.current.delete(senderId);
+
+              if (sdpInit.type === "offer") {
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                if (user?.uid) {
+                  await sendCallSignal(chatId, {
+                    senderId: user.uid,
+                    chatId,
+                    targetUid: senderId,
+                    signal: answer,
+                  });
+                }
+              }
+            } catch (err) {
+              console.error("[WebRTC] Error processing SDP signal from", senderId, err);
             }
           }
         } else if ("candidate" in signal && (signal as any).candidate) {
           const cand = (signal as any).candidate;
-          if (pc.remoteDescription) {
+          if (pc.remoteDescription && pc.remoteDescription.type) {
             try {
               await pc.addIceCandidate(new RTCIceCandidate(cand));
             } catch { }
@@ -1515,20 +1533,44 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         notify(`${joined.name} entrou na sala.`, "info");
         playRingtone("connect");
 
-        // Se já estivermos na chamada, iniciamos a conexão Mesh para o novo participante
+        setSession((prev) => {
+          if (!prev) return prev;
+          const current = prev.participants || [];
+          if (current.some((p) => p.uid === joined.uid)) return prev;
+          return {
+            ...prev,
+            participants: [
+              ...current,
+              { uid: joined.uid, name: joined.name, avatar: joined.avatar || undefined },
+            ],
+          };
+        });
+
+        // Ensure peer connection exists in receiver/callee mode
         if (user?.uid && joined.uid !== user.uid) {
-          const pc = await createPeerConnectionForPeer(chatId, joined.uid, true);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await sendCallSignal(chatId, {
-            senderId: user.uid,
-            chatId,
-            targetUid: joined.uid,
-            signal: offer,
-          });
+          const pc = await createPeerConnectionForPeer(chatId, joined.uid, false);
+          // If the connection is still in stable state with no signaling ongoing, initiate offer if needed
+          if (pc.signalingState === "stable" && !pc.currentRemoteDescription && !pc.currentLocalDescription) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await sendCallSignal(chatId, {
+              senderId: user.uid,
+              chatId,
+              targetUid: joined.uid,
+              signal: offer,
+            });
+          }
         }
       },
       onMemberLeft: (left: CallMemberLeftPayload) => {
+        setSession((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            participants: (prev.participants || []).filter((p) => p.uid !== left.uid),
+          };
+        });
+
         const pc = peerConnectionsRef.current.get(left.uid);
         if (pc) {
           try {

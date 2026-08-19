@@ -69,6 +69,7 @@ export interface CallMemberLeftPayload {
 }
 
 const activeChannels = new Map<string, any>();
+const channelPromises = new Map<string, Promise<any>>();
 
 export const getVoiceRoomTopic = (chatId: string): string => {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(chatId);
@@ -76,29 +77,35 @@ export const getVoiceRoomTopic = (chatId: string): string => {
 };
 
 export const getOrCreateChannel = async (channelName: string): Promise<any> => {
-  let channel = activeChannels.get(channelName);
+  const channel = activeChannels.get(channelName);
   if (channel && channel.state === "joined") {
     return channel;
   }
-  if (!channel) {
-    channel = supabase.channel(channelName);
-    activeChannels.set(channelName, channel);
+
+  if (channelPromises.has(channelName)) {
+    return channelPromises.get(channelName);
   }
 
-  await new Promise<void>((resolve) => {
-    const timer = setTimeout(() => {
-      resolve();
-    }, 4000);
+  const newChannel = channel || supabase.channel(channelName);
+  activeChannels.set(channelName, newChannel);
 
-    channel.subscribe((status: string) => {
+  const subPromise = new Promise<any>((resolve) => {
+    const timer = setTimeout(() => {
+      channelPromises.delete(channelName);
+      resolve(newChannel);
+    }, 3000);
+
+    newChannel.subscribe((status: string) => {
       if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         clearTimeout(timer);
-        resolve();
+        channelPromises.delete(channelName);
+        resolve(newChannel);
       }
     });
   });
 
-  return channel;
+  channelPromises.set(channelName, subPromise);
+  return subPromise;
 };
 
 /**
@@ -172,13 +179,16 @@ export const subscribeToCallSession = (
   },
 ) => {
   const channelName = getVoiceRoomTopic(chatId);
-  let channel = activeChannels.get(channelName);
-  if (channel) {
-    supabase.removeChannel(channel);
+  const existingChannel = activeChannels.get(channelName);
+  if (existingChannel) {
+    try {
+      supabase.removeChannel(existingChannel);
+    } catch { }
     activeChannels.delete(channelName);
+    channelPromises.delete(channelName);
   }
 
-  channel = supabase.channel(channelName)
+  const channel = supabase.channel(channelName)
     .on("broadcast", { event: "call:answer" }, (e) => {
       if (e.payload && typeof e.payload === "object" && e.payload.responderId !== myUid) {
         callbacks.onAnswer?.(e.payload as CallAnswerPayload);
@@ -222,14 +232,33 @@ export const subscribeToCallSession = (
       if (e.payload && typeof e.payload === "object") {
         callbacks.onEnd?.(e.payload as CallEndPayload);
       }
-    })
-    .subscribe();
+    });
 
   activeChannels.set(channelName, channel);
 
+  const subPromise = new Promise<any>((resolve) => {
+    const timer = setTimeout(() => {
+      channelPromises.delete(channelName);
+      resolve(channel);
+    }, 3000);
+
+    channel.subscribe((status: string) => {
+      if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        clearTimeout(timer);
+        channelPromises.delete(channelName);
+        resolve(channel);
+      }
+    });
+  });
+
+  channelPromises.set(channelName, subPromise);
+
   return () => {
-    supabase.removeChannel(channel);
+    try {
+      supabase.removeChannel(channel);
+    } catch { }
     activeChannels.delete(channelName);
+    channelPromises.delete(channelName);
   };
 };
 
