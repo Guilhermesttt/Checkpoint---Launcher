@@ -42,3 +42,6 @@ public/download
 *.key
 
 .test-profile
+.superpowers
+scratch
+desktop-startup.log

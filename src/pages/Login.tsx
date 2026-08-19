@@ -276,8 +276,9 @@ const LoginContent: React.FC = () => {
     try {
       await signInWithGoogle();
       navigate("/app", { replace: true });
-    } catch {
-      setError("Falha ao entrar com Google.");
+    } catch (err: any) {
+      console.error("[Login] Erro no login Google:", err);
+      setError(err?.message || "Falha ao entrar com Google.");
     } finally {
       setIsLoading(false);
     }

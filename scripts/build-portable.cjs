@@ -59,6 +59,7 @@ const runBuilder = (extraArgs = []) => {
 };
 
 const buildPortable = () => {
+  process.env.VITE_BACKEND_URL = process.env.VITE_BACKEND_URL || "https://checkpoint-backend-vgvx.onrender.com";
   run(process.execPath, [path.join(projectRoot, "node_modules", "vite", "bin", "vite.js"), "build"]);
   cleanReleaseDirectories();
 
