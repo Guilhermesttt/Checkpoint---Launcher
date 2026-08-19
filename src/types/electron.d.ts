@@ -411,6 +411,12 @@ declare global {
         callback: (progress: { percent?: number }) => void,
       ) => () => void;
       toggleOverlayPanel: () => Promise<{ open: boolean }>;
+      showNotificationOverlay: (payload: {
+        message: string;
+        type?: string;
+        title?: string;
+        imageUrl?: string;
+      }) => Promise<void>;
       showGameStartOverlay: (payload: { gameTitle: string }) => Promise<void>;
       showFriendPlayingOverlay: (payload: {
         playerName: string;

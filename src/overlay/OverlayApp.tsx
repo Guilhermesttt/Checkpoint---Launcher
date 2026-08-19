@@ -20,6 +20,12 @@ import {
   PhoneCall,
   PhoneOff,
   PhoneIncoming,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  Bell,
+  UserPlus,
+  UserCheck,
 } from "lucide-react";
 
 interface AchievementToast {
@@ -34,7 +40,7 @@ interface AchievementToast {
 
 interface SocialToast {
   id: string;
-  kind: "friend-playing" | "friend-request" | "friend-accepted" | "message" | "capture" | "hint" | "incoming-call";
+  kind: "friend-playing" | "friend-request" | "friend-accepted" | "message" | "capture" | "hint" | "incoming-call" | "success" | "error" | "info" | "achievement" | string;
   title: string;
   subtitle?: string;
   avatar?: string;
@@ -309,10 +315,20 @@ const OverlayApp: React.FC = () => {
             >
               <div className="flex items-center gap-3.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
-                  {toast.avatar ? (
+                  {toast.avatar && !toast.avatar.includes("icon.ico") ? (
                     <img src={toast.avatar} alt="" className="h-full w-full object-cover" />
                   ) : toast.kind === "incoming-call" ? (
                     <PhoneIncoming className="h-5 w-5 text-emerald-400 animate-bounce" />
+                  ) : toast.kind === "success" || toast.kind === "friend-accepted" ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  ) : toast.kind === "error" ? (
+                    <AlertCircle className="h-5 w-5 text-rose-400" />
+                  ) : toast.kind === "info" ? (
+                    <Info className="h-5 w-5 text-blue-400" />
+                  ) : toast.kind === "friend-request" ? (
+                    <UserPlus className="h-5 w-5 text-blue-400" />
+                  ) : toast.kind === "achievement" ? (
+                    <Trophy className="h-5 w-5 text-yellow-400" />
                   ) : toast.screenshotUrl ? (
                     <Camera className="h-4.5 w-4.5 text-cyan-300" />
                   ) : (

@@ -272,9 +272,9 @@ export function useFriendsSystem({
 
     initialSync();
 
-    // Intervalo de polling: só executa se a janela estiver visível e focada
+    // Intervalo de polling contínuo (mantém a lista de amigos sincronizada mesmo minimizado)
     const interval = window.setInterval(() => {
-      if (!isInitialSync && !document.hidden && document.hasFocus()) {
+      if (!isInitialSync) {
         syncFriendStatuses();
       }
     }, 15_000);
@@ -314,7 +314,6 @@ export function useFriendsSystem({
               }
 
               if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing && previousFingerprint !== nextFingerprint) {
-                notify(`${newFriend.name} começou a jogar ${newFriend.playing}`, "success");
                 void window.electronAPI?.showFriendPlayingOverlay({
                   playerName: newFriend.name,
                   gameTitle: newFriend.playing,
@@ -331,7 +330,6 @@ export function useFriendsSystem({
         });
       },
       onFriendRequest: (req) => {
-        notify(`${req.fromName} enviou um pedido de amizade.`, "info");
         playSound("friendRequest");
         void window.electronAPI?.showFriendRequestOverlay({
           playerName: req.fromName,
@@ -341,7 +339,6 @@ export function useFriendsSystem({
         void refreshProfile();
       },
       onFriendAccepted: (friend) => {
-        notify(`${friend.friendName} aceitou seu pedido. Agora vocês são amigos!`, "success");
         void window.electronAPI?.showFriendAcceptedOverlay({
           playerName: friend.friendName,
           avatarUrl: friend.friendAvatar || null,
@@ -375,7 +372,6 @@ export function useFriendsSystem({
     const freshRequest = currentIncoming.find((request) => !previousIncomingIds.has(request.uid));
 
     if (freshRequest) {
-      notify(`${freshRequest.displayName} enviou um pedido de amizade.`, "info");
       playSound("friendRequest");
       void window.electronAPI?.showFriendRequestOverlay({
         playerName: freshRequest.displayName,
@@ -385,7 +381,7 @@ export function useFriendsSystem({
     }
 
     previousIncomingRequestsRef.current = currentIncomingIds;
-  }, [notify, playSound, userProfile?.checkpointFriendRequestsIncoming]);
+  }, [playSound, userProfile?.checkpointFriendRequestsIncoming]);
 
   useEffect(() => {
     const currentFriends = new Set((userProfile?.checkpointFriends ?? []).map((friend) => friend.uid));
@@ -400,10 +396,6 @@ export function useFriendsSystem({
         (friend) => !previousFriends.has(friend.uid) && previousOutgoing.has(friend.uid),
       );
       if (acceptedFriend) {
-        notify(
-          `${acceptedFriend.displayName} aceitou seu pedido. Agora voces sao amigos.`,
-          "success",
-        );
         void window.electronAPI?.showFriendAcceptedOverlay({
           playerName: acceptedFriend.displayName,
           avatarUrl: acceptedFriend.photoURL || null,

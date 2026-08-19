@@ -3887,15 +3887,19 @@
     };
 
     const socialBadgeLabel = (kind, contentKind) => {
+      if (kind === "success") return "SUCESSO";
+      if (kind === "error") return "ERRO";
+      if (kind === "info") return "INFORMAÇÃO";
+      if (kind === "incoming-call") return "CHAMADA DE VOZ";
       if (kind === "capture-saved") return overlayT("screenshot");
       if (kind === "overlay-hint") return overlayT("overlayAvailable");
       if (kind === "controller-connected") return overlayT("controllerConnected");
       if (kind === "friend-request") return overlayT("friendRequest");
       if (kind === "friend-accepted") return overlayT("requestAccepted");
       if (kind === "friend-playing") return overlayT("friendPlayingBadge");
-      if (kind === "friend-message") return overlayT(contentKind === "image" ? "newImage" : "newMessage");
+      if (kind === "friend-message" || kind === "message") return overlayT(contentKind === "image" ? "newImage" : "newMessage");
       if (kind === "spotify-track") return overlayT("nowPlaying");
-      return overlayT("gameStarted");
+      return "CHECKPOINT";
     };
 
     const formatPlaytime = (minutes) => {

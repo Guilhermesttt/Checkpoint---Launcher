@@ -91,7 +91,13 @@ export const updateCheckpointPresence = async (
   // Fast-path via WebSocket Realtime Broadcast
   void broadcastPresenceStatus({
     uid: session.user.id,
-    displayName: session.user.user_metadata?.displayName || session.user.email?.split("@")[0] || "Gamer",
+    displayName:
+      session.user.user_metadata?.displayName ||
+      session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      session.user.user_metadata?.nickname ||
+      session.user.email?.split("@")[0] ||
+      "Jogador",
     photoURL: session.user.user_metadata?.photoURL || null,
     status,
     playing: currentGameTitle || null,

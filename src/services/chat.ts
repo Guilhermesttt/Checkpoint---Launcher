@@ -142,10 +142,15 @@ export const ensureChatSession = async (
         error?: string;
       };
       if (!response.ok || !payload.chatId) {
-        throw new Error(payload.error || "Erro ao abrir conversa.");
+        openedChatIds.set(chatId, chatId);
+        return chatId;
       }
       openedChatIds.set(chatId, payload.chatId);
       return payload.chatId;
+    } catch (err) {
+      console.warn("[ensureChatSession] Fallback to deterministic chatId:", chatId, err);
+      openedChatIds.set(chatId, chatId);
+      return chatId;
     } finally {
       openingChats.delete(chatId);
     }

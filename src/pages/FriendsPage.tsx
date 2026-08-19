@@ -778,7 +778,6 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = React.memo(({
                       <div className="truncate text-sm font-bold text-white">
                         {profile.displayName || "Usuario"}
                       </div>
-                      <div className="truncate text-[11px] text-white/40">{profile.email}</div>
                       {profile.status && (
                         <div className="mt-1 text-[10px] uppercase tracking-wider text-white/30">
                           {profile.status === "online"

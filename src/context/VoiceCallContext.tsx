@@ -209,13 +209,12 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Notify in-game overlay when an incoming call arrives
   React.useEffect(() => {
     if (voiceCall.callState === "ringing-in" && voiceCall.incomingInvite) {
-      if ((window as any).electronAPI?.sendOverlaySocial) {
-        (window as any).electronAPI.sendOverlaySocial({
-          kind: "incoming-call",
+      if (window.electronAPI?.showNotificationOverlay) {
+        void window.electronAPI.showNotificationOverlay({
+          type: "incoming-call",
           title: "Chamada de Voz",
-          subtitle: `${voiceCall.incomingInvite.callerName} está te ligando...`,
-          avatar: voiceCall.incomingInvite.callerAvatar,
-          message: "Abra o overlay (F8) para atender ou recusar",
+          message: `${voiceCall.incomingInvite.callerName} está te ligando. Pressione F8 para abrir o overlay e atender.`,
+          imageUrl: voiceCall.incomingInvite.callerAvatar || undefined,
         });
       }
     }

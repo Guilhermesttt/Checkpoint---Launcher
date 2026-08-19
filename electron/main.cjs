@@ -1050,7 +1050,7 @@ const createWindow = async () => {
       sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      backgroundThrottling: true,
+      backgroundThrottling: false,
       spellcheck: false,
       navigateOnDragDrop: false,
       v8CacheOptions: "code",
@@ -3571,6 +3571,29 @@ registerSecureIpcHandler("overlay:set-achievement-sound-theme", async (_event, r
 
 registerSecureIpcHandler("overlay:set-achievement-notification-settings", async (_event, requestedSettings) => {
   return applyAchievementNotificationSettings(requestedSettings);
+});
+
+registerSecureIpcHandler("overlay:show-notification", async (_event, payload) => {
+  const type = String(payload?.type || "info");
+  const defaultTitle =
+    type === "error"
+      ? "Erro"
+      : type === "success"
+      ? "Sucesso"
+      : type === "achievement"
+      ? "Conquista Desbloqueada"
+      : "Notificação";
+  const title = String(payload?.title || defaultTitle).trim();
+  const message = String(payload?.message || payload?.description || "").trim();
+  const avatarUrl = sanitizeOverlayImageSource(payload?.imageUrl);
+
+  sendOverlayEvent("overlay:social", {
+    kind: type,
+    title,
+    message,
+    description: message,
+    avatarUrl: avatarUrl || (type === "achievement" ? undefined : overlayIconUrl()),
+  });
 });
 
 registerSecureIpcHandler("overlay:toggle-panel", async () => {

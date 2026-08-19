@@ -457,6 +457,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   sessionRef.current = session;
   const callStateRef = useRef<CallState>(callState);
   callStateRef.current = callState;
+  const incomingInviteRef = useRef<CallInvitePayload | null>(null);
+  incomingInviteRef.current = incomingInvite;
 
   // Local audio analyzer pipeline
   const localPipelineRef = useRef<AudioPipeline>(createEmptyPipeline());
@@ -2022,8 +2024,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   // ANSWER CALL (Callee 1:1)
   const answerCall = useCallback(async () => {
-    if (!user?.uid || !incomingInvite || callState !== "ringing-in") return;
-    const { callerId, callerName, callerAvatar, chatId, hasVideo } = incomingInvite;
+    const invite = incomingInvite || incomingInviteRef.current;
+    const currentState = callStateRef.current || callState;
+    if (!user?.uid || !invite) {
+      console.warn("[useVoiceCall] answerCall canceled: missing user or invite", { uid: user?.uid, invite, currentState });
+      return;
+    }
+    const { callerId, callerName, callerAvatar, chatId, hasVideo } = invite;
 
     try {
       if (audioRingIntervalRef.current) {
@@ -2089,15 +2096,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
       try {
         await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
-        setCallState("active");
-        playRingtone("connect");
-        if (!callDurationTimerRef.current) {
-          callDurationTimerRef.current = window.setInterval(() => {
-            setCallDuration((prev) => prev + 1);
-          }, 1000);
-        }
       } catch (lkErr) {
         console.warn("[LiveKit] SFU connect fallback in answerCall:", lkErr);
+      }
+
+      setCallState("active");
+      setIsVoiceWindowOpen(true);
+      playRingtone("connect");
+      if (!callDurationTimerRef.current) {
+        callDurationTimerRef.current = window.setInterval(() => {
+          setCallDuration((prev) => prev + 1);
+        }, 1000);
       }
 
       await sendCallAnswer(chatId, callerId, {
@@ -2112,7 +2121,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao atender chamada.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, selectedVideoInput, setupVoiceAnalyzer, user]);
+  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, selectedVideoInput, setupVoiceAnalyzer, user, userProfile]);
 
   // JOIN ROOM (Persistente / Multi-Participante)
   const joinRoom = useCallback(
