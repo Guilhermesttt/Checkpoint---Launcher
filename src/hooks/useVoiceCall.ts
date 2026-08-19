@@ -1579,8 +1579,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       // Reconnection helper for this peer
       const attemptPeerReconnect = async () => {
         if (!pc || pc.signalingState === "closed") return;
-        if (reconnectAttemptsRef.current >= 3) {
+        if (reconnectAttemptsRef.current >= 2) {
           notify("Conexão perdida com participante.", "error");
+          playRingtone("disconnect");
+          cleanUpCall();
           return;
         }
         reconnectAttemptsRef.current += 1;
@@ -1846,8 +1848,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return updated;
         });
 
-        notify("Um participante saiu da sala.", "info");
-        playRingtone("disconnect");
+        if (peerConnectionsRef.current.size === 0) {
+          notify("O participante se desconectou da chamada.", "info");
+          playRingtone("disconnect");
+          cleanUpCall();
+        } else {
+          notify("Um participante saiu da sala.", "info");
+          playRingtone("disconnect");
+        }
       },
       onKicked: (kick: CallKickPayload) => {
         // Validação de autorização: apenas aceita kick se vier do host registrado

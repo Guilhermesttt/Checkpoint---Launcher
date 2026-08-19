@@ -638,11 +638,12 @@ const Home: React.FC = () => {
             (f) => f.id === msg.senderId || f.id.endsWith(`:${msg.senderId}`),
           );
           const senderName = friend?.name || "Amigo";
+          const messageText = msg.text || (msg.attachmentType ? "Enviou uma mídia" : "Nova mensagem");
           notify(
-            `${senderName}: ${msg.text || (msg.attachmentType ? "Enviou uma mídia" : "Nova mensagem")}`,
+            messageText,
             "message",
             {
-              title: "Nova Mensagem",
+              title: senderName,
               imageUrl: friend?.avatar || undefined,
             },
           );

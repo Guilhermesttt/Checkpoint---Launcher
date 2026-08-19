@@ -43,6 +43,7 @@ interface SocialToast {
   kind: "friend-playing" | "friend-request" | "friend-accepted" | "message" | "capture" | "hint" | "incoming-call" | "success" | "error" | "info" | "achievement" | string;
   title: string;
   subtitle?: string;
+  description?: string;
   avatar?: string;
   message?: string;
   gameTitle?: string;
@@ -336,12 +337,20 @@ const OverlayApp: React.FC = () => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
+                  {(toast.kind === "message" || toast.kind === "friend-message") && (
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400 block mb-0.5">
+                      Nova Mensagem
+                    </span>
+                  )}
                   <h4 className="truncate text-xs font-bold text-white">{toast.title}</h4>
                   {toast.subtitle && (
                     <p className="truncate text-[10px] font-medium text-white/50 mt-0.5">{toast.subtitle}</p>
                   )}
                   {toast.message && (
                     <p className="line-clamp-1 text-[10px] font-medium text-white/70 mt-0.5">{toast.message}</p>
+                  )}
+                  {!toast.subtitle && !toast.message && toast.description && (
+                    <p className="line-clamp-1 text-[10px] font-medium text-white/70 mt-0.5">{toast.description}</p>
                   )}
                 </div>
               </div>
