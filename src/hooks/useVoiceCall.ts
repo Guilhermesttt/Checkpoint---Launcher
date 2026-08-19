@@ -442,6 +442,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const livekitAudioPubRef = useRef<LocalTrackPublication | null>(null);
   const livekitVideoPubRef = useRef<LocalTrackPublication | null>(null);
   const livekitScreenPubRef = useRef<LocalTrackPublication | null>(null);
+  const livekitAttachedElementsRef = useRef<Set<HTMLMediaElement>>(new Set());
 
   const localStreamRef = useRef<MediaStream | null>(null);
   /** Raw stream from getUserMedia — source of the audio processing chain. Never goes to WebRTC directly. */

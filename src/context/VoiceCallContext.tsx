@@ -23,14 +23,24 @@ const RemoteAudioElement: React.FC<{
   React.useEffect(() => {
     const el = audioElRef.current;
     if (!el || !stream) return;
-    el.srcObject = stream;
-    if (outputDeviceId && typeof (el as any).setSinkId === "function") {
-      void (el as any).setSinkId(outputDeviceId === "default" ? "" : outputDeviceId).catch(() => {});
-    }
-    el.volume = Math.max(0, Math.min(1, volume / 100));
-    void el.play().catch((err) => {
-      console.warn("[RemoteAudioElement] Autoplay policy note:", err);
-    });
+
+    const syncPlayback = () => {
+      if (stream.getAudioTracks().length === 0) return;
+      el.srcObject = stream;
+      if (outputDeviceId && typeof (el as any).setSinkId === "function") {
+        void (el as any).setSinkId(outputDeviceId === "default" ? "" : outputDeviceId).catch(() => {});
+      }
+      el.volume = Math.max(0, Math.min(1, volume / 100));
+      void el.play().catch((err) => {
+        console.warn("[RemoteAudioElement] Autoplay policy note:", err);
+      });
+    };
+
+    syncPlayback();
+    stream.addEventListener("addtrack", syncPlayback);
+    return () => {
+      stream.removeEventListener("addtrack", syncPlayback);
+    };
   }, [stream, outputDeviceId, volume]);
 
   return <audio ref={audioElRef} autoPlay playsInline style={{ display: "none" }} />;

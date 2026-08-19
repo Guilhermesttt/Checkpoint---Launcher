@@ -60,7 +60,17 @@ export const fetchLiveKitToken = async (
     throw new Error(errorData.error || `Erro ao obter token do LiveKit (${response.status})`);
   }
 
-  return response.json();
+  const payload = (await response.json()) as LiveKitTokenResponse;
+  const serverUrl =
+    String(payload.serverUrl || import.meta.env.VITE_LIVEKIT_URL || "").trim();
+  if (!serverUrl) {
+    throw new Error("URL do servidor LiveKit não configurada.");
+  }
+  if (!payload.token) {
+    throw new Error("Token LiveKit inválido.");
+  }
+
+  return { token: payload.token, serverUrl };
 };
 
 export {

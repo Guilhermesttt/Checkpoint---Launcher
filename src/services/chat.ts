@@ -52,6 +52,23 @@ const emitUnread = () => {
   unreadListeners.forEach((listener) => listener([...unreadMessages]));
 };
 
+// Agrupa múltiplas notificações de "unread" em um único frame de renderização,
+// evitando re-renders consecutivos quando mensagens chegam em burst.
+let _emitUnreadScheduled = false;
+const scheduleEmitUnread = () => {
+  if (_emitUnreadScheduled) return;
+  _emitUnreadScheduled = true;
+  const dispatch = () => {
+    _emitUnreadScheduled = false;
+    emitUnread();
+  };
+  if (typeof requestAnimationFrame !== "undefined") {
+    requestAnimationFrame(dispatch);
+  } else {
+    setTimeout(dispatch, 0);
+  }
+};
+
 export const normalizeMessage = (
   id: string,
   value: Record<string, unknown>,
@@ -164,7 +181,7 @@ export const subscribeToActiveChats = (uid: string) => {
       if (fastMsg.receiverId === uid) {
         if (!unreadMessages.some((m) => m.id === fastMsg.id)) {
           unreadMessages.push(fastMsg);
-          emitUnread();
+          scheduleEmitUnread();
         }
         messageListeners.forEach((listener) => listener(fastMsg));
       }
@@ -183,7 +200,7 @@ export const subscribeToActiveChats = (uid: string) => {
         );
         if (!unreadMessages.some((m) => m.id === msg.id)) {
           unreadMessages.push(msg);
-          emitUnread();
+          scheduleEmitUnread();
         }
         messageListeners.forEach((listener) => listener(msg));
       }
@@ -209,7 +226,7 @@ export const subscribeToActiveChats = (uid: string) => {
           unreadMessages.push(message);
         }
       });
-      emitUnread();
+      scheduleEmitUnread();
     });
 
   return () => {
@@ -407,7 +424,7 @@ export const markMessagesAsRead = async (friendUid: string) => {
   for (let index = unreadMessages.length - 1; index >= 0; index -= 1) {
     if (unreadMessages[index].senderId === friendUid) unreadMessages.splice(index, 1);
   }
-  emitUnread();
+  scheduleEmitUnread();
 };
 
 export const subscribeToChatMessages = (

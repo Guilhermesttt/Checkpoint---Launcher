@@ -364,8 +364,8 @@ const getNexusCredentialStore = () => {
   return nexusCredentialStore;
 };
 
-const getNexusApiKey = () => {
-  const apiKey = getNexusCredentialStore().read();
+const getNexusApiKey = async () => {
+  const apiKey = await getNexusCredentialStore().read();
   if (!apiKey) {
     throw new Error("Conecte uma chave pessoal Nexus antes de continuar.");
   }
@@ -375,22 +375,33 @@ const getNexusApiKey = () => {
 const getSpotifyAuthManager = () => {
   if (spotifyAuthManager) return spotifyAuthManager;
   const tokenPath = path.join(app.getPath("userData"), "spotify-session.bin");
+  // Cache em memória para evitar leituras repetidas de disco
+  let _cachedToken = undefined;
   const credentialStore = {
-    read: () => {
+    read: async () => {
+      if (_cachedToken !== undefined) return _cachedToken;
       try {
-        if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(tokenPath)) return null;
-        return JSON.parse(safeStorage.decryptString(fs.readFileSync(tokenPath)));
+        if (!safeStorage.isEncryptionAvailable()) return (_cachedToken = null);
+        const buf = await fs.promises.readFile(tokenPath).catch(() => null);
+        if (!buf) return (_cachedToken = null);
+        _cachedToken = JSON.parse(safeStorage.decryptString(buf));
+        return _cachedToken;
       } catch {
-        return null;
+        return (_cachedToken = null);
       }
     },
-    write: (value) => {
+    write: async (value) => {
       if (!safeStorage.isEncryptionAvailable()) return;
-      fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
-      fs.writeFileSync(tokenPath, safeStorage.encryptString(JSON.stringify(value)));
+      _cachedToken = value;
+      await fs.promises.mkdir(path.dirname(tokenPath), { recursive: true });
+      const encrypted = safeStorage.encryptString(JSON.stringify(value));
+      const tmpPath = `${tokenPath}.tmp`;
+      await fs.promises.writeFile(tmpPath, encrypted);
+      await fs.promises.rename(tmpPath, tokenPath);
     },
-    clear: () => {
-      try { fs.rmSync(tokenPath, { force: true }); } catch { /* ignore */ }
+    clear: async () => {
+      _cachedToken = null;
+      try { await fs.promises.rm(tokenPath, { force: true }); } catch { /* ignore */ }
     },
   };
   spotifyAuthManager = createSpotifyAuthManager({ BrowserWindow, credentialStore });
@@ -559,7 +570,7 @@ const handleNexusDownloadUrl = async (rawUrl) => {
   try {
     await ensureNexusDownloadRoot();
     const links = await getNexusDownloadLinks({
-      apiKey: getNexusApiKey(),
+      apiKey: await getNexusApiKey(),
       appVersion: app.getVersion(),
       ...parsed,
     });
@@ -654,40 +665,40 @@ registerSecureIpcHandler("nexus:connect-personal-key", async (_event, apiKey) =>
     apiKey,
     appVersion: app.getVersion(),
   });
-  getNexusCredentialStore().save(apiKey);
+  await getNexusCredentialStore().save(apiKey);
   return {
-    ...getNexusCredentialStore().getStatus(),
+    ...(await getNexusCredentialStore().getStatus()),
     account,
   };
 });
 
 registerSecureIpcHandler("nexus:validate-connection", async () => {
   const store = getNexusCredentialStore();
-  const apiKey = store.read();
-  if (!apiKey) return { ...store.getStatus(), account: null };
+  const apiKey = await store.read();
+  if (!apiKey) return { ...(await store.getStatus()), account: null };
   const account = await validateNexusApiKey({
     apiKey,
     appVersion: app.getVersion(),
   });
-  return { ...store.getStatus(), account };
+  return { ...(await store.getStatus()), account };
 });
 
-registerSecureIpcHandler("nexus:disconnect", () => {
-  getNexusCredentialStore().clear();
+registerSecureIpcHandler("nexus:disconnect", async () => {
+  await getNexusCredentialStore().clear();
   pendingNexusDownload = null;
   return getNexusCredentialStore().getStatus();
 });
 
 registerSecureIpcHandler("nexus:get-mod-catalog", async (_event, request) =>
   getNexusModCatalog({
-    apiKey: getNexusApiKey(),
+    apiKey: await getNexusApiKey(),
     appVersion: app.getVersion(),
     gameDomain: request?.gameDomain,
   }));
 
 registerSecureIpcHandler("nexus:get-mod-details", async (_event, request) =>
   getNexusModDetails({
-    apiKey: getNexusApiKey(),
+    apiKey: await getNexusApiKey(),
     appVersion: app.getVersion(),
     gameDomain: request?.gameDomain,
     modId: request?.modId,
@@ -695,7 +706,7 @@ registerSecureIpcHandler("nexus:get-mod-details", async (_event, request) =>
 
 registerSecureIpcHandler("nexus:get-mod-files", async (_event, request) =>
   getNexusModFiles({
-    apiKey: getNexusApiKey(),
+    apiKey: await getNexusApiKey(),
     appVersion: app.getVersion(),
     gameDomain: request?.gameDomain,
     modId: request?.modId,
@@ -897,6 +908,8 @@ const configureHidAccess = (electronSession) => {
   const ALLOWED_PERMISSIONS = new Set([
     "hid",
     "media",
+    "audioCapture",
+    "videoCapture",
     "mediaKeySystem",
     "display-capture",
     "notifications",
@@ -1402,42 +1415,55 @@ const requestOverlayPanelToggle = (source = "unknown") => {
 const overlaySettingsFile = () => path.join(app.getPath("userData"), "overlay-settings.json");
 const captureDirectory = () => path.join(app.getPath("pictures"), "Checkpoint Captures");
 
+// Debounce de 500ms para salvar configurações do overlay — evita múltiplas
+// escritas síncronas consecutivas quando várias configs mudam de uma vez.
+let _saveOverlaySettingsTimer = null;
 const saveOverlaySettings = () => {
-  try {
-    fs.mkdirSync(path.dirname(overlaySettingsFile()), { recursive: true });
-    fs.writeFileSync(
-      overlaySettingsFile(),
-      JSON.stringify({
-        captureShortcut,
-        achievementVolume,
-        achievementSoundTheme,
-        achievementNotificationsEnabled,
-        customAchievementNotifications,
-        achievementNotificationPosition,
-      }, null, 2),
-      "utf8",
-    );
-  } catch (error) {
-    console.warn("[overlay] Nao foi possivel salvar as configuracoes:", error);
-  }
+  if (_saveOverlaySettingsTimer) clearTimeout(_saveOverlaySettingsTimer);
+  _saveOverlaySettingsTimer = setTimeout(async () => {
+    _saveOverlaySettingsTimer = null;
+    try {
+      const file = overlaySettingsFile();
+      await fs.promises.mkdir(path.dirname(file), { recursive: true });
+      const tmpPath = `${file}.tmp`;
+      await fs.promises.writeFile(
+        tmpPath,
+        JSON.stringify({
+          captureShortcut,
+          achievementVolume,
+          achievementSoundTheme,
+          achievementNotificationsEnabled,
+          customAchievementNotifications,
+          achievementNotificationPosition,
+        }, null, 2),
+        "utf8",
+      );
+      await fs.promises.rename(tmpPath, file);
+    } catch (error) {
+      console.warn("[overlay] Nao foi possivel salvar as configuracoes:", error);
+    }
+  }, 500);
 };
 
-const loadRecentCaptures = () => {
+const loadRecentCaptures = async () => {
   try {
     const directory = captureDirectory();
-    fs.mkdirSync(directory, { recursive: true });
-    recentCaptures = fs.readdirSync(directory, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.(png|jpe?g)$/i.test(entry.name))
-      .map((entry) => {
+    await fs.promises.mkdir(directory, { recursive: true });
+    const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+    const imageEntries = entries.filter((entry) => entry.isFile() && /\.(png|jpe?g)$/i.test(entry.name));
+    const withStats = await Promise.all(
+      imageEntries.map(async (entry) => {
         const filePath = path.join(directory, entry.name);
-        const stat = fs.statSync(filePath);
+        const stat = await fs.promises.stat(filePath);
         return {
           id: `${stat.mtimeMs}:${entry.name}`,
           name: entry.name,
           url: pathToFileURL(filePath).toString(),
           createdAt: stat.mtime.toISOString(),
         };
-      })
+      }),
+    );
+    recentCaptures = withStats
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, CAPTURE_HISTORY_LIMIT);
   } catch (error) {
@@ -1489,7 +1515,7 @@ const captureCurrentDisplay = async () => {
     }
 
     const directory = captureDirectory();
-    fs.mkdirSync(directory, { recursive: true });
+    await fs.promises.mkdir(directory, { recursive: true });
     const gameTitle = String(overlayPanelState.currentGame?.title || "Desktop")
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
       .replace(/\s+/g, " ")
@@ -1498,7 +1524,8 @@ const captureCurrentDisplay = async () => {
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `${gameTitle} ${stamp}.png`;
     const filePath = path.join(directory, fileName);
-    fs.writeFileSync(filePath, source.thumbnail.toPNG());
+    // Escrita assíncrona para não bloquear o event loop
+    await fs.promises.writeFile(filePath, source.thumbnail.toPNG());
     const capture = {
       id: `${Date.now()}:${fileName}`,
       name: fileName,
@@ -2842,26 +2869,27 @@ registerSecureIpcHandler("launcher:open-executable", async (
       path.join(parentDir, "steam_settings")
     ];
 
-    const hasSteamDll = fs.existsSync(path.join(gameDir, "steam_api64.dll")) ||
-      fs.existsSync(path.join(gameDir, "steam_api.dll"));
+    const [hasDll64, hasDll32] = await Promise.all([
+      fs.promises.access(path.join(gameDir, "steam_api64.dll")).then(() => true).catch(() => false),
+      fs.promises.access(path.join(gameDir, "steam_api.dll")).then(() => true).catch(() => false),
+    ]);
+    const hasSteamDll = hasDll64 || hasDll32;
 
     let settingsPath = null;
     for (const p of pathsToCheck) {
-      if (fs.existsSync(p)) {
-        settingsPath = p;
-        break;
-      }
+      const exists = await fs.promises.access(p).then(() => true).catch(() => false);
+      if (exists) { settingsPath = p; break; }
     }
 
     if (!settingsPath && hasSteamDll) {
       settingsPath = path.join(gameDir, "steam_settings");
-      fs.mkdirSync(settingsPath, { recursive: true });
+      await fs.promises.mkdir(settingsPath, { recursive: true });
     }
 
     if (settingsPath) {
       const bridgeAddress = achievementBridge?.getAddress?.();
       const bridgePort = Number(bridgeAddress?.port || 3000);
-      fs.writeFileSync(
+      await fs.promises.writeFile(
         path.join(settingsPath, "achievements_receiver.txt"),
         `http://127.0.0.1:${bridgePort}`,
         "utf8",
@@ -2874,12 +2902,10 @@ registerSecureIpcHandler("launcher:open-executable", async (
         path.join(settingsPath, "steam_appid.txt")
       ];
       for (const ap of appidPaths) {
-        if (fs.existsSync(ap)) {
-          const content = fs.readFileSync(ap, "utf8").trim();
-          if (/^\d+$/.test(content)) {
-            appId = content;
-            break;
-          }
+        const content = await fs.promises.readFile(ap, "utf8").catch(() => null);
+        if (content !== null && /^\d+$/.test(content.trim())) {
+          appId = content.trim();
+          break;
         }
       }
 
@@ -2892,46 +2918,42 @@ registerSecureIpcHandler("launcher:open-executable", async (
         const achievementsDir = path.join(app.getPath("userData"), "achievements");
         let schemaAchievements = null;
 
-        if (fs.existsSync(achievementsDir)) {
-          const files = fs.readdirSync(achievementsDir);
-          for (const file of files) {
-            if (file.endsWith(".json")) {
-              const gameId = path.basename(file, ".json");
-              try {
-                const rawContent = fs.readFileSync(path.join(achievementsDir, file), "utf8");
-                const parsed = JSON.parse(rawContent);
-                // Verifica se bate com o appId
-                if (
-                  gameId.endsWith(`_steam_${appId}`) ||
-                  gameId === appId ||
-                  String(parsed.steamAppId) === String(appId)
-                ) {
-                  if (parsed && Array.isArray(parsed.achievements)) {
-                    schemaAchievements = parsed.achievements;
-                    break;
-                  }
-                }
-              } catch {
-                // ignore
+        const files = await fs.promises.readdir(achievementsDir).catch(() => []);
+        for (const file of files) {
+          if (!file.endsWith(".json")) continue;
+          const gameId = path.basename(file, ".json");
+          try {
+            const rawContent = await fs.promises.readFile(path.join(achievementsDir, file), "utf8");
+            const parsed = JSON.parse(rawContent);
+            if (
+              gameId.endsWith(`_steam_${appId}`) ||
+              gameId === appId ||
+              String(parsed.steamAppId) === String(appId)
+            ) {
+              if (parsed && Array.isArray(parsed.achievements)) {
+                schemaAchievements = parsed.achievements;
+                break;
               }
             }
+          } catch {
+            // ignore
           }
         }
 
-        // Se encontramos conquistas salvas, criamos os arquivos vazios no Goldberg
+        // Se encontramos conquistas salvas, criamos os arquivos vazios no Goldberg em paralelo
         if (schemaAchievements && schemaAchievements.length > 0) {
           const goldbergAchDir = path.join(settingsPath, "achievements");
-          fs.mkdirSync(goldbergAchDir, { recursive: true });
+          await fs.promises.mkdir(goldbergAchDir, { recursive: true });
 
-          for (const ach of schemaAchievements) {
-            const apiName = ach.apiName || ach.id;
-            if (apiName) {
-              const achFilePath = path.join(goldbergAchDir, String(apiName).trim());
-              if (!fs.existsSync(achFilePath)) {
-                fs.writeFileSync(achFilePath, "", "utf8");
-              }
-            }
-          }
+          await Promise.all(
+            schemaAchievements
+              .map((ach) => ach.apiName || ach.id)
+              .filter(Boolean)
+              .map((apiName) => {
+                const achFilePath = path.join(goldbergAchDir, String(apiName).trim());
+                return fs.promises.writeFile(achFilePath, "", "utf8").catch(() => {});
+              }),
+          );
         }
       }
     }
@@ -2954,16 +2976,16 @@ registerSecureIpcHandler("launcher:open-executable", async (
       path.join(gameDir, "ALI213.ini")
     ];
     for (const ap of appidCandidates) {
-      if (fs.existsSync(ap)) {
-        const raw = fs.readFileSync(ap, "utf8").trim();
-        if (ap.endsWith(".txt")) {
-          if (/^\d+$/.test(raw)) { detectedGameAppId = raw; break; }
-        } else {
-          const match = raw.match(/AppId\s*=\s*(\d+)/i);
-          if (match && match[1]) {
-            detectedGameAppId = match[1];
-            break;
-          }
+      const raw = await fs.promises.readFile(ap, "utf8").catch(() => null);
+      if (raw === null) continue;
+      const trimmed = raw.trim();
+      if (ap.endsWith(".txt")) {
+        if (/^\d+$/.test(trimmed)) { detectedGameAppId = trimmed; break; }
+      } else {
+        const match = trimmed.match(/AppId\s*=\s*(\d+)/i);
+        if (match && match[1]) {
+          detectedGameAppId = match[1];
+          break;
         }
       }
     }
@@ -3812,25 +3834,28 @@ app.whenReady().then(async () => {
     }
 
     try {
-      const saved = JSON.parse(fs.readFileSync(overlaySettingsFile(), "utf8"));
-      const savedShortcut = normalizeCaptureShortcut(saved?.captureShortcut);
-      if (savedShortcut) captureShortcut = savedShortcut;
-      const savedAchievementVolume = Number(saved?.achievementVolume);
-      if (Number.isFinite(savedAchievementVolume)) {
-        achievementVolume = Math.min(100, Math.max(0, Math.round(savedAchievementVolume)));
-      }
-      if (["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"].includes(saved?.achievementSoundTheme)) {
-        achievementSoundTheme = saved.achievementSoundTheme;
-      }
-      achievementNotificationsEnabled = saved?.achievementNotificationsEnabled !== false;
-      customAchievementNotifications = saved?.customAchievementNotifications !== false;
-      if (["top-left", "top-right", "bottom-left", "bottom-right"].includes(saved?.achievementNotificationPosition)) {
-        achievementNotificationPosition = saved.achievementNotificationPosition;
+      const rawSettings = await fs.promises.readFile(overlaySettingsFile(), "utf8").catch(() => null);
+      const saved = rawSettings ? JSON.parse(rawSettings) : null;
+      if (saved) {
+        const savedShortcut = normalizeCaptureShortcut(saved?.captureShortcut);
+        if (savedShortcut) captureShortcut = savedShortcut;
+        const savedAchievementVolume = Number(saved?.achievementVolume);
+        if (Number.isFinite(savedAchievementVolume)) {
+          achievementVolume = Math.min(100, Math.max(0, Math.round(savedAchievementVolume)));
+        }
+        if (["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"].includes(saved?.achievementSoundTheme)) {
+          achievementSoundTheme = saved.achievementSoundTheme;
+        }
+        achievementNotificationsEnabled = saved?.achievementNotificationsEnabled !== false;
+        customAchievementNotifications = saved?.customAchievementNotifications !== false;
+        if (["top-left", "top-right", "bottom-left", "bottom-right"].includes(saved?.achievementNotificationPosition)) {
+          achievementNotificationPosition = saved.achievementNotificationPosition;
+        }
       }
     } catch {
       // Primeira execucao ou configuracao ainda nao criada.
     }
-    loadRecentCaptures();
+    await loadRecentCaptures();
     overlayPanelState = {
       ...overlayPanelState,
       captures: recentCaptures,

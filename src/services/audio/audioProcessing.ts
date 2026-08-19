@@ -19,6 +19,8 @@ import rnnoiseWasmSimdPath from "@sapphi-red/web-noise-suppressor/rnnoise_simd.w
 export interface ProcessedAudioResult {
   /** The processed MediaStream - plug this into pc.addTrack / sender.replaceTrack */
   processedStream: MediaStream;
+  /** AudioContext that drives the processing chain — must stay resumed during calls */
+  audioContext: AudioContext;
   /** Live GainNode ref - call gainNode.gain.value = x at any time without rebuilding */
   gainNode: GainNode;
   /**
@@ -193,6 +195,7 @@ export async function buildProcessedAudioTrack(
 
   return {
     processedStream: destination.stream,
+    audioContext: ctx,
     gainNode,
     cleanup,
   };

@@ -14,6 +14,19 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 1200,
+    // Usa terser para minificação avançada em produção, incluindo remoção de
+    // console.* e debugger sem o risco de quebrar strings com regex.
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        // Remove console.* e debugger do bundle de produção
+        drop_console: true,
+        drop_debugger: true,
+        // Otimizações extras de compressão
+        passes: 2,
+        pure_funcs: ["console.log", "console.debug", "console.info"],
+      },
+    },
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, "index.html"),

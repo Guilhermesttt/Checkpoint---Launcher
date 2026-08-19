@@ -39,7 +39,7 @@ export function useAppUpdater() {
 
     if ((window as any).electronAPI?.onUpdateMessage) {
       const unsubscribe = (window as any).electronAPI.onUpdateMessage((msg: string, data: any) => {
-        console.log("[Update UI] Mensagem recebida:", msg, data);
+
         if (msg === "checking-for-update") {
           setUpdateStatus("checking");
         } else if (msg === "update-available") {

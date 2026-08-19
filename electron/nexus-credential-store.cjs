@@ -22,10 +22,11 @@ const createNexusCredentialStore = ({
   const encryptionAvailable = () =>
     Boolean(safeStorage.isEncryptionAvailable?.());
 
-  const readEnvelope = () => {
-    if (!fileSystem.existsSync(credentialPath)) return null;
+  /** Lê e valida o envelope de credenciais de forma assíncrona. */
+  const readEnvelope = async () => {
     try {
-      const envelope = JSON.parse(fileSystem.readFileSync(credentialPath, "utf8"));
+      const raw = await fileSystem.promises.readFile(credentialPath, "utf8");
+      const envelope = JSON.parse(raw);
       if (envelope?.version !== 1 || typeof envelope?.encryptedKey !== "string") {
         return null;
       }
@@ -35,9 +36,10 @@ const createNexusCredentialStore = ({
     }
   };
 
-  const read = () => {
+  /** Lê e descriptografa a chave Nexus. Retorna null se indisponível. */
+  const read = async () => {
     if (!encryptionAvailable()) return null;
-    const envelope = readEnvelope();
+    const envelope = await readEnvelope();
     if (!envelope) return null;
     try {
       const encrypted = Buffer.from(envelope.encryptedKey, "base64");
@@ -48,14 +50,15 @@ const createNexusCredentialStore = ({
     }
   };
 
-  const save = (apiKey) => {
+  /** Criptografa e persiste a chave Nexus de forma assíncrona com escrita atômica. */
+  const save = async (apiKey) => {
     const normalized = String(apiKey || "").trim();
     if (!normalized) throw new Error("Informe uma chave Nexus valida.");
     if (!encryptionAvailable()) {
       throw new Error("A criptografia do sistema operacional nao esta disponivel.");
     }
 
-    fileSystem.mkdirSync(userDataPath, { recursive: true });
+    await fileSystem.promises.mkdir(userDataPath, { recursive: true });
     const encryptedKey = safeStorage.encryptString(normalized).toString("base64");
     const envelope = JSON.stringify({
       version: 1,
@@ -63,17 +66,17 @@ const createNexusCredentialStore = ({
       savedAt: new Date().toISOString(),
     });
     const temporaryPath = `${credentialPath}.tmp`;
-    fileSystem.writeFileSync(temporaryPath, envelope, { encoding: "utf8", mode: 0o600 });
-    fileSystem.rmSync(credentialPath, { force: true });
-    fileSystem.renameSync(temporaryPath, credentialPath);
+    await fileSystem.promises.writeFile(temporaryPath, envelope, { encoding: "utf8", mode: 0o600 });
+    try { await fileSystem.promises.rm(credentialPath, { force: true }); } catch { /* ignore */ }
+    await fileSystem.promises.rename(temporaryPath, credentialPath);
   };
 
-  const clear = () => {
-    fileSystem.rmSync(credentialPath, { force: true });
+  const clear = async () => {
+    try { await fileSystem.promises.rm(credentialPath, { force: true }); } catch { /* ignore */ }
   };
 
-  const getStatus = () => ({
-    connected: Boolean(read()),
+  const getStatus = async () => ({
+    connected: Boolean(await read()),
     encryptionAvailable: encryptionAvailable(),
   });
 
