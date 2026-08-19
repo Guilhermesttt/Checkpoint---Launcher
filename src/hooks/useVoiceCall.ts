@@ -35,6 +35,13 @@ import { getChatId } from "../services/chat";
 import { getTurnServers } from "../services/turnCredentials";
 import { buildProcessedAudioTrack } from "../services/audio/audioProcessing";
 import { createVoiceRoom, joinVoiceRoom, leaveVoiceRoom } from "../services/voiceRooms";
+import {
+  fetchLiveKitToken,
+  Room as LiveKitRoom,
+  RoomEvent as LiveKitRoomEvent,
+  Track as LiveKitTrack,
+  type LocalTrackPublication,
+} from "../services/livekitVoice";
 import sfxJoin from "../sounds/Stoat_SFX/user_join_voice-DbrgaLbl.ogg";
 import sfxLeave from "../sounds/Stoat_SFX/user_leave_voice-CBZjEE14.ogg";
 import sfxMute from "../sounds/Stoat_SFX/mute-CuCJ24EB.ogg";
@@ -426,11 +433,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [startMicMonitoring, stopMicMonitoring],
   );
 
-  // Multi-peer Mesh Refs
+  // Multi-peer Mesh & LiveKit SFU Refs
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const remotePipelinesRef = useRef<Map<string, AudioPipeline>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
+  const livekitRoomRef = useRef<LiveKitRoom | null>(null);
+  const livekitAudioPubRef = useRef<LocalTrackPublication | null>(null);
+  const livekitVideoPubRef = useRef<LocalTrackPublication | null>(null);
+  const livekitScreenPubRef = useRef<LocalTrackPublication | null>(null);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   /** Raw stream from getUserMedia — source of the audio processing chain. Never goes to WebRTC directly. */
@@ -1240,6 +1251,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       localStreamRef.current = null;
     }
 
+    // Disconnect LiveKit SFU Room
+    if (livekitRoomRef.current) {
+      try {
+        void livekitRoomRef.current.disconnect();
+      } catch { }
+      livekitRoomRef.current = null;
+    }
+    livekitAudioPubRef.current = null;
+    livekitVideoPubRef.current = null;
+    livekitScreenPubRef.current = null;
+
     // Close all WebRTC PeerConnections in Mesh
     peerConnectionsRef.current.forEach((pc) => {
       try {
@@ -1287,6 +1309,135 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       cleanUpCall();
     };
   }, [cleanUpCall]);
+
+  // Connect and manage LiveKit SFU Room for low-latency voice and video
+  const connectLiveKitRoom = useCallback(
+    async (roomName: string, identity: string, displayName: string, avatarUrl?: string) => {
+      try {
+        if (livekitRoomRef.current) {
+          try {
+            await livekitRoomRef.current.disconnect();
+          } catch { }
+          livekitRoomRef.current = null;
+        }
+
+        const { token, serverUrl } = await fetchLiveKitToken(roomName, identity, displayName, { avatar: avatarUrl });
+        const room = new LiveKitRoom({
+          adaptiveStream: true,
+          dynacast: true,
+          audioCaptureDefaults: {
+            autoGainControl: true,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+
+        room.on(LiveKitRoomEvent.TrackSubscribed, (track, _pub, participant) => {
+          const peerId = participant.identity;
+          let stream = remoteStreamsRef.current.get(peerId);
+          if (!stream) {
+            stream = new MediaStream();
+            remoteStreamsRef.current.set(peerId, stream);
+          }
+          if (track.mediaStreamTrack && !stream.getTracks().includes(track.mediaStreamTrack)) {
+            stream.addTrack(track.mediaStreamTrack);
+          }
+          remoteStreamsRef.current.set(peerId, stream);
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          setRemoteStream(stream);
+
+          if (track.kind === LiveKitTrack.Kind.Audio) {
+            setupVoiceAnalyzer(stream, false, peerId);
+          } else if (track.kind === LiveKitTrack.Kind.Video) {
+            if (track.source === LiveKitTrack.Source.ScreenShare) {
+              setIsRemoteSharingScreen(true);
+            } else {
+              setIsRemoteCameraOn(true);
+            }
+          }
+        });
+
+        room.on(LiveKitRoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
+          const peerId = participant.identity;
+          const stream = remoteStreamsRef.current.get(peerId);
+          if (stream && track.mediaStreamTrack) {
+            stream.removeTrack(track.mediaStreamTrack);
+            setRemoteStreams(new Map(remoteStreamsRef.current));
+          }
+          if (track.kind === LiveKitTrack.Kind.Video) {
+            if (track.source === LiveKitTrack.Source.ScreenShare) {
+              setIsRemoteSharingScreen(false);
+            } else {
+              setIsRemoteCameraOn(false);
+            }
+          }
+        });
+
+        room.on(LiveKitRoomEvent.ActiveSpeakersChanged, (speakers) => {
+          const activeMap = new Map<string, boolean>();
+          speakers.forEach((s) => {
+            activeMap.set(s.identity, true);
+          });
+          setRemoteSpeakingStates(activeMap);
+        });
+
+        room.on(LiveKitRoomEvent.ParticipantConnected, (participant) => {
+          setSession((prev) => {
+            if (!prev) return prev;
+            const current = prev.participants || [];
+            if (current.some((p) => p.uid === participant.identity)) return prev;
+            let avatar: string | undefined;
+            try {
+              if (participant.metadata) {
+                avatar = JSON.parse(participant.metadata)?.avatar;
+              }
+            } catch { }
+            return {
+              ...prev,
+              participants: [
+                ...current,
+                { uid: participant.identity, name: participant.name || participant.identity, avatar },
+              ],
+            };
+          });
+        });
+
+        room.on(LiveKitRoomEvent.ParticipantDisconnected, (participant) => {
+          const peerId = participant.identity;
+          remoteStreamsRef.current.delete(peerId);
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          setSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              participants: (prev.participants || []).filter((p) => p.uid !== peerId),
+            };
+          });
+        });
+
+        await room.connect(serverUrl, token);
+        livekitRoomRef.current = room;
+
+        // Publish local audio track (with RNNoise / custom micGain)
+        if (localStreamRef.current) {
+          const audioTrack = localStreamRef.current.getAudioTracks()[0];
+          if (audioTrack) {
+            const pub = await room.localParticipant.publishTrack(audioTrack, {
+              name: "microphone",
+              source: LiveKitTrack.Source.Microphone,
+            });
+            livekitAudioPubRef.current = pub;
+          }
+        }
+
+        return room;
+      } catch (err) {
+        console.error("[LiveKit] Erro ao conectar na sala SFU:", err);
+        throw err;
+      }
+    },
+    [setupVoiceAnalyzer],
+  );
 
   // Create & setup a PeerConnection for a specific peer in the Full Mesh
   const createPeerConnectionForPeer = useCallback(
@@ -1435,6 +1586,23 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           if (audioRingIntervalRef.current) {
             clearInterval(audioRingIntervalRef.current);
             audioRingIntervalRef.current = null;
+          }
+          if (user?.uid) {
+            const displayName = userProfile?.displayName || user.displayName || "Jogador";
+            const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
+            try {
+              await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+              setCallState("active");
+              setIsVoiceWindowOpen(true);
+              playRingtone("connect");
+              if (!callDurationTimerRef.current) {
+                callDurationTimerRef.current = window.setInterval(() => {
+                  setCallDuration((prev) => prev + 1);
+                }, 1000);
+              }
+            } catch (lkErr) {
+              console.warn("[LiveKit] SFU connect fallback onAnswer:", lkErr);
+            }
           }
         } else {
           notify("O usuário recusou a chamada.", "info");
@@ -1850,6 +2018,21 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         createUnifiedSessionHandlers(chatId),
       );
 
+      const displayName = userProfile?.displayName || user.displayName || "Jogador";
+      const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
+      try {
+        await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+        setCallState("active");
+        playRingtone("connect");
+        if (!callDurationTimerRef.current) {
+          callDurationTimerRef.current = window.setInterval(() => {
+            setCallDuration((prev) => prev + 1);
+          }, 1000);
+        }
+      } catch (lkErr) {
+        console.warn("[LiveKit] SFU connect fallback in answerCall:", lkErr);
+      }
+
       await sendCallAnswer(chatId, callerId, {
         responderId: user.uid,
         accepted: true,
@@ -1927,6 +2110,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           user.uid,
           createUnifiedSessionHandlers(room.id),
         );
+
+        // Conecta ao LiveKit SFU de ultra baixa latência
+        try {
+          await connectLiveKitRoom(room.id, user.uid, displayName, avatarUrl);
+        } catch (lkErr) {
+          console.warn("[LiveKit] SFU connect in joinRoom note:", lkErr);
+        }
 
         // Notifica a sala que entramos
         await sendCallMemberJoined(room.id, {
@@ -2062,6 +2252,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       }
       setLocalCameraStream(null);
 
+      if (livekitVideoPubRef.current && livekitRoomRef.current?.localParticipant) {
+        try {
+          if (livekitVideoPubRef.current.track) {
+            void livekitRoomRef.current.localParticipant.unpublishTrack(livekitVideoPubRef.current.track);
+          }
+        } catch { }
+        livekitVideoPubRef.current = null;
+      }
+
       // Remove video track from all peers
       peerConnectionsRef.current.forEach((pc) => {
         const sender = pc.getSenders().find((s) => s.track?.kind === "video");
@@ -2094,6 +2293,18 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cameraStreamRef.current = stream;
         setLocalCameraStream(stream);
         const videoTrack = stream.getVideoTracks()[0];
+
+        if (videoTrack && livekitRoomRef.current?.localParticipant) {
+          try {
+            const pub = await livekitRoomRef.current.localParticipant.publishTrack(videoTrack, {
+              name: "camera",
+              source: LiveKitTrack.Source.Camera,
+            });
+            livekitVideoPubRef.current = pub;
+          } catch (lkErr) {
+            console.warn("[LiveKit] Camera track publish note:", lkErr);
+          }
+        }
 
         if (session.friendUid === "echo-bot") {
           setRemoteStream(stream);
@@ -2251,6 +2462,24 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
         }
 
+        if (videoTrack && livekitRoomRef.current?.localParticipant) {
+          try {
+            const pub = await livekitRoomRef.current.localParticipant.publishTrack(videoTrack, {
+              name: "screen",
+              source: LiveKitTrack.Source.ScreenShare,
+            });
+            livekitScreenPubRef.current = pub;
+            if (screenAudioTrack) {
+              void livekitRoomRef.current.localParticipant.publishTrack(screenAudioTrack, {
+                name: "screen-audio",
+                source: LiveKitTrack.Source.ScreenShareAudio,
+              });
+            }
+          } catch (lkErr) {
+            console.warn("[LiveKit] Screen share track publish note:", lkErr);
+          }
+        }
+
         setIsSharingScreen(true);
         setIsScreenPickerOpen(false);
         playSfx(sfxStreamStart);
@@ -2282,6 +2511,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       screenStreamRef.current = null;
     }
     setLocalScreenStream(null);
+
+    if (livekitScreenPubRef.current && livekitRoomRef.current?.localParticipant) {
+      try {
+        if (livekitScreenPubRef.current.track) {
+          void livekitRoomRef.current.localParticipant.unpublishTrack(livekitScreenPubRef.current.track);
+        }
+      } catch { }
+      livekitScreenPubRef.current = null;
+    }
 
     if (session?.friendUid === "echo-bot") {
       setRemoteStream(null);

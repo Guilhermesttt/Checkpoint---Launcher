@@ -14,6 +14,7 @@ import { createRetroAchievementsRouter } from "./retroachievements.mjs";
 import { createTheGamesDbRouter } from "./thegamesdb.mjs";
 import { fileURLToPath } from "url";
 import { getGamingNews } from "./gaming-news.mjs";
+import { AccessToken } from "livekit-server-sdk";
 
 export const app = express();
 
@@ -1399,6 +1400,47 @@ app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser,
   } catch (error) {
     console.warn("[TURN] Falha ao obter credenciais Metered no backend, usando STUN fallback:", error?.message);
     return res.json({ iceServers: FALLBACK_STUN_SERVERS });
+  }
+});
+
+app.post("/api/voice/livekit-token", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+  try {
+    const { roomName, identity, name, metadata } = req.body || {};
+    const effectiveIdentity = String(identity || req.user?.uid || "").trim();
+    const effectiveRoom = String(roomName || "").trim();
+
+    if (!effectiveRoom || !effectiveIdentity) {
+      return res.status(400).json({ error: "roomName e identity são obrigatórios." });
+    }
+
+    const apiKey = (process.env.LIVEKIT_API_KEY || "").trim();
+    const apiSecret = (process.env.LIVEKIT_API_SECRET || "").trim();
+    const livekitUrl = (process.env.LIVEKIT_URL || "").trim();
+
+    if (!apiKey || !apiSecret) {
+      return res.status(500).json({ error: "Credenciais do LiveKit não configuradas no servidor." });
+    }
+
+    const at = new AccessToken(apiKey, apiSecret, {
+      identity: effectiveIdentity,
+      name: String(name || effectiveIdentity),
+      metadata: typeof metadata === "string" ? metadata : JSON.stringify(metadata || {}),
+      ttl: "24h",
+    });
+
+    at.addGrant({
+      roomJoin: true,
+      room: effectiveRoom,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    const token = await at.toJwt();
+    return res.json({ token, serverUrl: livekitUrl });
+  } catch (err) {
+    console.error("[LiveKit Token Endpoint Error]", err);
+    return res.status(500).json({ error: err?.message || "Falha ao gerar token LiveKit." });
   }
 });
 

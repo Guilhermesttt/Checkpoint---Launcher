@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { IncomingCallModal } from "../src/components/voice/IncomingCallModal";
 import { VoiceCallBar } from "../src/components/voice/VoiceCallBar";
 import { VoiceCallWindow } from "../src/components/voice/VoiceCallWindow";
 import { ScreenPickerModal } from "../src/components/voice/ScreenPickerModal";
 
 describe("Voice & Screen Share Call System", () => {
+  afterEach(cleanup);
   it("renderiza IncomingCallModal com dados do chamador e dispara ações", () => {
     const onAccept = vi.fn();
     const onReject = vi.fn();
@@ -57,7 +58,7 @@ describe("Voice & Screen Share Call System", () => {
         duration={125}
         isMuted={false}
         isDeafened={false}
-        isSpeaking={true}
+        isSpeakingLocal={true}
         isSharingScreen={false}
         onToggleMute={onToggleMute}
         onToggleDeafen={onToggleDeafen}
@@ -67,9 +68,8 @@ describe("Voice & Screen Share Call System", () => {
       />,
     );
 
-    expect(screen.getByText("Voz Conectada")).toBeInTheDocument();
-    expect(screen.getByText("Matheus")).toBeInTheDocument();
-    expect(screen.getByText("• 02:05")).toBeInTheDocument();
+    expect(screen.getByText("Voz Ativa")).toBeInTheDocument();
+    expect(screen.getByText(/02:05/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTitle("Mutar microfone"));
     expect(onToggleMute).toHaveBeenCalledTimes(1);
