@@ -1176,37 +1176,56 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
   }, [handlePttDown, handlePttUp, inputMode, pushToTalkKey]);
 
-  // SFX sounds
-  const playRingtone = useCallback((type: "call" | "ringout" | "connect" | "disconnect") => {
-    switch (type) {
-      case "connect":
-        playSfx(sfxJoin);
-        break;
-      case "disconnect":
-        playSfx(sfxLeave);
-        break;
-      case "call":
-        playSfx(sfxIncomingCall);
-        break;
-      case "ringout":
-        playSfx(sfxJoin, 0.5);
-        break;
-    }
-  }, []);
+  const activeRingtoneAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Complete Cleanup Helper (Full Mesh P2P, AudioPipelines, Timers, Media Streams)
-  const cleanUpCall = useCallback(() => {
-    if (callDurationTimerRef.current) {
-      window.clearInterval(callDurationTimerRef.current);
-      callDurationTimerRef.current = null;
+  // Stop Ringtone instantaneously
+  const stopRingtone = useCallback(() => {
+    if (audioRingIntervalRef.current) {
+      window.clearInterval(audioRingIntervalRef.current);
+      audioRingIntervalRef.current = null;
     }
     if (ringoutTimerRef.current) {
       window.clearTimeout(ringoutTimerRef.current);
       ringoutTimerRef.current = null;
     }
-    if (audioRingIntervalRef.current) {
-      window.clearInterval(audioRingIntervalRef.current);
-      audioRingIntervalRef.current = null;
+    if (activeRingtoneAudioRef.current) {
+      try {
+        activeRingtoneAudioRef.current.pause();
+        activeRingtoneAudioRef.current.currentTime = 0;
+      } catch { }
+      activeRingtoneAudioRef.current = null;
+    }
+  }, []);
+
+  // SFX sounds
+  const playRingtone = useCallback((type: "call" | "ringout" | "connect" | "disconnect") => {
+    stopRingtone();
+    try {
+      if (type === "call") {
+        const audio = new Audio(sfxIncomingCall);
+        audio.loop = false;
+        audio.volume = 1.0;
+        activeRingtoneAudioRef.current = audio;
+        void audio.play().catch(() => { });
+      } else if (type === "ringout") {
+        const audio = new Audio(sfxJoin);
+        audio.volume = 0.5;
+        activeRingtoneAudioRef.current = audio;
+        void audio.play().catch(() => { });
+      } else if (type === "connect") {
+        playSfx(sfxJoin);
+      } else if (type === "disconnect") {
+        playSfx(sfxLeave);
+      }
+    } catch { }
+  }, [stopRingtone]);
+
+  // Complete Cleanup Helper (Full Mesh P2P, AudioPipelines, Timers, Media Streams)
+  const cleanUpCall = useCallback(() => {
+    stopRingtone();
+    if (callDurationTimerRef.current) {
+      window.clearInterval(callDurationTimerRef.current);
+      callDurationTimerRef.current = null;
     }
     if (reconnectTimerRef.current) {
       window.clearTimeout(reconnectTimerRef.current);
@@ -1348,6 +1367,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
           if (track.kind === LiveKitTrack.Kind.Audio) {
             setupVoiceAnalyzer(stream, false, peerId);
+            try {
+              const el = track.attach();
+              el.volume = isDeafened ? 0 : 1.0;
+              if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (el as any).setSinkId === "function") {
+                void (el as any).setSinkId(selectedAudioOutput).catch(() => { });
+              }
+              void el.play().catch(() => { });
+            } catch (attachErr) {
+              console.warn("[LiveKit] Audio attach warning:", attachErr);
+            }
           } else if (track.kind === LiveKitTrack.Kind.Video) {
             if (track.source === LiveKitTrack.Source.ScreenShare) {
               setIsRemoteSharingScreen(true);
@@ -1364,6 +1393,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             stream.removeTrack(track.mediaStreamTrack);
             setRemoteStreams(new Map(remoteStreamsRef.current));
           }
+          try {
+            track.detach();
+          } catch { }
+
           if (track.kind === LiveKitTrack.Kind.Video) {
             if (track.source === LiveKitTrack.Source.ScreenShare) {
               setIsRemoteSharingScreen(false);
@@ -1418,6 +1451,39 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         await room.connect(serverUrl, token);
         livekitRoomRef.current = room;
 
+        // Attach any existing tracks from participants already in the room
+        room.remoteParticipants.forEach((participant) => {
+          participant.trackPublications.forEach((publication) => {
+            if (publication.isSubscribed && publication.track) {
+              const track = publication.track;
+              const peerId = participant.identity;
+              let stream = remoteStreamsRef.current.get(peerId);
+              if (!stream) {
+                stream = new MediaStream();
+                remoteStreamsRef.current.set(peerId, stream);
+              }
+              if (track.mediaStreamTrack && !stream.getTracks().includes(track.mediaStreamTrack)) {
+                stream.addTrack(track.mediaStreamTrack);
+              }
+              remoteStreamsRef.current.set(peerId, stream);
+              setRemoteStreams(new Map(remoteStreamsRef.current));
+              setRemoteStream(stream);
+
+              if (track.kind === LiveKitTrack.Kind.Audio) {
+                setupVoiceAnalyzer(stream, false, peerId);
+                try {
+                  const el = track.attach();
+                  el.volume = isDeafened ? 0 : 1.0;
+                  if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (el as any).setSinkId === "function") {
+                    void (el as any).setSinkId(selectedAudioOutput).catch(() => { });
+                  }
+                  void el.play().catch(() => { });
+                } catch { }
+              }
+            }
+          });
+        });
+
         // Publish local audio track (with RNNoise / custom micGain)
         if (localStreamRef.current) {
           const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -1436,7 +1502,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         throw err;
       }
     },
-    [setupVoiceAnalyzer],
+    [selectedAudioOutput, setupVoiceAnalyzer],
   );
 
   // Create & setup a PeerConnection for a specific peer in the Full Mesh
