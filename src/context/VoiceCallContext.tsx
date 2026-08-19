@@ -13,6 +13,29 @@ type VoiceCallContextType = ReturnType<typeof useVoiceCall>;
 
 const VoiceCallContext = createContext<VoiceCallContextType | null>(null);
 
+const RemoteAudioElement: React.FC<{
+  stream: MediaStream;
+  outputDeviceId?: string;
+  volume: number;
+}> = ({ stream, outputDeviceId, volume }) => {
+  const audioElRef = React.useRef<HTMLAudioElement | null>(null);
+
+  React.useEffect(() => {
+    const el = audioElRef.current;
+    if (!el || !stream) return;
+    el.srcObject = stream;
+    if (outputDeviceId && typeof (el as any).setSinkId === "function") {
+      void (el as any).setSinkId(outputDeviceId === "default" ? "" : outputDeviceId).catch(() => {});
+    }
+    el.volume = Math.max(0, Math.min(1, volume / 100));
+    void el.play().catch((err) => {
+      console.warn("[RemoteAudioElement] Autoplay policy note:", err);
+    });
+  }, [stream, outputDeviceId, volume]);
+
+  return <audio ref={audioElRef} autoPlay playsInline style={{ display: "none" }} />;
+};
+
 export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, userProfile } = useAuth();
   let notify: (msg: string, type: "success" | "error" | "info") => void = () => {};
@@ -321,6 +344,26 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           void voiceCall.startScreenShare(options);
         }}
       />
+
+      {/* Zero-latency DOM <audio autoPlay> elements for all remote streams */}
+      <div style={{ display: "none" }} aria-hidden="true">
+        {voiceCall.remoteStream && (
+          <RemoteAudioElement
+            key={`stream-${voiceCall.session?.friendUid || "main"}`}
+            stream={voiceCall.remoteStream}
+            outputDeviceId={voiceCall.selectedAudioOutput}
+            volume={voiceCall.isDeafened ? 0 : voiceCall.remoteVolume}
+          />
+        )}
+        {Array.from(voiceCall.remoteStreams.entries()).map(([peerId, st]) => (
+          <RemoteAudioElement
+            key={`mesh-stream-${peerId}`}
+            stream={st}
+            outputDeviceId={voiceCall.selectedAudioOutput}
+            volume={voiceCall.isDeafened ? 0 : voiceCall.remoteVolume}
+          />
+        ))}
+      </div>
     </VoiceCallContext.Provider>
   );
 };

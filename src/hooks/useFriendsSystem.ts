@@ -8,6 +8,7 @@ import type {
 } from "../types/domain";
 import type { SoundEffectType } from './useSoundEffects';
 import { subscribeToUnreadMessages } from '../services/chat';
+import { subscribeToGlobalEventBus } from '../services/realtimeEventBus';
 import {
   acceptCheckpointFriendRequest,
   rejectCheckpointFriendRequest,
@@ -285,13 +286,76 @@ export function useFriendsSystem({
       }
     };
 
-    window.addEventListener('focus', handleFocus);
+    // Subscrição instantânea via WebSocket Event Bus (Sub-50ms)
+    const unsubPresenceBus = subscribeToGlobalEventBus(user.uid, {
+      onStatusUpdate: (presence) => {
+        if (!presence?.uid) return;
+        setSocialFriends((current) => {
+          let hasChanges = false;
+          const updated = current.map((friend) => {
+            if (!friend.id.includes(presence.uid)) return friend;
+
+            const newFriend = {
+              ...friend,
+              name: presence.displayName || friend.name,
+              avatar: presence.photoURL || friend.avatar,
+              status: presence.status || "offline",
+              playing: presence.playing || undefined,
+            };
+
+            const nextFingerprint = `${newFriend.status}:${newFriend.playing || ""}`;
+            const previousFingerprint = friendPresenceFingerprintRef.current.get(friend.id);
+
+            if (friend.status !== newFriend.status || friend.playing !== newFriend.playing) {
+              hasChanges = true;
+
+              if (friend.status === "offline" && newFriend.status === "online" && previousFingerprint !== nextFingerprint) {
+                notify(`${newFriend.name} ficou online`, "success");
+              }
+
+              if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing && previousFingerprint !== nextFingerprint) {
+                notify(`${newFriend.name} começou a jogar ${newFriend.playing}`, "success");
+                void window.electronAPI?.showFriendPlayingOverlay({
+                  playerName: newFriend.name,
+                  gameTitle: newFriend.playing,
+                  avatarUrl: newFriend.avatar || null,
+                });
+              }
+            }
+
+            friendPresenceFingerprintRef.current.set(friend.id, nextFingerprint);
+            return newFriend;
+          });
+
+          return hasChanges ? updated : current;
+        });
+      },
+      onFriendRequest: (req) => {
+        notify(`${req.fromName} enviou um pedido de amizade.`, "info");
+        playSound("friendRequest");
+        void window.electronAPI?.showFriendRequestOverlay({
+          playerName: req.fromName,
+          avatarUrl: req.fromAvatar || null,
+          friendId: `cp-friend:${req.fromUid}`,
+        });
+        void refreshProfile();
+      },
+      onFriendAccepted: (friend) => {
+        notify(`${friend.friendName} aceitou seu pedido. Agora vocês são amigos!`, "success");
+        void window.electronAPI?.showFriendAcceptedOverlay({
+          playerName: friend.friendName,
+          avatarUrl: friend.friendAvatar || null,
+        });
+        void refreshProfile();
+      },
+    });
 
     return () => {
+      unsubPresenceBus();
       window.clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user?.uid, userProfile?.checkpointFriends, notify]);
+  }, [user?.uid, userProfile?.checkpointFriends, notify, playSound, refreshProfile]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

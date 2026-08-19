@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { Game, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
+import { broadcastPresenceStatus } from "./realtimeEventBus";
 
 const getAuthHeaders = async () => {
   const session = (await supabase.auth.getSession()).data.session;
@@ -86,6 +87,16 @@ export const updateCheckpointPresence = async (
   if (!session?.user) {
     throw new Error("Sessao expirada. Entre novamente.");
   }
+
+  // Fast-path via WebSocket Realtime Broadcast
+  void broadcastPresenceStatus({
+    uid: session.user.id,
+    displayName: session.user.user_metadata?.displayName || session.user.email?.split("@")[0] || "Gamer",
+    photoURL: session.user.user_metadata?.photoURL || null,
+    status,
+    playing: currentGameTitle || null,
+    updatedAt: Date.now(),
+  }).catch(() => {});
 
   const response = await fetch(apiUrl("/api/presence"), {
     method: "POST",

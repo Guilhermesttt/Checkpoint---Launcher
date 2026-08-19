@@ -1328,26 +1328,30 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       };
 
       pc.ontrack = (event) => {
-        if (event.streams && event.streams[0]) {
-          const stream = event.streams[0];
-          remoteStreamsRef.current.set(targetPeerUid, stream);
-          setRemoteStreams(new Map(remoteStreamsRef.current));
-          setRemoteStream(stream); // Fallback for 1:1
-
-          setupVoiceAnalyzer(stream, false, targetPeerUid);
-
-          const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
-          setIsRemoteSharingScreen(hasVideo);
-
-          stream.onaddtrack = () => {
-            setRemoteStreams(new Map(remoteStreamsRef.current));
-            setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
-          };
-          stream.onremovetrack = () => {
-            setRemoteStreams(new Map(remoteStreamsRef.current));
-            setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
-          };
+        let stream = event.streams && event.streams[0];
+        if (!stream) {
+          stream = remoteStreamsRef.current.get(targetPeerUid) || new MediaStream();
+          if (event.track && !stream.getTracks().includes(event.track)) {
+            stream.addTrack(event.track);
+          }
         }
+        remoteStreamsRef.current.set(targetPeerUid, stream);
+        setRemoteStreams(new Map(remoteStreamsRef.current));
+        setRemoteStream(stream); // Fallback for 1:1
+
+        setupVoiceAnalyzer(stream, false, targetPeerUid);
+
+        const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
+        setIsRemoteSharingScreen(hasVideo);
+
+        stream.onaddtrack = () => {
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
+        };
+        stream.onremovetrack = () => {
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          setIsRemoteSharingScreen(stream.getVideoTracks().length > 0);
+        };
       };
 
       // Reconnection helper for this peer

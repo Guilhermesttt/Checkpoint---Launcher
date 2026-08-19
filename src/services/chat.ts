@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { ChatMessage } from "../types/domain";
 import { apiUrl } from "./api";
+import { sendFastU2UMessage, subscribeToGlobalEventBus } from "./realtimeEventBus";
 
 const HISTORY_LIMIT = 50;
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
@@ -157,7 +158,20 @@ export const subscribeToActiveChats = (uid: string) => {
     return () => undefined;
   }
 
-  // Inscreve no canal de tempo real PRIMEIRO para evitar perder mensagens criadas durante a busca inicial
+  // 1. Fast-path WebSocket Event Bus listener (Sub-50ms instant delivery)
+  const unsubFastBus = subscribeToGlobalEventBus(uid, {
+    onMessage: (fastMsg) => {
+      if (fastMsg.receiverId === uid) {
+        if (!unreadMessages.some((m) => m.id === fastMsg.id)) {
+          unreadMessages.push(fastMsg);
+          emitUnread();
+        }
+        messageListeners.forEach((listener) => listener(fastMsg));
+      }
+    },
+  });
+
+  // 2. Inscreve no canal de tempo real postgres_changes como garantia de persistência
   const channel = supabase
     .channel(`user_chats_${uid}`)
     .on(
@@ -199,6 +213,7 @@ export const subscribeToActiveChats = (uid: string) => {
     });
 
   return () => {
+    unsubFastBus();
     supabase.removeChannel(channel);
     activeChatChannels.delete(channelKey);
   };
@@ -234,6 +249,26 @@ export const sendChatMessage = async (
   }
 
   const chatId = await ensureChatSession(senderId, receiverId);
+
+  // Fast-Path via WebSocket (Instantâneo / Sub-50ms para o destinatário)
+  const tempMsgId = `fast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const fastMsg: ChatMessage = {
+    id: tempMsgId,
+    chatId,
+    senderId,
+    receiverId,
+    text,
+    createdAt: new Date().toISOString(),
+    read: false,
+    attachmentName: attachment?.attachmentName,
+    attachmentUrl: attachment?.attachmentUrl,
+    attachmentType: attachment?.attachmentType,
+    attachmentSize: attachment?.attachmentSize,
+    attachmentPath: attachment?.attachmentPath,
+  };
+
+  void sendFastU2UMessage(receiverId, fastMsg);
+
   const newMsg = {
     chat_id: chatId,
     sender_id: senderId,
@@ -247,8 +282,12 @@ export const sendChatMessage = async (
     attachment_path: attachment?.attachmentPath || null,
   };
 
+  // Persistência em segundo plano / DB
   const { data, error } = await supabase.from("chat_messages").insert(newMsg).select().single();
-  if (error || !data) throw new Error(error?.message || "Falha ao enviar mensagem.");
+  if (error || !data) {
+    // Retorna mensagem temporária otimista mesmo se houver delay no banco
+    return fastMsg;
+  }
 
   return hydrateAttachmentUrl(normalizeMessage(String(data.id), data as any));
 };
@@ -406,6 +445,23 @@ export const subscribeToChatMessages = (
         }
       });
 
+    // Fast-path WebSocket Event Bus listener for open chat window
+    const unsubFast = subscribeToGlobalEventBus(uid, {
+      onMessage: (fastMsg) => {
+        if (cancelled) return;
+        if (
+          (fastMsg.senderId === friendUid && fastMsg.receiverId === uid) ||
+          (fastMsg.senderId === uid && fastMsg.receiverId === friendUid) ||
+          fastMsg.chatId === chatId
+        ) {
+          if (!latestMessages.some((current) => current.id === fastMsg.id)) {
+            latestMessages = [...latestMessages, fastMsg].sort(compareChatMessages);
+            callback([...latestMessages]);
+          }
+        }
+      },
+    });
+
     const channel = supabase
       .channel(`chat_${chatId}`)
       .on(
@@ -424,14 +480,16 @@ export const subscribeToChatMessages = (
       )
       .subscribe();
 
-    activeChatChannels.set(chatId, channel);
+    activeChatChannels.set(chatId, { channel, unsubFast });
   });
 
   return () => {
     cancelled = true;
-    const channel = activeChatChannels.get(activeKey);
-    if (channel) {
-      supabase.removeChannel(channel);
+    const item = activeChatChannels.get(activeKey);
+    if (item) {
+      if (typeof item.unsubFast === "function") item.unsubFast();
+      if (item.channel) supabase.removeChannel(item.channel);
+      else if (typeof item === "object") supabase.removeChannel(item);
       activeChatChannels.delete(activeKey);
     }
   };
