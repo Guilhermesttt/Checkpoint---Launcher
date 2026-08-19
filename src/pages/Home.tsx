@@ -640,7 +640,7 @@ const Home: React.FC = () => {
           const senderName = friend?.name || "Amigo";
           notify(
             `${senderName}: ${msg.text || (msg.attachmentType ? "Enviou uma mídia" : "Nova mensagem")}`,
-            "info",
+            "message",
             {
               title: "Nova Mensagem",
               imageUrl: friend?.avatar || undefined,

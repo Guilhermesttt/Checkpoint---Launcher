@@ -167,6 +167,26 @@ export const establishChatConnection = async () => {
   subscribeToActiveChats(uid);
 };
 
+const processedMessageKeys = new Map<string, number>();
+
+const isDuplicateIncomingMessage = (msg: ChatMessage): boolean => {
+  const now = Date.now();
+  processedMessageKeys.forEach((timestamp, key) => {
+    if (now - timestamp > 15_000) processedMessageKeys.delete(key);
+  });
+
+  if (msg.id && processedMessageKeys.has(msg.id)) return true;
+
+  const timeWindow = Math.floor(messageTimestamp(msg) / 6000);
+  const signature = `${msg.senderId}_${msg.receiverId}_${msg.text.trim()}_${timeWindow}`;
+
+  if (processedMessageKeys.has(signature)) return true;
+
+  if (msg.id) processedMessageKeys.set(msg.id, now);
+  processedMessageKeys.set(signature, now);
+  return false;
+};
+
 export const subscribeToNewMessages = (callback: (message: ChatMessage) => void) => {
   messageListeners.add(callback);
   return () => {
@@ -184,6 +204,7 @@ export const subscribeToActiveChats = (uid: string) => {
   const unsubFastBus = subscribeToGlobalEventBus(uid, {
     onMessage: (fastMsg) => {
       if (fastMsg.receiverId === uid) {
+        if (isDuplicateIncomingMessage(fastMsg)) return;
         if (!unreadMessages.some((m) => m.id === fastMsg.id)) {
           unreadMessages.push(fastMsg);
           scheduleEmitUnread();
@@ -203,6 +224,7 @@ export const subscribeToActiveChats = (uid: string) => {
         const msg = await hydrateAttachmentUrl(
           normalizeMessage(String(payload.new.id), payload.new as any),
         );
+        if (isDuplicateIncomingMessage(msg)) return;
         if (!unreadMessages.some((m) => m.id === msg.id)) {
           unreadMessages.push(msg);
           scheduleEmitUnread();

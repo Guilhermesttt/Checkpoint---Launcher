@@ -1656,22 +1656,42 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             clearInterval(audioRingIntervalRef.current);
             audioRingIntervalRef.current = null;
           }
+
+          // Send fresh WebRTC SDP offer to callee now that callee is active & subscribed
+          const targetPeerUid = answerPayload.responderId || sessionRef.current?.friendUid;
+          if (targetPeerUid && user?.uid) {
+            try {
+              const pc = await createPeerConnectionForPeer(chatId, targetPeerUid, true);
+              const offer = await pc.createOffer({ iceRestart: true });
+              await pc.setLocalDescription(offer);
+              await sendCallSignal(chatId, {
+                senderId: user.uid,
+                chatId,
+                targetUid: targetPeerUid,
+                signal: offer,
+              });
+            } catch (offerErr) {
+              console.error("[useVoiceCall] Error sending WebRTC offer onAnswer:", offerErr);
+            }
+          }
+
           if (user?.uid) {
             const displayName = userProfile?.displayName || user.displayName || "Jogador";
             const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
             try {
               await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
-              setCallState("active");
-              setIsVoiceWindowOpen(true);
-              playRingtone("connect");
-              if (!callDurationTimerRef.current) {
-                callDurationTimerRef.current = window.setInterval(() => {
-                  setCallDuration((prev) => prev + 1);
-                }, 1000);
-              }
             } catch (lkErr) {
               console.warn("[LiveKit] SFU connect fallback onAnswer:", lkErr);
             }
+          }
+
+          setCallState("active");
+          setIsVoiceWindowOpen(true);
+          playRingtone("connect");
+          if (!callDurationTimerRef.current) {
+            callDurationTimerRef.current = window.setInterval(() => {
+              setCallDuration((prev) => prev + 1);
+            }, 1000);
           }
         } else {
           notify("O usuário recusou a chamada.", "info");
