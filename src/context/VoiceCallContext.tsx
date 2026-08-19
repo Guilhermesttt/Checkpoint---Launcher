@@ -232,7 +232,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       {/* Expanded Main Call Window */}
       <VoiceCallWindow
-        isOpen={voiceCall.isVoiceWindowOpen && (voiceCall.callState === "active" || voiceCall.callState === "connecting")}
+        isOpen={voiceCall.isVoiceWindowOpen && voiceCall.callState !== "idle" && voiceCall.callState !== "ringing-in"}
         onClose={() => voiceCall.setIsVoiceWindowOpen(false)}
         session={voiceCall.session}
         userProfile={userProfile}
@@ -241,6 +241,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localCameraStream={voiceCall.localCameraStream}
         localScreenStream={voiceCall.localScreenStream}
         duration={voiceCall.callDuration}
+        callState={voiceCall.callState}
         isMuted={voiceCall.isMuted}
         isDeafened={voiceCall.isDeafened}
         isSpeakingLocal={voiceCall.isSpeakingLocal}

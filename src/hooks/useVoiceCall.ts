@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuthUser } from "../auth/AuthProvider";
-import type {
-  CallState,
-  SocialFriend,
-  UserProfile,
-  VoiceCallSession,
-  VoiceCallParticipant,
+import {
+  type CallState,
+  type SocialFriend,
+  type UserProfile,
+  type VoiceCallSession,
+  type VoiceCallParticipant,
 } from "../types/domain";
+export type { CallState };
 import {
   type CallAnswerPayload,
   type CallEndPayload,
@@ -1688,6 +1689,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
       try {
         setCallState("ringing-out");
+        setIsVoiceWindowOpen(true);
         setSession({
           chatId,
           friendUid,
@@ -1712,6 +1714,29 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setIsMuted(true);
         }
 
+        let actualWithVideo = false;
+        if (withVideo) {
+          try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const hasVideoInput = devices.some((d) => d.kind === "videoinput");
+            if (hasVideoInput) {
+              const camStream = await navigator.mediaDevices.getUserMedia({
+                video: selectedVideoInput !== "default" ? { deviceId: { exact: selectedVideoInput } } : true,
+                audio: false,
+              });
+              cameraStreamRef.current = camStream;
+              setLocalCameraStream(camStream);
+              setIsCameraOn(true);
+              actualWithVideo = true;
+            } else {
+              notify("Nenhuma câmera detectada. Iniciando chamada de voz.", "info");
+            }
+          } catch (camErr) {
+            console.warn("[startCall] Camera acquisition fallback:", camErr);
+            notify("Não foi possível acessar a câmera. Iniciando apenas por voz.", "info");
+          }
+        }
+
         const pc = await createPeerConnectionForPeer(chatId, friendUid, true);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -1728,7 +1753,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           callerName: userProfile?.displayName || user.displayName || "Jogador",
           callerAvatar: userProfile?.photoURL || user.photoURL || null,
           chatId,
-          hasVideo: withVideo,
+          hasVideo: actualWithVideo,
           timestamp: Date.now(),
         });
 
@@ -1762,13 +1787,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         cleanUpCall();
       }
     },
-    [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, setupVoiceAnalyzer, user, userProfile],
+    [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, selectedVideoInput, setupVoiceAnalyzer, user, userProfile],
   );
 
   // ANSWER CALL (Callee 1:1)
   const answerCall = useCallback(async () => {
     if (!user?.uid || !incomingInvite || callState !== "ringing-in") return;
-    const { callerId, callerName, callerAvatar, chatId } = incomingInvite;
+    const { callerId, callerName, callerAvatar, chatId, hasVideo } = incomingInvite;
 
     try {
       if (audioRingIntervalRef.current) {
@@ -1777,6 +1802,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       }
 
       setCallState("connecting");
+      setIsVoiceWindowOpen(true);
       setSession({
         chatId,
         friendUid: callerId,
@@ -1801,6 +1827,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setIsMuted(true);
       }
 
+      // If incoming call was video, try to activate local camera automatically if available
+      if (hasVideo) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const hasVideoInput = devices.some((d) => d.kind === "videoinput");
+          if (hasVideoInput) {
+            const camStream = await navigator.mediaDevices.getUserMedia({
+              video: selectedVideoInput !== "default" ? { deviceId: { exact: selectedVideoInput } } : true,
+              audio: false,
+            });
+            cameraStreamRef.current = camStream;
+            setLocalCameraStream(camStream);
+            setIsCameraOn(true);
+          }
+        } catch {
+          // Ignore camera fallback for callee
+        }
+      }
+
       await createPeerConnectionForPeer(chatId, callerId, false);
 
       if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
@@ -1822,7 +1867,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao atender chamada.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, setupVoiceAnalyzer, user]);
+  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, selectedVideoInput, setupVoiceAnalyzer, user]);
 
   // JOIN ROOM (Persistente / Multi-Participante)
   const joinRoom = useCallback(

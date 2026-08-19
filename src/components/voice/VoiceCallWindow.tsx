@@ -10,6 +10,7 @@ import {
   VideoOff,
   MonitorUp,
   MonitorOff,
+  Phone,
   PhoneOff,
   Minimize2,
   Maximize,
@@ -39,7 +40,7 @@ import {
   Lock,
   Unlock,
 } from "lucide-react";
-import type { SocialFriend, UserProfile, VoiceCallSession } from "../../types/domain";
+import type { SocialFriend, UserProfile, VoiceCallSession, CallState } from "../../types/domain";
 import type { CallRoomConfig } from "../../types/voice-governance";
 import { ParticipantContextMenu } from "./ParticipantContextMenu";
 import { ChannelInviteModal } from "./ChannelInviteModal";
@@ -55,6 +56,7 @@ interface VoiceCallWindowProps {
   localCameraStream?: MediaStream | null;
   localScreenStream?: MediaStream | null;
   duration: number;
+  callState?: CallState;
   isMuted: boolean;
   isDeafened: boolean;
   isSpeakingLocal: boolean;
@@ -141,6 +143,7 @@ export interface CallFeed {
   isDeafened: boolean;
   isScreen?: boolean;
   isCamera?: boolean;
+  isRinging?: boolean;
 }
 
 const formatDuration = (secs: number) => {
@@ -199,6 +202,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   localCameraStream,
   localScreenStream,
   duration,
+  callState,
   isMuted,
   isDeafened,
   isSpeakingLocal,
@@ -460,11 +464,19 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       });
     } else if (session.friendUid && session.friendUid !== userProfile?.uid) {
       // 2. Chamada 1:1 direta ou auto-teste echo-bot
+      const isRingingOut = callState === "ringing-out";
+      const isConnecting = callState === "connecting";
       feeds.push({
         id: "remote-user",
         type: "voice",
         title: session.friendName,
-        subtitle: isSpeakingRemote ? "Falando..." : "Conectado",
+        subtitle: isRingingOut
+          ? "Chamando..."
+          : isConnecting
+            ? "Conectando..."
+            : isSpeakingRemote
+              ? "Falando..."
+              : "Conectado",
         avatar: session.friendAvatar,
         cameraStream: isRemoteCameraOn && !isRemoteSharingScreen ? remoteStream : null,
         isLocal: false,
@@ -472,6 +484,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         isMuted: isRemoteMuted,
         isDeafened: isRemoteDeafened,
         isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
+        isRinging: isRingingOut || isConnecting,
       });
     }
 
@@ -642,10 +655,19 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               </div>
               <div>
                 <h2 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
-                  <span>{session.friendName}</span>
-                  <span className="text-xs font-mono font-normal text-white/90 bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
-                    {formatDuration(duration)}
-                  </span>
+                  {callState === "ringing-out" ? (
+                    <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30 animate-pulse flex items-center gap-1">
+                      <Phone className="h-3 w-3 animate-bounce" /> Chamando...
+                    </span>
+                  ) : callState === "connecting" ? (
+                    <span className="text-[11px] font-bold text-white/80 bg-white/10 px-2 py-0.5 rounded-md border border-white/15 animate-pulse">
+                      Conectando...
+                    </span>
+                  ) : (
+                    <span className="text-xs font-mono font-normal text-white/90 bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
+                      {formatDuration(duration)}
+                    </span>
+                  )}
                   {isFocusedMode && focusedFeed && (
                     <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/15">
                       <Pin className="h-3 w-3 text-white fill-white" />
@@ -997,12 +1019,30 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   ) : (
                     // Voice Card Stage (Focused on User's Voice Profile)
                     <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
-                      <div className="relative">
+                      <div className="relative flex items-center justify-center">
+                        {/* Animated Calling / Ringing Radar Rings in Stage */}
+                        {focusedFeed.isRinging && (
+                          <>
+                            <motion.div
+                              animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
+                              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                              className="absolute h-48 w-48 rounded-full bg-white/10"
+                            />
+                            <motion.div
+                              animate={{ scale: [1, 1.2, 1], opacity: [0.7, 0.1, 0.7] }}
+                              transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
+                              className="absolute h-40 w-40 rounded-full border border-white/30"
+                            />
+                          </>
+                        )}
+
                         {/* Big Glowing Speaking Ring */}
                         <div
-                          className={`relative h-36 w-36 rounded-full overflow-hidden border-4 transition-all duration-150 ${focusedFeed.isSpeaking
-                            ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04]"
-                            : "border-white/15"
+                          className={`relative h-36 w-36 rounded-full overflow-hidden border-4 transition-all duration-200 ${focusedFeed.isRinging
+                            ? "border-white/20 opacity-35 grayscale-[30%]"
+                            : focusedFeed.isSpeaking
+                              ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04] opacity-100"
+                              : "border-white/15 opacity-100"
                             }`}
                         >
                           {focusedFeed.avatar ? (
@@ -1029,10 +1069,13 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       <div className="space-y-1.5">
                         <h3 className="text-xl font-black text-white tracking-tight">{focusedFeed.title}</h3>
                         <p className="text-xs text-white/50 flex items-center justify-center gap-1.5">
-                          {focusedFeed.isSpeaking ? (
+                          {focusedFeed.isRinging ? (
+                            <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
+                              <Phone className="h-3.5 w-3.5 animate-bounce text-amber-300" /> Chamando...
+                            </span>
+                          ) : focusedFeed.isSpeaking ? (
                             <span className="text-white font-bold flex items-center gap-1">
-                              <Activity className="h-3.5 w-3.5 animate-pulse" />
-                              Falando ao vivo
+                              <Activity className="h-3.5 w-3.5 animate-pulse" /> Falando ao vivo
                             </span>
                           ) : (
                             <span>Em chamada</span>
@@ -1237,11 +1280,29 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       ) : (
                         // ── Voice-only card: avatar circle (camera OFF) ──
                         <div className="flex flex-col items-center justify-center text-center">
-                          <div className="relative mb-3">
+                          <div className="relative mb-3 flex items-center justify-center">
+                            {/* Animated Calling / Ringing Radar Rings */}
+                            {feed.isRinging && (
+                              <>
+                                <motion.div
+                                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                  className="absolute h-32 w-32 rounded-full bg-white/10"
+                                />
+                                <motion.div
+                                  animate={{ scale: [1, 1.18, 1], opacity: [0.7, 0.1, 0.7] }}
+                                  transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
+                                  className="absolute h-28 w-28 rounded-full border border-white/30"
+                                />
+                              </>
+                            )}
+
                             <div
-                              className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-150 ${feed.isSpeaking
-                                ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05]"
-                                : "border-white/10"
+                              className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-200 ${feed.isRinging
+                                ? "border-white/20 opacity-35 grayscale-[30%]"
+                                : feed.isSpeaking
+                                  ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
+                                  : "border-white/10 opacity-100"
                                 }`}
                             >
                               {feed.avatar ? (
@@ -1275,6 +1336,19 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               </span>
                             )}
                           </div>
+                          <p className="mt-1 text-xs text-white/50 flex items-center justify-center gap-1.5">
+                            {feed.isRinging ? (
+                              <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
+                                <Phone className="h-3 w-3 animate-bounce text-amber-300" /> Chamando...
+                              </span>
+                            ) : feed.isSpeaking ? (
+                              <span className="text-white font-bold flex items-center gap-1">
+                                <Activity className="h-3 w-3 animate-pulse" /> Falando
+                              </span>
+                            ) : (
+                              <span className="text-white/40">{feed.subtitle}</span>
+                            )}
+                          </p>
                           <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
