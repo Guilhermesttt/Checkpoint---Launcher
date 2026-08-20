@@ -172,7 +172,8 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
         knownServerMessageIds = nextServerMessageIds;
         messagesInitialized = true;
 
-        // Instead of setDisplayMessages immediately, store snapshot and let flusher update state
+        // Set state immediately for real-time responsiveness and keep snapshot in sync
+        setDisplayMessages(merged);
         pendingSnapshotRef.current = merged;
       });
 
@@ -678,6 +679,23 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
                   </div>
                 </div>
               </div>
+            )}
+            {friendTyping && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                className="flex items-center gap-2 py-1 text-white/50"
+              >
+                <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-white/10 bg-white/[0.06] px-3.5 py-2 shadow-sm">
+                  <span className="mr-1 text-[11px] font-semibold text-white/70">
+                    {friend.name} está digitando
+                  </span>
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" style={{ animationDelay: "300ms" }} />
+                </div>
+              </motion.div>
             )}
             <div ref={messagesEndRef} />
           </div>

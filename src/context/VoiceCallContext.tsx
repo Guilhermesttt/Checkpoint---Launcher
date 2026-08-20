@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { PhoneCall, X } from "lucide-react";
 import { useAuth } from "../auth/AuthProvider";
 import { useNotification } from "../components/NotificationCenter";
 import { useVoiceCall } from "../hooks/useVoiceCall";
@@ -370,6 +372,47 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           />
         ))}
       </div>
+
+      {/* Floating Reconnect Prompt */}
+      <AnimatePresence>
+        {voiceCall.pendingReconnectSession && voiceCall.callState === "idle" && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-[9999] flex max-w-md items-center gap-3.5 rounded-2xl border border-emerald-500/30 bg-[#0d1117]/95 p-3.5 pr-4 shadow-[0_12px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
+              <PhoneCall className="h-5 w-5 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                Chamada em andamento
+              </p>
+              <p className="text-[11px] text-white/60 truncate">
+                Você estava em chamada com <span className="font-semibold text-emerald-300">{voiceCall.pendingReconnectSession.friendName}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void voiceCall.reconnectCall()}
+                className="rounded-xl bg-emerald-500 px-3.5 py-1.5 text-xs font-bold text-black shadow-md transition hover:bg-emerald-400 active:scale-95 cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={() => voiceCall.dismissReconnect()}
+                className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                title="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </VoiceCallContext.Provider>
   );
 };

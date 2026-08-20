@@ -124,10 +124,9 @@ export function useFriendsSystem({
             || msg.attachmentPath,
           );
 
-          const isActiveChat =
-            currentActiveChat?.id === `cp-friend:${msg.senderId}` ||
-            currentActiveChat?.id === msg.senderId ||
-            currentActiveChat?.id?.endsWith(`:${msg.senderId}`);
+          const cleanSenderId = String(msg.senderId || "").replace(/^cp-friend:/, "").trim();
+          const cleanActiveId = String(currentActiveChat?.id || "").replace(/^cp-friend:/, "").trim();
+          const isActiveChat = Boolean(cleanActiveId && cleanSenderId && cleanActiveId === cleanSenderId);
 
           if (!isActiveChat) {
             const displayContent = isImage ? "📷 Enviou uma imagem" : msg.text;

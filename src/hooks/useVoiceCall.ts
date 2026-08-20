@@ -184,6 +184,29 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const [callDuration, setCallDuration] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
+  const [pendingReconnectSession, setPendingReconnectSession] = useState<{
+    chatId: string;
+    friendUid: string;
+    friendName: string;
+    friendAvatar?: string;
+    hasVideo?: boolean;
+    timestamp: number;
+  } | null>(() => {
+    try {
+      const saved = sessionStorage.getItem("checkpoint_last_voice_session");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  const lastProcessedInviteKeyRef = useRef<string>("");
+  const lastInviteTimestampRef = useRef<number>(0);
+
   // Device lists and selection
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
@@ -1849,9 +1872,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         });
 
         if (peerConnectionsRef.current.size === 0) {
-          notify("O participante se desconectou da chamada.", "info");
+          notify("O participante se desconectou. A sala permanece aberta para retorno.", "info");
           playRingtone("disconnect");
-          cleanUpCall();
         } else {
           notify("Um participante saiu da sala.", "info");
           playRingtone("disconnect");
@@ -1909,6 +1931,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
     const unsubscribe = subscribeToUserIncomingCalls(user.uid, {
       onInvite: (invite) => {
+        const inviteKey = `${invite.chatId}:${invite.callerId}:${invite.timestamp}`;
+        const now = Date.now();
+        if (
+          lastProcessedInviteKeyRef.current === inviteKey ||
+          (now - lastInviteTimestampRef.current < 3000 && lastProcessedInviteKeyRef.current.startsWith(invite.chatId))
+        ) {
+          return;
+        }
+        lastProcessedInviteKeyRef.current = inviteKey;
+        lastInviteTimestampRef.current = now;
+
         if (callState === "idle") {
           setIncomingInvite(invite);
           setCallState("ringing-in");
@@ -1959,6 +1992,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           isInitiator: true,
           startedAt: Date.now(),
         });
+
+        try {
+          sessionStorage.setItem("checkpoint_last_voice_session", JSON.stringify({
+            chatId,
+            friendUid,
+            friendName: friend.name,
+            friendAvatar: friend.avatar,
+            hasVideo: withVideo,
+            timestamp: Date.now(),
+          }));
+        } catch {}
 
         const rawAudioStream = await acquireAudioStream();
         if (rawAudioStream) {
@@ -2052,6 +2096,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   // ANSWER CALL (Callee 1:1)
   const answerCall = useCallback(async () => {
+    stopRingtone();
     const invite = incomingInvite || incomingInviteRef.current;
     const currentState = callStateRef.current || callState;
     if (!user?.uid || !invite) {
@@ -2077,6 +2122,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         isInitiator: false,
         startedAt: Date.now(),
       });
+
+      try {
+        sessionStorage.setItem("checkpoint_last_voice_session", JSON.stringify({
+          chatId,
+          friendUid: callerId,
+          friendName: callerName,
+          friendAvatar: callerAvatar || undefined,
+          hasVideo: Boolean(hasVideo),
+          timestamp: Date.now(),
+        }));
+      } catch {}
 
       const rawAudioStream = await acquireAudioStream();
       if (rawAudioStream) {
@@ -2149,7 +2205,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao atender chamada.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, selectedVideoInput, setupVoiceAnalyzer, user, userProfile]);
+  }, [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, incomingInvite, inputMode, notify, playRingtone, selectedVideoInput, setupVoiceAnalyzer, stopRingtone, user, userProfile]);
 
   // JOIN ROOM (Persistente / Multi-Participante)
   const joinRoom = useCallback(
@@ -2279,6 +2335,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   // REJECT CALL
   const rejectCall = useCallback(async () => {
+    stopRingtone();
     if (!user?.uid || !incomingInvite) return;
     const { callerId, chatId } = incomingInvite;
 
@@ -2290,10 +2347,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
     playRingtone("disconnect");
     cleanUpCall();
-  }, [cleanUpCall, incomingInvite, playRingtone, user?.uid]);
+  }, [cleanUpCall, incomingInvite, playRingtone, stopRingtone, user?.uid]);
 
   // HANGUP / DISCONNECT
   const hangUp = useCallback(async () => {
+    stopRingtone();
+    try {
+      sessionStorage.removeItem("checkpoint_last_voice_session");
+    } catch {}
+    setPendingReconnectSession(null);
+
     if (session && user?.uid) {
       await sendCallEnd(session.chatId, session.friendUid || "room-all", {
         senderId: user.uid,
@@ -2307,7 +2370,33 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
     playRingtone("disconnect");
     cleanUpCall();
-  }, [cleanUpCall, playRingtone, session, user?.uid]);
+  }, [cleanUpCall, playRingtone, session, stopRingtone, user?.uid]);
+
+  // RECONNECT TO LAST SESSION
+  const reconnectCall = useCallback(async () => {
+    if (!pendingReconnectSession || !user?.uid) return;
+    const targetSession = { ...pendingReconnectSession };
+    setPendingReconnectSession(null);
+    try {
+      sessionStorage.removeItem("checkpoint_last_voice_session");
+    } catch {}
+
+    const fakeFriend: SocialFriend = {
+      id: `cp-friend:${targetSession.friendUid}`,
+      name: targetSession.friendName,
+      avatar: targetSession.friendAvatar || "",
+      status: "online",
+      platform: "pc",
+    };
+    await startCall(fakeFriend, Boolean(targetSession.hasVideo));
+  }, [pendingReconnectSession, startCall, user?.uid]);
+
+  const dismissReconnect = useCallback(() => {
+    setPendingReconnectSession(null);
+    try {
+      sessionStorage.removeItem("checkpoint_last_voice_session");
+    } catch {}
+  }, []);
 
   // MUTE / UNMUTE
   const toggleMute = useCallback(() => {
@@ -2511,7 +2600,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             screenAudioTrack.enabled = false;
           }
           setRemoteStream(screenStream);
-          setIsRemoteSharingScreen(true);
+      setIsRemoteSharingScreen(true);
           setIsSharingScreen(true);
           setIsScreenPickerOpen(false);
           playSfx(sfxStreamStart);
@@ -2525,7 +2614,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         const targetBitrate = res === "720p" ? 2_500_000 : fps === 60 ? 6_000_000 : 4_500_000;
 
         for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
-          const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+          const senders = pc.getSenders();
+          let sender = senders.find((s) => s.track?.kind === "video" || (s as any)._kind === "video" || s.track === null);
+          if (!sender) {
+            const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+            const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video" || (t as any)._kind === "video");
+            if (videoTransceiver) {
+              sender = videoTransceiver.sender;
+            }
+          }
+
           if (sender) {
             await sender.replaceTrack(videoTrack);
           } else {
@@ -2539,14 +2637,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             }
           }
 
-          // Apply bitrate and degradation preferences
+          // Apply bitrate and low latency preferences
           try {
             const videoSender = pc.getSenders().find((s) => s.track === videoTrack);
             if (videoSender && videoSender.getParameters) {
               const params = videoSender.getParameters();
               if (params.encodings && params.encodings.length > 0) {
                 params.encodings[0].maxBitrate = targetBitrate;
-                (params as any).degradationPreference = "maintain-resolution";
+                (params as any).degradationPreference = "maintain-framerate";
                 await videoSender.setParameters(params);
               }
             }
@@ -2636,10 +2734,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     if (session?.chatId && user?.uid) {
       for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
         const senders = pc.getSenders();
-        const videoSender = senders.find((s) => s.track?.kind === "video");
+        const videoSender = senders.find((s) => s.track?.kind === "video" || (s as any)._kind === "video");
         if (videoSender) {
           try {
-            pc.removeTrack(videoSender);
+            await videoSender.replaceTrack(null);
           } catch { }
         }
 
@@ -2662,8 +2760,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       });
     }
 
-    playSfx(sfxStreamEnd);
     setIsSharingScreen(false);
+    playSfx(sfxStreamEnd);
   }, [session?.chatId, session?.friendUid, user?.uid]);
 
   // START TEST CALL (Loopback Echo Bot)
@@ -3003,5 +3101,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     toggleCamera,
     startScreenShare,
     stopScreenShare,
+    pendingReconnectSession,
+    reconnectCall,
+    dismissReconnect,
   };
 };

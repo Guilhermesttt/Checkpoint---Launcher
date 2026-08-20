@@ -630,31 +630,10 @@ const Home: React.FC = () => {
       return;
     }
     void establishChatConnection();
-    const unsub = subscribeToNewMessages((msg) => {
-      if (msg.senderId && msg.senderId !== user.uid) {
-        if (activeChatFriend?.id !== msg.senderId) {
-          playSound("chatReceived");
-          const friend = socialFriends.find(
-            (f) => f.id === msg.senderId || f.id.endsWith(`:${msg.senderId}`),
-          );
-          const senderName = friend?.name || "Amigo";
-          const messageText = msg.text || (msg.attachmentType ? "Enviou uma mídia" : "Nova mensagem");
-          notify(
-            messageText,
-            "message",
-            {
-              title: senderName,
-              imageUrl: friend?.avatar || undefined,
-            },
-          );
-        }
-      }
-    });
     return () => {
-      unsub();
       closeChatConnection();
     };
-  }, [user?.uid, activeChatFriend?.id, socialFriends, playSound, notify]);
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
