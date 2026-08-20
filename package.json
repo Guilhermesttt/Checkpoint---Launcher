@@ -18,6 +18,7 @@
     "build": "tsc -b && vite build",
     "dist": "node scripts/build-portable.cjs",
     "dist:windows": "node scripts/build-portable.cjs",
+    "build:portable": "node scripts/build-portable.cjs",
     "publish": "npm run build && electron-builder --win --publish always",
     "lint": "eslint .",
     "test": "vitest run",

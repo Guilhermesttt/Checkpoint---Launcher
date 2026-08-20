@@ -59,6 +59,16 @@ const runBuilder = (extraArgs = []) => {
 };
 
 const buildPortable = () => {
+  try {
+    const dotenvPath = path.join(projectRoot, ".env");
+    if (fs.existsSync(dotenvPath)) {
+      const dotenv = require("dotenv");
+      dotenv.config({ path: dotenvPath });
+    }
+  } catch (e) {
+    console.warn("[build-portable] AVISO: Não foi possível carregar o arquivo .env:", e.message);
+  }
+
   process.env.VITE_BACKEND_URL = process.env.VITE_BACKEND_URL || "https://checkpoint-backend-vgvx.onrender.com";
   run(process.execPath, [path.join(projectRoot, "node_modules", "vite", "bin", "vite.js"), "build"]);
   cleanReleaseDirectories();

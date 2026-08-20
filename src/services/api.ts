@@ -3,28 +3,24 @@ const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
 const resolveBackendUrl = () => {
   const configured = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");
 
-  if (configured === "https://localhost:8787") {
-    return PROD_BACKEND_URL;
-  }
-
-  // In production builds, never use localhost even if baked in from local .env
-  if (import.meta.env.PROD) {
-    if (configured && !configured.includes("localhost") && !configured.includes("127.0.0.1")) {
-      return configured;
-    }
-    if (typeof window !== "undefined" && window.location.origin && window.location.origin.startsWith("http") && !window.location.hostname.includes("localhost")) {
-      return window.location.origin.replace(/\/$/, "");
-    }
-    return PROD_BACKEND_URL;
-  }
-
-  // Development mode
+  // Se VITE_BACKEND_URL foi explicitamente definido no .env ou ambiente, deve ser respeitado
   if (configured) {
+    if (configured === "https://localhost:8787") {
+      return "http://localhost:8787";
+    }
     return configured;
   }
 
-  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
-    return "http://localhost:8787";
+  // Em modo de desenvolvimento Vite
+  if (!import.meta.env.PROD) {
+    if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+      return "http://localhost:8787";
+    }
+  }
+
+  // Se estiver em um navegador web com hostname proprio que nao seja localhost
+  if (typeof window !== "undefined" && window.location.origin && window.location.origin.startsWith("http") && !window.location.hostname.includes("localhost")) {
+    return window.location.origin.replace(/\/$/, "");
   }
 
   return PROD_BACKEND_URL;

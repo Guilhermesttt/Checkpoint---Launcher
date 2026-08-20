@@ -248,6 +248,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchProfile]);
 
+  useEffect(() => {
+    if (!user?.uid || typeof (supabase as any)?.channel !== "function") return;
+
+    const channel = supabase
+      .channel(`friendships_realtime_${user.uid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "friendships",
+          filter: `requester_id=eq.${user.uid}`,
+        },
+        () => {
+          void refreshProfile();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "friendships",
+          filter: `addressee_id=eq.${user.uid}`,
+        },
+        () => {
+          void refreshProfile();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.uid, refreshProfile]);
+
 
 
   const value = useMemo<AuthContextValue>(
