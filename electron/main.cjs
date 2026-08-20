@@ -1351,18 +1351,6 @@ const sendOverlayEvent = (channel, payload) => {
 
   if (channel === "overlay:social" || channel === "achievement:unlock") {
     revealOverlayForToast();
-    if (Notification.isSupported() && payload && (payload.title || payload.description)) {
-      try {
-        const notif = new Notification({
-          title: String(payload.title || "Checkpoint"),
-          body: String(payload.description || ""),
-          silent: false,
-        });
-        notif.show();
-      } catch (err) {
-        console.warn("[overlay] Nao foi possivel exibir notificacao nativa:", err);
-      }
-    }
   }
 
   if (!overlayReady || overlayWindow.webContents.isLoadingMainFrame()) {

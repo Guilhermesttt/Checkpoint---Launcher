@@ -944,92 +944,6 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
 
               <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
                 <SettingsHeader
-                  icon={<Mic className="h-5 w-5 text-white/70" />}
-                  title="Voz & Comunicação"
-                  description="Configure o modo de captura do microfone, atalhos de Push-to-Talk e status de rede."
-                />
-                <div className="space-y-3.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
-                    <div>
-                      <p className="text-xs font-bold text-white">Modo de Entrada de Áudio</p>
-                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
-                        {voiceCallContext?.inputMode === "push-to-talk"
-                          ? "O microfone só transmite áudio enquanto a tecla configurada estiver pressionada."
-                          : "O microfone transmite automaticamente ao detectar sua voz."}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => voiceCallContext?.setInputMode?.("voice-activity")}
-                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode !== "push-to-talk"
-                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
-                          }`}
-                      >
-                        Atividade de Voz
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => voiceCallContext?.setInputMode?.("push-to-talk")}
-                        className={`cursor-pointer px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode === "push-to-talk"
-                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
-                          }`}
-                      >
-                        Push-to-Talk
-                      </button>
-                    </div>
-                  </div>
-
-                  {voiceCallContext?.inputMode === "push-to-talk" && (
-                    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
-                      <div>
-                        <p className="text-xs font-bold text-white">Atalho Global de Push-to-Talk</p>
-                        <p className="mt-0.5 text-[10px] font-medium text-white/40">
-                          Funciona mesmo durante jogos em tela cheia via atalho nativo do Windows.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsRecordingPttKey(true);
-                          const onKey = (e: KeyboardEvent) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
-                            voiceCallContext?.setPushToTalkKey?.(key);
-                            setIsRecordingPttKey(false);
-                            window.removeEventListener("keydown", onKey, true);
-                          };
-                          window.addEventListener("keydown", onKey, true);
-                        }}
-                        className={`cursor-pointer min-w-[100px] px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all ${isRecordingPttKey
-                            ? "bg-amber-500/30 text-amber-300 border border-amber-500 animate-pulse"
-                            : "bg-white/10 text-white border border-white/15 hover:bg-white/20"
-                          }`}
-                      >
-                        {isRecordingPttKey ? "Pressione uma tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
-                    <div>
-                      <p className="text-xs font-bold text-white">Conexão ICE / TURN (NAT & CGNAT)</p>
-                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
-                        Roteamento WebRTC resiliente com suporte a redes residenciais e provedores locais.
-                      </p>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
-                      Metered.ca TURN Ativo
-                    </span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
-                <SettingsHeader
                   icon={<Zap className="h-5 w-5 text-white/70" />}
                   title={detailCopy.performanceTitle}
                   description={detailCopy.performanceHint}
@@ -1666,43 +1580,54 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                 </div>
               </section>
 
-              {/* Modo de Entrada & Auto-Teste Echo */}
+              {/* Modo de Entrada, Rede & Auto-Teste Echo */}
               <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
                 <SettingsHeader
-                  icon={<Radio className="h-5 w-5 text-white/70" />}
-                  title="Modo de Transmissão & Auto-Teste"
-                  description="Escolha entre falar livremente ou usar tecla de atalho Push-to-Talk."
+                  icon={<Mic className="h-5 w-5 text-white/70" />}
+                  title="Voz & Comunicação"
+                  description="Configure o modo de captura do microfone, atalhos de Push-to-Talk e status de rede."
                 />
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2 bg-white/5 p-1.5 rounded-2xl border border-white/8">
-                    <button
-                      type="button"
-                      onClick={() => voiceCallContext?.setInputMode("voice-activity")}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${voiceCallContext?.inputMode === "voice-activity"
-                          ? "bg-white text-black font-black shadow-lg"
-                          : "text-white/60 hover:text-white hover:bg-white/5"
-                        }`}
-                    >
-                      Atividade de Voz
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => voiceCallContext?.setInputMode("push-to-talk")}
-                      className={`py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${voiceCallContext?.inputMode === "push-to-talk"
-                          ? "bg-white text-black font-black shadow-lg"
-                          : "text-white/60 hover:text-white hover:bg-white/5"
-                        }`}
-                    >
-                      Push-to-Talk
-                    </button>
+                  {/* Modo de Entrada */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white">Modo de Entrada de Áudio</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
+                        {voiceCallContext?.inputMode === "push-to-talk"
+                          ? "O microfone só transmite áudio enquanto a tecla configurada estiver pressionada."
+                          : "O microfone transmite automaticamente ao detectar sua voz."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => voiceCallContext?.setInputMode("voice-activity")}
+                        className={`cursor-pointer px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode !== "push-to-talk"
+                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                          }`}
+                      >
+                        Atividade de Voz
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => voiceCallContext?.setInputMode("push-to-talk")}
+                        className={`cursor-pointer px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${voiceCallContext?.inputMode === "push-to-talk"
+                            ? "bg-white text-black font-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                            : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                          }`}
+                      >
+                        Push-to-Talk
+                      </button>
+                    </div>
                   </div>
 
                   {voiceCallContext?.inputMode === "push-to-talk" && (
                     <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border border-white/6 bg-white/[0.035]">
                       <div>
-                        <p className="text-xs font-bold text-white">Atalho de Teclado Global (PTT)</p>
+                        <p className="text-xs font-bold text-white">Atalho Global de Push-to-Talk</p>
                         <p className="text-[10px] font-medium text-white/40">
-                          Funciona mesmo com jogos e outros aplicativos em foco.
+                          Funciona mesmo durante jogos em tela cheia via atalho nativo do Windows.
                         </p>
                       </div>
                       <button
@@ -1719,17 +1644,31 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                           };
                           window.addEventListener("keydown", onKey, true);
                         }}
-                        className={`px-4 py-2 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${isRecordingPttKey
-                            ? "bg-white/20 text-white border-white/40 animate-pulse"
-                            : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                        className={`min-w-[100px] px-3.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer ${isRecordingPttKey
+                            ? "bg-amber-500/30 text-amber-300 border-amber-500 animate-pulse"
+                            : "bg-white/10 text-white border-white/15 hover:bg-white/20"
                           }`}
                       >
-                        {isRecordingPttKey ? "Pressione a tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
+                        {isRecordingPttKey ? "Pressione uma tecla..." : voiceCallContext?.pushToTalkKey || "F8"}
                       </button>
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-white/6 flex items-center justify-between">
+                  {/* Status Conexão ICE / TURN */}
+                  <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                    <div>
+                      <p className="text-xs font-bold text-white">Conexão ICE / TURN (NAT & CGNAT)</p>
+                      <p className="mt-0.5 text-[10px] font-medium text-white/40">
+                        Roteamento WebRTC resiliente com suporte a redes residenciais e provedores locais.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+                      Metered.ca TURN Ativo
+                    </span>
+                  </div>
+
+                  {/* Auto Teste Echo Bot */}
+                  <div className="pt-3 border-t border-white/6 flex items-center justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold text-white">Auto-Teste de Chamada (Echo Bot)</p>
                       <p className="text-[10px] font-medium text-white/40">
@@ -1739,7 +1678,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     <button
                       type="button"
                       onClick={() => voiceCallContext?.startTestCall()}
-                      className="px-4 py-2 rounded-xl bg-white text-black font-black text-xs uppercase tracking-wider hover:bg-white/90 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-white text-black font-black text-xs uppercase tracking-wider hover:bg-white/90 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-white/10 cursor-pointer shrink-0"
                     >
                       Iniciar Auto-Teste
                     </button>

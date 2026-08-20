@@ -71,6 +71,8 @@ interface VoiceCallWindowProps {
   isRemoteSharingScreen: boolean;
   remoteVolume?: number;
   onChangeRemoteVolume?: (val: number) => void;
+  peerVolumes?: Record<string, number>;
+  onSetPeerVolume?: (peerId: string, val: number) => void;
   isReconnecting?: boolean;
   inputMode?: "voice-activity" | "push-to-talk";
   setInputMode?: (mode: "voice-activity" | "push-to-talk") => void;
@@ -211,7 +213,7 @@ const VideoRenderer: React.FC<{
       }}
       autoPlay
       playsInline
-      muted={muted}
+      muted={true}
       className={`h-full w-full ${fitMode === "cover" ? "object-cover" : "object-contain"} ${className}`}
     />
   );
@@ -240,6 +242,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   isRemoteSharingScreen,
   remoteVolume = 100,
   onChangeRemoteVolume,
+  peerVolumes = {},
+  onSetPeerVolume,
   isReconnecting = false,
   inputMode = "voice-activity",
   setInputMode,
@@ -452,8 +456,33 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     const remoteParticipants = (session.participants || []).filter((p) => p.uid !== userProfile?.uid);
 
     if (isRoom) {
-      // 1. Participantes remotos reais da sala
-      remoteParticipants.forEach((p) => {
+      // 1. Participantes remotos reais da sala (mesclando lista estática com peers ativos conectados)
+      const knownUids = new Set<string>();
+      (session.participants || []).forEach((p) => {
+        if (p.uid && p.uid !== userProfile?.uid) knownUids.add(p.uid);
+      });
+      if (remoteStreams && remoteStreams instanceof Map) {
+        remoteStreams.forEach((_, peerId) => {
+          if (peerId && peerId !== userProfile?.uid && peerId !== "local-user") knownUids.add(peerId);
+        });
+      }
+      if (remoteStatesMap && remoteStatesMap instanceof Map) {
+        remoteStatesMap.forEach((_, peerId) => {
+          if (peerId && peerId !== userProfile?.uid && peerId !== "local-user") knownUids.add(peerId);
+        });
+      }
+
+      const participantList = Array.from(knownUids).map((uid) => {
+        const explicit = (session.participants || []).find((p) => p.uid === uid);
+        const social = socialFriends?.find((f) => f.id === uid || f.id === `cp-friend:${uid}`);
+        return {
+          uid,
+          name: explicit?.name || social?.name || (uid === session.friendUid ? session.friendName : `Jogador ${uid.slice(0, 4)}`),
+          avatar: explicit?.avatar || social?.avatar || (uid === session.friendUid ? session.friendAvatar : undefined),
+        };
+      });
+
+      participantList.forEach((p) => {
         const stream = remoteStreams?.get(p.uid) || (p.uid === session.friendUid ? remoteStream : null);
         const isSpeaking = remoteSpeakingStates?.get(p.uid) ?? false;
         const remoteState = remoteStatesMap?.get(p.uid);
@@ -952,63 +981,133 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
                         {/* Stream Action Toolbar */}
                         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-black/75 border border-white/10 backdrop-blur-md opacity-90 group-hover:opacity-100 transition-opacity pointer-events-auto">
-                          {/* Remote Participant Volume Control */}
-                          {!focusedFeed.isLocal && onChangeRemoteVolume && (
+                          {/* Remote Participant / Stream Volume Control */}
+                          {!focusedFeed.isLocal && (
                             <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => setIsVolumeSliderOpen((prev) => !prev)}
-                                className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer ${isVolumeSliderOpen
-                                  ? "bg-white text-black"
-                                  : "text-white/70 hover:text-white hover:bg-white/10"
-                                  }`}
-                                title={`Ajustar volume de ${focusedFeed.title} (${remoteVolume}%)`}
-                              >
-                                {remoteVolume === 0 ? (
-                                  <VolumeX className="h-4 w-4" />
-                                ) : remoteVolume < 60 ? (
-                                  <Volume1 className="h-4 w-4" />
-                                ) : (
-                                  <Volume2 className="h-4 w-4" />
-                                )}
-                              </button>
+                              {(() => {
+                                const currentFeedVol = userVolumes[focusedFeed.id] ?? (remoteVolume ?? 100);
+                                return (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsVolumeSliderOpen((prev) => !prev)}
+                                      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors cursor-pointer ${isVolumeSliderOpen
+                                        ? "bg-white text-black"
+                                        : "text-white/70 hover:text-white hover:bg-white/10"
+                                        }`}
+                                      title={`Ajustar volume de ${focusedFeed.title} (${currentFeedVol}%)`}
+                                    >
+                                      {currentFeedVol === 0 ? (
+                                        <VolumeX className="h-4 w-4 text-rose-400" />
+                                      ) : currentFeedVol < 60 ? (
+                                        <Volume1 className="h-4 w-4" />
+                                      ) : (
+                                        <Volume2 className="h-4 w-4" />
+                                      )}
+                                    </button>
 
-                              {/* Volume Slider Popover */}
-                              <AnimatePresence>
-                                {isVolumeSliderOpen && (
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.9, y: 5 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9, y: 5 }}
-                                    className="absolute top-10 right-0 p-3 w-48 rounded-2xl bg-[#14151e]/98 border border-white/15 shadow-2xl backdrop-blur-xl z-50 space-y-2"
-                                  >
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-white">
-                                      <span>Volume do Usuário</span>
-                                      <span className="font-mono text-white/90">{remoteVolume}%</span>
-                                    </div>
-                                    <input
-                                      type="range"
-                                      min={0}
-                                      max={200}
-                                      value={remoteVolume}
-                                      onChange={(e) => onChangeRemoteVolume(Number(e.target.value))}
-                                      className="w-full accent-white cursor-pointer"
-                                    />
-                                    <div className="flex justify-between text-[9px] font-bold text-white/40">
-                                      <span onClick={() => onChangeRemoteVolume(0)} className="cursor-pointer hover:text-white">
-                                        Mudo
-                                      </span>
-                                      <span onClick={() => onChangeRemoteVolume(100)} className="cursor-pointer hover:text-white">
-                                        100%
-                                      </span>
-                                      <span onClick={() => onChangeRemoteVolume(200)} className="cursor-pointer hover:text-white">
-                                        200%
-                                      </span>
-                                    </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
+                                    {/* Volume Slider Popover */}
+                                    <AnimatePresence>
+                                      {isVolumeSliderOpen && (
+                                        <motion.div
+                                          initial={{ opacity: 0, scale: 0.9, y: 5 }}
+                                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                                          exit={{ opacity: 0, scale: 0.9, y: 5 }}
+                                          className="absolute top-10 right-0 p-3 w-48 rounded-2xl bg-[#14151e]/98 border border-white/15 shadow-2xl backdrop-blur-xl z-50 space-y-2"
+                                        >
+                                          <div className="flex items-center justify-between text-[11px] font-bold text-white">
+                                            <span>Volume Individual</span>
+                                            <span className="font-mono text-white/90">{currentFeedVol}%</span>
+                                          </div>
+                                          <input
+                                            type="range"
+                                            min={0}
+                                            max={200}
+                                            value={currentFeedVol}
+                                            onChange={(e) => {
+                                              const newVol = Number(e.target.value);
+                                              setUserVolumes((prev) => ({
+                                                ...prev,
+                                                [focusedFeed.id]: newVol,
+                                              }));
+                                              const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                                              if (onSetPeerVolume) {
+                                                onSetPeerVolume(rawPeerId, newVol);
+                                              } else if (onChangeRemoteVolume) {
+                                                onChangeRemoteVolume(newVol);
+                                              }
+                                            }}
+                                            className="w-full accent-white cursor-pointer"
+                                          />
+                                          <div className="flex justify-between text-[9px] font-bold text-white/40">
+                                            <span
+                                              onClick={() => {
+                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 0 }));
+                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 0);
+                                              }}
+                                              className="cursor-pointer hover:text-white"
+                                            >
+                                              Mudo
+                                            </span>
+                                            <span
+                                              onClick={() => {
+                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 100 }));
+                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 100);
+                                              }}
+                                              className="cursor-pointer hover:text-white"
+                                            >
+                                              100%
+                                            </span>
+                                            <span
+                                              onClick={() => {
+                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 200 }));
+                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 200);
+                                              }}
+                                              className="cursor-pointer hover:text-white"
+                                            >
+                                              200%
+                                            </span>
+                                          </div>
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+                                  </>
+                                );
+                              })()}
                             </div>
+                          )}
+
+                          {/* Streamer Audio Toggle (Mute/Unmute Screen Share Audio on the fly) */}
+                          {focusedFeed.isLocal && focusedFeed.isScreen && localScreenStream && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const audioTracks = localScreenStream.getAudioTracks();
+                                if (audioTracks.length === 0) return;
+                                const nextState = !audioTracks[0].enabled;
+                                audioTracks.forEach((t) => { t.enabled = nextState; });
+                                notify?.(nextState ? "Áudio da tela ativado" : "Áudio da tela silenciado", "info");
+                              }}
+                              className="flex h-8 items-center gap-1.5 px-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer text-xs font-bold"
+                              title="Silenciar / Ativar áudio transmitido da tela"
+                            >
+                              {localScreenStream.getAudioTracks().length === 0 ? (
+                                <span className="text-[10px] text-white/40">Sem áudio de tela</span>
+                              ) : localScreenStream.getAudioTracks()[0]?.enabled === false ? (
+                                <>
+                                  <VolumeX className="h-3.5 w-3.5 text-rose-400" />
+                                  <span className="text-[10px] text-rose-300">Tela Muda</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                                  <span className="text-[10px] text-emerald-300">Tela c/ Som</span>
+                                </>
+                              )}
+                            </button>
                           )}
 
                           {/* Aspect Ratio Mode (Contain vs Cover) */}
@@ -1860,15 +1959,23 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   ...prev,
                   [contextMenu.feed.id]: newVol,
                 }));
-                if (!contextMenu.feed.isLocal && onChangeRemoteVolume) {
+                const rawPeerId = contextMenu.feed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                if (onSetPeerVolume) {
+                  onSetPeerVolume(rawPeerId, newVol);
+                } else if (!contextMenu.feed.isLocal && onChangeRemoteVolume) {
                   onChangeRemoteVolume(newVol);
                 }
               }}
               onToggleLocalMute={() => {
+                const nextMuted = !locallyMutedFeeds[contextMenu.feed.id];
                 setLocallyMutedFeeds((prev) => ({
                   ...prev,
-                  [contextMenu.feed.id]: !prev[contextMenu.feed.id],
+                  [contextMenu.feed.id]: nextMuted,
                 }));
+                const rawPeerId = contextMenu.feed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                if (onSetPeerVolume) {
+                  onSetPeerVolume(rawPeerId, nextMuted ? 0 : (userVolumes[contextMenu.feed.id] ?? 100));
+                }
               }}
               onToggleWatchStream={() => {
                 const nextState = !watchedStreams[contextMenu.feed.id];

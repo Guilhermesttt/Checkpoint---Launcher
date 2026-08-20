@@ -37,7 +37,7 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [resolution, setResolution] = useState<"720p" | "1080p" | "source">("1080p");
   const [fps, setFps] = useState<30 | 60>(60);
-  const [withAudio, setWithAudio] = useState(true);
+  const [withAudio, setWithAudio] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchSources = async () => {
@@ -286,9 +286,12 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
                   />
                   <div className="flex items-center gap-1.5 text-xs font-bold text-white/90">
                     <Volume2 className="h-3.5 w-3.5 text-white/60" />
-                    <span>Áudio do Sistema / Jogo</span>
+                    <span>Transmitir Sons do Computador / Jogo</span>
                   </div>
                 </label>
+                <p className="text-[9px] text-white/40 leading-tight">
+                  Recomendado usar fones de ouvido para evitar que o microfone capture o áudio dos alto-falantes em eco.
+                </p>
               </div>
             </div>
 

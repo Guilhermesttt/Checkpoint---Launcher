@@ -131,10 +131,7 @@ export function useFriendsSystem({
           if (!isActiveChat) {
             const displayContent = isImage ? "📷 Enviou uma imagem" : msg.text;
 
-            // Toast in-app notification
-            notify(`${senderName}: ${displayContent}`, "info");
-
-            // Native OS notification if window is blurred or in background
+            // In-game overlay notification
             if ("Notification" in window && Notification.permission === "granted") {
               try {
                 new Notification(`Mensagem de ${senderName}`, {

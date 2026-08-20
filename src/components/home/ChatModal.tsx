@@ -655,32 +655,6 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
               })
             )}
             {friendTyping && (
-              <div className="flex justify-start">
-                <div className="rounded-[18px] rounded-tl-none border border-white/5 bg-white/[0.04] px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] uppercase tracking-[0.28em] text-white/30">
-                      digitando
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {[0, 1, 2].map((dot) => (
-                        <motion.span
-                          key={dot}
-                          animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
-                          transition={{
-                            duration: 0.8,
-                            repeat: Infinity,
-                            delay: dot * 0.12,
-                            ease: "easeInOut",
-                          }}
-                          className="h-1.5 w-1.5 rounded-full bg-emerald-400"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            {friendTyping && (
               <motion.div
                 initial={{ opacity: 0, y: 6, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}

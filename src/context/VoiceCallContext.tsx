@@ -15,38 +15,7 @@ type VoiceCallContextType = ReturnType<typeof useVoiceCall>;
 
 const VoiceCallContext = createContext<VoiceCallContextType | null>(null);
 
-const RemoteAudioElement: React.FC<{
-  stream: MediaStream;
-  outputDeviceId?: string;
-  volume: number;
-}> = ({ stream, outputDeviceId, volume }) => {
-  const audioElRef = React.useRef<HTMLAudioElement | null>(null);
 
-  React.useEffect(() => {
-    const el = audioElRef.current;
-    if (!el || !stream) return;
-
-    const syncPlayback = () => {
-      if (stream.getAudioTracks().length === 0) return;
-      el.srcObject = stream;
-      if (outputDeviceId && typeof (el as any).setSinkId === "function") {
-        void (el as any).setSinkId(outputDeviceId === "default" ? "" : outputDeviceId).catch(() => {});
-      }
-      el.volume = Math.max(0, Math.min(1, volume / 100));
-      void el.play().catch((err) => {
-        console.warn("[RemoteAudioElement] Autoplay policy note:", err);
-      });
-    };
-
-    syncPlayback();
-    stream.addEventListener("addtrack", syncPlayback);
-    return () => {
-      stream.removeEventListener("addtrack", syncPlayback);
-    };
-  }, [stream, outputDeviceId, volume]);
-
-  return <audio ref={audioElRef} autoPlay playsInline style={{ display: "none" }} />;
-};
 
 export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, userProfile } = useAuth();
@@ -135,7 +104,6 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   React.useEffect(() => {
     const isEchoTest = voiceCall.session?.friendUid === "echo-bot";
     const isMutedLocally = voiceCall.isDeafened || isEchoTest;
-    const globalVolume = isMutedLocally ? 0 : (voiceCall.remoteVolume ?? 100);
 
     // Collect all active remote audio streams (support both Map and singular fallback)
     const activeStreams = new Map<string, MediaStream>();
@@ -176,15 +144,19 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         import("../services/audio/PeerAudioNode").then(({ PeerAudioNode }) => {
           if (!audioContextRef.current) return;
           activeStreams.forEach((stream, peerId) => {
+            const peerVolume = isMutedLocally
+              ? 0
+              : (voiceCall.peerVolumes?.[peerId] ?? voiceCall.remoteVolume ?? 100);
+
             const existing = peerAudioNodesMapRef.current.get(peerId);
             if (!existing) {
-              const newNode = new PeerAudioNode(audioContextRef.current!, stream, globalVolume);
+              const newNode = new PeerAudioNode(audioContextRef.current!, stream, peerVolume);
               if (voiceCall.selectedAudioOutput) {
                 void newNode.setSinkId(voiceCall.selectedAudioOutput);
               }
               peerAudioNodesMapRef.current.set(peerId, newNode);
             } else {
-              existing.setVolume(globalVolume);
+              existing.setVolume(peerVolume);
             }
           });
         }).catch(() => {});
@@ -205,6 +177,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     voiceCall.isDeafened,
     voiceCall.session?.friendUid,
     voiceCall.remoteVolume,
+    voiceCall.peerVolumes,
     voiceCall.selectedAudioOutput,
   ]);
 
@@ -297,6 +270,8 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isRemoteSharingScreen={voiceCall.isRemoteSharingScreen}
         remoteVolume={voiceCall.remoteVolume}
         onChangeRemoteVolume={voiceCall.setRemoteVolume}
+        peerVolumes={voiceCall.peerVolumes}
+        onSetPeerVolume={voiceCall.setPeerVolume}
         isReconnecting={voiceCall.isReconnecting}
         inputMode={voiceCall.inputMode}
         setInputMode={voiceCall.setInputMode}
@@ -364,22 +339,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }}
       />
 
-      {/* Zero-latency DOM <audio autoPlay> elements for all remote streams */}
-      <div style={{ display: "none" }} aria-hidden="true">
-        {Array.from(
-          new Map([
-            ...(voiceCall.remoteStream ? [[voiceCall.session?.friendUid || "main", voiceCall.remoteStream] as const] : []),
-            ...Array.from(voiceCall.remoteStreams.entries()),
-          ]).entries(),
-        ).map(([peerId, st]) => (
-          <RemoteAudioElement
-            key={`audio-stream-${peerId}-${st.id}`}
-            stream={st}
-            outputDeviceId={voiceCall.selectedAudioOutput}
-            volume={voiceCall.isDeafened ? 0 : voiceCall.remoteVolume}
-          />
-        ))}
-      </div>
+
 
       {/* Floating Reconnect Prompt */}
       <AnimatePresence>

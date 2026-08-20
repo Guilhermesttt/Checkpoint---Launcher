@@ -158,6 +158,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
   });
 
+  const [peerVolumes, setPeerVolumes] = useState<Record<string, number>>({});
+
+  const setPeerVolume = useCallback((peerOrFeedId: string, val: number) => {
+    const clamped = Math.max(0, Math.min(200, Math.round(val)));
+    setPeerVolumes((prev) => ({
+      ...prev,
+      [peerOrFeedId]: clamped,
+    }));
+  }, []);
+
   const setRemoteVolume = useCallback((val: number) => {
     const clamped = Math.max(0, Math.min(200, Math.round(val)));
     setRemoteVolumeState(clamped);
@@ -272,6 +282,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       return true;
     }
   });
+
+  const echoCancellationRef = useRef(echoCancellation);
+  echoCancellationRef.current = echoCancellation;
+
+  const noiseSuppressionRef = useRef(noiseSuppression);
+  noiseSuppressionRef.current = noiseSuppression;
+
+  const autoGainControlRef = useRef(autoGainControl);
+  autoGainControlRef.current = autoGainControl;
 
   // Push-to-Talk settings
   const [inputMode, setInputModeState] = useState<VoiceInputMode>(() => {
@@ -772,27 +791,30 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   const setEchoCancellation = useCallback((val: boolean) => {
     setEchoCancellationState(val);
+    echoCancellationRef.current = val;
     try {
       localStorage.setItem("checkpoint_voice_echo_cancellation", String(val));
     } catch { }
-    void applyAudioProcessingConstraints(val, noiseSuppression, autoGainControl);
-  }, [applyAudioProcessingConstraints, autoGainControl, noiseSuppression]);
+    void applyAudioProcessingConstraints(val, noiseSuppressionRef.current, autoGainControlRef.current);
+  }, [applyAudioProcessingConstraints]);
 
   const setNoiseSuppression = useCallback((val: boolean) => {
     setNoiseSuppressionState(val);
+    noiseSuppressionRef.current = val;
     try {
       localStorage.setItem("checkpoint_voice_noise_suppression", String(val));
     } catch { }
-    void applyAudioProcessingConstraints(echoCancellation, val, autoGainControl);
-  }, [applyAudioProcessingConstraints, autoGainControl, echoCancellation]);
+    void applyAudioProcessingConstraints(echoCancellationRef.current, val, autoGainControlRef.current);
+  }, [applyAudioProcessingConstraints]);
 
   const setAutoGainControl = useCallback((val: boolean) => {
     setAutoGainControlState(val);
+    autoGainControlRef.current = val;
     try {
       localStorage.setItem("checkpoint_voice_auto_gain", String(val));
     } catch { }
-    void applyAudioProcessingConstraints(echoCancellation, noiseSuppression, val);
-  }, [applyAudioProcessingConstraints, echoCancellation, noiseSuppression]);
+    void applyAudioProcessingConstraints(echoCancellationRef.current, noiseSuppressionRef.current, val);
+  }, [applyAudioProcessingConstraints]);
 
   const setAdvancedNoiseSuppression = useCallback(
     async (val: boolean) => {
@@ -1402,16 +1424,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
           if (track.kind === LiveKitTrack.Kind.Audio) {
             setupVoiceAnalyzer(stream, false, peerId);
-            try {
-              const el = track.attach();
-              el.volume = isDeafened ? 0 : 1.0;
-              if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (el as any).setSinkId === "function") {
-                void (el as any).setSinkId(selectedAudioOutput).catch(() => { });
-              }
-              void el.play().catch(() => { });
-            } catch (attachErr) {
-              console.warn("[LiveKit] Audio attach warning:", attachErr);
-            }
           } else if (track.kind === LiveKitTrack.Kind.Video) {
             if (track.source === LiveKitTrack.Source.ScreenShare) {
               setIsRemoteSharingScreen(true);
@@ -3076,6 +3088,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     localScreenStream,
     remoteVolume,
     setRemoteVolume,
+    peerVolumes,
+    setPeerVolume,
     isMuted,
     isDeafened,
     isSpeakingLocal,

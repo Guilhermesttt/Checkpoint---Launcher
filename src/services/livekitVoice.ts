@@ -60,7 +60,10 @@ export const fetchLiveKitToken = async (
     throw new Error(errorData.error || `Erro ao obter token do LiveKit (${response.status})`);
   }
 
-  const payload = (await response.json()) as LiveKitTokenResponse;
+  const payload = (await response.json()) as (LiveKitTokenResponse & { disabled?: boolean; error?: string });
+  if (payload.disabled) {
+    throw new Error("LiveKit não habilitado no backend. Usando WebRTC P2P.");
+  }
   const serverUrl =
     String(payload.serverUrl || import.meta.env.VITE_LIVEKIT_URL || "").trim();
   if (!serverUrl) {

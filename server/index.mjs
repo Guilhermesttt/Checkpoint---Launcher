@@ -1417,10 +1417,10 @@ app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser,
   }
 });
 
-app.post("/api/voice/livekit-token", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
+app.post("/api/voice/livekit-token", steamPrivateLimiter, async (req, res) => {
   try {
     const { roomName, identity, name, metadata } = req.body || {};
-    const effectiveIdentity = String(identity || req.user?.uid || "").trim();
+    const effectiveIdentity = String(identity || "").trim();
     const effectiveRoom = String(roomName || "").trim();
 
     if (!effectiveRoom || !effectiveIdentity) {
@@ -1431,8 +1431,8 @@ app.post("/api/voice/livekit-token", steamPrivateLimiter, requireFirebaseUser, a
     const apiSecret = (process.env.LIVEKIT_API_SECRET || "").trim();
     const livekitUrl = (process.env.LIVEKIT_URL || "").trim();
 
-    if (!apiKey || !apiSecret) {
-      return res.status(500).json({ error: "Credenciais do LiveKit não configuradas no servidor." });
+    if (!apiKey || !apiSecret || !livekitUrl) {
+      return res.status(200).json({ disabled: true, error: "LiveKit não configurado no servidor." });
     }
 
     const at = new AccessToken(apiKey, apiSecret, {

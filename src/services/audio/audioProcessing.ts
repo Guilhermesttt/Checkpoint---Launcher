@@ -1,4 +1,4 @@
-﻿/**
+/**
  * audioProcessing.ts
  *
  * Builds a real Web Audio processing chain between the raw getUserMedia stream
@@ -81,7 +81,19 @@ export async function buildProcessedAudioTrack(
   const makeupGain = ctx.createGain();
   makeupGain.gain.value = 1.45;
 
+  // -- Dual-Channel (Stereo Center) Merger ------------------------------------
+  // Duplica o fluxo de áudio para os canais Esquerdo (0) e Direito (1) da saída,
+  // garantindo que fones de ouvido e placas de som recebam som balanceado em ambos os lados,
+  // corrigindo o problema de supressão de ruído WASM tocar apenas em um lado.
+  const merger = ctx.createChannelMerger(2);
   const destination = ctx.createMediaStreamDestination();
+  destination.channelCount = 2;
+  destination.channelCountMode = "explicit";
+  destination.channelInterpretation = "speakers";
+
+  makeupGain.connect(merger, 0, 0);
+  makeupGain.connect(merger, 0, 1);
+  merger.connect(destination);
 
   // Keep track of the RNNoise node so we can disconnect it on cleanup.
   let rnnoiseNode: (AudioNode & { destroy?: () => void }) | null = null;
@@ -99,15 +111,14 @@ export async function buildProcessedAudioTrack(
       });
       rnnoiseNode = new RnnoiseWorkletNode(ctx, {
         wasmBinary,
-        maxChannels: 1, // mono is all we need for voice
+        maxChannels: 1, // mono processing
       });
 
-      // Chain: source -> gain -> compressor -> rnnoise -> makeupGain -> destination
+      // Chain: source -> gain -> compressor -> rnnoise -> makeupGain -> merger -> destination
       source.connect(gainNode);
       gainNode.connect(compressor);
       compressor.connect(rnnoiseNode);
       rnnoiseNode.connect(makeupGain);
-      makeupGain.connect(destination);
     } catch (err) {
       // Graceful fallback - worklet failed, continue without RNNoise.
       console.warn(
@@ -131,24 +142,17 @@ export async function buildProcessedAudioTrack(
       } catch {
         /* ignore */
       }
-      try {
-        makeupGain.disconnect();
-      } catch {
-        /* ignore */
-      }
 
       // Re-connect without worklet
       source.connect(gainNode);
       gainNode.connect(compressor);
       compressor.connect(makeupGain);
-      makeupGain.connect(destination);
     }
   } else {
-    // No RNNoise - simple chain: source -> gain -> compressor -> makeupGain -> destination
+    // No RNNoise - simple chain: source -> gain -> compressor -> makeupGain -> merger -> destination
     source.connect(gainNode);
     gainNode.connect(compressor);
     compressor.connect(makeupGain);
-    makeupGain.connect(destination);
   }
 
   // -- Cleanup ---------------------------------------------------------------
@@ -170,6 +174,11 @@ export async function buildProcessedAudioTrack(
     }
     try {
       makeupGain.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      merger.disconnect();
     } catch {
       /* ignore */
     }

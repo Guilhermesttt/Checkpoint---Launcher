@@ -16,13 +16,13 @@ export class PeerAudioNode {
     this.gainNode = this.ctx.createGain();
     this.compressor = this.ctx.createDynamicsCompressor();
 
-    // Configuração de Soft Limiter
-    // Threshold em -3dB para dar folga de headroom antes do teto digital 0dBFS
-    this.compressor.threshold.setValueAtTime(-3, this.ctx.currentTime);
-    this.compressor.knee.setValueAtTime(6, this.ctx.currentTime); // Transição suave
-    this.compressor.ratio.setValueAtTime(14, this.ctx.currentTime); // Razão de compressão alta (Limiter)
-    this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime); // 3ms de ataque rápido
-    this.compressor.release.setValueAtTime(0.12, this.ctx.currentTime); // 120ms de liberação
+    // Configuração de Soft Limiter Profissional
+    // Threshold em -6dB com ratio 20:1 para fornecer 6dB de headroom garantido antes do clipping
+    this.compressor.threshold.setValueAtTime(-6, this.ctx.currentTime);
+    this.compressor.knee.setValueAtTime(4, this.ctx.currentTime); // Transição suave
+    this.compressor.ratio.setValueAtTime(20, this.ctx.currentTime); // Ratio de limiter estrito
+    this.compressor.attack.setValueAtTime(0.002, this.ctx.currentTime); // 2ms de ataque ultra-rápido
+    this.compressor.release.setValueAtTime(0.1, this.ctx.currentTime); // 100ms de liberação
 
     // Conexão: Source -> Gain (0-200%) -> Compressor -> Destination
     this.source.connect(this.gainNode);
@@ -33,14 +33,19 @@ export class PeerAudioNode {
   }
 
   /**
-   * Ajusta o volume com rampa linear/exponencial suave de 15ms para evitar estalos (clicks)
+   * Ajusta o volume com resposta imediata para mudo e rampa suave de 15ms para mudanças graduais
    * @param volumePercent Percentual de 0 a 200
    */
   public setVolume(volumePercent: number): void {
     if (this.isDestroyed || this.ctx.state === 'closed') return;
     const targetGain = Math.max(0, Math.min(2.0, volumePercent / 100));
     try {
-      this.gainNode.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.015);
+      if (targetGain === 0) {
+        this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
+      } else {
+        this.gainNode.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.015);
+      }
     } catch {
       this.gainNode.gain.value = targetGain;
     }
