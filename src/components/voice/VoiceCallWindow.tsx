@@ -171,13 +171,35 @@ const VideoRenderer: React.FC<{
     const video = videoRef.current;
     if (!video) return;
 
-    if (stream) {
+    const syncVideo = () => {
+      if (!stream || stream.getVideoTracks().length === 0) {
+        video.srcObject = null;
+        return;
+      }
       if (video.srcObject !== stream) {
         video.srcObject = stream;
       }
       video.play().catch(() => { });
-    } else {
-      video.srcObject = null;
+    };
+
+    syncVideo();
+
+    if (stream) {
+      stream.addEventListener("addtrack", syncVideo);
+      stream.addEventListener("removetrack", syncVideo);
+      const tracks = stream.getVideoTracks();
+      tracks.forEach((t) => {
+        t.addEventListener("unmute", syncVideo);
+        t.addEventListener("ended", syncVideo);
+      });
+      return () => {
+        stream.removeEventListener("addtrack", syncVideo);
+        stream.removeEventListener("removetrack", syncVideo);
+        tracks.forEach((t) => {
+          t.removeEventListener("unmute", syncVideo);
+          t.removeEventListener("ended", syncVideo);
+        });
+      };
     }
   }, [stream]);
 

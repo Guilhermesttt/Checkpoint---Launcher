@@ -4090,13 +4090,15 @@
       content.appendChild(createProgressBar());
       shell.appendChild(content);
       card.appendChild(shell);
-      if (payload.kind === "friend-message" || payload.kind === "friend-request") {
+      if (payload.kind === "friend-message" || payload.kind === "friend-request" || payload.kind === "incoming-call" || payload.kind === "call") {
         card.classList.add("is-clickable");
         card.setAttribute(
           "title",
-          payload.kind === "friend-message"
-            ? "Clique para abrir a conversa no Checkpoint"
-            : "Clique para ver pedidos de amizade",
+          payload.kind === "incoming-call" || payload.kind === "call"
+            ? "Clique para atender no Checkpoint"
+            : payload.kind === "friend-message"
+              ? "Clique para abrir a conversa no Checkpoint"
+              : "Clique para ver pedidos de amizade",
         );
         card.addEventListener("mouseenter", () => {
           window.achievementOverlay.panelAction({
@@ -4115,7 +4117,12 @@
             kind: "set-toast-interactive",
             interactive: false,
           });
-          if (payload.kind === "friend-message") {
+          if (payload.kind === "incoming-call" || payload.kind === "call") {
+            window.achievementOverlay.panelAction({
+              kind: "open-launcher-call",
+              friendId: payload.friendId,
+            });
+          } else if (payload.kind === "friend-message") {
             window.achievementOverlay.panelAction({
               kind: "open-launcher-chat",
               friendId: payload.friendId,

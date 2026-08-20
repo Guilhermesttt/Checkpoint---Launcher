@@ -324,7 +324,7 @@ export const subscribeToCallSession = (
       }
     })
     .on("broadcast", { event: "call:end" }, (e) => {
-      if (e.payload && typeof e.payload === "object") {
+      if (e.payload && typeof e.payload === "object" && e.payload.senderId !== myUid) {
         callbacks.onEnd?.(e.payload as CallEndPayload);
       }
     });

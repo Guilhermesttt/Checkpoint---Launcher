@@ -416,6 +416,7 @@ declare global {
         type?: string;
         title?: string;
         imageUrl?: string;
+        friendId?: string;
       }) => Promise<void>;
       showGameStartOverlay: (payload: { gameTitle: string }) => Promise<void>;
       showFriendPlayingOverlay: (payload: {

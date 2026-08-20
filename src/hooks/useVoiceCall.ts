@@ -1203,6 +1203,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   }, [handlePttDown, handlePttUp, inputMode, pushToTalkKey]);
 
   const activeRingtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+  const incomingTimeoutTimerRef = useRef<number | null>(null);
 
   // Stop Ringtone instantaneously
   const stopRingtone = useCallback(() => {
@@ -1213,6 +1214,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     if (ringoutTimerRef.current) {
       window.clearTimeout(ringoutTimerRef.current);
       ringoutTimerRef.current = null;
+    }
+    if (incomingTimeoutTimerRef.current) {
+      window.clearTimeout(incomingTimeoutTimerRef.current);
+      incomingTimeoutTimerRef.current = null;
     }
     if (activeRingtoneAudioRef.current) {
       try {
@@ -1229,7 +1234,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     try {
       if (type === "call") {
         const audio = new Audio(sfxIncomingCall);
-        audio.loop = false;
+        audio.loop = true;
         audio.volume = 1.0;
         activeRingtoneAudioRef.current = audio;
         void audio.play().catch(() => { });
@@ -1256,6 +1261,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     if (reconnectTimerRef.current) {
       window.clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+    if (incomingTimeoutTimerRef.current) {
+      window.clearTimeout(incomingTimeoutTimerRef.current);
+      incomingTimeoutTimerRef.current = null;
     }
     reconnectAttemptsRef.current = 0;
     setIsReconnecting(false);
@@ -1573,26 +1582,56 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       pc.ontrack = (event) => {
         let stream = remoteStreamsRef.current.get(targetPeerUid);
         if (!stream) {
-          stream = event.streams && event.streams[0] ? event.streams[0] : new MediaStream();
+          stream = new MediaStream();
+          remoteStreamsRef.current.set(targetPeerUid, stream);
         }
-        if (event.track && !stream.getTracks().includes(event.track)) {
-          stream.addTrack(event.track);
+
+        if (event.track) {
+          if (event.track.kind === "video") {
+            // Remove previous stagnant or dead video tracks
+            stream.getVideoTracks().forEach((vt) => {
+              if (vt !== event.track) {
+                try {
+                  stream.removeTrack(vt);
+                  vt.stop();
+                } catch { }
+              }
+            });
+            if (!stream.getTracks().includes(event.track)) {
+              stream.addTrack(event.track);
+            }
+            setIsRemoteCameraOn(true);
+
+            event.track.onended = () => {
+              try { stream.removeTrack(event.track); } catch { }
+              setRemoteStreams(new Map(remoteStreamsRef.current));
+            };
+            event.track.onmute = () => {
+              setRemoteStreams(new Map(remoteStreamsRef.current));
+            };
+            event.track.onunmute = () => {
+              setRemoteStreams(new Map(remoteStreamsRef.current));
+            };
+          } else if (event.track.kind === "audio") {
+            stream.getAudioTracks().forEach((at) => {
+              if (at !== event.track) {
+                try { stream.removeTrack(at); } catch { }
+              }
+            });
+            if (!stream.getTracks().includes(event.track)) {
+              stream.addTrack(event.track);
+            }
+          }
         }
+
         remoteStreamsRef.current.set(targetPeerUid, stream);
         setRemoteStreams(new Map(remoteStreamsRef.current));
         setRemoteStream(stream); // Fallback for 1:1
 
         setupVoiceAnalyzer(stream, false, targetPeerUid);
 
-        const hasVideo = stream.getVideoTracks().some((t) => t.enabled);
-        if (hasVideo) {
-          setIsRemoteCameraOn(true);
-        }
-
         stream.onaddtrack = () => {
           setRemoteStreams(new Map(remoteStreamsRef.current));
-          const hasVid = stream.getVideoTracks().some((t) => t.enabled);
-          if (hasVid) setIsRemoteCameraOn(true);
         };
         stream.onremovetrack = () => {
           setRemoteStreams(new Map(remoteStreamsRef.current));
@@ -1947,10 +1986,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setCallState("ringing-in");
           playRingtone("call");
 
-          if (audioRingIntervalRef.current) clearInterval(audioRingIntervalRef.current);
-          audioRingIntervalRef.current = window.setInterval(() => {
-            playRingtone("call");
-          }, 3000);
+          if (incomingTimeoutTimerRef.current) window.clearTimeout(incomingTimeoutTimerRef.current);
+          incomingTimeoutTimerRef.current = window.setTimeout(() => {
+            if (callStateRef.current === "ringing-in") {
+              stopRingtone();
+              setIncomingInvite(null);
+              setCallState("idle");
+              notify(`Chamada perdida de ${invite.callerName}.`, "info");
+              playRingtone("disconnect");
+            }
+          }, 35000);
         } else {
           void sendCallEnd(invite.chatId, invite.callerId, {
             senderId: user.uid,
@@ -1971,13 +2016,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     return () => {
       unsubscribe();
     };
-  }, [callState, cleanUpCall, notify, playRingtone, user?.uid]);
+  }, [callState, cleanUpCall, notify, playRingtone, stopRingtone, user?.uid]);
 
   // INITIATE CALL (1:1 Friend Call)
   const startCall = useCallback(
     async (friend: SocialFriend, withVideo = false) => {
-      if (!user?.uid || callState !== "idle") return;
-      const friendUid = friend.id.split(":")[1] || friend.id;
+      if (!user?.uid) return;
+      if (callState !== "idle") {
+        cleanUpCall();
+      }
+      const friendUid = String(friend.id || "").replace(/^cp-friend:/, "").trim();
       const chatId = getChatId(user.uid, friendUid);
 
       try {

@@ -1854,9 +1854,9 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
     }
     return { ok: true };
   }
-  if (kind === "open-launcher-chat" || kind === "open-launcher-friends") {
+  if (kind === "open-launcher-chat" || kind === "open-launcher-friends" || kind === "open-launcher-call") {
     const payload = { kind };
-    if (kind === "open-launcher-chat") {
+    if (kind === "open-launcher-chat" || kind === "open-launcher-call") {
       payload.friendId = String(action?.friendId || "").slice(0, 128);
     }
     if (kind === "open-launcher-chat" && inGameOverlayActive && payload.friendId) {
@@ -1877,7 +1877,7 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       mainWindow.focus();
       mainWindow.webContents.send("overlay:panel-action", payload);
     }
-    return { ok: true, target: kind === "open-launcher-chat" ? "launcher-chat" : "launcher-friends" };
+    return { ok: true, target: kind === "open-launcher-chat" ? "launcher-chat" : kind === "open-launcher-call" ? "launcher-call" : "launcher-friends" };
   }
   if (kind === "capture-screen") {
     return runCapture();
@@ -3593,6 +3593,8 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
       ? "Sucesso"
       : type === "achievement"
       ? "Conquista Desbloqueada"
+      : type === "incoming-call"
+      ? "Chamada de Voz"
       : "Notificação";
   const title = String(payload?.title || defaultTitle).trim();
   const message = String(payload?.message || payload?.description || "").trim();
@@ -3604,6 +3606,7 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
     message,
     description: message,
     avatarUrl: avatarUrl || (type === "achievement" ? undefined : overlayIconUrl()),
+    friendId: payload?.friendId ? String(payload.friendId).slice(0, 128) : undefined,
   });
 });
 

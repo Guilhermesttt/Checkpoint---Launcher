@@ -208,17 +208,25 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     voiceCall.selectedAudioOutput,
   ]);
 
-  // Notify in-game overlay when an incoming call arrives
+  // Notify in-game overlay when an incoming call arrives (deduplicated)
+  const lastNotifiedInviteKeyRef = React.useRef<string>("");
   React.useEffect(() => {
     if (voiceCall.callState === "ringing-in" && voiceCall.incomingInvite) {
+      const key = `${voiceCall.incomingInvite.chatId}:${voiceCall.incomingInvite.timestamp}`;
+      if (lastNotifiedInviteKeyRef.current === key) return;
+      lastNotifiedInviteKeyRef.current = key;
+
       if (window.electronAPI?.showNotificationOverlay) {
         void window.electronAPI.showNotificationOverlay({
           type: "incoming-call",
           title: "Chamada de Voz",
-          message: `${voiceCall.incomingInvite.callerName} está te ligando. Pressione F8 para abrir o overlay e atender.`,
+          message: `${voiceCall.incomingInvite.callerName} está te ligando. Clique para atender.`,
           imageUrl: voiceCall.incomingInvite.callerAvatar || undefined,
+          friendId: voiceCall.incomingInvite.callerId,
         });
       }
+    } else if (voiceCall.callState === "idle") {
+      lastNotifiedInviteKeyRef.current = "";
     }
   }, [voiceCall.callState, voiceCall.incomingInvite]);
 
