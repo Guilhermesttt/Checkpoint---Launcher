@@ -2279,6 +2279,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         startedAt: Date.now(),
       });
 
+      // Notifica imediatamente quem chamou que o convite foi aceito (Feedback instantâneo de "Conectando...")
+      void sendCallAnswer(chatId, callerId, {
+        responderId: user.uid,
+        accepted: true,
+        chatId,
+      });
+
       try {
         sessionStorage.setItem("checkpoint_last_voice_session", JSON.stringify({
           chatId,
@@ -2348,12 +2355,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setCallDuration((prev) => prev + 1);
         }, 1000);
       }
-
-      await sendCallAnswer(chatId, callerId, {
-        responderId: user.uid,
-        accepted: true,
-        chatId,
-      });
 
       if (user?.uid) {
         void sendCallState(chatId, {

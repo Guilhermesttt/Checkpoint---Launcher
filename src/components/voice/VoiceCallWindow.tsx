@@ -35,12 +35,13 @@ import {
   UserPlus,
   Gamepad2,
   Swords,
-  BookOpen,
-  MessageSquare,
   Lock,
   Unlock,
   Palette,
-  Sparkles
+  Sparkles,
+  Loader2,
+  BookOpen,
+  MessageSquare,
 } from "lucide-react";
 import type { SocialFriend, UserProfile, VoiceCallSession, CallState } from "../../types/domain";
 import type { CallRoomConfig } from "../../types/voice-governance";
@@ -152,6 +153,7 @@ export interface CallFeed {
   isScreen?: boolean;
   isCamera?: boolean;
   isRinging?: boolean;
+  isConnecting?: boolean;
   isDisconnected?: boolean;
 }
 
@@ -547,7 +549,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         isMuted: isRemoteMuted,
         isDeafened: isRemoteDeafened,
         isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
-        isRinging: isRingingOut || isConnecting,
+        isRinging: isRingingOut,
+        isConnecting: isConnecting,
         isDisconnected,
       });
     }
@@ -767,12 +770,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               <div>
                 <h2 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
                   {callState === "ringing-out" ? (
-                    <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/30 animate-pulse flex items-center gap-1">
+                    <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30 animate-pulse flex items-center gap-1.5 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
                       <Phone className="h-3 w-3 animate-bounce" /> Chamando...
                     </span>
                   ) : callState === "connecting" ? (
-                    <span className="text-[11px] font-bold text-white/80 bg-white/10 px-2 py-0.5 rounded-md border border-white/15 animate-pulse">
-                      Conectando...
+                    <span className="text-[11px] font-bold text-sky-300 bg-sky-500/20 px-2.5 py-1 rounded-lg border border-sky-500/30 animate-pulse flex items-center gap-1.5 shadow-[0_0_12px_rgba(14,165,233,0.2)]">
+                      <Loader2 className="h-3 w-3 animate-spin text-sky-300" /> Conectando...
                     </span>
                   ) : (
                     <span className="text-xs font-mono font-normal text-white/90 bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
@@ -1250,18 +1253,18 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     // Voice Card Stage (Focused on User's Voice Profile)
                     <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
                       <div className="relative flex items-center justify-center">
-                        {/* Animated Calling / Ringing Radar Rings in Stage */}
-                        {focusedFeed.isRinging && (
+                        {/* Animated Calling / Connecting Radar Rings in Stage */}
+                        {(focusedFeed.isRinging || focusedFeed.isConnecting) && (
                           <>
                             <motion.div
                               animate={{ scale: [1, 1.35, 1], opacity: [0.5, 0, 0.5] }}
                               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                              className="absolute h-48 w-48 rounded-full bg-white/10"
+                              className={`absolute h-48 w-48 rounded-full ${focusedFeed.isConnecting ? "bg-sky-500/15" : "bg-white/10"}`}
                             />
                             <motion.div
                               animate={{ scale: [1, 1.2, 1], opacity: [0.7, 0.1, 0.7] }}
                               transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
-                              className="absolute h-40 w-40 rounded-full border border-white/30"
+                              className={`absolute h-40 w-40 rounded-full border ${focusedFeed.isConnecting ? "border-sky-400/30" : "border-white/30"}`}
                             />
                           </>
                         )}
@@ -1269,10 +1272,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         {/* Big Glowing Speaking Ring */}
                         <div
                           className={`relative h-36 w-36 rounded-full overflow-hidden border-4 transition-all duration-200 ${focusedFeed.isRinging
-                            ? "border-white/20 opacity-35 grayscale-[30%]"
-                            : focusedFeed.isSpeaking
-                              ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04] opacity-100"
-                              : "border-white/15 opacity-100"
+                            ? "border-amber-500/30 opacity-60 grayscale-[20%]"
+                            : focusedFeed.isConnecting
+                              ? "border-sky-400/50 ring-4 ring-sky-400/25 shadow-[0_0_25px_rgba(56,189,248,0.25)] opacity-90 animate-pulse"
+                              : focusedFeed.isSpeaking
+                                ? "border-white ring-8 ring-white/30 shadow-[0_0_35px_rgba(255,255,255,0.35)] scale-[1.04] opacity-100"
+                                : "border-white/15 opacity-100"
                             }`}
                         >
                           {focusedFeed.avatar ? (
@@ -1308,6 +1313,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                           {focusedFeed.isRinging ? (
                             <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
                               <Phone className="h-3.5 w-3.5 animate-bounce text-amber-300" /> Chamando...
+                            </span>
+                          ) : focusedFeed.isConnecting ? (
+                            <span className="text-sky-300 font-bold flex items-center gap-1.5 animate-pulse">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-300" /> Conectando...
                             </span>
                           ) : focusedFeed.isDeafened ? (
                             <span className="text-rose-400 font-bold flex items-center gap-1.5">
@@ -1529,30 +1538,32 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         // ── Voice-only card: avatar circle (camera OFF) ──
                         <div className="flex flex-col items-center justify-center text-center">
                           <div className="relative mb-3 flex items-center justify-center">
-                            {/* Animated Calling / Ringing Radar Rings */}
-                            {feed.isRinging && (
+                            {/* Animated Calling / Connecting Radar Rings */}
+                            {(feed.isRinging || feed.isConnecting) && (
                               <>
                                 <motion.div
                                   animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
                                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                                  className="absolute h-32 w-32 rounded-full bg-white/10"
+                                  className={`absolute h-32 w-32 rounded-full ${feed.isConnecting ? "bg-sky-500/15" : "bg-white/10"}`}
                                 />
                                 <motion.div
                                   animate={{ scale: [1, 1.18, 1], opacity: [0.7, 0.1, 0.7] }}
                                   transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
-                                  className="absolute h-28 w-28 rounded-full border border-white/30"
+                                  className={`absolute h-28 w-28 rounded-full border ${feed.isConnecting ? "border-sky-400/30" : "border-white/30"}`}
                                 />
                               </>
                             )}
 
                             <div
                               className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-200 ${feed.isRinging
-                                ? "border-white/20 opacity-35 grayscale-[30%]"
-                                : feed.isDisconnected
-                                  ? "border-dashed border-white/25 opacity-55 grayscale-[20%]"
-                                  : feed.isSpeaking
-                                    ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
-                                    : "border-white/10 opacity-100"
+                                ? "border-amber-500/30 opacity-60 grayscale-[20%]"
+                                : feed.isConnecting
+                                  ? "border-sky-400/50 ring-2 ring-sky-400/25 shadow-[0_0_20px_rgba(56,189,248,0.25)] opacity-90 animate-pulse"
+                                  : feed.isDisconnected
+                                    ? "border-dashed border-white/25 opacity-55 grayscale-[20%]"
+                                    : feed.isSpeaking
+                                      ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
+                                      : "border-white/10 opacity-100"
                                 }`}
                             >
                               {feed.avatar ? (
@@ -1596,6 +1607,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             {feed.isRinging ? (
                               <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
                                 <Phone className="h-3 w-3 animate-bounce text-amber-300" /> Chamando...
+                              </span>
+                            ) : feed.isConnecting ? (
+                              <span className="text-sky-300 font-bold flex items-center gap-1.5 animate-pulse">
+                                <Loader2 className="h-3 w-3 animate-spin text-sky-300" /> Conectando...
                               </span>
                             ) : feed.isDisconnected ? (
                               <span className="text-amber-400/90 font-medium flex items-center gap-1 text-[11px]">

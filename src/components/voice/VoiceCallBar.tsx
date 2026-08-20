@@ -123,6 +123,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                   ? "border-amber-400"
                   : isRingingOut
                   ? "border-amber-400/40 opacity-50"
+                  : isConnecting
+                  ? "border-sky-400/50 ring-2 ring-sky-400/20 opacity-80 animate-pulse"
                   : isCurrentlySpeaking
                   ? "border-white ring-2 ring-white/40 shadow-[0_0_15px_rgba(255,255,255,0.4)] scale-105"
                   : "border-white/10"
@@ -146,6 +148,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                   ? "bg-amber-400 animate-ping"
                   : isRingingOut
                   ? "bg-amber-400"
+                  : isConnecting
+                  ? "bg-sky-400 animate-pulse"
                   : isCurrentlySpeaking
                   ? "bg-white"
                   : "bg-white/60"
@@ -161,6 +165,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                     ? "bg-amber-400 animate-bounce"
                     : isRingingOut
                     ? "bg-amber-400 animate-ping"
+                    : isConnecting
+                    ? "bg-sky-400 animate-pulse"
                     : isCurrentlySpeaking
                     ? "bg-white animate-pulse"
                     : "bg-white/60"
@@ -172,6 +178,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                     ? "text-amber-400"
                     : isRingingOut
                     ? "text-amber-300"
+                    : isConnecting
+                    ? "text-sky-300"
                     : isCurrentlySpeaking
                     ? "text-white"
                     : "text-white/70"

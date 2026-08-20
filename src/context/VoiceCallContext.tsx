@@ -420,7 +420,6 @@ const safeFallbackVoiceCallContext: Partial<VoiceCallContextType> = {
   selectedVideoInput: "default",
   isVoiceWindowOpen: false,
   isScreenPickerOpen: false,
-  isSettingsOpen: false,
   incomingInvite: null,
   pendingReconnectSession: null,
   localStream: null,
@@ -453,14 +452,12 @@ const safeFallbackVoiceCallContext: Partial<VoiceCallContextType> = {
   setVoiceSensitivity: () => {},
   setEchoCancellation: () => {},
   setNoiseSuppression: () => {},
-  setAdvancedNoiseSuppression: () => {},
+  setAdvancedNoiseSuppression: async () => {},
   changeAudioInputDevice: async () => {},
   changeAudioOutputDevice: async () => {},
   changeVideoInputDevice: async () => {},
   setIsVoiceWindowOpen: () => {},
   setIsScreenPickerOpen: () => {},
-  setIsSettingsOpen: () => {},
-  setSession: () => {},
 };
 
 export const useVoiceCallContext = (): VoiceCallContextType => {
