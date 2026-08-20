@@ -67,6 +67,8 @@ export interface RoomConfig {
 }
 
 export interface CallRoomConfig {
+  adminId?: string;
+  hostUid?: string;
   roomName: string;
   category: RoomCategory;
   isPrivate: boolean;
