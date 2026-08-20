@@ -18,6 +18,7 @@ export interface U2UEventHandlers {
   onTyping?: (data: { senderId: string; typing: boolean }) => void;
   onFriendRequest?: (data: { fromUid: string; fromName: string; fromAvatar?: string | null }) => void;
   onFriendAccepted?: (data: { friendUid: string; friendName: string; friendAvatar?: string | null }) => void;
+  onFriendRemoved?: (data: { fromUid: string }) => void;
   onCustomEvent?: (event: string, payload: any) => void;
 }
 
@@ -98,6 +99,11 @@ export const subscribeToGlobalEventBus = (
       .on("broadcast", { event: "u2u:friend_accepted" }, (e: any) => {
         if (e.payload && typeof e.payload === "object") {
           globalEventHandlers.forEach((h) => h.onFriendAccepted?.(e.payload));
+        }
+      })
+      .on("broadcast", { event: "u2u:friend_removed" }, (e: any) => {
+        if (e.payload && typeof e.payload === "object") {
+          globalEventHandlers.forEach((h) => h.onFriendRemoved?.(e.payload));
         }
       })
       .on("broadcast", { event: "u2u:custom" }, (e: any) => {
@@ -324,5 +330,38 @@ export const sendFastFriendRequestNotification = async (
     }
   } catch (err) {
     console.warn("[realtimeEventBus] sendFastFriendRequestNotification error:", err);
+  }
+};
+
+/**
+ * Notifica que uma amizade foi desfeita/removida instantaneamente via WebSocket
+ */
+export const sendFastFriendRemovedNotification = async (
+  targetUid: string,
+  myUid: string,
+) => {
+  try {
+    const channelName = `user_inbox_${targetUid}`;
+    let targetChannel = activeInboxChannels.get(channelName);
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
+      try {
+        targetChannel.subscribe((s: string) => { });
+      } catch { }
+    }
+
+    await targetChannel.send({
+      type: "broadcast",
+      event: "u2u:friend_removed",
+      payload: { fromUid: myUid },
+    });
+
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
+  } catch (err) {
+    console.warn("[realtimeEventBus] sendFastFriendRemovedNotification error:", err);
   }
 };

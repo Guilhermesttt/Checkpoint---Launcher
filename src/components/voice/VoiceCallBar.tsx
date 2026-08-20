@@ -100,21 +100,21 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 50, opacity: 0 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[9990] flex items-center gap-4 rounded-2xl border px-4 py-2.5 shadow-[0_15px_40px_rgba(0,0,0,0.7)] backdrop-blur-2xl transition-colors duration-300 ${
+        className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[9990] flex items-center gap-4 rounded-[22px] border px-4 py-2.5 shadow-[0_25px_60px_rgba(0,0,0,0.92)] backdrop-blur-2xl transition-colors duration-300 ${
           isReconnecting
-            ? "border-amber-500/50 bg-[#15130d]/95"
-            : "border-white/10 bg-[#121215]/95"
+            ? "border-amber-500/50 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#241c0e]/98 via-[#18130a]/99 to-[#0c0a06]"
+            : "border-white/[0.12] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c]"
         }`}
       >
         {/* Connection Status & Friend / Speaker */}
         <div
           onClick={onOpenWindow}
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group select-none"
           title="Abrir tela de chamada"
         >
           <div className="relative">
             <div
-              className={`h-9 w-9 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
+              className={`h-9 w-9 rounded-xl overflow-hidden border transition-all duration-300 ${
                 isReconnecting
                   ? "border-amber-400"
                   : isRingingOut
@@ -215,10 +215,10 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
           <button
             type="button"
             onClick={onToggleMute}
-            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
               isMuted
-                ? "bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                ? "bg-rose-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.45)] scale-105"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:scale-105 border border-white/[0.06]"
             }`}
             title={isMuted ? "Desmutar microfone" : "Mutar microfone"}
           >
@@ -229,10 +229,10 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
           <button
             type="button"
             onClick={onToggleDeafen}
-            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
               isDeafened
-                ? "bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                ? "bg-rose-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.45)] scale-105"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:scale-105 border border-white/[0.06]"
             }`}
             title={isDeafened ? "Desmutar áudio" : "Silenciar áudio"}
           >
@@ -243,10 +243,10 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
           <button
             type="button"
             onClick={onToggleScreenShare}
-            className={`flex h-8.5 w-8.5 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
+            className={`flex h-9 w-9 items-center justify-center rounded-xl transition-all duration-200 cursor-pointer ${
               isSharingScreen
-                ? "bg-white text-black shadow-md scale-105"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                ? "bg-white text-black shadow-md scale-105 hover:bg-white/90"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:scale-105 border border-white/[0.06]"
             }`}
             title={isSharingScreen ? "Parar compartilhamento" : "Compartilhar tela"}
           >
@@ -257,7 +257,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
           <button
             type="button"
             onClick={onOpenWindow}
-            className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-white/6 text-white hover:bg-white/12 hover:scale-105 transition-all duration-200"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:scale-105 border border-white/[0.06] transition-all duration-200 cursor-pointer"
             title="Expandir chamada"
           >
             <Maximize2 className="h-4 w-4" />
@@ -267,7 +267,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
           <button
             type="button"
             onClick={onHangUp}
-            className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-rose-500 text-white hover:bg-rose-600 hover:scale-105 active:scale-95 transition-all duration-200 shadow-md shadow-rose-500/30"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500 text-white hover:bg-rose-600 hover:scale-105 active:scale-95 transition-all duration-200 shadow-[0_0_14px_rgba(244,63,94,0.45)] cursor-pointer"
             title="Desconectar"
           >
             <PhoneOff className="h-4 w-4" />

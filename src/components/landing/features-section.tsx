@@ -27,7 +27,7 @@ const features = [
     number: "04",
     icon: Shield,
     title: "Dados na Nuvem",
-    description: "Sua biblioteca sincronizada em todos os dispositivos via Firebase. Nunca perca suas configurações e progresso.",
+    description: "Sua biblioteca sincronizada em todos os dispositivos via Nuvem Segura. Nunca perca suas configurações e progresso.",
     stats: { value: "100%", label: "sincronizado" },
   },
 ];

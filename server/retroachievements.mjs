@@ -330,7 +330,8 @@ export const createRetroAchievementsRouter = ({
       }
       const payload = await requestJson("API_GetUserProfile.php", { u: username });
       const identity = normalizeRetroAchievementsProfile(payload);
-      await saveProfile(req.firebaseUser.uid, {
+      const uid = req.authUid || req.user?.id || req.firebaseUser?.uid;
+      await saveProfile(uid, {
         retroachievements_ulid: identity.ulid,
         retroachievements_username: identity.username,
       });
@@ -342,7 +343,8 @@ export const createRetroAchievementsRouter = ({
 
   router.delete("/link", async (req, res) => {
     try {
-      await saveProfile(req.firebaseUser.uid, {
+      const uid = req.authUid || req.user?.id || req.firebaseUser?.uid;
+      await saveProfile(uid, {
         retroachievements_ulid: null,
         retroachievements_username: null,
       });
@@ -381,7 +383,8 @@ export const createRetroAchievementsRouter = ({
     const gameId = Number(req.params.gameId);
     try {
       if (!Number.isSafeInteger(gameId) || gameId <= 0) throw fail("RA_INVALID_RESPONSE");
-      const profile = await loadLinkedProfile(req.firebaseUser.uid);
+      const uid = req.authUid || req.user?.id || req.firebaseUser?.uid;
+      const profile = await loadLinkedProfile(uid);
       const cacheKey = `${profile.retroachievements_ulid}:${gameId}`;
       const currentTime = now();
       const cached = cacheRead(progressCache, cacheKey, currentTime, CACHE_TTL.progress);

@@ -20,7 +20,8 @@ async function createTestApp(options: {
     apiKey: "server-secret",
     fetchImpl: options.fetchImpl,
     requireUser: (req: any, _res: any, next: () => void) => {
-      req.firebaseUser = { uid: "user-1" };
+      req.authUid = "user-1";
+      req.user = { id: "user-1" };
       next();
     },
     loadProfile: options.loadProfile ?? (async () => ({

@@ -62,7 +62,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
     <div
       ref={menuRef}
       style={{ top: clampedY, left: clampedX }}
-      className="fixed z-[999999] w-60 p-2.5 rounded-2xl border border-white/12 bg-[#12131a]/98 shadow-[0_20px_60px_rgba(0,0,0,0.92)] backdrop-blur-2xl text-white space-y-2.5 animate-in fade-in zoom-in-95 duration-100 select-none"
+      className="fixed z-[999999] w-64 p-3 rounded-2xl border border-white/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_24px_70px_rgba(0,0,0,0.95)] backdrop-blur-2xl text-white space-y-2.5 animate-in fade-in zoom-in-95 duration-100 select-none"
     >
       {/* Header Info */}
       <div className="px-2 py-1 border-b border-white/8 flex items-center justify-between">
@@ -77,7 +77,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
 
       {/* Volume Control Slider (0 - 200%) */}
       {!feed.isLocal && (
-        <div className="p-2.5 space-y-2 bg-white/[0.03] rounded-xl border border-white/6">
+        <div className="p-3 space-y-2 bg-black/30 rounded-xl border border-white/8">
           <div className="flex items-center justify-between text-[11px] font-bold text-white/80">
             <span className="flex items-center gap-1.5">
               {isLocallyMuted || volume === 0 ? (
@@ -102,7 +102,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
               }
               onVolumeChange(Number(e.target.value));
             }}
-            className="w-full accent-white cursor-pointer"
+            className="w-full accent-white cursor-pointer h-1.5"
           />
 
           <div className="flex justify-between text-[9px] font-bold text-white/40">
@@ -129,7 +129,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
               onToggleLocalMute();
               onClose();
             }}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold hover:bg-white/10 transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold hover:bg-white/8 transition cursor-pointer text-left"
           >
             <span className="flex items-center gap-2">
               {isLocallyMuted ? (
@@ -155,7 +155,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
               onToggleWatchStream(feed.id as string);
               onClose();
             }}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold hover:bg-white/10 transition cursor-pointer text-left"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold hover:bg-white/8 transition cursor-pointer text-left"
           >
             <span className="flex items-center gap-2">
               <Tv className="h-3.5 w-3.5 text-white" />
@@ -174,7 +174,7 @@ export const ParticipantContextMenu: React.FC<ParticipantContextMenuProps> = ({
                 onKickParticipant(feed.peerId || (feed.id as string));
                 onClose();
               }}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition cursor-pointer text-left"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition cursor-pointer text-left"
             >
               <UserX className="h-3.5 w-3.5" />
               <span>Expulsar da Chamada</span>

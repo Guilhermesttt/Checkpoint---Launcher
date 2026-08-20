@@ -11,6 +11,7 @@ import { subscribeToUnreadMessages } from '../services/chat';
 import {
   subscribeToGlobalEventBus,
   sendFastFriendRequestNotification,
+  sendFastFriendRemovedNotification,
 } from '../services/realtimeEventBus';
 import {
   acceptCheckpointFriendRequest,
@@ -346,6 +347,11 @@ export function useFriendsSystem({
         });
         void refreshProfile();
       },
+      onFriendRemoved: (data) => {
+        if (!data?.fromUid) return;
+        setSocialFriends((current) => current.filter((friend) => !friend.id.includes(data.fromUid)));
+        void refreshProfile();
+      },
     });
 
     return () => {
@@ -478,17 +484,20 @@ export function useFriendsSystem({
 
   const removeFriend = async (friend: SocialFriend) => {
     const id = friend.id;
+    // Remoção otimista imediata na UI local
+    setSocialFriends((current) => current.filter((item) => item.id !== id));
+
     if (id.startsWith("cp-friend:") && user?.uid) {
       const friendUid = id.split(":")[1];
       try {
         await removeCheckpointFriend(friendUid);
+        void sendFastFriendRemovedNotification(friendUid, user.uid);
         await refreshProfile();
         notify(`${friend.name} foi removido da sua lista de amigos.`, "success");
       } catch (e) {
         notify(e instanceof Error ? e.message : "Erro ao remover amigo do Checkpoint.", "error");
+        await refreshProfile();
       }
-    } else {
-      setSocialFriends((current) => current.filter((friend) => friend.id !== id));
     }
   };
 
@@ -538,12 +547,16 @@ export function useFriendsSystem({
 
   const rejectFriendRequest = async (uid: string) => {
     try {
-      await rejectCheckpointFriendRequest(uid);
       setIncomingFriendRequests((current) => current.filter((item) => item.uid !== uid));
-      notify("Solicitacao rejeitada.", "success");
+      await rejectCheckpointFriendRequest(uid);
+      if (user?.uid) {
+        void sendFastFriendRemovedNotification(uid, user.uid);
+      }
+      notify("Solicitação cancelada/rejeitada.", "success");
       await refreshProfile();
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Erro ao rejeitar solicitacao.", "error");
+      notify(error instanceof Error ? error.message : "Erro ao cancelar solicitação.", "error");
+      await refreshProfile();
     }
   };
 

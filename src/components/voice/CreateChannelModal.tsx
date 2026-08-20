@@ -183,10 +183,10 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 10 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="relative flex flex-col w-full max-w-xl max-h-[85vh] overflow-hidden rounded-3xl border border-white/10 bg-[#0f1015] shadow-[0_30px_90px_rgba(0,0,0,0.95)] z-10"
+          className="relative flex flex-col w-full max-w-xl max-h-[88vh] overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_35px_110px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-10"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40 backdrop-blur-md">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 bg-black/35 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div
                 className="flex h-10 w-10 items-center justify-center rounded-xl border text-lg shadow-sm"
@@ -232,12 +232,12 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                   setRoomName(e.target.value);
                   setError(null);
                 }}
-                className="w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition"
+                className="w-full h-11 px-4 rounded-xl bg-black/35 border border-white/10 text-xs font-semibold text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:bg-black/50 transition"
               />
             </div>
 
             {/* 2. Personalização Visual: Ícone / Foto e Cor */}
-            <div className="space-y-3 p-4 rounded-2xl bg-white/[0.02] border border-white/8">
+            <div className="space-y-3 p-4 rounded-2xl bg-black/30 border border-white/8">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-white/80 flex items-center gap-1.5">
                   <Palette className="h-3.5 w-3.5 text-white/70" />
@@ -323,7 +323,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                       onClick={() => setCategory(cat.id)}
                       className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1.5 ${isSelected
                           ? "bg-white text-black border-white shadow-lg"
-                          : "bg-white/[0.03] hover:bg-white/[0.07] border-white/8 text-white hover:border-white/15"
+                          : "bg-black/30 hover:bg-white/[0.05] border-white/8 text-white hover:border-white/15"
                         }`}
                     >
                       <div className="flex items-center gap-2 font-black text-xs">
@@ -352,15 +352,15 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                   type="button"
                   onClick={() => setIsPrivate(false)}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${!isPrivate
-                      ? "bg-white/10 border-white/40 text-white shadow-sm"
-                      : "bg-white/[0.03] hover:bg-white/[0.06] border-white/8 text-white/60"
+                      ? "bg-white text-black border-white shadow-sm"
+                      : "bg-black/30 hover:bg-white/[0.05] border-white/8 text-white/60"
                     }`}
                 >
-                  <div className="flex items-center gap-1.5 font-black text-xs text-white">
-                    <Unlock className="h-3.5 w-3.5 text-white/80" />
+                  <div className={`flex items-center gap-1.5 font-black text-xs ${!isPrivate ? "text-black" : "text-white"}`}>
+                    <Unlock className={`h-3.5 w-3.5 ${!isPrivate ? "text-black" : "text-white/80"}`} />
                     <span>🌐 Sala Pública</span>
                   </div>
-                  <p className="text-[10px] text-white/50 leading-tight">
+                  <p className={`text-[10px] leading-tight ${!isPrivate ? "text-black/70 font-medium" : "text-white/50"}`}>
                     Visível na aba de Canais. Qualquer amigo pode entrar direto.
                   </p>
                 </button>
@@ -369,15 +369,15 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                   type="button"
                   onClick={() => setIsPrivate(true)}
                   className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${isPrivate
-                      ? "bg-white/10 border-white/40 text-white shadow-sm"
-                      : "bg-white/[0.03] hover:bg-white/[0.06] border-white/8 text-white/60"
+                      ? "bg-white text-black border-white shadow-sm"
+                      : "bg-black/30 hover:bg-white/[0.05] border-white/8 text-white/60"
                     }`}
                 >
-                  <div className="flex items-center gap-1.5 font-black text-xs text-white">
-                    <Lock className="h-3.5 w-3.5 text-amber-400" />
+                  <div className={`flex items-center gap-1.5 font-black text-xs ${isPrivate ? "text-black" : "text-white"}`}>
+                    <Lock className={`h-3.5 w-3.5 ${isPrivate ? "text-amber-600" : "text-amber-400"}`} />
                     <span>🔒 Sala Privada</span>
                   </div>
-                  <p className="text-[10px] text-white/50 leading-tight">
+                  <p className={`text-[10px] leading-tight ${isPrivate ? "text-black/70 font-medium" : "text-white/50"}`}>
                     Invisível na lista global. Apenas quem receber convite entra.
                   </p>
                 </button>
@@ -390,7 +390,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
-                className="space-y-1.5 p-3.5 rounded-2xl bg-white/[0.03] border border-white/8"
+                className="space-y-1.5 p-3.5 rounded-2xl bg-black/30 border border-white/8"
               >
                 <label className="text-[11px] font-bold text-white/70 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
@@ -408,7 +408,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                       setPassword(e.target.value);
                       setError(null);
                     }}
-                    className="w-full h-10 px-3.5 pr-10 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold text-white placeholder-white/30 focus:outline-none focus:border-white/30 transition"
+                    className="w-full h-10 px-3.5 pr-10 rounded-xl bg-black/40 border border-white/10 text-xs font-semibold text-white placeholder-white/30 focus:outline-none focus:border-white/30 transition"
                   />
                   <button
                     type="button"
@@ -427,7 +427,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="px-6 py-4 border-t border-white/8 bg-black/40 flex gap-3">
+          <div className="px-6 py-4 border-t border-white/8 bg-black/35 backdrop-blur-md flex gap-3">
             <button
               type="button"
               onClick={onClose}

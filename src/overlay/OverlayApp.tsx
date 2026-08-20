@@ -27,6 +27,7 @@ import {
   UserPlus,
   UserCheck,
 } from "lucide-react";
+import { Button } from "@/components/ui/Shandc/button";
 
 interface AchievementToast {
   id: string;
@@ -271,7 +272,7 @@ const OverlayApp: React.FC = () => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -20, scale: 0.95 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-3.5 rounded-2xl border border-emerald-500/25 bg-black/85 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+              className="flex items-center gap-3.5 rounded-[22px] border border-emerald-500/25 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#13241b]/98 via-[#0e1612]/99 to-[#080c09] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
             >
               <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-400/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
                 {toast.icon ? (
@@ -312,7 +313,7 @@ const OverlayApp: React.FC = () => {
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -30, scale: 0.95 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/85 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-2xl"
+              className="flex flex-col gap-3 rounded-[22px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
             >
               <div className="flex items-center gap-3.5">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/10">
@@ -356,27 +357,31 @@ const OverlayApp: React.FC = () => {
               </div>
 
               {toast.kind === "incoming-call" && (
-                <div className="flex items-center gap-2 pt-1 border-t border-white/10">
-                  <button
+                <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/[0.07] pt-3">
+                  <Button
                     type="button"
                     onClick={() => {
                       (window as any).achievementOverlay?.panelAction?.({ kind: "voice-accept" });
                       setSocialToasts((prev) => prev.filter((t) => t.id !== toast.id));
                     }}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs py-2 px-3 transition-colors shadow-lg shadow-emerald-500/20"
+                    className="h-9 rounded-xl bg-white text-black text-[11px] font-black shadow-none hover:!bg-white/90 hover:!text-black"
                   >
-                    <PhoneCall className="h-3.5 w-3.5" /> Atender
-                  </button>
-                  <button
+                    <PhoneCall className="mr-1.5 h-3.5 w-3.5" />
+                    Atender
+                  </Button>
+
+                  <Button
                     type="button"
+                    variant="outline"
                     onClick={() => {
                       (window as any).achievementOverlay?.panelAction?.({ kind: "voice-reject" });
                       setSocialToasts((prev) => prev.filter((t) => t.id !== toast.id));
                     }}
-                    className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 font-bold text-xs py-2 px-3 transition-colors"
+                    className="h-9 rounded-xl border-rose-500/20 bg-rose-500/[0.06] text-rose-300 text-[11px] font-black shadow-none hover:!bg-rose-500/15 hover:!text-rose-200"
                   >
-                    <PhoneOff className="h-3.5 w-3.5" /> Recusar
-                  </button>
+                    <PhoneOff className="mr-1.5 h-3.5 w-3.5" />
+                    Recusar
+                  </Button>
                 </div>
               )}
             </motion.div>
@@ -398,7 +403,7 @@ const OverlayApp: React.FC = () => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.96, opacity: 0, y: 15 }}
               transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex h-[82vh] w-[90vw] max-w-6xl overflow-hidden rounded-[28px] border border-white/10 bg-[#08080a]/90 shadow-[0_30px_100px_rgba(0,0,0,0.8)] backdrop-blur-3xl"
+              className="relative flex h-[82vh] w-[90vw] max-w-6xl overflow-hidden rounded-[28px] border border-white/15 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28] via-[#0d0e12] to-[#050507] shadow-[0_30px_100px_rgba(0,0,0,0.95)]"
             >
               {/* Sidebar Navigation */}
               <div className="flex w-64 flex-col border-r border-white/[0.08] bg-white/[0.02] p-5">
@@ -423,8 +428,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("game")}
                     className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "game"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <Gamepad2 className="h-4 w-4" /> Visão Geral
@@ -433,8 +438,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("achievements")}
                     className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "achievements"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <Trophy className="h-4 w-4" /> Conquistas
@@ -443,8 +448,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("friends")}
                     className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "friends"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <Users className="h-4 w-4" /> Amigos
@@ -453,8 +458,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("chats")}
                     className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "chats"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -468,8 +473,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("media")}
                     className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "media"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <Camera className="h-4 w-4" /> Capturas
@@ -478,8 +483,8 @@ const OverlayApp: React.FC = () => {
                     type="button"
                     onClick={() => setActiveView("settings")}
                     className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "settings"
-                        ? "bg-white text-black shadow-md"
-                        : "text-white/50 hover:bg-white/5 hover:text-white"
+                      ? "bg-white text-black shadow-md"
+                      : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                   >
                     <Settings className="h-4 w-4" /> Ajustes
@@ -555,8 +560,8 @@ const OverlayApp: React.FC = () => {
                           </div>
                           <span
                             className={`rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase ${ach.achieved
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
-                                : "bg-white/5 text-white/40 border border-white/10"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
+                              : "bg-white/5 text-white/40 border border-white/10"
                               }`}
                           >
                             {ach.achieved ? "Desbloqueada" : "Bloqueada"}
@@ -586,13 +591,12 @@ const OverlayApp: React.FC = () => {
                                 </div>
                               )}
                               <span
-                                className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-black ${
-                                  friend.status === "playing"
-                                    ? "bg-green-500 animate-pulse"
-                                    : friend.status === "online"
-                                      ? "bg-green-400"
-                                      : "bg-white/20"
-                                }`}
+                                className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-black ${friend.status === "playing"
+                                  ? "bg-green-500 animate-pulse"
+                                  : friend.status === "online"
+                                    ? "bg-green-400"
+                                    : "bg-white/20"
+                                  }`}
                               />
                             </div>
                             <div className="min-w-0">
@@ -700,11 +704,10 @@ const OverlayApp: React.FC = () => {
                                 className={`flex ${msg.mine ? "justify-end" : "justify-start"}`}
                               >
                                 <div
-                                  className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
-                                    msg.mine
-                                      ? "bg-white text-black font-medium"
-                                      : "bg-white/[0.07] border border-white/10 text-white"
-                                  }`}
+                                  className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${msg.mine
+                                    ? "bg-white text-black font-medium"
+                                    : "bg-white/[0.07] border border-white/10 text-white"
+                                    }`}
                                 >
                                   {msg.attachmentUrl && (
                                     <div className="mb-2 overflow-hidden rounded-xl border border-black/10">
@@ -730,9 +733,8 @@ const OverlayApp: React.FC = () => {
                                   )}
                                   {msg.text && <p className="break-words leading-relaxed">{msg.text}</p>}
                                   <span
-                                    className={`mt-1 block text-right text-[8px] font-bold ${
-                                      msg.mine ? "text-black/50" : "text-white/40"
-                                    }`}
+                                    className={`mt-1 block text-right text-[8px] font-bold ${msg.mine ? "text-black/50" : "text-white/40"
+                                      }`}
                                   >
                                     {new Date(msg.createdAt).toLocaleTimeString([], {
                                       hour: "2-digit",

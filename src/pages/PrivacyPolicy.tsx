@@ -63,7 +63,7 @@ export default function PrivacyPolicy() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">Third-Party Services</h2>
             <p>
-              Checkpoint may use third-party services such as Firebase, Epic
+              Checkpoint may use third-party services such as Supabase, Epic
               Games, Steam, Discord, hosting providers, and analytics or
               infrastructure providers. These services process information under
               their own privacy policies when you use or authorize their

@@ -40,9 +40,12 @@ import {
   Lock,
   Unlock,
   Palette,
+  Sparkles
 } from "lucide-react";
 import type { SocialFriend, UserProfile, VoiceCallSession, CallState } from "../../types/domain";
 import type { CallRoomConfig } from "../../types/voice-governance";
+import { Button } from "@/components/ui/Shandc/button";
+import { Badge } from "@/components/ui/Shandc/badge";
 import { ParticipantContextMenu } from "./ParticipantContextMenu";
 import { ChannelInviteModal } from "./ChannelInviteModal";
 import { CallPrivacyPanel } from "./CallPrivacyPanel";
@@ -691,6 +694,50 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
   if (!isOpen || !session) return null;
 
+  const AudioFader: React.FC<{
+    label: string;
+    value: number;
+    min: number;
+    max: number;
+    unit?: string;
+    onChange: (val: number) => void;
+    marks?: number[];
+    accentClass?: string;
+  }> = ({ label, value, min, max, unit = "%", onChange, marks, accentClass = "accent-white" }) => {
+    const pct = ((value - min) / (max - min)) * 100;
+    const scaleMarks = marks || [min, min + (max - min) * 0.5, max];
+
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-white/50">
+          <span>{label}</span>
+          <span className="font-mono text-xs text-white/90 tabular-nums">
+            {value}
+            <span className="text-white/40">{unit}</span>
+          </span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          style={{
+            background: `linear-gradient(to right, currentColor ${pct}%, rgba(255,255,255,0.08) ${pct}%)`,
+          }}
+          className={`w-full h-1.5 rounded-full ${accentClass} text-white cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(255,255,255,0.5)] [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-black/50 [&::-webkit-slider-thumb]:transition-transform hover:[&::-webkit-slider-thumb]:scale-110`}
+        />
+        <div className="flex justify-between px-0.5">
+          {scaleMarks.map((m, i) => (
+            <span key={i} className="text-[8px] font-mono text-white/25">
+              {Math.round(m)}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-[9995] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xl select-none">
@@ -700,7 +747,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 10 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
+          className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
         >
           {/* Top Bar Header */}
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/8 bg-black/35 backdrop-blur-md z-20">
@@ -725,16 +772,22 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     </span>
                   )}
                   {isFocusedMode && focusedFeed && (
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/15">
-                      <Pin className="h-3 w-3 text-white fill-white" />
+                    <Badge
+                      variant="secondary"
+                      className="hidden sm:inline-flex h-6 gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 text-[10px] font-semibold text-white/90"
+                    >
+                      <Pin className="h-3 w-3 fill-white" />
                       <span>Focado: {focusedFeed.title}</span>
-                    </span>
+                    </Badge>
                   )}
                   {/* Category Pill */}
-                  <span className="hidden lg:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 text-white/70 border border-white/8">
+                  <Badge
+                    variant="outline"
+                    className="hidden lg:inline-flex h-6 gap-1.5 rounded-full border-white/10 bg-white/[0.04] px-2.5 text-[10px] font-semibold text-white/70"
+                  >
                     {currentCategory.icon}
                     <span>{currentCategory.label}</span>
-                  </span>
+                  </Badge>
 
                   {/* Room Privacy Button */}
                   <button
@@ -774,75 +827,85 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     <span>Editar Canal</span>
                   </button>
                 </h2>
-                <p className="text-[11px] text-white/40">Chamada Direta Checkpoint</p>
+                <p className="text-[10px] text-white/35 mt-0.5">Chamada Direta Checkpoint</p>
               </div>
             </div>
 
             {/* Right Actions: Invite Friends Button, View Mode Switcher, Fullscreen, Minimize */}
             <div className="flex items-center gap-2">
               {/* Invite Friends Modal Button */}
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setIsInviteModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/6 hover:bg-white/12 border border-white/8 text-xs font-bold text-white transition cursor-pointer"
                 title="Convidar amigos para a chamada"
+                className="h-9 gap-1.5 rounded-xl border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-white shadow-none hover:bg-white/[0.09] hover:text-white"
               >
-                <UserPlus className="h-3.5 w-3.5 text-white/80" />
+                <UserPlus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Convidar</span>
-              </button>
+              </Button>
 
               {/* View Switcher: Grid Mode vs Focus Mode */}
               <div className="flex items-center gap-1 bg-white/6 p-1 rounded-xl border border-white/8">
-                <button
+                <Button
                   type="button"
+                  variant={!isFocusedMode ? "secondary" : "ghost"}
+                  size="sm"
                   onClick={() => setFocusedFeedId(null)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${!isFocusedMode
-                    ? "bg-white text-black shadow-sm"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                    }`}
                   title="Visualização em Grade (Todos os participantes)"
+                  className={`h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold ${!isFocusedMode
+                    ? "bg-white text-black hover:!bg-white/90 hover:!text-black"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    }`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
                   <span className="hidden md:inline">Grade</span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant={isFocusedMode ? "secondary" : "ghost"}
+                  size="sm"
                   onClick={() => {
                     if (!isFocusedMode) {
                       const firstVideo = activeFeeds.find((f) => f.type === "video") || activeFeeds[0];
                       if (firstVideo) setFocusedFeedId(firstVideo.id);
                     }
                   }}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${isFocusedMode
-                    ? "bg-white text-black shadow-sm"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                    }`}
                   title="Modo Foco / Destaque"
+                  className={`h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold ${isFocusedMode
+                    ? "bg-white text-black hover:!bg-white/90 hover:!text-black"
+                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                    }`}
                 >
                   <Pin className="h-3.5 w-3.5" />
                   <span className="hidden md:inline">Foco</span>
-                </button>
+                </Button>
               </div>
 
               {/* Fullscreen Button */}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={() => void toggleFullscreen()}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/6 text-white/60 hover:text-white hover:bg-white/12 transition cursor-pointer"
                 title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                className="h-9 w-9 rounded-xl text-white/60 hover:bg-white/[0.08] hover:text-white"
               >
                 <Maximize className="h-4 w-4" />
-              </button>
+              </Button>
 
               {/* Minimize Call Button */}
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/6 text-white/60 hover:text-white hover:bg-white/12 transition cursor-pointer"
                 title="Minimizar chamada"
+                className="h-9 w-9 rounded-xl text-white/60 hover:bg-white/[0.08] hover:text-white"
               >
                 <Minimize2 className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -1013,7 +1076,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                           initial={{ opacity: 0, scale: 0.9, y: 5 }}
                                           animate={{ opacity: 1, scale: 1, y: 0 }}
                                           exit={{ opacity: 0, scale: 0.9, y: 5 }}
-                                          className="absolute top-10 right-0 p-3 w-48 rounded-2xl bg-[#14151e]/98 border border-white/15 shadow-2xl backdrop-blur-xl z-50 space-y-2"
+                                          className="absolute top-10 right-0 p-3.5 w-52 rounded-2xl bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] border border-white/12 shadow-[0_20px_60px_rgba(0,0,0,0.92)] backdrop-blur-2xl z-50 space-y-2.5"
                                         >
                                           <div className="flex items-center justify-between text-[11px] font-bold text-white">
                                             <span>Volume Individual</span>
@@ -1037,7 +1100,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                                 onChangeRemoteVolume(newVol);
                                               }
                                             }}
-                                            className="w-full accent-white cursor-pointer"
+                                            className="w-full accent-white cursor-pointer h-1.5"
                                           />
                                           <div className="flex justify-between text-[9px] font-bold text-white/40">
                                             <span
@@ -1508,7 +1571,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           {/* Voice & Devices Settings Modal */}
           <AnimatePresence>
             {isSettingsOpen && (
-              <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+              <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md">
                 {/* Backdrop Click Dismiss */}
                 <div
                   className="absolute inset-0"
@@ -1520,16 +1583,16 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 380, damping: 28 }}
-                  className="relative flex flex-col w-full max-w-xl max-h-[85vh] overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_30px_90px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-10"
+                  className="relative flex flex-col w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-[26px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_35px_110px_rgba(0,0,0,0.95)] backdrop-blur-2xl z-10"
                 >
                   {/* Modal Header */}
-                  <div className="flex items-center justify-between px-6 py-4.5 border-b border-white/8 bg-black/30 backdrop-blur-md">
+                  <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-white/8 bg-black/35 backdrop-blur-md">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white border border-white/10 shadow-sm">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.07] text-white border border-white/[0.1] shadow-sm">
                         <Sliders className="h-5 w-5" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-black text-white tracking-tight uppercase">
+                        <h3 className="text-[13px] font-black text-white tracking-tight uppercase">
                           Configurações de Voz & Dispositivos
                         </h3>
                         <p className="text-[11px] text-white/40">
@@ -1540,7 +1603,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="h-8 w-8 flex items-center justify-center rounded-xl bg-white/5 text-white/60 hover:text-white hover:bg-white/15 transition cursor-pointer"
+                      className="h-9 w-9 flex items-center justify-center rounded-xl bg-white/[0.04] text-white/45 hover:!bg-white/[0.09] hover:!text-white transition cursor-pointer border border-white/[0.06]"
                       title="Fechar configurações"
                     >
                       <X className="h-4 w-4" />
@@ -1548,24 +1611,24 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   </div>
 
                   {/* Modal Body Scroll Area */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar pr-3">
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 custom-scrollbar pr-2">
                     {/* 1. Device Selectors Card */}
-                    <div className="p-4 rounded-2xl border border-white/8 bg-white/[0.025] space-y-3.5">
-                      <h4 className="text-[11px] font-black uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+                    <div className="p-3.5 sm:p-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] space-y-3">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45 flex items-center gap-2">
                         <Headphones className="h-3.5 w-3.5 text-white/70" />
                         <span>Dispositivos de Entrada & Saída</span>
                       </h4>
 
                       {/* Microfone */}
                       <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                        <label className="text-[10px] font-bold text-white/55 flex items-center gap-1.5">
                           <Mic className="h-3.5 w-3.5 text-white/70" />
                           <span>Dispositivo de Microfone</span>
                         </label>
                         <select
                           value={selectedAudioInput}
                           onChange={(e) => onChangeAudioInputDevice?.(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-[#161722] px-3.5 py-2.5 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                          className="w-full h-10 rounded-xl border border-white/[0.1] bg-[#15161e] px-3.5 text-[11px] font-semibold text-white/90 outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/[0.06] cursor-pointer hover:bg-[#191a23]"
                         >
                           <option value="default" className="bg-[#181922] text-white">
                             {defaultInputLabel && defaultInputLabel !== "default"
@@ -1581,24 +1644,43 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       </div>
 
                       {/* Teste de Microfone em Tempo Real com RMS */}
-                      <div className="space-y-1.5 bg-black/30 p-3 rounded-xl border border-white/6">
+                      <div className="space-y-2 bg-black/25 p-3 rounded-xl border border-white/[0.07]">
                         <div className="flex items-center justify-between text-[11px] font-bold">
                           <span className="text-white/60 flex items-center gap-1">
                             <Activity className="h-3 w-3 text-white/70" />
-                            Teste de Volume ao Vivo
+                            Nível de Entrada
                           </span>
-                          <span className="font-mono text-white/80">{micVolumeLevel}%</span>
+                          <span
+                            className={`font-mono transition-colors ${micVolumeLevel > 85
+                              ? "text-rose-400"
+                              : micVolumeLevel > 60
+                                ? "text-amber-300"
+                                : "text-white/80"
+                              }`}
+                          >
+                            {micVolumeLevel}%
+                          </span>
                         </div>
-                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
-                          <div
-                            className="h-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.4)] transition-all duration-75"
-                            style={{ width: `${micVolumeLevel}%` }}
-                          />
+                        {/* Segmented VU meter — 20 barras, zonas verde/amber/vermelho como um console real */}
+                        <div className="flex items-center gap-1 h-2.5">
+                          {Array.from({ length: 20 }).map((_, i) => {
+                            const threshold = (i + 1) * 5;
+                            const isLit = micVolumeLevel >= threshold;
+                            const zoneColor =
+                              threshold > 85 ? "bg-rose-500" : threshold > 60 ? "bg-amber-400" : "bg-emerald-400";
+                            return (
+                              <div
+                                key={i}
+                                className={`flex-1 h-full rounded-[2px] transition-all duration-75 ${isLit ? `${zoneColor} shadow-[0_0_4px_rgba(255,255,255,0.3)]` : "bg-white/8"
+                                  }`}
+                              />
+                            );
+                          })}
                         </div>
                       </div>
 
                       {/* Retorno de Microfone / Ouvir Própria Voz (Sidetone) */}
-                      <label className="flex items-center justify-between p-3 rounded-xl border border-white/6 bg-black/20 cursor-pointer hover:bg-black/30 transition">
+                      <label className="flex items-center justify-between gap-3 p-3 rounded-xl border border-white/[0.07] bg-black/20 cursor-pointer hover:!bg-white/[0.035] transition">
                         <div className="flex items-center gap-2.5">
                           <Headphones className="h-4 w-4 text-white/70" />
                           <div>
@@ -1610,20 +1692,20 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                           type="checkbox"
                           checked={Boolean(isMicMonitoring)}
                           onChange={(e) => onChangeMicMonitoring?.(e.target.checked)}
-                          className="h-4 w-4 rounded accent-white cursor-pointer"
+                          className="h-4 w-4 rounded-md accent-white cursor-pointer"
                         />
                       </label>
 
                       {/* Alto-Falante */}
                       <div className="space-y-1">
-                        <label className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                        <label className="text-[10px] font-bold text-white/55 flex items-center gap-1.5">
                           <Headphones className="h-3.5 w-3.5 text-white/70" />
                           <span>Dispositivo de Saída (Alto-Falante)</span>
                         </label>
                         <select
                           value={selectedAudioOutput}
                           onChange={(e) => onChangeAudioOutputDevice?.(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-[#161722] px-3.5 py-2.5 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                          className="w-full h-10 rounded-xl border border-white/[0.1] bg-[#15161e] px-3.5 text-[11px] font-semibold text-white/90 outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/[0.06] cursor-pointer hover:bg-[#191a23]"
                         >
                           <option value="default" className="bg-[#181922] text-white">
                             {defaultOutputLabel && defaultOutputLabel !== "default"
@@ -1641,14 +1723,14 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       {/* Câmera */}
                       {videoInputDevices.length > 0 && (
                         <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-white/70 flex items-center gap-1.5">
+                          <label className="text-[10px] font-bold text-white/55 flex items-center gap-1.5">
                             <Camera className="h-3.5 w-3.5 text-white/70" />
                             <span>Câmera de Vídeo</span>
                           </label>
                           <select
                             value={selectedVideoInput}
                             onChange={(e) => onChangeVideoInputDevice?.(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-[#161722] px-3.5 py-2.5 text-xs font-medium text-white focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                            className="w-full h-10 rounded-xl border border-white/[0.1] bg-[#15161e] px-3.5 text-[11px] font-semibold text-white/90 outline-none transition focus:border-white/25 focus:ring-2 focus:ring-white/[0.06] cursor-pointer hover:bg-[#191a23]"
                           >
                             <option value="default" className="bg-[#181922] text-white">
                               {defaultVideoLabel && defaultVideoLabel !== "default"
@@ -1667,7 +1749,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
                     {/* 2. Sensibilidade de Atividade de Voz Card */}
                     {typeof micGain === "number" && onChangeMicGain && (
-                      <div className="space-y-2 bg-black/30 p-3 rounded-xl border border-white/6">
+                      <div className="space-y-2.5 bg-black/25 p-3 rounded-xl border border-white/[0.07]">
                         <div className="flex items-center justify-between text-[11px] font-bold">
                           <span className="text-white/60 flex items-center gap-1">
                             <Volume2 className="h-3 w-3 text-white/70" />
@@ -1703,7 +1785,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         type="button"
                         disabled={isCalibratingNoise}
                         onClick={() => void onCalibrateNoise()}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+                        className="w-full h-9 flex items-center justify-center gap-2 rounded-xl bg-white/[0.06] hover:!bg-white/[0.1] border border-white/[0.07] text-white/80 text-[10px] font-bold transition cursor-pointer disabled:opacity-50 disabled:cursor-wait"
                       >
                         <Activity className="h-3.5 w-3.5" />
                         <span>{isCalibratingNoise ? "Calibrando... (fique em silêncio)" : "Calibrar ruído ambiente automaticamente"}</span>
@@ -1711,89 +1793,151 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     )}
 
                     {/* 3. Toggles de Processamento de Áudio Card */}
-                    <div className="p-4 rounded-2xl border border-white/8 bg-white/[0.025] space-y-2.5">
-                      <h4 className="text-[11px] font-black uppercase tracking-wider text-white/50">
-                        Processamento de Áudio
+                    <div className="p-3.5 sm:p-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] space-y-0.5">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45 mb-3 flex items-center gap-2">
+                        <Sliders className="h-3.5 w-3.5 text-white/70" />
+                        <span>Cadeia de Processamento</span>
+                        <span className="text-[9px] font-medium normal-case text-white/30">— mic → saída</span>
                       </h4>
-                      <div className="grid grid-cols-3 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onChangeEchoCancellation?.(!echoCancellation)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${echoCancellation
-                            ? "bg-white text-black font-black shadow-sm border-white"
-                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                            }`}
-                        >
-                          <span>Anti-Eco</span>
-                          {echoCancellation && <Check className="h-3.5 w-3.5" />}
-                        </button>
 
-                        <button
-                          type="button"
-                          onClick={() => onChangeNoiseSuppression?.(!noiseSuppression)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${noiseSuppression
-                            ? "bg-white text-black font-black shadow-sm border-white"
-                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                            }`}
-                        >
-                          <span>Supressão Nativa</span>
-                          {noiseSuppression && <Check className="h-3.5 w-3.5" />}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => onChangeAutoGainControl?.(!autoGainControl)}
-                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${autoGainControl
-                            ? "bg-white text-black font-black shadow-sm border-white"
-                            : "bg-white/5 text-white/40 border-white/10 hover:bg-white/10 hover:text-white"
-                            }`}
-                        >
-                          <span>Ganho Auto</span>
-                          {autoGainControl && <Check className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
-
-                      {/* Sub-card: Supressão IA (RNNoise WASM) */}
-                      <div className="pt-2 border-t border-white/6 flex items-center justify-between">
-                        <div className="space-y-0.5 pr-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-white/90">
-                              Supressão de Ruído IA
-                            </span>
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                              RNNoise
-                            </span>
+                      {/* Stage 1: Anti-Eco */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center pt-0.5">
+                          <div
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black transition-colors ${echoCancellation ? "bg-white text-black" : "bg-white/10 text-white/40"
+                              }`}
+                          >
+                            1
                           </div>
-                          <p className="text-[10px] text-white/40">
-                            Filtro neural em tempo real para eliminar teclado, cliques e ruído ambiente.
-                          </p>
+                          <div className="w-px flex-1 min-h-[18px] bg-white/10 my-1" />
                         </div>
                         <button
                           type="button"
-                          onClick={() => onChangeAdvancedNoiseSuppression?.(!advancedNoiseSuppression)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${advancedNoiseSuppression ? "bg-emerald-500" : "bg-white/10"
+                          onClick={() => onChangeEchoCancellation?.(!echoCancellation)}
+                          className={`flex-1 mb-2 flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${echoCancellation
+                            ? "bg-white/[0.07] border-white/[0.16] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
+                            : "bg-transparent border-white/[0.07] hover:!bg-white/[0.035]"
                             }`}
                         >
-                          <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${advancedNoiseSuppression ? "translate-x-5" : "translate-x-0"
-                              }`}
-                          />
+                          <div>
+                            <p className="text-xs font-bold text-white">Anti-Eco</p>
+                            <p className="text-[10px] text-white/40">Remove eco do próprio alto-falante</p>
+                          </div>
+                          {echoCancellation && <Check className="h-4 w-4 text-white shrink-0" />}
                         </button>
+                      </div>
+
+                      {/* Stage 2: Supressão Nativa */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center pt-0.5">
+                          <div
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black transition-colors ${noiseSuppression ? "bg-white text-black" : "bg-white/10 text-white/40"
+                              }`}
+                          >
+                            2
+                          </div>
+                          <div className="w-px flex-1 min-h-[18px] bg-white/10 my-1" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onChangeNoiseSuppression?.(!noiseSuppression)}
+                          className={`flex-1 mb-2 flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${noiseSuppression
+                            ? "bg-white/[0.07] border-white/[0.16]"
+                            : "bg-transparent border-white/[0.07] hover:!bg-white/[0.035]"
+                            }`}
+                        >
+                          <div>
+                            <p className="text-xs font-bold text-white">Supressão Nativa</p>
+                            <p className="text-[10px] text-white/40">Filtro de ruído estacionário do sistema</p>
+                          </div>
+                          {noiseSuppression && <Check className="h-4 w-4 text-white shrink-0" />}
+                        </button>
+                      </div>
+
+                      {/* Stage 3: Ganho Automático */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center pt-0.5">
+                          <div
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black transition-colors ${autoGainControl ? "bg-white text-black" : "bg-white/10 text-white/40"
+                              }`}
+                          >
+                            3
+                          </div>
+                          <div className="w-px flex-1 min-h-[18px] bg-white/10 my-1" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onChangeAutoGainControl?.(!autoGainControl)}
+                          className={`flex-1 mb-2 flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${autoGainControl
+                            ? "bg-white/[0.07] border-white/[0.16]"
+                            : "bg-transparent border-white/[0.07] hover:!bg-white/[0.035]"
+                            }`}
+                        >
+                          <div>
+                            <p className="text-xs font-bold text-white">Ganho Automático</p>
+                            <p className="text-[10px] text-white/40">Equaliza o volume da sua voz</p>
+                          </div>
+                          {autoGainControl && <Check className="h-4 w-4 text-white shrink-0" />}
+                        </button>
+                      </div>
+
+                      {/* Stage 4 (final): RNNoise IA — estágio de destaque, sem linha de continuação */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex flex-col items-center pt-0.5">
+                          <div
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black transition-colors ${advancedNoiseSuppression
+                              ? "bg-emerald-400 text-black"
+                              : "bg-white/10 text-white/40"
+                              }`}
+                          >
+                            4
+                          </div>
+                        </div>
+                        <div
+                          className={`flex-1 flex items-center justify-between p-3 rounded-xl border transition-all ${advancedNoiseSuppression
+                            ? "bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.08)]"
+                            : "bg-transparent border-white/8"
+                            }`}
+                        >
+                          <div className="pr-2">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className={`h-3.5 w-3.5 ${advancedNoiseSuppression ? "text-emerald-400" : "text-white/40"}`} />
+                              <span className="text-xs font-bold text-white">Supressão de Ruído IA</span>
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                RNNoise
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-white/40 mt-0.5">
+                              Filtro neural final — elimina teclado, cliques e ruído ambiente
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => onChangeAdvancedNoiseSuppression?.(!advancedNoiseSuppression)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${advancedNoiseSuppression ? "bg-emerald-500" : "bg-white/10"
+                              }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${advancedNoiseSuppression ? "translate-x-5" : "translate-x-0"
+                                }`}
+                            />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {/* 4. Modo de Entrada Card */}
-                    <div className="p-4 rounded-2xl border border-white/8 bg-white/[0.025] space-y-3">
-                      <h4 className="text-[11px] font-black uppercase tracking-wider text-white/50">
+                    <div className="p-3.5 sm:p-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] space-y-3">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.12em] text-white/45">
                         Modo de Transmissão
                       </h4>
-                      <div className="grid grid-cols-2 gap-1.5 bg-black/30 p-1 rounded-xl border border-white/8">
+                      <div className="grid grid-cols-2 gap-1 bg-black/25 p-1 rounded-xl border border-white/[0.08]">
                         <button
                           type="button"
                           onClick={() => setInputMode?.("voice-activity")}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${inputMode === "voice-activity"
+                          className={`py-2.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${inputMode === "voice-activity"
                             ? "bg-white text-black font-black shadow-sm"
-                            : "text-white/50 hover:text-white hover:bg-white/5"
+                            : "text-white/50 hover:!text-white hover:!bg-white/[0.05]"
                             }`}
                         >
                           Atividade de Voz
@@ -1801,9 +1945,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                         <button
                           type="button"
                           onClick={() => setInputMode?.("push-to-talk")}
-                          className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${inputMode === "push-to-talk"
+                          className={`py-2.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${inputMode === "push-to-talk"
                             ? "bg-white text-black font-black shadow-sm"
-                            : "text-white/50 hover:text-white hover:bg-white/5"
+                            : "text-white/50 hover:!text-white hover:!bg-white/[0.05]"
                             }`}
                         >
                           Push-to-Talk
@@ -1846,14 +1990,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   </div>
 
                   {/* Modal Footer */}
-                  <div className="flex items-center justify-end px-6 py-3.5 border-t border-white/8 bg-black/30 backdrop-blur-md">
-                    <button
+                  <div className="flex items-center justify-end px-5 sm:px-6 py-3 border-t border-white/[0.08] bg-black/25">
+                    <Button
                       type="button"
+                      variant="secondary"
                       onClick={() => setIsSettingsOpen(false)}
-                      className="px-5 py-2 rounded-xl bg-white text-black font-black text-xs hover:bg-white/90 active:scale-95 transition cursor-pointer shadow-sm"
+                      className="h-9 rounded-xl bg-white px-5 text-[11px] font-black text-black hover:!bg-white/90 hover:!text-black shadow-sm"
                     >
                       Concluído
-                    </button>
+                    </Button>
                   </div>
                 </motion.div>
               </div>
@@ -1861,84 +2006,95 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           </AnimatePresence>
 
           {/* Bottom Call Controls Dock (Discord 6-Button Grid) */}
-          <div className="flex items-center justify-center gap-3 p-4 border-t border-white/8 bg-black/40 backdrop-blur-xl z-20">
+          <div className="flex items-center justify-center gap-2.5 p-3.5 sm:p-4 border-t border-white/[0.08] bg-black/50 backdrop-blur-2xl z-20">
             {/* 1. Mute Button */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onToggleMute}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isMuted
-                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isMuted
+                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105 hover:!bg-rose-500/90"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
                 }`}
               title={isMuted ? "Desmutar microfone" : "Mutar microfone"}
             >
               {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </button>
+            </Button>
 
             {/* 2. Video / Camera Button */}
             {onToggleCamera && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 onClick={onToggleCamera}
-                className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isCameraOn
-                  ? "bg-white text-black shadow-md scale-105"
-                  : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+                className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isCameraOn
+                  ? "bg-white text-black shadow-md scale-105 hover:bg-white/90"
+                  : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
                   }`}
                 title={isCameraOn ? "Desligar câmera" : "Ligar câmera"}
               >
                 {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-              </button>
+              </Button>
             )}
 
             {/* 3. Share Screen Button */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onToggleScreenShare}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isSharingScreen
-                ? "bg-white text-black shadow-md scale-105"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isSharingScreen
+                ? "bg-white text-black shadow-md scale-105 hover:bg-white/90"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
                 }`}
               title={isSharingScreen ? "Parar transmissão" : "Transmitir tela ou jogo"}
             >
               {isSharingScreen ? <MonitorOff className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
-            </button>
+            </Button>
 
             {/* 4. Deafen Button */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={onToggleDeafen}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isDeafened
-                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isDeafened
+                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105 hover:!bg-rose-500/90"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
                 }`}
               title={isDeafened ? "Desativar silêncio total" : "Silenciar tudo (Deafen)"}
             >
               {isDeafened ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </button>
+            </Button>
 
             {/* 5. Voice Settings Button (Gear) */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => setIsSettingsOpen((prev) => !prev)}
-              className={`flex h-12 w-12 items-center justify-center rounded-2xl transition-all duration-200 cursor-pointer ${isSettingsOpen
-                ? "bg-white text-black shadow-md"
-                : "bg-white/8 text-white hover:bg-white/15 hover:scale-105"
+              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isSettingsOpen
+                ? "bg-white text-black shadow-md hover:bg-white/90"
+                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
                 }`}
               title="Ajustes de voz & entrada"
             >
               <Settings className="h-5 w-5" />
-            </button>
+            </Button>
 
             {/* 6. Disconnect Button */}
-            <button
+            <Button
               type="button"
+              variant="destructive"
               onClick={onHangUp}
-              className="flex h-12 px-6 items-center justify-center gap-2 rounded-2xl bg-rose-600 text-white font-black text-xs uppercase tracking-wider hover:bg-rose-500 hover:scale-105 active:scale-95 transition-all duration-200 shadow-lg shadow-rose-600/35 cursor-pointer ml-2"
+              className="h-12 gap-2 rounded-2xl bg-rose-600 px-6 text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-600/35 transition-all duration-200 hover:bg-rose-500 hover:scale-105 active:scale-95 ml-2"
               title="Desconectar"
             >
               <PhoneOff className="h-4.5 w-4.5" />
               <span>Desconectar</span>
-            </button>
+            </Button>
           </div>
 
           {/* Right-Click Participant Context Menu */}

@@ -107,8 +107,8 @@ const EpicIcon: React.FC<{ className?: string }> = ({ className }) => (
   />
 );
 
-const avatarUrl = (profile: UserProfile | null, firebasePhotoURL?: string | null) =>
-  profile?.photoURL || firebasePhotoURL || profile?.discordAvatar || profile?.steamAvatar || "";
+const avatarUrl = (profile: UserProfile | null, authPhotoURL?: string | null) =>
+  profile?.photoURL || authPhotoURL || profile?.discordAvatar || profile?.steamAvatar || "";
 
 const initialsFor = (name: string) =>
   name
@@ -157,11 +157,11 @@ const copyToClipboard = async (value: string) => {
 
 const ProfileAvatar: React.FC<{
   profile: UserProfile | null;
-  firebasePhotoURL?: string | null;
+  authPhotoURL?: string | null;
   displayName: string;
   compact?: boolean;
-}> = ({ profile, firebasePhotoURL, displayName, compact = false }) => {
-  const src = avatarUrl(profile, firebasePhotoURL);
+}> = ({ profile, authPhotoURL, displayName, compact = false }) => {
+  const src = avatarUrl(profile, authPhotoURL);
   return (
     <div className={`relative shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06] shadow-[0_18px_48px_rgba(0,0,0,.45)] ${compact ? "h-[72px] w-[72px]" : "h-[88px] w-[88px]"}`}>
       {src ? (
@@ -361,7 +361,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
         <section className={`rounded-[28px] border border-white/10 bg-black/40 backdrop-blur-3xl shadow-[0_24px_90px_rgba(0,0,0,0.55)] ${compactProfile ? "p-5 md:p-6" : "p-7 md:p-8"}`}>
           <div className={`flex flex-col md:flex-row md:items-center md:justify-between ${compactProfile ? "gap-4" : "gap-6"}`}>
             <div className="flex min-w-0 items-center gap-5">
-              <ProfileAvatar profile={userProfile} firebasePhotoURL={user?.photoURL} displayName={displayName} compact={compactProfile} />
+              <ProfileAvatar profile={userProfile} authPhotoURL={user?.photoURL} displayName={displayName} compact={compactProfile} />
               <div className="min-w-0">
                 <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
                   {editable ? "Seu perfil" : "Perfil do jogador"}

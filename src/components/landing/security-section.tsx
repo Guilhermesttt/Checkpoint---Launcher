@@ -4,9 +4,9 @@ import { Shield, Lock, Eye, Database } from "lucide-react";
 const securityPoints = [
   {
     icon: Lock,
-    title: "Autenticação Firebase",
+    title: "Autenticação Segura",
     description:
-      "Login com Firebase Auth usando Google ou e-mail/senha. Cada usuário acessa apenas os próprios dados.",
+      "Login seguro com Supabase Auth usando Google ou e-mail/senha. Cada usuário acessa apenas os próprios dados.",
   },
   {
     icon: Eye,
