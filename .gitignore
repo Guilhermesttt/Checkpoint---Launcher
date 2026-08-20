@@ -8,10 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
-release
-release-next
+/dist
+/dist-ssr
+/release
+/release-next
 coverage
 .firebase
 public/download
