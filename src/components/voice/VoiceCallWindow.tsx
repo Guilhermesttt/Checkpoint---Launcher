@@ -152,6 +152,7 @@ export interface CallFeed {
   isScreen?: boolean;
   isCamera?: boolean;
   isRinging?: boolean;
+  isDisconnected?: boolean;
 }
 
 const formatDuration = (secs: number) => {
@@ -525,6 +526,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       // 2. Chamada 1:1 direta ou auto-teste echo-bot
       const isRingingOut = callState === "ringing-out";
       const isConnecting = callState === "connecting";
+      const isDisconnected = !remoteStream && callState === "active" && !isSpeakingRemote;
       feeds.push({
         id: "remote-user",
         type: "voice",
@@ -533,9 +535,11 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           ? "Chamando..."
           : isConnecting
             ? "Conectando..."
-            : isSpeakingRemote
-              ? "Falando..."
-              : "Conectado",
+            : isDisconnected
+              ? "Desconectou (Aguardando retorno...)"
+              : isSpeakingRemote
+                ? "Falando..."
+                : "Conectado",
         avatar: session.friendAvatar,
         cameraStream: isRemoteCameraOn && !isRemoteSharingScreen ? remoteStream : null,
         isLocal: false,
@@ -544,6 +548,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         isDeafened: isRemoteDeafened,
         isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
         isRinging: isRingingOut || isConnecting,
+        isDisconnected,
       });
     }
 
@@ -1543,9 +1548,11 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             <div
                               className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-200 ${feed.isRinging
                                 ? "border-white/20 opacity-35 grayscale-[30%]"
-                                : feed.isSpeaking
-                                  ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
-                                  : "border-white/10 opacity-100"
+                                : feed.isDisconnected
+                                  ? "border-dashed border-white/25 opacity-55 grayscale-[20%]"
+                                  : feed.isSpeaking
+                                    ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
+                                    : "border-white/10 opacity-100"
                                 }`}
                             >
                               {feed.avatar ? (
@@ -1589,6 +1596,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             {feed.isRinging ? (
                               <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
                                 <Phone className="h-3 w-3 animate-bounce text-amber-300" /> Chamando...
+                              </span>
+                            ) : feed.isDisconnected ? (
+                              <span className="text-amber-400/90 font-medium flex items-center gap-1 text-[11px]">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping shrink-0" /> Desconectou (Aguardando retorno)
                               </span>
                             ) : feed.isDeafened ? (
                               <span className="text-rose-400 font-bold flex items-center gap-1">

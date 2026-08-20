@@ -362,6 +362,13 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                       ? copy.online
                       : copy.offline;
 
+                const rawFriendUid = friend.id.replace(/^cp-friend:/, "");
+                const isCallActiveWithFriend = voiceCall.callState === "active" && (
+                  voiceCall.session?.friendUid === friend.id ||
+                  voiceCall.session?.friendUid === rawFriendUid ||
+                  (voiceCall.session?.participants || []).some((p) => p.uid === friend.id || p.uid === rawFriendUid)
+                );
+
                 return (
                   <ContactCard
                     key={friend.id}
@@ -369,7 +376,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     avatarUrl={friend.avatar}
                     customIcon={friend.source === "discord_friend" ? <DiscordIcon className="h-4 w-4 text-white/60" /> : undefined}
                     status={statusState}
-                    statusText={statusLabel}
+                    statusText={isCallActiveWithFriend ? "Em chamada com você" : statusLabel}
                     badge={unreadCount > 0 ? unreadCount : undefined}
                     onCardClick={() => onOpenChat(friend)}
                     actions={
@@ -378,10 +385,20 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                           <>
                             <button
                               type="button"
-                              onClick={() => onStartVoiceCall(friend, false)}
-                              title="Ligar (Voz)"
+                              onClick={() => {
+                                if (isCallActiveWithFriend) {
+                                  voiceCall.setIsVoiceWindowOpen(true);
+                                } else {
+                                  onStartVoiceCall(friend, false);
+                                }
+                              }}
+                              title={isCallActiveWithFriend ? "Chamada ativa — Clique para voltar à chamada" : "Ligar (Voz)"}
                               aria-label="Ligar por voz"
-                              className="cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/60 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                              className={`cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border transition-all ${
+                                isCallActiveWithFriend
+                                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse hover:bg-emerald-600"
+                                  : "border-white/10 bg-white/[0.04] text-white/60 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                              }`}
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </button>
