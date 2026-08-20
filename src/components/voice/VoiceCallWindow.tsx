@@ -1048,7 +1048,44 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                           {!focusedFeed.isLocal && (
                             <div className="relative">
                               {(() => {
-                                const currentFeedVol = userVolumes[focusedFeed.id] ?? (remoteVolume ?? 100);
+                                const getFeedVol = (feedId: string) => {
+                                  if (userVolumes[feedId] !== undefined) return userVolumes[feedId];
+                                  if (peerVolumes[feedId] !== undefined) return peerVolumes[feedId];
+                                  const rawId = feedId.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                                  if (peerVolumes[rawId] !== undefined) return peerVolumes[rawId];
+                                  if (feedId.startsWith("remote-screen") && peerVolumes[`screen:${rawId}`] !== undefined) {
+                                    return peerVolumes[`screen:${rawId}`];
+                                  }
+                                  return remoteVolume ?? 100;
+                                };
+
+                                const currentFeedVol = getFeedVol(focusedFeed.id);
+
+                                const handleVolChange = (newVol: number) => {
+                                  setUserVolumes((prev) => ({
+                                    ...prev,
+                                    [focusedFeed.id]: newVol,
+                                  }));
+                                  const rawPeerId = focusedFeed.id.startsWith("remote-screen:")
+                                    ? `screen:${focusedFeed.id.replace("remote-screen:", "")}`
+                                    : focusedFeed.id === "remote-screen"
+                                      ? "remote-screen"
+                                      : focusedFeed.id.startsWith("remote-user:")
+                                        ? focusedFeed.id.replace("remote-user:", "")
+                                        : focusedFeed.id;
+
+                                  if (onSetPeerVolume) {
+                                    onSetPeerVolume(rawPeerId, newVol);
+                                    onSetPeerVolume(focusedFeed.id, newVol);
+                                    if (focusedFeed.id === "remote-user" && session?.friendUid) {
+                                      onSetPeerVolume(session.friendUid, newVol);
+                                    }
+                                  }
+                                  if (onChangeRemoteVolume && (focusedFeed.id === "remote-user" || !focusedFeed.id.includes(":"))) {
+                                    onChangeRemoteVolume(newVol);
+                                  }
+                                };
+
                                 return (
                                   <>
                                     <button
@@ -1087,48 +1124,24 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                             min={0}
                                             max={200}
                                             value={currentFeedVol}
-                                            onChange={(e) => {
-                                              const newVol = Number(e.target.value);
-                                              setUserVolumes((prev) => ({
-                                                ...prev,
-                                                [focusedFeed.id]: newVol,
-                                              }));
-                                              const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
-                                              if (onSetPeerVolume) {
-                                                onSetPeerVolume(rawPeerId, newVol);
-                                              } else if (onChangeRemoteVolume) {
-                                                onChangeRemoteVolume(newVol);
-                                              }
-                                            }}
+                                            onChange={(e) => handleVolChange(Number(e.target.value))}
                                             className="w-full accent-white cursor-pointer h-1.5"
                                           />
                                           <div className="flex justify-between text-[9px] font-bold text-white/40">
                                             <span
-                                              onClick={() => {
-                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 0 }));
-                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
-                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 0);
-                                              }}
+                                              onClick={() => handleVolChange(0)}
                                               className="cursor-pointer hover:text-white"
                                             >
                                               Mudo
                                             </span>
                                             <span
-                                              onClick={() => {
-                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 100 }));
-                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
-                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 100);
-                                              }}
+                                              onClick={() => handleVolChange(100)}
                                               className="cursor-pointer hover:text-white"
                                             >
                                               100%
                                             </span>
                                             <span
-                                              onClick={() => {
-                                                setUserVolumes((prev) => ({ ...prev, [focusedFeed.id]: 200 }));
-                                                const rawPeerId = focusedFeed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
-                                                if (onSetPeerVolume) onSetPeerVolume(rawPeerId, 200);
-                                              }}
+                                              onClick={() => handleVolChange(200)}
                                               className="cursor-pointer hover:text-white"
                                             >
                                               200%
@@ -2107,7 +2120,18 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               }}
               x={contextMenu.x}
               y={contextMenu.y}
-              volume={userVolumes[contextMenu.feed.id] ?? (contextMenu.feed.isLocal ? 100 : (remoteVolume ?? 100))}
+              volume={(() => {
+                if (contextMenu.feed.isLocal) return 100;
+                const feedId = contextMenu.feed.id;
+                if (userVolumes[feedId] !== undefined) return userVolumes[feedId];
+                if (peerVolumes[feedId] !== undefined) return peerVolumes[feedId];
+                const rawId = feedId.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                if (peerVolumes[rawId] !== undefined) return peerVolumes[rawId];
+                if (feedId.startsWith("remote-screen") && peerVolumes[`screen:${rawId}`] !== undefined) {
+                  return peerVolumes[`screen:${rawId}`];
+                }
+                return remoteVolume ?? 100;
+              })()}
               isLocallyMuted={locallyMutedFeeds[contextMenu.feed.id]}
               isLocalAdmin={true}
               onVolumeChange={(newVol) => {
@@ -2115,10 +2139,22 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   ...prev,
                   [contextMenu.feed.id]: newVol,
                 }));
-                const rawPeerId = contextMenu.feed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                const rawPeerId = contextMenu.feed.id.startsWith("remote-screen:")
+                  ? `screen:${contextMenu.feed.id.replace("remote-screen:", "")}`
+                  : contextMenu.feed.id === "remote-screen"
+                    ? "remote-screen"
+                    : contextMenu.feed.id.startsWith("remote-user:")
+                      ? contextMenu.feed.id.replace("remote-user:", "")
+                      : contextMenu.feed.id;
+
                 if (onSetPeerVolume) {
                   onSetPeerVolume(rawPeerId, newVol);
-                } else if (!contextMenu.feed.isLocal && onChangeRemoteVolume) {
+                  onSetPeerVolume(contextMenu.feed.id, newVol);
+                  if (contextMenu.feed.id === "remote-user" && session?.friendUid) {
+                    onSetPeerVolume(session.friendUid, newVol);
+                  }
+                }
+                if (!contextMenu.feed.isLocal && onChangeRemoteVolume && (contextMenu.feed.id === "remote-user" || !contextMenu.feed.id.includes(":"))) {
                   onChangeRemoteVolume(newVol);
                 }
               }}
@@ -2128,9 +2164,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   ...prev,
                   [contextMenu.feed.id]: nextMuted,
                 }));
-                const rawPeerId = contextMenu.feed.id.replace(/^remote-user:/, "").replace(/^remote-screen:/, "");
+                const rawPeerId = contextMenu.feed.id.startsWith("remote-screen:")
+                  ? `screen:${contextMenu.feed.id.replace("remote-screen:", "")}`
+                  : contextMenu.feed.id === "remote-screen"
+                    ? "remote-screen"
+                    : contextMenu.feed.id.startsWith("remote-user:")
+                      ? contextMenu.feed.id.replace("remote-user:", "")
+                      : contextMenu.feed.id;
+                const currVol = userVolumes[contextMenu.feed.id] ?? (contextMenu.feed.isLocal ? 100 : (remoteVolume ?? 100));
                 if (onSetPeerVolume) {
-                  onSetPeerVolume(rawPeerId, nextMuted ? 0 : (userVolumes[contextMenu.feed.id] ?? 100));
+                  onSetPeerVolume(rawPeerId, nextMuted ? 0 : currVol);
+                  onSetPeerVolume(contextMenu.feed.id, nextMuted ? 0 : currVol);
                 }
               }}
               onToggleWatchStream={() => {

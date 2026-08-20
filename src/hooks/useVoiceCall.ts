@@ -485,6 +485,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const livekitVideoPubRef = useRef<LocalTrackPublication | null>(null);
   const livekitScreenPubRef = useRef<LocalTrackPublication | null>(null);
   const livekitAttachedElementsRef = useRef<Set<HTMLMediaElement>>(new Set());
+  const echoAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const peerVolumesRef = useRef(peerVolumes);
+  peerVolumesRef.current = peerVolumes;
+  const remoteVolumeRef = useRef(remoteVolume);
+  remoteVolumeRef.current = remoteVolume;
+  const selectedAudioOutputRef = useRef(selectedAudioOutput);
+  selectedAudioOutputRef.current = selectedAudioOutput;
 
   const localStreamRef = useRef<MediaStream | null>(null);
   /** Raw stream from getUserMedia — source of the audio processing chain. Never goes to WebRTC directly. */
@@ -514,14 +522,44 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const reconnectTimerRef = useRef<number | null>(null);
   const isAcquiringMediaRef = useRef(false);
 
-  // Sync mic monitoring with local stream
+  // Live synchronization of remote participant & stream volume changes
   useEffect(() => {
-    if (isMicMonitoring && localStream) {
-      startMicMonitoring(localStream);
-    } else {
-      stopMicMonitoring();
+    if (livekitRoomRef.current) {
+      try {
+        livekitRoomRef.current.remoteParticipants.forEach((participant) => {
+          const peerId = participant.identity;
+          participant.trackPublications.forEach((pub) => {
+            if (pub.track && pub.track.kind === LiveKitTrack.Kind.Audio) {
+              const isScreenAudio = pub.source === LiveKitTrack.Source.ScreenShareAudio;
+              const peerVol = isDeafened
+                ? 0
+                : isScreenAudio
+                  ? (peerVolumes[`screen:${peerId}`] ?? peerVolumes["remote-screen"] ?? peerVolumes[peerId] ?? remoteVolume)
+                  : (peerVolumes[peerId] ?? peerVolumes["remote-user"] ?? remoteVolume);
+              const normVol = Math.max(0, Math.min(1.0, (peerVol ?? 100) / 100));
+
+              pub.track.attachedElements?.forEach((el) => {
+                el.volume = normVol;
+                if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (el as any).setSinkId === "function") {
+                  void (el as any).setSinkId(selectedAudioOutput).catch(() => { });
+                }
+              });
+            }
+          });
+        });
+      } catch (err) {
+        console.warn("[useVoiceCall] Sync LiveKit volumes error:", err);
+      }
     }
-  }, [isMicMonitoring, localStream, startMicMonitoring, stopMicMonitoring]);
+
+    if (echoAudioRef.current) {
+      const vol = isDeafened ? 0 : (peerVolumes["echo-bot"] ?? peerVolumes["remote-user"] ?? remoteVolume ?? 100) / 100;
+      echoAudioRef.current.volume = Math.max(0, Math.min(1, vol));
+      if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (echoAudioRef.current as any).setSinkId === "function") {
+        void (echoAudioRef.current as any).setSinkId(selectedAudioOutput).catch(() => { });
+      }
+    }
+  }, [peerVolumes, remoteVolume, isDeafened, selectedAudioOutput]);
 
   /**
    * Wraps a raw getUserMedia stream in the real audio processing chain.
@@ -1327,6 +1365,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       localStreamRef.current = null;
     }
 
+    // Clean up attached LiveKit media elements
+    livekitAttachedElementsRef.current.forEach((el) => {
+      try {
+        el.pause();
+        el.srcObject = null;
+        el.remove();
+      } catch { }
+    });
+    livekitAttachedElementsRef.current.clear();
+
+    // Clean up local echo audio element
+    if (echoAudioRef.current) {
+      try {
+        echoAudioRef.current.pause();
+        echoAudioRef.current.srcObject = null;
+      } catch { }
+      echoAudioRef.current = null;
+    }
+
     // Disconnect LiveKit SFU Room
     if (livekitRoomRef.current) {
       try {
@@ -1408,7 +1465,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           },
         });
 
-        room.on(LiveKitRoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        room.on(LiveKitRoomEvent.TrackSubscribed, (track, publication, participant) => {
           const peerId = participant.identity;
           let stream = remoteStreamsRef.current.get(peerId);
           if (!stream) {
@@ -1424,6 +1481,23 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
           if (track.kind === LiveKitTrack.Kind.Audio) {
             setupVoiceAnalyzer(stream, false, peerId);
+            try {
+              const el = track.attach();
+              livekitAttachedElementsRef.current.add(el);
+              const isScreenAudio = publication?.source === LiveKitTrack.Source.ScreenShareAudio;
+              const peerVol = isDeafenedRef.current
+                ? 0
+                : isScreenAudio
+                  ? (peerVolumesRef.current[`screen:${peerId}`] ?? peerVolumesRef.current["remote-screen"] ?? peerVolumesRef.current[peerId] ?? remoteVolumeRef.current)
+                  : (peerVolumesRef.current[peerId] ?? peerVolumesRef.current["remote-user"] ?? remoteVolumeRef.current);
+              el.volume = Math.max(0, Math.min(1.0, (peerVol ?? 100) / 100));
+              if (selectedAudioOutputRef.current && selectedAudioOutputRef.current !== "default" && typeof (el as any).setSinkId === "function") {
+                void (el as any).setSinkId(selectedAudioOutputRef.current).catch(() => { });
+              }
+              void el.play().catch(() => { });
+            } catch (attachErr) {
+              console.warn("[LiveKit] TrackSubscribed attach error:", attachErr);
+            }
           } else if (track.kind === LiveKitTrack.Kind.Video) {
             if (track.source === LiveKitTrack.Source.ScreenShare) {
               setIsRemoteSharingScreen(true);
@@ -1441,7 +1515,11 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             setRemoteStreams(new Map(remoteStreamsRef.current));
           }
           try {
-            track.detach();
+            const detached = track.detach();
+            detached.forEach((el) => {
+              livekitAttachedElementsRef.current.delete(el);
+              try { el.remove(); } catch { }
+            });
           } catch { }
 
           if (track.kind === LiveKitTrack.Kind.Video) {
@@ -1520,9 +1598,16 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                 setupVoiceAnalyzer(stream, false, peerId);
                 try {
                   const el = track.attach();
-                  el.volume = isDeafened ? 0 : 1.0;
-                  if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (el as any).setSinkId === "function") {
-                    void (el as any).setSinkId(selectedAudioOutput).catch(() => { });
+                  livekitAttachedElementsRef.current.add(el);
+                  const isScreenAudio = publication.source === LiveKitTrack.Source.ScreenShareAudio;
+                  const peerVol = isDeafenedRef.current
+                    ? 0
+                    : isScreenAudio
+                      ? (peerVolumesRef.current[`screen:${peerId}`] ?? peerVolumesRef.current["remote-screen"] ?? peerVolumesRef.current[peerId] ?? remoteVolumeRef.current)
+                      : (peerVolumesRef.current[peerId] ?? peerVolumesRef.current["remote-user"] ?? remoteVolumeRef.current);
+                  el.volume = Math.max(0, Math.min(1.0, (peerVol ?? 100) / 100));
+                  if (selectedAudioOutputRef.current && selectedAudioOutputRef.current !== "default" && typeof (el as any).setSinkId === "function") {
+                    void (el as any).setSinkId(selectedAudioOutputRef.current).catch(() => { });
                   }
                   void el.play().catch(() => { });
                 } catch { }
@@ -2848,6 +2933,30 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           const track = processedStream.getAudioTracks()[0];
           if (track) track.enabled = false;
         }
+
+        // Echo loopback setup so the user hears themselves and tests volume
+        setRemoteStream(processedStream);
+        remoteStreamsRef.current.set("echo-bot", processedStream);
+        setRemoteStreams(new Map(remoteStreamsRef.current));
+        setupVoiceAnalyzer(processedStream, false, "echo-bot");
+
+        try {
+          if (echoAudioRef.current) {
+            echoAudioRef.current.pause();
+            echoAudioRef.current.srcObject = null;
+          }
+          const echoAudio = new Audio();
+          echoAudio.srcObject = processedStream;
+          const vol = isDeafened ? 0 : (peerVolumes["echo-bot"] ?? peerVolumes["remote-user"] ?? remoteVolume ?? 100) / 100;
+          echoAudio.volume = Math.max(0, Math.min(1, vol));
+          if (selectedAudioOutput && selectedAudioOutput !== "default" && typeof (echoAudio as any).setSinkId === "function") {
+            void (echoAudio as any).setSinkId(selectedAudioOutput).catch(() => { });
+          }
+          void echoAudio.play().catch(() => { });
+          echoAudioRef.current = echoAudio;
+        } catch (echoErr) {
+          console.warn("[useVoiceCall] startTestCall echo loopback error:", echoErr);
+        }
       } else {
         setIsMuted(true);
         notify("Microfone não detectado ou sem permissão.", "info");
@@ -2865,7 +2974,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       notify("Erro ao acessar microfone para o teste.", "error");
       cleanUpCall();
     }
-  }, [acquireAudioStream, applyAudioProcessingChain, cleanUpCall, inputMode, notify, playRingtone, setupVoiceAnalyzer]);
+  }, [
+    acquireAudioStream,
+    applyAudioProcessingChain,
+    cleanUpCall,
+    inputMode,
+    isDeafened,
+    notify,
+    peerVolumes,
+    playRingtone,
+    remoteVolume,
+    selectedAudioOutput,
+    setupVoiceAnalyzer,
+  ]);
 
   // KICK PARTICIPANT (Admin Action)
   const kickParticipant = useCallback(

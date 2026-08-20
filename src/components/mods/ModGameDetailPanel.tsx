@@ -49,6 +49,7 @@ import {
 import { Switch } from "../ui/switch";
 import { usePreferences } from "../../context/PreferencesContext";
 import { useSoundEffects } from "../../hooks/useSoundEffects";
+import { HudCornerMarkers } from "../ui/HudPanel";
 
 export interface InstalledModEntry {
   id: string;
@@ -1416,36 +1417,42 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                             const displayedEnabled = optimisticModStates[mod.id] ?? mod.enabled;
                             const isBusy = modActionIds.has(mod.id);
                             return (
-                            <div key={mod.id} className="mod-list-item flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:flex-nowrap sm:gap-4">
-                              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-white/[0.04]">
-                                {mod.pictureUrl && <img src={mod.pictureUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
+                            <div key={mod.id} className="group relative flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.08] bg-[#0E0E0E] p-3.5 transition-all hover:border-white/20 hover:bg-[#151515] sm:flex-nowrap sm:gap-4">
+                              <HudCornerMarkers className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-[#171717]">
+                                {mod.pictureUrl && <img src={mod.pictureUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <h3 className="truncate text-sm font-black text-white/80">{mod.name}</h3>
-                                <p className="mt-1 text-[10px] text-white/30">
+                                <div className="flex items-center gap-2 font-mono">
+                                  <span className="text-white/35 font-bold text-xs select-none">[</span>
+                                  <h3 className="truncate text-xs md:text-sm font-bold text-white tracking-tight">{mod.name}</h3>
+                                  <span className="text-white/40 text-xs">▶</span>
+                                  <span className="text-white/35 font-bold text-xs select-none">]</span>
+                                </div>
+                                <p className="mt-1 font-mono text-[10px] text-white/35">
                                   {[
-                                    mod.author ? `Por ${mod.author}` : null,
-                                    mod.version ? `v${mod.version}` : null,
-                                  ].filter(Boolean).join(" · ")}
+                                    mod.author ? `AUTHOR: ${mod.author.toUpperCase()}` : null,
+                                    mod.version ? `VER: ${mod.version}` : null,
+                                  ].filter(Boolean).join(" | ")}
                                 </p>
                               </div>
-                              <div className="ml-auto flex items-center gap-3">
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${
+                              <div className="ml-auto flex items-center gap-3 font-mono">
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                                   displayedEnabled && mod.manifestPath
-                                    ? "text-emerald-400"
+                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
                                     : displayedEnabled
-                                      ? "text-amber-300/70"
+                                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
                                     : mod.status === "downloaded"
-                                      ? "text-sky-300/70"
-                                      : "text-white/25"
+                                      ? "border-white/10 bg-white/[0.04] text-white/50"
+                                      : "border-white/10 bg-white/[0.04] text-white/30"
                                 }`}>
                                   {isBusy
-                                    ? displayedEnabled ? "Ativando..." : "Desativando..."
+                                    ? displayedEnabled ? "ATIVANDO..." : "DESATIVANDO..."
                                     : displayedEnabled
-                                    ? mod.manifestPath ? "Ativo" : "Verificação necessária"
+                                    ? mod.manifestPath ? "ACTIVE" : "VERIFY"
                                     : mod.status === "downloaded"
-                                      ? "Baixado"
-                                      : "Desativado"}
+                                      ? "DOWNLOADED"
+                                      : "DISABLED"}
                                 </span>
                                 <button
                                   type="button"
@@ -1453,11 +1460,11 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                   disabled={isBusy}
                                   aria-label={`Remover ${mod.name}`}
                                   title="Remover do jogo e apagar o download"
-                                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-400/10 bg-red-400/[0.04] text-red-200/35 transition hover:border-red-400/25 hover:bg-red-400/10 hover:text-red-200 disabled:cursor-wait disabled:opacity-40"
+                                  className="cursor-pointer flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/35 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400 disabled:cursor-wait disabled:opacity-40"
                                 >
                                   {isBusy
-                                    ? <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    : <Trash2 className="h-4 w-4" />}
+                                    ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                    : <Trash2 className="h-3.5 w-3.5" />}
                                 </button>
                                 <Switch
                                   checked={displayedEnabled}

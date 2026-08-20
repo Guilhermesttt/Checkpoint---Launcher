@@ -15,6 +15,10 @@ import ModGameDetailPanel, {
   type InstalledModEntry,
 } from "../components/mods/ModGameDetailPanel";
 
+import { HudCornerMarkers, HudPanel } from "../components/ui/HudPanel";
+import { MetricMiniCard } from "../components/ui/MetricMiniCard";
+import { PerspectiveGrid } from "../components/ui/PerspectiveGrid";
+
 interface ModsPageProps {
   uid: string;
   games: Game[];
@@ -41,8 +45,6 @@ const normalizeInstalledMods = (
   Object.entries(record).map(([gameId, mods]) => [
     gameId,
     (Array.isArray(mods) ? mods : []).map((mod) => {
-      // Versoes antigas marcavam o download como ativo mesmo sem um manifesto.
-      // Nesse caso o Checkpoint so pode confirmar que o pacote foi baixado.
       if (mod.enabled && !mod.manifestPath) {
         return { ...mod, enabled: false, status: "downloaded" as const };
       }
@@ -192,50 +194,69 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
         data-system-page
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-10 pb-10 pt-4 thin-scrollbar"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto px-8 pb-14 pt-4 thin-scrollbar"
       >
-        <div className="mx-auto w-full max-w-6xl space-y-5">
-          <section className="relative overflow-hidden rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
-            <div
-              className="pointer-events-none absolute inset-0 opacity-60"
-              style={{
-                background:
-                  "radial-gradient(circle at 82% 15%, rgb(var(--launcher-accent) / 0.24), transparent 36%)",
-              }}
-            />
+        <div className="mx-auto w-full max-w-6xl space-y-6">
+          {/* HUD Header Section */}
+          <section className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/95 p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+            <HudCornerMarkers />
+            <PerspectiveGrid opacity={0.18} dotSize={1.2} gap={24} />
+
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-white/45">
-                  <PackageOpen className="h-3.5 w-3.5" />
-                  Biblioteca de mods
+                <div className="mb-2.5 inline-flex items-center gap-2 rounded-md border border-white/15 bg-white/[0.04] px-2.5 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-white/60">
+                  <PackageOpen className="h-3 w-3" />
+                  [MOD_MANAGER // SYS_V2]
                 </div>
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-                  Escolha um jogo para modificar
+                <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
+                  Gerenciador de Mods
                 </h1>
-                <p className="mt-1.5 max-w-2xl text-xs md:text-sm font-medium leading-relaxed text-white/40">
-                  Cada jogo possui seu próprio catálogo, pasta, mods instalados e controles.
+                <p className="mt-1.5 max-w-2xl text-xs md:text-sm font-medium leading-relaxed text-white/40 font-body">
+                  Selecione um jogo para gerenciar pastas, catálogo do Nexus Mods e arquivos instalados.
                 </p>
               </div>
 
+              {/* HUD Summary Counters with monospace metrics */}
               <div className="grid grid-cols-3 gap-3">
-                <SummaryStat label="Jogos" value={games.length} />
-                <SummaryStat label="Configurados" value={configuredGames} />
-                <SummaryStat label="Mods" value={installedCount} />
+                <MetricMiniCard
+                  label="Jogos"
+                  value={games.length}
+                  isMono={true}
+                  badge="TOTAL"
+                  className="min-w-28 p-3.5"
+                />
+                <MetricMiniCard
+                  label="Configurados"
+                  value={configuredGames}
+                  isMono={true}
+                  badge="DIR"
+                  className="min-w-28 p-3.5"
+                />
+                <MetricMiniCard
+                  label="Mods"
+                  value={installedCount}
+                  isMono={true}
+                  badge="INSTALLED"
+                  className="min-w-28 p-3.5"
+                />
               </div>
             </div>
           </section>
 
-          <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
-            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {/* Games Grid Section with HUD styling */}
+          <section className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 md:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+            <HudCornerMarkers />
+
+            <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-white/[0.06] pb-5">
               <div>
                 <div className="flex items-center gap-2.5">
-                  <Gamepad2 className="h-4.5 w-4.5 text-white/50" />
-                  <h2 className="text-base md:text-lg font-bold text-white tracking-tight">
-                    Meus jogos
+                  <Gamepad2 className="h-4 w-4 text-white/50" />
+                  <h2 className="text-base font-black uppercase tracking-tight text-white">
+                    Biblioteca de Jogos
                   </h2>
                 </div>
                 <p className="mt-0.5 text-xs font-medium text-white/40">
-                  Abra um card para explorar e gerenciar os mods daquele jogo.
+                  Selecione um título para abrir o painel de mods e integração com o Nexus.
                 </p>
               </div>
 
@@ -244,20 +265,20 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                 <input
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Buscar jogo"
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.04] pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-white/25"
+                  placeholder="Buscar jogo..."
+                  className="h-10 w-full rounded-xl border border-white/[0.08] bg-[#0E0E0E] pl-10 pr-3 font-mono text-xs text-white outline-none placeholder:text-white/20 focus:border-white/25 shadow-inner"
                 />
               </div>
             </div>
 
             {filteredGames.length === 0 ? (
-              <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 text-center">
-                <Gamepad2 className="mb-3 h-7 w-7 text-white/15" />
+              <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-white/[0.08] bg-[#0E0E0E] px-6 text-center">
+                <Gamepad2 className="mb-3 h-7 w-7 text-white/20" />
                 <p className="text-sm font-bold text-white/50">
                   {games.length ? "Nenhum jogo encontrado" : "Sua biblioteca está vazia"}
                 </p>
-                <p className="mt-1 text-xs font-medium text-white/40">
-                  {games.length ? "Tente outro nome." : "Adicione um jogo antes de configurar seus mods."}
+                <p className="mt-1 text-xs font-medium text-white/35">
+                  {games.length ? "Tente outro termo na busca." : "Adicione um jogo antes de configurar seus mods."}
                 </p>
               </div>
             ) : (
@@ -280,14 +301,17 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                         }
                         setSelectedGame(game);
                       }}
-                      className="group overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.035] text-left shadow-[0_14px_40px_rgba(0,0,0,0.32)] transition duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/[0.07]"
+                      className="cursor-pointer group relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0E0E0E] text-left shadow-[0_12px_36px_rgba(0,0,0,0.4)] transition-all duration-200 hover:-translate-y-1 hover:border-white/25 hover:bg-[#151515]"
                     >
-                      <div className="relative h-36 overflow-hidden bg-white/[0.04]">
+                      <HudCornerMarkers className="opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                      {/* Standardized 16:9 thumbnail */}
+                      <div className="relative aspect-video w-full overflow-hidden bg-[#171717]">
                         {image ? (
                           <img
                             src={image}
                             alt=""
-                            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                            className="h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
                             loading="lazy"
                           />
                         ) : (
@@ -295,37 +319,35 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                             <Gamepad2 className="h-8 w-8 text-white/15" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-linear-to-t from-black via-black/15 to-transparent" />
-                        <div className="absolute left-3 top-3 flex gap-1.5">
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0E0E0E] via-transparent to-transparent opacity-80" />
+
+                        {/* Badges on thumbnail */}
+                        <div className="absolute left-2.5 top-2.5 flex flex-wrap gap-1.5">
                           {folder && (
-                            <span className="flex h-6 items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-500/20 px-2 text-[9px] font-black uppercase text-emerald-300 backdrop-blur-md">
-                              <CheckCircle2 className="h-3 w-3" /> Pasta
+                            <span className="flex h-5 items-center gap-1 rounded border border-emerald-500/30 bg-black/75 px-1.5 font-mono text-[8.5px] font-bold uppercase text-emerald-400 backdrop-blur-md">
+                              <CheckCircle2 className="h-2.5 w-2.5" /> DIR
                             </span>
                           )}
                           {domain && (
-                            <span className="flex h-6 items-center gap-1 rounded-lg border border-white/15 bg-black/60 px-2 text-[9px] font-black uppercase text-white/70 backdrop-blur-md">
-                              Nexus
+                            <span className="flex h-5 items-center rounded border border-white/15 bg-black/75 px-1.5 font-mono text-[8.5px] font-bold uppercase text-white/70 backdrop-blur-md">
+                              NEXUS
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-4">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-white group-hover:text-white">
-                            {game.title}
-                          </p>
-                          <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-white/35">
-                            {game.launcherType || "local"}
-                          </p>
-                          <p className="mt-1 text-xs font-medium text-white/40">
-                            {installed.length
-                              ? `${activeMods} de ${installed.length} mods ativos`
-                              : "Nenhum mod instalado"}
-                          </p>
-                        </div>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/30 transition group-hover:bg-white/10 group-hover:text-white">
-                          <Sparkles className="h-4 w-4" />
+                      {/* Card Content with monospace details */}
+                      <div className="p-4">
+                        <p className="truncate text-xs md:text-sm font-bold text-white group-hover:text-white tracking-tight">
+                          {game.title}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between font-mono text-[10px] text-white/35">
+                          <span className="uppercase">{game.launcherType || "LOCAL"}</span>
+                          <span className="text-white/50">
+                            {installed.length > 0
+                              ? `[ ${activeMods}/${installed.length} MODS ]`
+                              : "[ 0 MODS ]"}
+                          </span>
                         </div>
                       </div>
                     </button>
@@ -334,7 +356,6 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
               </div>
             )}
           </section>
-
         </div>
       </motion.main>
 
@@ -365,12 +386,5 @@ const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     </>
   );
 };
-
-const SummaryStat: React.FC<{ label: string; value: number }> = ({ label, value }) => (
-  <div className="min-w-24 rounded-2xl border border-white/[0.06] bg-white/[0.035] px-4.5 py-3 text-right backdrop-blur-xl">
-    <p className="text-xl font-bold text-white tabular-nums">{value}</p>
-    <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-white/35">{label}</p>
-  </div>
-);
 
 export default ModsPage;

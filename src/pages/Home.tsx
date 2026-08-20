@@ -1832,20 +1832,12 @@ const Home: React.FC = () => {
                   >
                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] group-hover/steam:bg-red-500 group-hover/steam:shadow-[0_0_8px_rgba(239,68,68,0.6)] transition-all" />
                     <div className="relative h-3 overflow-hidden min-w-[40px]">
-                      <AnimatePresence mode="wait">
-                        <motion.span
-                          key="steam-label"
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          exit={{ y: -20, opacity: 0 }}
-                          className="absolute inset-0 text-[10px] font-black uppercase tracking-wider text-emerald-500/60 group-hover/steam:hidden"
-                        >
-                          Steam
-                        </motion.span>
-                        <span className="hidden group-hover/steam:block text-[10px] font-black uppercase tracking-wider text-red-500/60 whitespace-nowrap">
-                          {t("unlink")}
-                        </span>
-                      </AnimatePresence>
+                      <span className="block group-hover/steam:hidden text-[10px] font-black uppercase tracking-wider text-emerald-500/60">
+                        Steam
+                      </span>
+                      <span className="hidden group-hover/steam:block text-[10px] font-black uppercase tracking-wider text-red-500/60 whitespace-nowrap">
+                        {t("unlink")}
+                      </span>
                     </div>
                   </button>
 
