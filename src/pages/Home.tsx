@@ -466,7 +466,8 @@ const Home: React.FC = () => {
     setIsAddFriendModalOpen,
   });
 
-  const { startCall, startTestCall } = useVoiceCallContext();
+  const voiceCallContext = useVoiceCallContext();
+  const { startCall, startTestCall } = voiceCallContext;
 
   const [overlayAchievements, setOverlayAchievements] = useState<{
     loading: boolean;
