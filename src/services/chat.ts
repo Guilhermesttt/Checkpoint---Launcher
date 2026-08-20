@@ -264,8 +264,17 @@ export const subscribeToActiveChats = (uid: string) => {
 };
 
 export const closeChatConnection = () => {
-  activeChatChannels.forEach((channel) => {
-    supabase.removeChannel(channel);
+  activeChatChannels.forEach((item) => {
+    try {
+      if (item) {
+        if (typeof item.unsubFast === "function") item.unsubFast();
+        if (item.channel && typeof item.channel.unsubscribe === "function") {
+          supabase.removeChannel(item.channel);
+        } else if (typeof item.unsubscribe === "function") {
+          supabase.removeChannel(item);
+        }
+      }
+    } catch {}
   });
   activeChatChannels.clear();
   unreadMessages.splice(0, unreadMessages.length);
@@ -366,36 +375,34 @@ export const sendChatImage = async (
 const typingThrottleMap = new Map<string, { lastSentTime: number; isCurrentlyTyping: boolean; timeoutId: number | null }>();
 
 const sendTypingPayload = async (friendUid: string, typing: boolean) => {
-  const session = (await supabase.auth.getSession()).data.session;
-  if (!session?.user) return;
-  const uid = session.user.id;
-  const chatId = await ensureChatSession(uid, friendUid);
-  const channelKey = `typing_send_${chatId}`;
-  let channel = activeChatChannels.get(channelKey);
-  if (!channel) {
-    channel = supabase.channel(`typing_${chatId}`);
-    await new Promise<void>((resolve, reject) => {
-      const timeoutId = window.setTimeout(
-        () => reject(new Error("Tempo limite ao conectar indicador de digitacao.")),
-        5_000,
-      );
-      channel.subscribe((status: string) => {
-        if (status === "SUBSCRIBED") {
-          window.clearTimeout(timeoutId);
+  try {
+    const session = (await supabase.auth.getSession()).data.session;
+    if (!session?.user) return;
+    const uid = session.user.id;
+    const chatId = await ensureChatSession(uid, friendUid);
+    const channelKey = `typing_send_${chatId}`;
+    let channel = activeChatChannels.get(channelKey);
+    if (!channel || typeof channel.send !== "function") {
+      channel = supabase.channel(`typing_${chatId}`);
+      await new Promise<void>((resolve) => {
+        const timeoutId = window.setTimeout(() => {
           resolve();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          window.clearTimeout(timeoutId);
-          reject(new Error("Falha no indicador de digitacao."));
-        }
+        }, 3000);
+        channel.subscribe((status: string) => {
+          if (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            window.clearTimeout(timeoutId);
+            resolve();
+          }
+        });
       });
+      activeChatChannels.set(channelKey, channel);
+    }
+    await channel.send({
+      type: "broadcast",
+      event: "typing",
+      payload: { senderId: uid, typing },
     });
-    activeChatChannels.set(channelKey, channel);
-  }
-  await channel.send({
-    type: "broadcast",
-    event: "typing",
-    payload: { senderId: uid, typing },
-  });
+  } catch {}
 };
 
 export const setChatTyping = async (friendUid: string, typing: boolean) => {

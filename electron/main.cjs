@@ -1111,9 +1111,20 @@ const createWindow = async () => {
   });
 
   mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F11" && input.type === "keyDown") {
-      mainWindow.setFullScreen(!mainWindow.isFullScreen());
-      event.preventDefault();
+    if (input.type === "keyDown") {
+      if (input.key === "F11") {
+        mainWindow.setFullScreen(!mainWindow.isFullScreen());
+        event.preventDefault();
+      } else if (
+        input.key === "F12" ||
+        ((input.control || input.meta) && input.shift && input.key.toLowerCase() === "i")
+      ) {
+        mainWindow.webContents.toggleDevTools();
+        event.preventDefault();
+      } else if ((input.control || input.meta) && input.key.toLowerCase() === "r" && !app.isPackaged) {
+        mainWindow.webContents.reload();
+        event.preventDefault();
+      }
     }
   });
 
@@ -3640,6 +3651,7 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
   const playerName = String(payload?.playerName || "").trim() || copy.player;
   const avatarUrl = sanitizeOverlayImageSource(payload?.avatarUrl);
   const friendId = String(payload?.friendId || "").trim().slice(0, 128);
+  const contentKind = payload?.contentKind === "image" ? "image" : "text";
 
   sendOverlayEvent("overlay:social", {
     kind: "friend-request",

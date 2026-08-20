@@ -81,38 +81,65 @@ export const getOrCreateChannel = async (channelName: string): Promise<any> => {
   const cleanChannelName = String(channelName || "").trim();
   const channel = activeChannels.get(cleanChannelName);
   if (channel && (channel.state === "joined" || channel.status === "SUBSCRIBED")) {
+    // eslint-disable-next-line no-console
+    console.debug("[voiceCall] getOrCreateChannel: reusing", cleanChannelName, "state:", channel.state ?? channel.status);
     return channel;
   }
-
   if (channelPromises.has(cleanChannelName)) {
+    // eslint-disable-next-line no-console
+    console.debug("[voiceCall] getOrCreateChannel: awaiting existing promise for", cleanChannelName);
     return channelPromises.get(cleanChannelName);
   }
-
   const newChannel = channel || supabase.channel(cleanChannelName, {
     config: { broadcast: { self: false } },
   });
+  try {
+    (newChannel as any).__createdAt = Date.now();
+  } catch {}
   activeChannels.set(cleanChannelName, newChannel);
-
-  const subPromise = new Promise<any>((resolve) => {
+  const subPromise: Promise<any> = new Promise<any>((resolve) => {
     let resolved = false;
     const timer = setTimeout(() => {
       if (!resolved) {
         resolved = true;
         channelPromises.delete(cleanChannelName);
+        // eslint-disable-next-line no-console
+        console.warn(`[voiceCall] getOrCreateChannel: subscribe timed out for ${cleanChannelName} (resolving with channel object).`);
+        try {
+          (newChannel as any).__subscribed = false;
+        } catch {}
         resolve(newChannel);
       }
-    }, 2500);
-
-    newChannel.subscribe((status: string) => {
-      if (!resolved && (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
-        resolved = true;
-        clearTimeout(timer);
-        channelPromises.delete(cleanChannelName);
-        resolve(newChannel);
-      }
-    });
+    }, 4000);
+    try {
+      newChannel.subscribe((status: string) => {
+        // eslint-disable-next-line no-console
+        console.debug("[voiceCall] channel subscribe status", cleanChannelName, status);
+        if (!resolved && status === "SUBSCRIBED") {
+          resolved = true;
+          clearTimeout(timer);
+          channelPromises.delete(cleanChannelName);
+          try {
+            (newChannel as any).__subscribed = true;
+          } catch {}
+          resolve(newChannel);
+        } else if (!resolved && (status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
+          // log only; wait for timeout to resolve to avoid false positives
+          // eslint-disable-next-line no-console
+          console.warn("[voiceCall] channel subscribe reported", status, "for", cleanChannelName);
+        }
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      channelPromises.delete(cleanChannelName);
+      // eslint-disable-next-line no-console
+      console.error("[voiceCall] getOrCreateChannel subscribe threw:", cleanChannelName, err);
+      try {
+        (newChannel as any).__subscribed = false;
+      } catch {}
+      resolve(newChannel);
+    }
   });
-
   channelPromises.set(cleanChannelName, subPromise);
   return subPromise;
 };
@@ -188,27 +215,44 @@ export const sendCallInvite = async (
   invite: CallInvitePayload,
 ) => {
   const cleanUid = String(targetFriendUid || "").replace(/^cp-friend:/, "").trim();
-  
+  // eslint-disable-next-line no-console
+  console.debug("[voiceCall] sendCallInvite -> target:", cleanUid, "invite:", { chatId: invite.chatId, callerId: invite.callerId });
   try {
     const channelCalls = await getOrCreateChannel(`user_calls_${cleanUid}`);
-    await channelCalls.send({
-      type: "broadcast",
-      event: "call:invite",
-      payload: invite,
-    });
+    try {
+      await channelCalls.send({
+        type: "broadcast",
+        event: "call:invite",
+        payload: invite,
+      });
+      // eslint-disable-next-line no-console
+      console.debug("[voiceCall] sendCallInvite: sent on user_calls channel for", cleanUid);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[voiceCall] sendCallInvite: send to user_calls failed:", cleanUid, err);
+    }
   } catch (err) {
-    console.warn("[sendCallInvite] user_calls channel send warning:", err);
+    // eslint-disable-next-line no-console
+    console.warn("[voiceCall] sendCallInvite getOrCreateChannel(user_calls) failed for", cleanUid, err);
   }
 
   try {
     const channelInbox = await getOrCreateChannel(`user_inbox_${cleanUid}`);
-    await channelInbox.send({
-      type: "broadcast",
-      event: "call:invite",
-      payload: invite,
-    });
+    try {
+      await channelInbox.send({
+        type: "broadcast",
+        event: "call:invite",
+        payload: invite,
+      });
+      // eslint-disable-next-line no-console
+      console.debug("[voiceCall] sendCallInvite: sent on user_inbox channel for", cleanUid);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[voiceCall] sendCallInvite: send to user_inbox failed:", cleanUid, err);
+    }
   } catch (err) {
-    console.warn("[sendCallInvite] user_inbox channel send warning:", err);
+    // eslint-disable-next-line no-console
+    console.warn("[voiceCall] sendCallInvite getOrCreateChannel(user_inbox) failed for", cleanUid, err);
   }
 };
 
