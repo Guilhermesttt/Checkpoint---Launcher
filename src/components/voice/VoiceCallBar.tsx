@@ -19,6 +19,8 @@ interface VoiceCallBarProps {
   duration: number;
   isMuted: boolean;
   isDeafened: boolean;
+  isRemoteMuted?: boolean;
+  isRemoteDeafened?: boolean;
   isSpeakingLocal?: boolean;
   isSpeakingRemote?: boolean;
   remoteSpeakingStates?: Map<string, boolean>;
@@ -47,6 +49,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
   duration,
   isMuted,
   isDeafened,
+  isRemoteMuted = false,
+  isRemoteDeafened = false,
   isSpeakingLocal = false,
   isSpeakingRemote = false,
   remoteSpeakingStates,
@@ -196,9 +200,18 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-white group-hover:text-white/80 transition-colors truncate max-w-[140px]">
+              <span className="text-xs font-bold text-white group-hover:text-white/80 transition-colors truncate max-w-[130px]">
                 {displayName}
               </span>
+              {isRemoteDeafened ? (
+                <span className="flex items-center gap-1 rounded bg-rose-500/20 px-1 py-0.2 text-[8px] font-bold uppercase text-rose-300 border border-rose-500/30">
+                  <VolumeX className="h-2.5 w-2.5" /> Mutou tudo
+                </span>
+              ) : isRemoteMuted ? (
+                <span className="flex items-center gap-1 rounded bg-rose-500/20 px-1 py-0.2 text-[8px] font-bold uppercase text-rose-300 border border-rose-500/30">
+                  <MicOff className="h-2.5 w-2.5" /> Mutado
+                </span>
+              ) : null}
               <span className="text-[10px] font-mono text-white/40 shrink-0">
                 • {formatDuration(duration)}
               </span>

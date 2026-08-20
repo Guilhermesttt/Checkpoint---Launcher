@@ -1269,11 +1269,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
                         {/* Mute/Deafen Badge */}
                         {focusedFeed.isDeafened ? (
-                          <div className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg">
+                          <div
+                            className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg animate-pulse"
+                            title="Mutou tudo (Microfone e Som desativados)"
+                          >
                             <VolumeX className="h-4.5 w-4.5" />
                           </div>
                         ) : focusedFeed.isMuted ? (
-                          <div className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg">
+                          <div
+                            className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg"
+                            title="Microfone Mutado"
+                          >
                             <MicOff className="h-4.5 w-4.5" />
                           </div>
                         ) : null}
@@ -1285,6 +1291,14 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                           {focusedFeed.isRinging ? (
                             <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
                               <Phone className="h-3.5 w-3.5 animate-bounce text-amber-300" /> Chamando...
+                            </span>
+                          ) : focusedFeed.isDeafened ? (
+                            <span className="text-rose-400 font-bold flex items-center gap-1.5">
+                              <VolumeX className="h-3.5 w-3.5 text-rose-400" /> Mutou tudo (Som & Mic)
+                            </span>
+                          ) : focusedFeed.isMuted ? (
+                            <span className="text-rose-400 font-bold flex items-center gap-1.5">
+                              <MicOff className="h-3.5 w-3.5 text-rose-400" /> Microfone mutado
                             </span>
                           ) : focusedFeed.isSpeaking ? (
                             <span className="text-white font-bold flex items-center gap-1">
@@ -1395,11 +1409,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                 {feed.title}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1.5 shrink-0">
                               {feed.isDeafened ? (
-                                <VolumeX className="h-3.5 w-3.5 text-rose-400" />
+                                <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
+                                  <VolumeX className="h-3 w-3" /> Mutou Tudo
+                                </span>
                               ) : feed.isMuted ? (
-                                <MicOff className="h-3.5 w-3.5 text-rose-400" />
+                                <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
+                                  <MicOff className="h-3 w-3" /> Mutado
+                                </span>
                               ) : (
                                 <Camera className="h-3 w-3 text-white/50" />
                               )}
@@ -1527,11 +1545,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               )}
                             </div>
                             {feed.isDeafened ? (
-                              <div className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg">
+                              <div
+                                className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg animate-pulse"
+                                title="Mutou tudo (Microfone e Som desativados)"
+                              >
                                 <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </div>
                             ) : feed.isMuted ? (
-                              <div className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg">
+                              <div
+                                className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg"
+                                title="Microfone Mutado"
+                              >
                                 <MicOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               </div>
                             ) : null}
@@ -1553,6 +1577,14 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             {feed.isRinging ? (
                               <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
                                 <Phone className="h-3 w-3 animate-bounce text-amber-300" /> Chamando...
+                              </span>
+                            ) : feed.isDeafened ? (
+                              <span className="text-rose-400 font-bold flex items-center gap-1">
+                                <VolumeX className="h-3 w-3 text-rose-400" /> Mutou tudo (Som & Mic)
+                              </span>
+                            ) : feed.isMuted ? (
+                              <span className="text-rose-400/90 font-bold flex items-center gap-1">
+                                <MicOff className="h-3 w-3 text-rose-400" /> Mutado
                               </span>
                             ) : feed.isSpeaking ? (
                               <span className="text-white font-bold flex items-center gap-1">

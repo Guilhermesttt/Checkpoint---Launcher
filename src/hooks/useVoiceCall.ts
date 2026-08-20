@@ -2558,12 +2558,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           senderId: user.uid,
           chatId: session.chatId,
           isMuted: nextMuted,
+          isDeafened: isDeafened,
         });
       }
     }
-  }, [session?.chatId, user?.uid]);
+  }, [isDeafened, session?.chatId, user?.uid]);
 
-  // DEAFEN / UNDEAFEN
+  // DEAFEN / UNDEAFEN (MUTE ALL / SOM & MIC)
   const toggleDeafen = useCallback(() => {
     setIsDeafened((prev) => {
       const nextDeafened = !prev;
@@ -2575,9 +2576,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           if (audioTrack) audioTrack.enabled = false;
         }
       }
+
+      if (session?.chatId && user?.uid) {
+        void sendCallState(session.chatId, {
+          senderId: user.uid,
+          chatId: session.chatId,
+          isDeafened: nextDeafened,
+          isMuted: nextDeafened ? true : isMuted,
+        });
+      }
+
       return nextDeafened;
     });
-  }, []);
+  }, [isMuted, session?.chatId, user?.uid]);
 
   // TOGGLE CAMERA
   const toggleCamera = useCallback(async () => {
