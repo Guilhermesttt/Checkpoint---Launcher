@@ -8,7 +8,10 @@ import type {
 } from "../types/domain";
 import type { SoundEffectType } from './useSoundEffects';
 import { subscribeToUnreadMessages } from '../services/chat';
-import { subscribeToGlobalEventBus } from '../services/realtimeEventBus';
+import {
+  subscribeToGlobalEventBus,
+  sendFastFriendRequestNotification,
+} from '../services/realtimeEventBus';
 import {
   acceptCheckpointFriendRequest,
   rejectCheckpointFriendRequest,
@@ -60,8 +63,8 @@ export function useFriendsSystem({
   const [incomingFriendRequests, setIncomingFriendRequests] = useState<CheckpointFriendRequest[]>([]);
   const [activeChatFriend, setActiveChatFriend] = useState<SocialFriend | null>(null);
 
-  const notifiedMessageIdsRef = useRef<Set<string>>(new Set());  
-  const isFirstUnreadSnapshotRef = useRef(true);  
+  const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
+  const isFirstUnreadSnapshotRef = useRef(true);
   const friendPresenceFingerprintRef = useRef<Map<string, string>>(new Map());
 
   const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
@@ -128,7 +131,7 @@ export function useFriendsSystem({
 
           if (!isActiveChat) {
             const displayContent = isImage ? "📷 Enviou uma imagem" : msg.text;
-            
+
             // Toast in-app notification
             notify(`${senderName}: ${displayContent}`, "info");
 
@@ -272,10 +275,11 @@ export function useFriendsSystem({
 
     initialSync();
 
-    // Intervalo de polling contínuo (mantém a lista de amigos sincronizada mesmo minimizado)
+    // Intervalo de polling contínuo (mantém a lista de amigos e solicitações sincronizadas mesmo minimizado)
     const interval = window.setInterval(() => {
       if (!isInitialSync) {
         syncFriendStatuses();
+        void refreshProfile();
       }
     }, 15_000);
 
@@ -283,6 +287,7 @@ export function useFriendsSystem({
     const handleFocus = () => {
       if (!isInitialSync) {
         syncFriendStatuses();
+        void refreshProfile();
       }
     };
 
@@ -411,23 +416,23 @@ export function useFriendsSystem({
     if (!user?.uid) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSocialFriends([]);
-       
+
       setLocalSocialStateLoaded(false);
       return;
     }
     const stored: SocialFriend[] = JSON.parse(
       localStorage.getItem(`checkpoint_social_friends_${user.uid}`) || "[]",
     );
-     
+
     setSocialFriends(stored.filter((f) => f.source?.startsWith("discord") || f.source === "checkpoint"));
-     
+
     setLocalSocialStateLoaded(true);
   }, [user?.uid, setLocalSocialStateLoaded]);
 
   useEffect(() => {
     if (!localSocialStateLoaded) return;
     const resolvedDiscordId = userProfile?.discordId;
-    
+
     if (!resolvedDiscordId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSocialFriends((current) =>
@@ -436,7 +441,7 @@ export function useFriendsSystem({
       return;
     }
 
-     
+
     setSocialFriends((current) => {
       const remoteFriends: SocialFriend[] = (userProfile?.discordFriends ?? [])
         .filter((friend) => friend.id && friend.id !== resolvedDiscordId)
@@ -495,6 +500,11 @@ export function useFriendsSystem({
     if (!user?.uid) return;
     try {
       await sendCheckpointFriendRequest(friendProfile.uid);
+      void sendFastFriendRequestNotification(friendProfile.uid, {
+        uid: user.uid,
+        displayName: userProfile?.displayName || user.displayName || user.email?.split("@")[0] || "Jogador",
+        photoURL: userProfile?.photoURL || user.photoURL || null,
+      });
       notify("Solicitação enviada.", "success");
       await refreshProfile();
       setIsAddFriendModalOpen(false);

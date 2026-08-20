@@ -24,82 +24,37 @@ export interface U2UEventHandlers {
 let inboxChannel: any = null;
 let presenceChannel: any = null;
 const globalEventHandlers = new Set<U2UEventHandlers>();
-
-// ── Outbound channel pool with idle-close ────────────────────────────────────
-// Canais de saída são reutilizados e fechados automaticamente após 30s de idle,
-// evitando acúmulo ilimitado de WebSockets abertos.
 const activeInboxChannels = new Map<string, any>();
 const sentMessageIds = new Set<string>();
 
-const INBOX_CHANNEL_IDLE_MS = 30_000;
+// Refcount + idle close management for per-user inbox channels created on-demand.
+const channelRefCounts = new Map<string, number>();
 const channelIdleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const INBOX_CHANNEL_IDLE_MS = 30_000; // close channels after 30s idle
 
-/** Agenda o fechamento automático de um canal de saída após período de idle. */
 function scheduleChannelIdleClose(channelName: string, channelObj: any) {
-  // Cancela timer anterior antes de criar um novo
-  cancelChannelIdleClose(channelName);
+  if (channelIdleTimers.has(channelName)) return;
   const t = setTimeout(() => {
     try {
       channelObj?.unsubscribe?.();
+    } catch { }
+    try {
       supabase.removeChannel(channelObj);
-    } catch {
-      // Ignora erros no fechamento silencioso
-    }
+    } catch { }
     activeInboxChannels.delete(channelName);
+    channelRefCounts.delete(channelName);
     channelIdleTimers.delete(channelName);
   }, INBOX_CHANNEL_IDLE_MS);
+  // @ts-ignore
   channelIdleTimers.set(channelName, t);
 }
 
-/** Cancela um timer de idle-close existente (ao reutilizar o canal). */
 function cancelChannelIdleClose(channelName: string) {
   const t = channelIdleTimers.get(channelName);
-  if (t !== undefined) {
+  if (t) {
     clearTimeout(t);
     channelIdleTimers.delete(channelName);
   }
-}
-
-/** Fecha e remove os canais globais de inbox e presence quando não há mais handlers. */
-function teardownGlobalChannels() {
-  if (inboxChannel) {
-    try {
-      inboxChannel.unsubscribe?.();
-      supabase.removeChannel(inboxChannel);
-    } catch {
-      // Silencioso
-    }
-    inboxChannel = null;
-  }
-  if (presenceChannel) {
-    try {
-      presenceChannel.unsubscribe?.();
-      supabase.removeChannel(presenceChannel);
-    } catch {
-      // Silencioso
-    }
-    presenceChannel = null;
-  }
-}
-
-/**
- * Garante que existe um canal de saída (outbound) para o destinatário.
- * A subscrição é feita de forma não bloqueante em background.
- * Retorna o canal imediatamente para que o caller possa enfileirar o send.
- */
-function getOrCreateOutboundChannel(channelName: string): any {
-  let channel = activeInboxChannels.get(channelName);
-  if (!channel) {
-    channel = supabase.channel(channelName);
-    activeInboxChannels.set(channelName, channel);
-    // Subscrição assíncrona em background — não bloqueia o envio
-    channel.subscribe(() => {
-      // Canal pronto; idle timer continua válido
-    });
-  }
-  // Reutilizando o canal: cancela o idle timer para mantê-lo vivo
-  cancelChannelIdleClose(channelName);
-  return channel;
 }
 
 /**
@@ -151,11 +106,16 @@ export const subscribeToGlobalEventBus = (
         }
       });
 
-    inboxChannel.subscribe((status: string) => {
-      if (status === "SUBSCRIBED") {
-        // Conectado ao inbox pessoal
-      }
-    });
+    // non-blocking subscribe (do not await SUBSCRIBED here to avoid blocking callers)
+    try {
+      inboxChannel.subscribe((status: string) => {
+        if (status === "SUBSCRIBED") {
+          // connected to personal inbox
+        }
+      });
+    } catch (err) {
+      // ignore subscribe errors silently — presence of the channel object is sufficient
+    }
   }
 
   // Inscreve também no canal global de Presence para sincronização instantânea de status de amigos
@@ -197,16 +157,34 @@ export const subscribeToGlobalEventBus = (
         }
       });
 
-    presenceChannel.subscribe();
+    try {
+      presenceChannel.subscribe();
+    } catch { }
   }
 
-  // ── Cleanup correto: remove o handler E fecha os canais globais se não há mais ninguém ──
-  return () => {
+  const unsubscribe = () => {
     globalEventHandlers.delete(handlers);
+    // If no more handlers remain, clean up inbox/presence channels to free resources
     if (globalEventHandlers.size === 0) {
-      teardownGlobalChannels();
+      try {
+        inboxChannel?.unsubscribe?.();
+      } catch { }
+      try {
+        if (inboxChannel) supabase.removeChannel(inboxChannel);
+      } catch { }
+      inboxChannel = null;
+
+      try {
+        presenceChannel?.unsubscribe?.();
+      } catch { }
+      try {
+        if (presenceChannel) supabase.removeChannel(presenceChannel);
+      } catch { }
+      presenceChannel = null;
     }
   };
+
+  return unsubscribe;
 };
 
 /**
@@ -216,11 +194,9 @@ export const broadcastPresenceStatus = async (presence: PresencePayload) => {
   try {
     if (!presenceChannel) {
       presenceChannel = supabase.channel("checkpoint_presence_bus");
-      await new Promise<void>((resolve) => {
-        presenceChannel.subscribe((s: string) => {
-          if (s === "SUBSCRIBED") resolve();
-        });
-      });
+      try {
+        presenceChannel.subscribe((s: string) => { });
+      } catch { }
     }
 
     // 1. Broadcast instantâneo para canais inscritos
@@ -240,13 +216,26 @@ export const broadcastPresenceStatus = async (presence: PresencePayload) => {
 };
 
 /**
- * Envia uma mensagem direta de entrega instantânea (Fast-Path via WebSocket).
- * A subscrição do canal é feita em background — não bloqueia o envio.
+ * Envia uma mensagem direta de entrega instantânea (Fast-Path via WebSocket)
  */
 export const sendFastU2UMessage = async (receiverUid: string, message: ChatMessage) => {
   try {
     const channelName = `user_inbox_${receiverUid}`;
-    const targetChannel = getOrCreateOutboundChannel(channelName);
+    let targetChannel = activeInboxChannels.get(channelName);
+
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
+      // non-blocking subscribe
+      try {
+        targetChannel.subscribe((s: string) => { });
+      } catch { }
+    }
+
+    // Keep the channel alive while sending
+    channelRefCounts.set(channelName, (channelRefCounts.get(channelName) || 0) + 1);
+    cancelChannelIdleClose(channelName);
 
     sentMessageIds.add(message.id || "");
 
@@ -256,8 +245,11 @@ export const sendFastU2UMessage = async (receiverUid: string, message: ChatMessa
       payload: message,
     });
 
-    // Agenda o fechamento idle após o envio
-    scheduleChannelIdleClose(channelName, targetChannel);
+    // decrement refcount and schedule idle close if none left
+    channelRefCounts.set(channelName, (channelRefCounts.get(channelName) || 1) - 1);
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
   } catch (err) {
     console.warn("[realtimeEventBus] sendFastU2UMessage error:", err);
   }
@@ -269,27 +261,30 @@ export const sendFastU2UMessage = async (receiverUid: string, message: ChatMessa
 export const sendFastU2UTyping = async (receiverUid: string, senderId: string, typing: boolean) => {
   try {
     const channelName = `user_inbox_${receiverUid}`;
-    const targetChannel = getOrCreateOutboundChannel(channelName);
+    let targetChannel = activeInboxChannels.get(channelName);
 
-    await targetChannel.send({
-      type: "broadcast",
-      event: "u2u:typing",
-      payload: { senderId, typing },
-    });
-
-    // Typing é muito frequente: usa idle timer curto de 5s para fechar logo
-    const t = setTimeout(() => {
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
       try {
-        targetChannel?.unsubscribe?.();
-        supabase.removeChannel(targetChannel);
-      } catch {
-        // Silencioso
-      }
-      activeInboxChannels.delete(channelName);
-      channelIdleTimers.delete(channelName);
-    }, 5_000);
-    // Sobrescreve o timer existente (cancelChannelIdleClose já chamado em getOrCreateOutboundChannel)
-    channelIdleTimers.set(channelName, t);
+        targetChannel.subscribe((s: string) => { });
+      } catch { }
+    }
+
+    // do not increase refcount for typing (fire-and-forget)
+    try {
+      await targetChannel.send({
+        type: "broadcast",
+        event: "u2u:typing",
+        payload: { senderId, typing },
+      });
+    } catch { }
+
+    // schedule idle close since this was only a fire-and-forget use
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
   } catch {
     // Ignore typing throttle errors
   }
@@ -304,7 +299,15 @@ export const sendFastFriendRequestNotification = async (
 ) => {
   try {
     const channelName = `user_inbox_${targetUid}`;
-    const targetChannel = getOrCreateOutboundChannel(channelName);
+    let targetChannel = activeInboxChannels.get(channelName);
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
+      try {
+        targetChannel.subscribe((s: string) => { });
+      } catch { }
+    }
 
     await targetChannel.send({
       type: "broadcast",
@@ -316,7 +319,9 @@ export const sendFastFriendRequestNotification = async (
       },
     });
 
-    scheduleChannelIdleClose(channelName, targetChannel);
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
   } catch (err) {
     console.warn("[realtimeEventBus] sendFastFriendRequestNotification error:", err);
   }
