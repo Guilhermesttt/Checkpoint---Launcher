@@ -1854,6 +1854,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               setCallDuration((prev) => prev + 1);
             }, 1000);
           }
+
+          if (user?.uid) {
+            void sendCallState(chatId, {
+              senderId: user.uid,
+              chatId,
+              isMuted,
+              isDeafened,
+              isCameraOn,
+              isSharingScreen,
+            });
+          }
         } else {
           notify("O usuário recusou a chamada.", "info");
           playRingtone("disconnect");
@@ -2343,6 +2354,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         accepted: true,
         chatId,
       });
+
+      if (user?.uid) {
+        void sendCallState(chatId, {
+          senderId: user.uid,
+          chatId,
+          isMuted,
+          isDeafened,
+          isCameraOn,
+          isSharingScreen,
+        });
+      }
 
       setIncomingInvite(null);
     } catch (err: any) {

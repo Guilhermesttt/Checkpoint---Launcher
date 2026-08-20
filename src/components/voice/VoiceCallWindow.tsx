@@ -601,6 +601,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     session,
     isRemoteSharingScreen,
     remoteStream,
+    remoteStreams,
+    remoteStatesMap,
+    remoteSpeakingStates,
     isSpeakingRemote,
     isRemoteMuted,
     isRemoteDeafened,
@@ -780,54 +783,63 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       <span>Focado: {focusedFeed.title}</span>
                     </Badge>
                   )}
-                  {/* Category Pill */}
-                  <Badge
-                    variant="outline"
-                    className="hidden lg:inline-flex h-6 gap-1.5 rounded-full border-white/10 bg-white/[0.04] px-2.5 text-[10px] font-semibold text-white/70"
-                  >
-                    {currentCategory.icon}
-                    <span>{currentCategory.label}</span>
-                  </Badge>
+                  {/* Room-specific badges (Only for persistent voice rooms / channels) */}
+                  {isRoomSession && (
+                    <>
+                      {/* Category Pill */}
+                      <Badge
+                        variant="outline"
+                        className="hidden lg:inline-flex h-6 gap-1.5 rounded-full border-white/10 bg-white/[0.04] px-2.5 text-[10px] font-semibold text-white/70"
+                      >
+                        {currentCategory.icon}
+                        <span>{currentCategory.label}</span>
+                      </Badge>
 
-                  {/* Room Privacy Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsPrivacyModalOpen(true)}
-                    className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${session?.isPrivate || roomConfig?.isPrivate
-                      ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
-                      : "bg-white/5 border-white/8 text-white/70 hover:bg-white/10 hover:text-white"
-                      }`}
-                    title={
-                      session?.isPrivate || roomConfig?.isPrivate
-                        ? "Chamada Privada (requer senha) - Clique para gerenciar"
-                        : "Chamada Aberta - Clique para privar com senha"
-                    }
-                  >
-                    {session?.isPrivate || roomConfig?.isPrivate ? (
-                      <>
-                        <Lock className="h-3 w-3 text-amber-400" />
-                        <span>Privada</span>
-                      </>
-                    ) : (
-                      <>
-                        <Unlock className="h-3 w-3 text-white/60" />
-                        <span>Pública</span>
-                      </>
-                    )}
-                  </button>
+                      {/* Room Privacy Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsPrivacyModalOpen(true)}
+                        className={`hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border transition cursor-pointer ${session?.isPrivate || roomConfig?.isPrivate
+                          ? "bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
+                          : "bg-white/5 border-white/8 text-white/70 hover:bg-white/10 hover:text-white"
+                          }`}
+                        title={
+                          session?.isPrivate || roomConfig?.isPrivate
+                            ? "Chamada Privada (requer senha) - Clique para gerenciar"
+                            : "Chamada Aberta - Clique para privar com senha"
+                        }
+                      >
+                        {session?.isPrivate || roomConfig?.isPrivate ? (
+                          <>
+                            <Lock className="h-3 w-3 text-amber-400" />
+                            <span>Privada</span>
+                          </>
+                        ) : (
+                          <>
+                            <Unlock className="h-3 w-3 text-white/60" />
+                            <span>Pública</span>
+                          </>
+                        )}
+                      </button>
 
-                  {/* Edit Appearance Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsEditAppearanceModalOpen(true)}
-                    className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/12 border border-white/8 text-white/80 hover:text-white transition cursor-pointer"
-                    title="Editar aparência e configurações do canal (Nome, Ícone, Cor)"
-                  >
-                    <Palette className="h-3 w-3 text-white/70" />
-                    <span>Editar Canal</span>
-                  </button>
+                      {/* Edit Appearance Button (Admin only) */}
+                      {Boolean(session?.adminId === userProfile?.uid || roomConfig?.adminId === userProfile?.uid || !session?.adminId) && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEditAppearanceModalOpen(true)}
+                          className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/12 border border-white/8 text-white/80 hover:text-white transition cursor-pointer"
+                          title="Editar aparência e configurações do canal (Nome, Ícone, Cor)"
+                        >
+                          <Palette className="h-3 w-3 text-white/70" />
+                          <span>Editar Canal</span>
+                        </button>
+                      )}
+                    </>
+                  )}
                 </h2>
-                <p className="text-[10px] text-white/35 mt-0.5">Chamada Direta Checkpoint</p>
+                <p className="text-[10px] text-white/35 mt-0.5">
+                  {isRoomSession ? (session.roomName || "Canal de Voz Checkpoint") : "Chamada Direta Checkpoint"}
+                </p>
               </div>
             </div>
 
@@ -2165,7 +2177,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                 return remoteVolume ?? 100;
               })()}
               isLocallyMuted={locallyMutedFeeds[contextMenu.feed.id]}
-              isLocalAdmin={true}
+              isLocalAdmin={Boolean(isRoomSession && (session?.adminId === userProfile?.uid || roomConfig?.adminId === userProfile?.uid || (!session?.adminId && !session?.friendUid)))}
               onVolumeChange={(newVol) => {
                 setUserVolumes((prev) => ({
                   ...prev,
