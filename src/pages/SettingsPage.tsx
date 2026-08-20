@@ -422,12 +422,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   const [privacyStatus, setPrivacyStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [privacyError, setPrivacyError] = React.useState("");
 
-  let voiceCallContext: ReturnType<typeof useVoiceCallContext> | null = null;
-  try {
-    voiceCallContext = useVoiceCallContext();
-  } catch {
-    // optional outside provider
-  }
+  const voiceCallContext = useVoiceCallContext();
   const [isRecordingPttKey, setIsRecordingPttKey] = React.useState(false);
   const [isTestingMic, setIsTestingMic] = React.useState(false);
   const [testMicVolume, setTestMicVolume] = React.useState(0);

@@ -248,6 +248,7 @@ export interface VoiceCallSession {
   isInitiator: boolean;
   startedAt?: number;
   hostUid?: string;
+  adminId?: string;
   category?: import("./voice-governance").RoomCategory;
   roomName?: string;
   isPrivate?: boolean;

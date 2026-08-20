@@ -407,13 +407,6 @@ const Home: React.FC = () => {
     language: launcherLanguage,
   });
 
-  let voiceCallContext: ReturnType<typeof useVoiceCallContext> | null = null;
-  try {
-    voiceCallContext = useVoiceCallContext();
-  } catch {
-    // optional outside provider
-  }
-
   const connectRetroAchievements = useCallback(async (username: string) => {
     setRetroAchievementsConnecting(true);
     setRetroAchievementsError(undefined);
