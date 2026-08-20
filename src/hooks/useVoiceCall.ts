@@ -2434,7 +2434,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       name: targetSession.friendName,
       avatar: targetSession.friendAvatar || "",
       status: "online",
-      platform: "pc",
+      source: "checkpoint",
     };
     await startCall(fakeFriend, Boolean(targetSession.hasVideo));
   }, [pendingReconnectSession, startCall, user?.uid]);

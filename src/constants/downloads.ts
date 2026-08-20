@@ -1,16 +1,14 @@
-// ─── Configuração de Download Direto e Servidor de Atualizações ────────────────
+// ─── Configuração de Download e Links de Releases ────────────────
 
-export const CURRENT_LAUNCHER_VERSION = "3.0.6";
+export const CURRENT_LAUNCHER_VERSION = "3.1.3";
 
-// URL base do servidor ou bucket de hospedagem do executável e latest.yml
-export const UPDATE_SERVER_URL =
-  import.meta.env.VITE_UPDATE_SERVER_URL ||
-  "https://checkpointlauncher.com/downloads";
+export const GITHUB_REPO_URL =
+  "https://github.com/Guilhermesttt/Checkpoint---Launcher";
 
-// Nome do instalador .exe gerado pelo electron-builder (ex: Checkpoint-Launcher-Setup-3.0.6.exe)
+export const GITHUB_RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
+
+export const GITHUB_LATEST_RELEASE_URL = `${GITHUB_REPO_URL}/releases/latest`;
+
+// Nome padrão do instalador para referência visual
 export const LAUNCHER_EXE_FILENAME = `Checkpoint-Launcher-Setup-${CURRENT_LAUNCHER_VERSION}.exe`;
 
-// URL direta do instalador .exe para o botão de download no site
-export const DIRECT_LAUNCHER_DOWNLOAD_URL =
-  import.meta.env.VITE_DIRECT_DOWNLOAD_URL ||
-  `${UPDATE_SERVER_URL}/${LAUNCHER_EXE_FILENAME}`;

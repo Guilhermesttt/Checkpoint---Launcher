@@ -13,10 +13,10 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.1.2",
+  version: "3.1.3",
   title: "Áudio WebRTC Instantâneo, Barramento U2U e Overlays",
   description: "Reprodução automática de áudio WebRTC em DOM nativo, barramento WebSocket U2U em tempo real, edição de canais de voz e overlays reativos instantâneos.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.2",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.3",
   highlights: [
     {
       id: "voice",
