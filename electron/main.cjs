@@ -3587,6 +3587,10 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
   const title = String(payload?.title || defaultTitle).trim();
   const message = String(payload?.message || payload?.description || "").trim();
   const avatarUrl = sanitizeOverlayImageSource(payload?.imageUrl);
+  const duration = typeof payload?.duration === "number" ? payload.duration : undefined;
+  const sound = typeof payload?.sound === "boolean" ? payload.sound : undefined;
+  const action = payload?.action ? { label: String(payload.action.label), actionId: String(payload.action.actionId || "custom") } : undefined;
+  const metadata = payload?.metadata && typeof payload.metadata === "object" ? payload.metadata : undefined;
 
   sendOverlayEvent("overlay:social", {
     kind: type,
@@ -3595,6 +3599,18 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
     description: message,
     avatarUrl: avatarUrl || (type === "achievement" ? undefined : overlayIconUrl()),
     friendId: payload?.friendId ? String(payload.friendId).slice(0, 128) : undefined,
+    duration,
+    sound,
+    action,
+    metadata,
+  });
+});
+
+registerSecureIpcHandler("overlay:dismiss-notification", async (_event, payload) => {
+  sendOverlayEvent("overlay:social", {
+    kind: "dismiss",
+    notificationId: payload?.id ? String(payload.id) : undefined,
+    dismissAll: Boolean(payload?.dismissAll),
   });
 });
 

@@ -37,7 +37,7 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [resolution, setResolution] = useState<"720p" | "1080p" | "source">("1080p");
   const [fps, setFps] = useState<30 | 60>(60);
-  const [withAudio, setWithAudio] = useState(false);
+  const [withAudio, setWithAudio] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const fetchSources = async () => {

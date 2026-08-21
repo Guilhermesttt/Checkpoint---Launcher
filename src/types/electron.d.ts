@@ -417,7 +417,12 @@ declare global {
         title?: string;
         imageUrl?: string;
         friendId?: string;
+        duration?: number;
+        sound?: boolean;
+        action?: { label: string; actionId: string };
+        metadata?: Record<string, any>;
       }) => Promise<void>;
+      dismissNotificationOverlay: (payload?: { id?: string; dismissAll?: boolean }) => Promise<void>;
       showGameStartOverlay: (payload: { gameTitle: string }) => Promise<void>;
       showFriendPlayingOverlay: (payload: {
         playerName: string;

@@ -1673,11 +1673,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
       });
 
-      // Check if we have relay candidates (TURN)
-      const candidates = pc.getLocalCandidates?.() || [];
-      const hasRelayCandidate = candidates.some((c) => c.type === "relay" || c.candidate?.includes("relay"));
-      
-      // Also check via onicecandidate
+      // Check via onicecandidate for relay candidates
       let hasRelay = false;
       await new Promise<void>((resolve) => {
         const timeout = setTimeout(() => resolve(), 3000);
@@ -1696,7 +1692,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
       pc.close();
 
-      if (!hasRelay && !hasRelayCandidate) {
+      if (!hasRelay) {
         return { success: false, error: "TURN relay não disponível - conexão P2P pode falhar" };
       }
 
@@ -2899,7 +2895,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             video: {
               width: { ideal: maxW },
               height: { ideal: maxH },
-              frameRate: { ideal: fps, max: fps },
+              frameRate: { ideal: fps, max: fps, exact: fps },
             },
             audio: includeAudio,
           });
@@ -2910,9 +2906,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         const videoTrack = screenStream.getVideoTracks()[0];
         const screenAudioTrack = screenStream.getAudioTracks()[0];
 
-        // Otimização de nitidez: prioriza texto/UI legível
+        // contentHint: "motion" para jogos/vídeo, "detail" para texto/UI
         if (videoTrack && "contentHint" in videoTrack) {
-          (videoTrack as any).contentHint = "detail";
+          (videoTrack as any).contentHint = "motion";
         }
 
         if (session.friendUid === "echo-bot") {
@@ -2930,75 +2926,86 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return;
         }
 
-        // Add track and set explicit bitrates on all peers
-        const targetBitrate = res === "720p" ? 2_500_000 : fps === 60 ? 6_000_000 : 4_500_000;
+        const useLiveKitPrimary = useLiveKitPrimaryRef.current && livekitConnectedRef.current;
 
-        for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
-          const senders = pc.getSenders();
-          let sender = senders.find((s) => s.track?.kind === "video" || (s as any)._kind === "video" || s.track === null);
-          if (!sender) {
-            const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
-            const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video" || (t as any)._kind === "video");
-            if (videoTransceiver) {
-              sender = videoTransceiver.sender;
+        // If using LiveKit as primary, publish there ONLY (not P2P mesh)
+        if (useLiveKitPrimary) {
+          if (videoTrack && livekitRoomRef.current?.localParticipant) {
+            try {
+              // Configure video encoding for screen share: preserve FPS, high bitrate
+              const encodings = [
+                { maxBitrate: res === "720p" ? 2_500_000 : fps === 60 ? 6_000_000 : 4_500_000, maxFramerate: fps, scaleResolutionDownBy: 1 },
+              ];
+              const pub = await livekitRoomRef.current.localParticipant.publishTrack(videoTrack, {
+                name: "screen",
+                source: LiveKitTrack.Source.ScreenShare,
+                simulcast: false, // Single layer for screen share - preserves FPS
+                videoEncoding: { maxBitrate: encodings[0].maxBitrate, maxFramerate: fps },
+              });
+              livekitScreenPubRef.current = pub;
+              if (screenAudioTrack) {
+                void livekitRoomRef.current.localParticipant.publishTrack(screenAudioTrack, {
+                  name: "screen-audio",
+                  source: LiveKitTrack.Source.ScreenShareAudio,
+                });
+              }
+            } catch (lkErr) {
+              console.warn("[LiveKit] Screen share track publish note:", lkErr);
             }
           }
+        } else {
+          // Fallback: P2P mesh only
+          const targetBitrate = res === "720p" ? 2_500_000 : fps === 60 ? 6_000_000 : 4_500_000;
 
-          if (sender) {
-            await sender.replaceTrack(videoTrack);
-          } else {
-            pc.addTrack(videoTrack, screenStream);
-          }
-
-          if (includeAudio && screenAudioTrack) {
-            const audioSender = pc.getSenders().find((s) => s.track === screenAudioTrack);
-            if (!audioSender) {
-              pc.addTrack(screenAudioTrack, screenStream);
-            }
-          }
-
-          // Apply bitrate and low latency preferences
-          try {
-            const videoSender = pc.getSenders().find((s) => s.track === videoTrack);
-            if (videoSender && videoSender.getParameters) {
-              const params = videoSender.getParameters();
-              if (params.encodings && params.encodings.length > 0) {
-                params.encodings[0].maxBitrate = targetBitrate;
-                (params as any).degradationPreference = "maintain-framerate";
-                await videoSender.setParameters(params);
+          for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+            const senders = pc.getSenders();
+            let sender = senders.find((s) => s.track?.kind === "video" || (s as any)._kind === "video" || s.track === null);
+            if (!sender) {
+              const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+              const videoTransceiver = transceivers.find((t) => t.receiver?.track?.kind === "video" || t.sender?.track?.kind === "video" || (t as any)._kind === "video");
+              if (videoTransceiver) {
+                sender = videoTransceiver.sender;
               }
             }
-          } catch (e) {
-            console.warn("[useVoiceCall] setParameters on screen sender warning:", e);
-          }
 
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          if (user?.uid) {
-            await sendCallSignal(session.chatId, {
-              senderId: user.uid,
-              chatId: session.chatId,
-              targetUid: peerId,
-              signal: offer,
-            });
-          }
-        }
+            if (sender) {
+              await sender.replaceTrack(videoTrack);
+            } else {
+              pc.addTrack(videoTrack, screenStream);
+            }
 
-        if (videoTrack && livekitRoomRef.current?.localParticipant) {
-          try {
-            const pub = await livekitRoomRef.current.localParticipant.publishTrack(videoTrack, {
-              name: "screen",
-              source: LiveKitTrack.Source.ScreenShare,
-            });
-            livekitScreenPubRef.current = pub;
-            if (screenAudioTrack) {
-              void livekitRoomRef.current.localParticipant.publishTrack(screenAudioTrack, {
-                name: "screen-audio",
-                source: LiveKitTrack.Source.ScreenShareAudio,
+            if (includeAudio && screenAudioTrack) {
+              const audioSender = pc.getSenders().find((s) => s.track === screenAudioTrack);
+              if (!audioSender) {
+                pc.addTrack(screenAudioTrack, screenStream);
+              }
+            }
+
+            // Apply bitrate and low latency preferences
+            try {
+              const videoSender = pc.getSenders().find((s) => s.track === videoTrack);
+              if (videoSender && videoSender.getParameters) {
+                const params = videoSender.getParameters();
+                if (params.encodings && params.encodings.length > 0) {
+                  params.encodings[0].maxBitrate = targetBitrate;
+                  (params as any).degradationPreference = "maintain-framerate";
+                  await videoSender.setParameters(params);
+                }
+              }
+            } catch (e) {
+              console.warn("[useVoiceCall] setParameters on screen sender warning:", e);
+            }
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (user?.uid) {
+              await sendCallSignal(session.chatId, {
+                senderId: user.uid,
+                chatId: session.chatId,
+                targetUid: peerId,
+                signal: offer,
               });
             }
-          } catch (lkErr) {
-            console.warn("[LiveKit] Screen share track publish note:", lkErr);
           }
         }
 
@@ -3034,6 +3041,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     }
     setLocalScreenStream(null);
 
+    const useLiveKitPrimary = useLiveKitPrimaryRef.current && livekitConnectedRef.current;
+
     if (livekitScreenPubRef.current && livekitRoomRef.current?.localParticipant) {
       try {
         if (livekitScreenPubRef.current.track) {
@@ -3051,7 +3060,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       return;
     }
 
-    if (session?.chatId && user?.uid) {
+    // Only renegotiate P2P mesh if NOT using LiveKit primary
+    if (session?.chatId && user?.uid && !useLiveKitPrimary) {
       for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
         const senders = pc.getSenders();
         const videoSender = senders.find((s) => s.track?.kind === "video" || (s as any)._kind === "video");

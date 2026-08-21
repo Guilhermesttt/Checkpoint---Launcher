@@ -99,6 +99,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("overlay:set-achievement-notification-settings", settings),
   toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),
   showNotificationOverlay: (payload) => ipcRenderer.invoke("overlay:show-notification", payload),
+  dismissNotificationOverlay: (payload) => ipcRenderer.invoke("overlay:dismiss-notification", payload),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
 
   showFriendPlayingOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-playing", payload),

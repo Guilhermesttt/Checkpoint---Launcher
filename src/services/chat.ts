@@ -546,36 +546,60 @@ export const subscribeToChatMessages = (
   };
 };
 
+const typingSubscriptionMap = new Map<string, { channel: any; count: number }>();
+
 export const subscribeToFriendTyping = (
   friendUid: string,
   callback: (typing: boolean) => void,
 ) => {
   let cancelled = false;
-  let channelKey = "";
+  let resolvedChatId: string | null = null;
+
+  const cleanup = () => {
+    if (resolvedChatId) {
+      const sub = typingSubscriptionMap.get(resolvedChatId);
+      if (sub) {
+        sub.count--;
+        if (sub.count <= 0) {
+          supabase.removeChannel(sub.channel);
+          typingSubscriptionMap.delete(resolvedChatId);
+        }
+      }
+    }
+  };
+
   supabase.auth.getSession().then(async ({ data: { session } }) => {
     if (!session?.user || cancelled) return;
     const uid = session.user.id;
     const chatId = await ensureChatSession(uid, friendUid);
     if (cancelled) return;
-    channelKey = `typing_receive_${chatId}`;
-    const channel = supabase
-      .channel(`typing_${chatId}`)
-      .on("broadcast", { event: "typing" }, (event) => {
-        if (event.payload?.senderId === friendUid) {
-          callback(Boolean(event.payload?.typing));
-        }
-      })
-      .subscribe();
-    activeChatChannels.set(channelKey, channel);
+    resolvedChatId = chatId;
+
+    // Reuse existing channel if already subscribed for this chat
+    let sub = typingSubscriptionMap.get(chatId);
+    if (!sub) {
+      const channel = supabase
+        .channel(`typing_${chatId}`)
+        .on("broadcast", { event: "typing" }, (event) => {
+          const payload = event.payload;
+          if (!payload) return;
+          const senderId = String(payload.senderId || "").replace(/^cp-friend:/, "");
+          const targetFriendUid = String(friendUid).replace(/^cp-friend:/, "");
+          if (senderId === targetFriendUid) {
+            callback(Boolean(payload.typing));
+          }
+        })
+        .subscribe();
+      sub = { channel, count: 0 };
+      typingSubscriptionMap.set(chatId, sub);
+    }
+    sub.count++;
+    activeChatChannels.set(`typing_receive_${chatId}`, sub.channel);
   });
 
   return () => {
     cancelled = true;
-    const channel = activeChatChannels.get(channelKey);
-    if (channel) {
-      supabase.removeChannel(channel);
-      activeChatChannels.delete(channelKey);
-    }
+    cleanup();
   };
 };
 
