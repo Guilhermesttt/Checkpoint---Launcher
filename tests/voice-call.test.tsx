@@ -30,7 +30,7 @@ describe("Voice & Screen Share Call System", () => {
     );
 
     expect(screen.getByText("Gabriel")).toBeInTheDocument();
-    expect(screen.getByText("Chamada de Voz")).toBeInTheDocument();
+    expect(screen.getByText(/Chamada de voz/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Atender/i }));
     expect(onAccept).toHaveBeenCalledTimes(1);

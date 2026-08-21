@@ -1648,7 +1648,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const iceServers = await getTurnServers();
       const pc = new RTCPeerConnection({
         iceServers,
-        iceCandidatePoolSize: 2,
+        iceCandidatePoolSize: 0,
+        iceTransportPolicy: "all",
         bundlePolicy: "max-bundle",
       });
 
@@ -1735,10 +1736,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         };
       };
 
-      // Reconnection helper for this peer
+      // Reconnection helper for this peer with ICE restart
       const attemptPeerReconnect = async () => {
         if (!pc || pc.signalingState === "closed") return;
-        if (reconnectAttemptsRef.current >= 2) {
+        if (reconnectAttemptsRef.current >= 5) {
           notify("Conexão perdida com participante.", "error");
           playRingtone("disconnect");
           cleanUpCall();
@@ -1748,17 +1749,18 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         setIsReconnecting(true);
 
         try {
-          if (isInitiator) {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            if (user?.uid) {
-              await sendCallSignal(chatId, {
-                senderId: user.uid,
-                chatId,
-                targetUid: targetPeerUid,
-                signal: offer,
-              });
-            }
+          if (typeof (pc as any).restartIce === "function") {
+            (pc as any).restartIce();
+          }
+          const offer = await pc.createOffer({ iceRestart: true });
+          await pc.setLocalDescription(offer);
+          if (user?.uid) {
+            await sendCallSignal(chatId, {
+              senderId: user.uid,
+              chatId,
+              targetUid: targetPeerUid,
+              signal: offer,
+            });
           }
         } catch (err) {
           console.error("[useVoiceCall] ICE restart error for peer:", targetPeerUid, err);
@@ -1772,7 +1774,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
               void attemptPeerReconnect();
             }
-          }, 3500);
+          }, 5000);
         } else if (pc.iceConnectionState === "failed") {
           void attemptPeerReconnect();
         } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
