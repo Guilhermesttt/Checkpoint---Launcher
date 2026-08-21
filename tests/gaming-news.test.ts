@@ -25,4 +25,37 @@ describe("Radar Gamer", () => {
       source: "Fonte",
     })]);
   });
+
+  it("prioriza media:thumbnail sobre media:content quando este é um vídeo", () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Trailer do Jogo</title>
+          <link>https://games.example/trailer</link>
+          <pubDate>Fri, 21 Aug 2026 00:43:05 GMT</pubDate>
+          <description>Confira o trailer.</description>
+          <media:content url="https://www.youtube.com/embed/2xrKoQEvKvI" medium="video">
+            <media:thumbnail url="https://games.example/uploads/thumb.png" />
+          </media:content>
+        </item>
+      </channel></rss>`;
+
+    const result = parseGamingNewsFeed(xml, "GameVicio");
+    expect(result[0]?.imageUrl).toBe("https://games.example/uploads/thumb.png");
+  });
+
+  it("converte embed do YouTube para thumbnail hqdefault quando não há outra imagem", () => {
+    const xml = `<?xml version="1.0"?>
+      <rss><channel>
+        <item>
+          <title>Vídeo sem thumbnail dedicada</title>
+          <link>https://games.example/video</link>
+          <pubDate>Fri, 21 Aug 2026 00:43:05 GMT</pubDate>
+          <description><![CDATA[<iframe src="https://www.youtube.com/embed/qw2q02bgZfo"></iframe>]]></description>
+        </item>
+      </channel></rss>`;
+
+    const result = parseGamingNewsFeed(xml, "YouTubeNews");
+    expect(result[0]?.imageUrl).toBe("https://img.youtube.com/vi/qw2q02bgZfo/hqdefault.jpg");
+  });
 });

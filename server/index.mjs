@@ -1960,16 +1960,48 @@ const ALLOWED_IMAGE_HOSTS = [
   "gamevicio.com",
   "adrenaline.com.br",
   "i.imgur.com",
+  "imgur.com",
   "cdn.gamevicio.com",
   "sm.ign.com",
   "assets.gamevicio.com",
+  "youtube.com",
+  "img.youtube.com",
+  "i.ytimg.com",
+  "ytimg.com",
+  "wp.com",
+  "i0.wp.com",
+  "i1.wp.com",
+  "i2.wp.com",
+  "ign.com",
+  "assets-prd.ignimgs.com",
+  "oyster.ignimgs.com",
+  "media.ign.com",
+  "ignimgs.com",
+  "steamcommunity.com",
+  "steamstatic.com",
+  "akamaihd.net",
+  "steampowered.com",
+  "nexusmods.com",
+  "theenemy.com.br",
+  "jovemnerd.com.br",
+  "voxel.com.br",
+  "tecmundo.com.br",
+  "googleusercontent.com",
+  "ggpht.com",
+  "twimg.com",
+  "pbs.twimg.com",
 ];
 app.get("/api/proxy/image", steamPublicLimiter, async (req, res) => {
   const raw = String(req.query.url || "").trim();
   if (!raw) return res.status(400).end();
   let target;
   try {
-    target = new URL(raw);
+    let normalizedRaw = raw;
+    const ytEmbedMatch = raw.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/)([\w-]{11})/i);
+    if (ytEmbedMatch?.[1]) {
+      normalizedRaw = `https://img.youtube.com/vi/${ytEmbedMatch[1]}/hqdefault.jpg`;
+    }
+    target = new URL(normalizedRaw);
     if (target.protocol !== "https:") return res.status(400).end();
     const hostOk = ALLOWED_IMAGE_HOSTS.some(
       (h) => target.hostname === h || target.hostname.endsWith("." + h),

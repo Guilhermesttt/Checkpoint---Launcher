@@ -23,6 +23,8 @@ export const NewsCard: React.FC<NewsCardProps> = ({
   onOpen,
   className = "",
 }) => {
+  const [imgError, setImgError] = React.useState(false);
+
   return (
     <article
       onClick={onOpen}
@@ -30,11 +32,12 @@ export const NewsCard: React.FC<NewsCardProps> = ({
     >
       {/* Fixed aspect ratio thumbnail (16:9) */}
       <div className="relative aspect-video w-full overflow-hidden bg-[#171717]">
-        {imageUrl ? (
+        {imageUrl && !imgError ? (
           <img
             src={imageUrl}
             alt=""
             loading="lazy"
+            onError={() => setImgError(true)}
             className="h-full w-full object-cover opacity-80 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
           />
         ) : (

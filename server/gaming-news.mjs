@@ -38,11 +38,45 @@ const stripHtml = (value) => decodeXml(value)
   .replace(/\s+/g, " ")
   .trim();
 
-const thumbnailFrom = (block, description) => {
-  const media = block.match(/<(?:media:content|media:thumbnail)\b[^>]*\burl=["']([^"']+)["']/i)?.[1];
-  const enclosure = block.match(/<enclosure\b(?=[^>]*\btype=["']image\/)[^>]*\burl=["']([^"']+)["']/i)?.[1];
-  const inline = description.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1];
-  return safeHttpsUrl(media || enclosure || inline || "");
+const thumbnailFrom = (block, description = "", contentEncoded = "") => {
+  // 1. media:thumbnail
+  const mediaThumb = block.match(/<media:thumbnail\b[^>]*\burl=["']([^"']+)["']/i)?.[1];
+  if (mediaThumb) {
+    const safe = safeHttpsUrl(mediaThumb);
+    if (safe) return safe;
+  }
+
+  // 2. enclosure with image type or image extension
+  const enclosure = block.match(/<enclosure\b(?=[^>]*\b(?:type=["']image\/|url=["'][^"']+\.(?:jpg|jpeg|png|webp|avif|gif)))[^>]*\burl=["']([^"']+)["']/i)?.[1]
+    || block.match(/<enclosure\b[^>]*\burl=["']([^"']+)["'][^>]*\btype=["']image\//i)?.[1];
+  if (enclosure) {
+    const safe = safeHttpsUrl(enclosure);
+    if (safe) return safe;
+  }
+
+  // 3. media:content specifically for images (avoid video embeds)
+  const mediaImage = block.match(/<media:content\b(?=[^>]*\b(?:medium=["']image["']|type=["']image\/|url=["'][^"']+\.(?:jpg|jpeg|png|webp|avif|gif)))[^>]*\burl=["']([^"']+)["']/i)?.[1];
+  if (mediaImage) {
+    const safe = safeHttpsUrl(mediaImage);
+    if (safe) return safe;
+  }
+
+  // 4. inline <img> in description, content:encoded or block
+  const inline = description.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1]
+    || contentEncoded.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1]
+    || block.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1];
+  if (inline) {
+    const safe = safeHttpsUrl(inline);
+    if (safe) return safe;
+  }
+
+  // 5. fallback: youtube embed -> youtube thumbnail
+  const ytMatch = block.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/)([\w-]{11})/i);
+  if (ytMatch?.[1]) {
+    return `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`;
+  }
+
+  return "";
 };
 
 export const parseGamingNewsFeed = (xml, source) => {
@@ -53,6 +87,7 @@ export const parseGamingNewsFeed = (xml, source) => {
     if (!title || !link) return [];
 
     const rawDescription = textFrom(block, "description");
+    const rawContentEncoded = textFrom(block, "content:encoded");
     const publishedAtRaw = textFrom(block, "pubDate") || textFrom(block, "dc:date");
     const publishedAt = Number.isNaN(Date.parse(publishedAtRaw))
       ? new Date().toISOString()
@@ -63,7 +98,7 @@ export const parseGamingNewsFeed = (xml, source) => {
       title,
       url: link,
       summary: stripHtml(rawDescription).slice(0, 260),
-      imageUrl: thumbnailFrom(block, rawDescription),
+      imageUrl: thumbnailFrom(block, rawDescription, rawContentEncoded),
       publishedAt,
       source,
     }];
