@@ -9,6 +9,7 @@ import { VoiceCallBar } from "../components/voice/VoiceCallBar";
 import { VoiceCallWindow } from "../components/voice/VoiceCallWindow";
 import { ScreenPickerModal } from "../components/voice/ScreenPickerModal";
 import { getCheckpointFriendStatuses } from "../services/checkpointFriends";
+import { audioContextManager } from "../services/audio/AudioContextManager";
 import type { SocialFriend } from "../types/domain";
 
 type VoiceCallContextType = ReturnType<typeof useVoiceCall>;
@@ -81,7 +82,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Persistent audio playback for remote participants with Web Audio API Soft-Limiter
   const remoteAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const peerAudioNodesMapRef = React.useRef<Map<string, any>>(new Map());
-  const audioContextRef = React.useRef<AudioContext | null>(null);
+  const audioContextManagerRef = React.useRef(audioContextManager);
 
   // Sync audio output device changes (setSinkId)
   React.useEffect(() => {
@@ -91,9 +92,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (remoteAudioRef.current && typeof (remoteAudioRef.current as any).setSinkId === "function") {
       void (remoteAudioRef.current as any).setSinkId(targetOutput === "default" ? "" : targetOutput).catch(() => {});
     }
-    if (audioContextRef.current && typeof (audioContextRef.current as any).setSinkId === "function") {
-      void (audioContextRef.current as any).setSinkId(targetOutput === "default" ? "" : targetOutput).catch(() => {});
-    }
+    audioContextManagerRef.current.setSinkId(targetOutput);
     peerAudioNodesMapRef.current.forEach((node) => {
       if (node && typeof node.setSinkId === "function") {
         void node.setSinkId(targetOutput);
@@ -119,47 +118,46 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     if (activeStreams.size > 0) {
       try {
-        if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-            latencyHint: "interactive",
-          });
-          if (voiceCall.selectedAudioOutput && typeof (audioContextRef.current as any).setSinkId === "function") {
-            void (audioContextRef.current as any).setSinkId(voiceCall.selectedAudioOutput === "default" ? "" : voiceCall.selectedAudioOutput).catch(() => {});
+        // Initialize shared AudioContext
+        const initAudioContext = async () => {
+          const ctx = await audioContextManagerRef.current.getContext();
+          if (ctx.state === "suspended") {
+            await ctx.resume();
           }
-        }
+          return ctx;
+        };
 
-        if (audioContextRef.current.state === "suspended") {
-          void audioContextRef.current.resume();
-        }
-
-        // Clean up nodes for peers that are no longer active
-        peerAudioNodesMapRef.current.forEach((node, peerId) => {
-          if (!activeStreams.has(peerId)) {
-            node.destroy?.();
-            peerAudioNodesMapRef.current.delete(peerId);
-          }
-        });
-
-        // Initialize or update nodes for active streams
-        import("../services/audio/PeerAudioNode").then(({ PeerAudioNode }) => {
-          if (!audioContextRef.current) return;
-          activeStreams.forEach((stream, peerId) => {
-            const peerVolume = isMutedLocally
-              ? 0
-              : (voiceCall.peerVolumes?.[peerId] ?? voiceCall.remoteVolume ?? 100);
-
-            const existing = peerAudioNodesMapRef.current.get(peerId);
-            if (!existing) {
-              const newNode = new PeerAudioNode(audioContextRef.current!, stream, peerVolume);
-              if (voiceCall.selectedAudioOutput) {
-                void newNode.setSinkId(voiceCall.selectedAudioOutput);
-              }
-              peerAudioNodesMapRef.current.set(peerId, newNode);
-            } else {
-              existing.setVolume(peerVolume);
+        initAudioContext().then((ctx) => {
+          // Clean up nodes for peers that are no longer active
+          peerAudioNodesMapRef.current.forEach((node, peerId) => {
+            if (!activeStreams.has(peerId)) {
+              node.destroy?.();
+              peerAudioNodesMapRef.current.delete(peerId);
             }
           });
-        }).catch(() => {});
+
+          // Initialize or update nodes for active streams
+          import("../services/audio/PeerAudioNode").then(({ PeerAudioNode }) => {
+            activeStreams.forEach((stream, peerId) => {
+              const peerVolume = isMutedLocally
+                ? 0
+                : (voiceCall.peerVolumes?.[peerId] ?? voiceCall.remoteVolume ?? 100);
+
+              const existing = peerAudioNodesMapRef.current.get(peerId);
+              if (!existing) {
+                const newNode = new PeerAudioNode(stream, peerVolume);
+                if (voiceCall.selectedAudioOutput) {
+                  void newNode.setSinkId(voiceCall.selectedAudioOutput);
+                }
+                peerAudioNodesMapRef.current.set(peerId, newNode);
+              } else {
+                existing.setVolume(peerVolume);
+              }
+            });
+          }).catch(() => {});
+        }).catch((err) => {
+          console.warn("[VoiceCallContext] Web Audio pipeline error:", err);
+        });
       } catch (err) {
         console.warn("[VoiceCallContext] Web Audio pipeline error:", err);
       }

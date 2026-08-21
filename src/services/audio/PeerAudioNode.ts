@@ -3,6 +3,8 @@
  * Permite ganho de 0% até 200% sem distorção digital destrutiva (hard clipping)
  * utilizando DynamicsCompressorNode como limitador de áudio profissional.
  */
+import { audioContextManager } from "./AudioContextManager";
+
 export class PeerAudioNode {
   private ctx: AudioContext;
   private source: MediaStreamAudioSourceNode;
@@ -10,8 +12,26 @@ export class PeerAudioNode {
   private compressor: DynamicsCompressorNode;
   private isDestroyed = false;
 
-  constructor(ctx: AudioContext, stream: MediaStream, initialVolume = 100) {
-    this.ctx = ctx;
+  constructor(stream: MediaStream, initialVolume = 100) {
+    // Use shared AudioContext
+    const manager = audioContextManager;
+    // We need to get the context synchronously here, so we'll use a fallback
+    // In practice, the context should already be initialized by VoiceCallContext
+    const existingCtx = manager.getCurrentContext();
+    if (existingCtx && existingCtx.state !== "closed") {
+      this.ctx = existingCtx;
+    } else {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.ctx = new AudioCtx({ sampleRate: 48000, latencyHint: "interactive" });
+    }
+
+    // Resume AudioContext if suspended (required by browser autoplay policies)
+    if (this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
+
     this.source = this.ctx.createMediaStreamSource(stream);
     this.gainNode = this.ctx.createGain();
     this.compressor = this.ctx.createDynamicsCompressor();
@@ -37,7 +57,7 @@ export class PeerAudioNode {
    * @param volumePercent Percentual de 0 a 200
    */
   public setVolume(volumePercent: number): void {
-    if (this.isDestroyed || this.ctx.state === 'closed') return;
+    if (this.isDestroyed || this.ctx.state === "closed") return;
     const targetGain = Math.max(0, Math.min(2.0, volumePercent / 100));
     try {
       if (targetGain === 0) {
@@ -55,7 +75,7 @@ export class PeerAudioNode {
    * Redireciona o fluxo para o dispositivo de saída de áudio selecionado (se suportado pelo navegador)
    */
   public async setSinkId(deviceId: string): Promise<void> {
-    if (this.isDestroyed || this.ctx.state === 'closed') return;
+    if (this.isDestroyed || this.ctx.state === "closed") return;
     try {
       if (typeof (this.ctx as any).setSinkId === "function") {
         await (this.ctx as any).setSinkId(deviceId === "default" ? "" : deviceId);

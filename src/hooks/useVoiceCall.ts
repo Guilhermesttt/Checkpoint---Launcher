@@ -522,6 +522,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const reconnectTimerRef = useRef<number | null>(null);
   const isAcquiringMediaRef = useRef(false);
 
+  // LiveKit SFU as primary transport flag
+  const useLiveKitPrimaryRef = useRef(true);
+  const livekitConnectedRef = useRef(false);
+
   // Live synchronization of remote participant & stream volume changes
   useEffect(() => {
     if (livekitRoomRef.current) {
@@ -1391,6 +1395,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       } catch { }
       livekitRoomRef.current = null;
     }
+    livekitConnectedRef.current = false;
     livekitAudioPubRef.current = null;
     livekitVideoPubRef.current = null;
     livekitScreenPubRef.current = null;
@@ -1575,6 +1580,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
         await room.connect(serverUrl, token);
         livekitRoomRef.current = room;
+        livekitConnectedRef.current = true;
 
         // Attach any existing tracks from participants already in the room
         room.remoteParticipants.forEach((participant) => {
@@ -1637,6 +1643,70 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [selectedAudioOutput, setupVoiceAnalyzer],
   );
 
+  // ICE Preflight Connectivity Check
+  // Tests if WebRTC can establish a connection via TURN before committing to a call
+  const runIcePreflightCheck = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const iceServers = await getTurnServers();
+      const pc = new RTCPeerConnection({
+        iceServers,
+        iceTransportPolicy: "relay",
+        iceCandidatePoolSize: 10,
+      });
+
+      // Add a dummy data channel to trigger ICE gathering
+      pc.createDataChannel("preflight");
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Wait for ICE gathering to complete
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === "complete") {
+          resolve();
+        } else {
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === "complete") {
+              resolve();
+            }
+          };
+        }
+      });
+
+      // Check if we have relay candidates (TURN)
+      const candidates = pc.getLocalCandidates?.() || [];
+      const hasRelayCandidate = candidates.some((c) => c.type === "relay" || c.candidate?.includes("relay"));
+      
+      // Also check via onicecandidate
+      let hasRelay = false;
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => resolve(), 3000);
+        pc.onicecandidate = (e) => {
+          if (e.candidate) {
+            const cand = e.candidate.candidate;
+            if (cand.includes("relay") || cand.includes("turn:")) {
+              hasRelay = true;
+            }
+          } else {
+            clearTimeout(timeout);
+            resolve();
+          }
+        };
+      });
+
+      pc.close();
+
+      if (!hasRelay && !hasRelayCandidate) {
+        return { success: false, error: "TURN relay não disponível - conexão P2P pode falhar" };
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.warn("[ICE Preflight] Check failed:", err);
+      return { success: false, error: err?.message || "Falha no teste de conectividade" };
+    }
+  }, []);
+
   // Create & setup a PeerConnection for a specific peer in the Full Mesh
   const createPeerConnectionForPeer = useCallback(
     async (chatId: string, targetPeerUid: string, isInitiator: boolean) => {
@@ -1648,8 +1718,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const iceServers = await getTurnServers();
       const pc = new RTCPeerConnection({
         iceServers,
-        iceCandidatePoolSize: 0,
-        iceTransportPolicy: "all",
+        iceCandidatePoolSize: 10,
+        iceTransportPolicy: "relay",
         bundlePolicy: "max-bundle",
       });
 
@@ -1739,7 +1809,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       // Reconnection helper for this peer with ICE restart
       const attemptPeerReconnect = async () => {
         if (!pc || pc.signalingState === "closed") return;
-        if (reconnectAttemptsRef.current >= 5) {
+        if (reconnectAttemptsRef.current >= 8) {
           notify("Conexão perdida com participante.", "error");
           playRingtone("disconnect");
           cleanUpCall();
@@ -1748,10 +1818,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         reconnectAttemptsRef.current += 1;
         setIsReconnecting(true);
 
+        // Clean pending candidates for this peer on ICE restart
+        pendingCandidatesRef.current.delete(targetPeerUid);
+
         try {
-          if (typeof (pc as any).restartIce === "function") {
-            (pc as any).restartIce();
-          }
           const offer = await pc.createOffer({ iceRestart: true });
           await pc.setLocalDescription(offer);
           if (user?.uid) {
@@ -1774,7 +1844,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
               void attemptPeerReconnect();
             }
-          }, 5000);
+          }, 2000);
         } else if (pc.iceConnectionState === "failed") {
           void attemptPeerReconnect();
         } else if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
@@ -1784,6 +1854,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
           reconnectAttemptsRef.current = 0;
           setIsReconnecting(false);
+        }
+        if (pc.iceConnectionState === "checking" && pc.iceGatheringState === "complete") {
+          setTimeout(() => {
+            if (pc.iceConnectionState === "checking") {
+              void attemptPeerReconnect();
+            }
+          }, 3000);
         }
       };
 
@@ -1820,9 +1897,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             audioRingIntervalRef.current = null;
           }
 
+          // If using LiveKit SFU as primary, we don't need P2P mesh offer
+          // Media is handled by LiveKit; only call control signaling goes through Supabase
+          const useLiveKitPrimary = useLiveKitPrimaryRef.current && livekitConnectedRef.current;
+
           // Send fresh WebRTC SDP offer to callee now that callee is active & subscribed
+          // ONLY if NOT using LiveKit as primary transport
           const targetPeerUid = answerPayload.responderId || sessionRef.current?.friendUid;
-          if (targetPeerUid && user?.uid) {
+          if (targetPeerUid && user?.uid && !useLiveKitPrimary) {
             try {
               const pc = await createPeerConnectionForPeer(chatId, targetPeerUid, true);
               const offer = await pc.createOffer({ iceRestart: true });
@@ -1838,7 +1920,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             }
           }
 
-          if (user?.uid) {
+          // Connect to LiveKit SFU if not already connected (for 1:1 calls where initiator connects first)
+          if (user?.uid && !livekitConnectedRef.current) {
             const displayName = userProfile?.displayName || user.displayName || "Jogador";
             const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
             try {
@@ -1984,8 +2067,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           };
         });
 
-        // Ensure peer connection exists in receiver/callee mode (waiting for newcomer's offer)
-        if (user?.uid && joined.uid !== user.uid) {
+        // Only create P2P mesh peer connection if NOT using LiveKit SFU as primary
+        const useLiveKitPrimary = useLiveKitPrimaryRef.current && livekitConnectedRef.current;
+        if (user?.uid && joined.uid !== user.uid && !useLiveKitPrimary) {
           await createPeerConnectionForPeer(chatId, joined.uid, false);
         }
       },
@@ -2128,7 +2212,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     };
   }, [callState, cleanUpCall, notify, playRingtone, stopRingtone, user?.uid]);
 
-  // INITIATE CALL (1:1 Friend Call)
+  // INITIATE CALL (1:1 Friend Call) - LiveKit SFU Primary
   const startCall = useCallback(
     async (friend: SocialFriend, withVideo = false) => {
       if (!user?.uid) return;
@@ -2199,10 +2283,29 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
         }
 
-        const pc = await createPeerConnectionForPeer(chatId, friendUid, true);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
+        // ICE Preflight Check - test TURN connectivity before committing to call
+        // Only run if we might fall back to P2P mesh (LiveKit could fail)
+        const preflight = await runIcePreflightCheck();
+        if (!preflight.success) {
+          console.warn("[ICE Preflight] Warning:", preflight.error);
+          // Don't block the call - LiveKit SFU might still work
+          // But warn user if both might fail
+        }
 
+        // Connect to LiveKit SFU FIRST (primary transport)
+        const displayName = userProfile?.displayName || user.displayName || "Jogador";
+        const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
+        let livekitConnected = false;
+        try {
+          await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+          livekitConnected = true;
+          useLiveKitPrimaryRef.current = true;
+        } catch (lkErr) {
+          console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", lkErr);
+          useLiveKitPrimaryRef.current = false;
+        }
+
+        // Subscribe to call session for SIGNALING only (call control: mute, hangup, etc.)
         if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
         unsubscribeSessionRef.current = subscribeToCallSession(
           chatId,
@@ -2219,12 +2322,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           timestamp: Date.now(),
         });
 
-        await sendCallSignal(chatId, {
-          senderId: user.uid,
-          chatId,
-          targetUid: friendUid,
-          signal: offer,
-        });
+        // If LiveKit failed, fall back to P2P mesh for media
+        if (!livekitConnected) {
+          const pc = await createPeerConnectionForPeer(chatId, friendUid, true);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          await sendCallSignal(chatId, {
+            senderId: user.uid,
+            chatId,
+            targetUid: friendUid,
+            signal: offer,
+          });
+        }
 
         playRingtone("ringout");
         audioRingIntervalRef.current = window.setInterval(() => {
@@ -2252,7 +2362,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [acquireAudioStream, applyAudioProcessingChain, callState, cleanUpCall, createPeerConnectionForPeer, createUnifiedSessionHandlers, inputMode, notify, playRingtone, selectedVideoInput, setupVoiceAnalyzer, user, userProfile],
   );
 
-  // ANSWER CALL (Callee 1:1)
+  // ANSWER CALL (Callee 1:1) - LiveKit SFU Primary
   const answerCall = useCallback(async () => {
     stopRingtone();
     const invite = incomingInvite || incomingInviteRef.current;
@@ -2332,8 +2442,26 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
       }
 
-      await createPeerConnectionForPeer(chatId, callerId, false);
+      // ICE Preflight Check
+      const preflight = await runIcePreflightCheck();
+      if (!preflight.success) {
+        console.warn("[ICE Preflight] Warning:", preflight.error);
+      }
 
+      // Connect to LiveKit SFU FIRST (primary transport)
+      const displayName = userProfile?.displayName || user.displayName || "Jogador";
+      const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
+      let livekitConnected = false;
+      try {
+        await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+        livekitConnected = true;
+        useLiveKitPrimaryRef.current = true;
+      } catch (lkErr) {
+        console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", lkErr);
+        useLiveKitPrimaryRef.current = false;
+      }
+
+      // Subscribe to call session for SIGNALING only (call control: mute, hangup, etc.)
       if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
       unsubscribeSessionRef.current = subscribeToCallSession(
         chatId,
@@ -2341,12 +2469,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         createUnifiedSessionHandlers(chatId),
       );
 
-      const displayName = userProfile?.displayName || user.displayName || "Jogador";
-      const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
-      try {
-        await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
-      } catch (lkErr) {
-        console.warn("[LiveKit] SFU connect fallback in answerCall:", lkErr);
+      // If LiveKit failed, fall back to P2P mesh for media
+      if (!livekitConnected) {
+        await createPeerConnectionForPeer(chatId, callerId, false);
       }
 
       setCallState("active");
@@ -2434,19 +2559,30 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setIsMuted(true);
         }
 
+        // ICE Preflight Check for rooms
+        const preflight = await runIcePreflightCheck();
+        if (!preflight.success) {
+          console.warn("[ICE Preflight] Warning:", preflight.error);
+        }
+
+        // Connect to LiveKit SFU FIRST (primary transport for rooms)
+        let livekitConnected = false;
+        try {
+          await connectLiveKitRoom(room.id, user.uid, displayName, avatarUrl);
+          livekitConnected = true;
+          useLiveKitPrimaryRef.current = true;
+        } catch (lkErr) {
+          console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", lkErr);
+          useLiveKitPrimaryRef.current = false;
+        }
+
+        // Subscribe to call session for SIGNALING only (call control: mute, hangup, etc.)
         if (unsubscribeSessionRef.current) unsubscribeSessionRef.current();
         unsubscribeSessionRef.current = subscribeToCallSession(
           room.id,
           user.uid,
           createUnifiedSessionHandlers(room.id),
         );
-
-        // Conecta ao LiveKit SFU de ultra baixa latência
-        try {
-          await connectLiveKitRoom(room.id, user.uid, displayName, avatarUrl);
-        } catch (lkErr) {
-          console.warn("[LiveKit] SFU connect in joinRoom note:", lkErr);
-        }
 
         // Notifica a sala que entramos
         await sendCallMemberJoined(room.id, {
@@ -2456,17 +2592,19 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           chatId: room.id,
         });
 
-        // Inicia conexões WebRTC Mesh com todos os membros já presentes
-        for (const peer of otherParticipants) {
-          const pc = await createPeerConnectionForPeer(room.id, peer.uid, true);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await sendCallSignal(room.id, {
-            senderId: user.uid,
-            chatId: room.id,
-            targetUid: peer.uid,
-            signal: offer,
-          });
+        // If LiveKit failed, fall back to P2P mesh for media
+        if (!livekitConnected) {
+          for (const peer of otherParticipants) {
+            const pc = await createPeerConnectionForPeer(room.id, peer.uid, true);
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            await sendCallSignal(room.id, {
+              senderId: user.uid,
+              chatId: room.id,
+              targetUid: peer.uid,
+              signal: offer,
+            });
+          }
         }
 
         setCallState("active");
@@ -2732,13 +2870,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const res = options.resolution || "1080p";
       const maxW = res === "720p" ? 1280 : res === "1080p" ? 1920 : 3840;
       const maxH = res === "720p" ? 720 : res === "1080p" ? 1080 : 2160;
+      const includeAudio = options.withAudio === true;
 
       try {
         let screenStream: MediaStream;
 
         if (sourceId && typeof navigator !== "undefined") {
           screenStream = await (navigator.mediaDevices as any).getUserMedia({
-            audio: options.withAudio
+            audio: includeAudio
               ? {
                 mandatory: {
                   chromeMediaSource: "desktop",
@@ -2762,7 +2901,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               height: { ideal: maxH },
               frameRate: { ideal: fps, max: fps },
             },
-            audio: Boolean(options.withAudio),
+            audio: includeAudio,
           });
         }
 
@@ -2811,7 +2950,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             pc.addTrack(videoTrack, screenStream);
           }
 
-          if (screenAudioTrack) {
+          if (includeAudio && screenAudioTrack) {
             const audioSender = pc.getSenders().find((s) => s.track === screenAudioTrack);
             if (!audioSender) {
               pc.addTrack(screenAudioTrack, screenStream);
