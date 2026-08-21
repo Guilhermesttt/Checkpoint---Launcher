@@ -1366,285 +1366,303 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               </div>
             ) : (
               /* ========================================================================= */
-              /* GRID VIEW MODE (Discord Style Balanced Equal Tiles)                      */
+              /* GRID VIEW MODE (Discord Style Balanced Equal Tiles & Fluid Layout)        */
               /* ========================================================================= */
-              <div
-                className={`grid gap-5 w-full h-full max-w-5xl items-center justify-center ${activeFeeds.length <= 2
-                  ? "grid-cols-1 sm:grid-cols-2 max-w-3xl"
-                  : activeFeeds.length === 3
-                    ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
-                    : "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3"
-                  }`}
-              >
-                {isRoomSession && activeFeeds.length === 1 && (
-                  <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.015] p-8 text-center space-y-3 min-h-[220px] max-h-[360px]">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-white/50 border border-white/10">
-                      <UserPlus className="h-5 w-5" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-bold text-white/70">Aguardando participantes</p>
-                      <p className="text-[10px] text-white/40 max-w-[200px]">
-                        Convide amigos para conversar neste canal
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsInviteModalOpen(true)}
-                      className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition cursor-pointer"
-                    >
-                      Convidar Amigos
-                    </button>
-                  </div>
-                )}
-                {activeFeeds.map((feed) => {
-                  const hasCameraFill = feed.type === "voice" && Boolean(feed.cameraStream);
-                  return (
-                    <motion.div
-                      key={feed.id}
-                      layout
-                      onDoubleClick={() => handleToggleFocus(feed.id)}
-                      onContextMenu={(e) => handleFeedContextMenu(e, feed)}
-                      className={`group relative flex flex-col items-center justify-center rounded-3xl border transition-all duration-300 w-full h-full min-h-[220px] max-h-[360px] overflow-hidden ${feed.type === "video" || hasCameraFill
-                        ? "bg-black/90 border-white/10 shadow-xl p-0"
-                        : "bg-white/[0.025] hover:bg-white/[0.045] border-white/8 hover:border-white/15 backdrop-blur-md p-6"
-                        } ${hasCameraFill && feed.isSpeaking
-                          ? "border-white ring-2 ring-white/40 shadow-[0_0_25px_rgba(255,255,255,0.3)]"
-                          : !hasCameraFill && feed.isSpeaking
-                            ? "border-white/30 bg-white/[0.04]"
-                            : ""
-                        }`}
-                    >
-                      {hasCameraFill ? (
-                        // ── Camera ON: fills entire card rectangle (Discord-style video tile) ──
-                        <div className="relative h-full w-full">
-                          <VideoRenderer
-                            stream={feed.cameraStream!}
-                            fitMode="cover"
-                            muted={feed.isLocal}
-                          />
-
-                          {/* Bottom gradient overlay: name + status */}
-                          <div className="absolute bottom-0 inset-x-0 flex items-end justify-between px-3 py-2.5 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none">
-                            <div className="flex items-center gap-1.5">
-                              {feed.isSpeaking && (
-                                <span className="h-2 w-2 rounded-full bg-white animate-pulse shrink-0" />
-                              )}
-                              <span className="text-xs font-bold text-white drop-shadow truncate max-w-[130px]">
-                                {feed.title}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {feed.isDeafened ? (
-                                <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
-                                  <VolumeX className="h-3 w-3" /> Mutou Tudo
-                                </span>
-                              ) : feed.isMuted ? (
-                                <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
-                                  <MicOff className="h-3 w-3" /> Mutado
-                                </span>
-                              ) : (
-                                <Camera className="h-3 w-3 text-white/50" />
-                              )}
-                            </div>
-                          </div>
-
-                          {/* PTT badge top-right */}
-                          {feed.isLocal && inputMode === "push-to-talk" && (
-                            <div className="absolute top-2 right-2 pointer-events-none">
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${isPttPressed
-                                  ? "bg-white/20 text-white border-white/40 animate-pulse"
-                                  : "bg-black/60 text-white/50 border-white/10"
-                                  }`}
-                              >
-                                PTT [{pushToTalkKey}]
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Hover overlay: Focus button */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleFocus(feed.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs shadow-lg hover:scale-105 transition cursor-pointer"
-                            >
-                              <Pin className="h-3.5 w-3.5" />
-                              <span>Focar no Palco</span>
-                            </button>
-                          </div>
+              <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden flex items-center justify-center p-2 sm:p-4">
+                <motion.div
+                  layout
+                  className={`grid gap-4 sm:gap-5 w-full h-full max-h-[76vh] items-stretch justify-items-stretch transition-all duration-300 ${activeFeeds.length <= 1
+                    ? "grid-cols-1 max-w-3xl"
+                    : activeFeeds.length === 2
+                      ? "grid-cols-1 md:grid-cols-2 max-w-5xl"
+                      : activeFeeds.length === 3
+                        ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-6xl"
+                        : activeFeeds.length === 4
+                          ? "grid-cols-2 max-w-5xl"
+                          : activeFeeds.length <= 6
+                            ? "grid-cols-2 md:grid-cols-3 max-w-6xl"
+                            : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 max-w-7xl"
+                    }`}
+                >
+                  <AnimatePresence mode="popLayout">
+                    {isRoomSession && activeFeeds.length === 1 && (
+                      <motion.div
+                        key="waiting-room-card"
+                        layout
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.75, transition: { duration: 0.2 } }}
+                        transition={{ layout: { type: "spring", stiffness: 350, damping: 28 } }}
+                        className="flex flex-col items-center justify-center rounded-[26px] border border-dashed border-white/10 bg-[#1e1f22]/60 p-8 text-center space-y-4 w-full h-full min-h-[240px]"
+                      >
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 text-white/50 border border-white/10 shadow-inner">
+                          <UserPlus className="h-6 w-6" />
                         </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-white/80">Ninguém mais está aqui ainda</p>
+                          <p className="text-xs text-white/40 max-w-[240px]">
+                            Convide seus amigos para conversar nesta chamada!
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsInviteModalOpen(true)}
+                          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all duration-200 hover:scale-105 active:scale-95 shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                          <span>Convidar Amigos</span>
+                        </button>
+                      </motion.div>
+                    )}
 
-                      ) : feed.type === "video" && feed.stream ? (
-                        feed.id === "remote-screen" && !watchedStreams["remote-screen"] ? (
-                          // On-Demand Screen Share Placeholder
-                          <div className="relative h-full w-full flex flex-col items-center justify-center p-6 text-center space-y-3 bg-black/85">
-                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-black uppercase text-white">
-                              <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                              <span>Transmissão Ao Vivo</span>
+                    {activeFeeds.map((feed, idx) => {
+                      const hasCameraFill = feed.type === "voice" && Boolean(feed.cameraStream);
+                      const isSpeaking = Boolean(feed.isSpeaking);
+
+                      // Discord surface tints
+                      const cardBgTints = [
+                        "bg-[#2b2d31]",
+                        "bg-[#313338]",
+                        "bg-[#2e3035]",
+                        "bg-[#383a40]",
+                      ];
+                      const assignedBg = cardBgTints[idx % cardBgTints.length];
+
+                      return (
+                        <motion.div
+                          key={feed.id}
+                          layout
+                          initial={{ opacity: 0, scale: 0.82, y: 15 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{
+                            opacity: 0,
+                            scale: 0.72,
+                            transition: { duration: 0.22, ease: "easeInOut" },
+                          }}
+                          transition={{
+                            layout: { type: "spring", stiffness: 350, damping: 28 },
+                            opacity: { duration: 0.2 },
+                            scale: { type: "spring", stiffness: 380, damping: 26 },
+                          }}
+                          onDoubleClick={() => handleToggleFocus(feed.id)}
+                          onContextMenu={(e) => handleFeedContextMenu(e, feed)}
+                          className={`group relative flex flex-col items-center justify-center rounded-[26px] border transition-all duration-200 w-full h-full min-h-[220px] overflow-hidden select-none ${feed.type === "video" || hasCameraFill
+                            ? "bg-black/90 border-white/10 shadow-2xl p-0"
+                            : `${assignedBg} border-white/[0.08] hover:border-white/[0.18] shadow-xl p-6`
+                            } ${isSpeaking
+                              ? "ring-[3px] ring-[#23a55a] border-[#23a55a] shadow-[0_0_30px_rgba(35,165,90,0.35)] scale-[1.01]"
+                              : ""
+                            }`}
+                        >
+                          {hasCameraFill ? (
+                            // ── Camera ON: fills entire card rectangle (Discord-style video tile) ──
+                            <div className="relative h-full w-full">
+                              <VideoRenderer
+                                stream={feed.cameraStream!}
+                                fitMode="cover"
+                                muted={feed.isLocal}
+                              />
+
+                              {/* Bottom gradient overlay: name + status */}
+                              <div className="absolute bottom-0 inset-x-0 flex items-end justify-between px-3 py-2.5 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none">
+                                <div className="flex items-center gap-1.5">
+                                  {isSpeaking && (
+                                    <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse shrink-0" />
+                                  )}
+                                  <span className="text-xs font-bold text-white drop-shadow truncate max-w-[130px]">
+                                    {feed.title}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {feed.isDeafened ? (
+                                    <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
+                                      <VolumeX className="h-3 w-3" /> Mutou Tudo
+                                    </span>
+                                  ) : feed.isMuted ? (
+                                    <span className="flex items-center gap-1 rounded bg-rose-600/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-white shadow">
+                                      <MicOff className="h-3 w-3" /> Mutado
+                                    </span>
+                                  ) : (
+                                    <Camera className="h-3 w-3 text-white/50" />
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* PTT badge top-right */}
+                              {feed.isLocal && inputMode === "push-to-talk" && (
+                                <div className="absolute top-2 right-2 pointer-events-none">
+                                  <span
+                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${isPttPressed
+                                      ? "bg-white/20 text-white border-white/40 animate-pulse"
+                                      : "bg-black/60 text-white/50 border-white/10"
+                                      }`}
+                                  >
+                                    PTT [{pushToTalkKey}]
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Hover overlay: Focus button */}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFocus(feed.id)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs shadow-lg hover:scale-105 transition cursor-pointer"
+                                >
+                                  <Pin className="h-3.5 w-3.5" />
+                                  <span>Focar no Palco</span>
+                                </button>
+                              </div>
                             </div>
-                            <div className="space-y-1">
-                              <p className="text-sm font-black text-white">{feed.title}</p>
-                              <p className="text-[11px] text-white/40 max-w-[200px]">Economizando banda e GPU em segundo plano.</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setWatchedStreams((prev) => ({ ...prev, [feed.id]: true }));
-                              }}
-                              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-black font-black text-xs hover:scale-105 active:scale-95 shadow-lg transition cursor-pointer"
-                            >
-                              <Tv className="h-4 w-4" />
-                              <span>Assistir Transmissão</span>
-                            </button>
-                          </div>
-                        ) : (
-                          // Live Video Tile (screen share)
-                          <div className="relative h-full w-full flex items-center justify-center">
-                            <VideoRenderer stream={feed.stream} fitMode="contain" />
-                            <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/80 border border-white/10 backdrop-blur-md">
-                              <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
-                              <span className="text-xs font-bold text-white truncate max-w-[130px]">{feed.title}</span>
-                            </div>
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                              <button
-                                type="button"
-                                onClick={() => handleToggleFocus(feed.id)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs shadow-lg hover:scale-105 transition cursor-pointer"
-                              >
-                                <Pin className="h-3.5 w-3.5" />
-                                <span>Focar no Palco</span>
-                              </button>
-                              {feed.id === "remote-screen" && (
+
+                          ) : feed.type === "video" && feed.stream ? (
+                            feed.id === "remote-screen" && !watchedStreams["remote-screen"] ? (
+                              // On-Demand Screen Share Placeholder
+                              <div className="relative h-full w-full flex flex-col items-center justify-center p-6 text-center space-y-3 bg-black/85">
+                                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/15 text-[10px] font-black uppercase text-white">
+                                  <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                                  <span>Transmissão Ao Vivo</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-sm font-black text-white">{feed.title}</p>
+                                  <p className="text-[11px] text-white/40 max-w-[200px]">Economizando banda e GPU em segundo plano.</p>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setWatchedStreams((prev) => ({ ...prev, [feed.id]: false }));
+                                    setWatchedStreams((prev) => ({ ...prev, [feed.id]: true }));
                                   }}
-                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-black/80 hover:bg-black text-white/80 hover:text-white font-bold text-xs border border-white/15 transition cursor-pointer"
+                                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-black font-black text-xs hover:scale-105 active:scale-95 shadow-lg transition cursor-pointer"
                                 >
-                                  <Tv className="h-3.5 w-3.5" />
-                                  <span>Pausar</span>
+                                  <Tv className="h-4 w-4" />
+                                  <span>Assistir Transmissão</span>
                                 </button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      ) : (
-                        // ── Voice-only card: avatar circle (camera OFF) ──
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <div className="relative mb-3 flex items-center justify-center">
-                            {/* Animated Calling / Connecting Radar Rings */}
-                            {(feed.isRinging || feed.isConnecting) && (
-                              <>
-                                <motion.div
-                                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                                  className={`absolute h-32 w-32 rounded-full ${feed.isConnecting ? "bg-sky-500/15" : "bg-white/10"}`}
-                                />
-                                <motion.div
-                                  animate={{ scale: [1, 1.18, 1], opacity: [0.7, 0.1, 0.7] }}
-                                  transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
-                                  className={`absolute h-28 w-28 rounded-full border ${feed.isConnecting ? "border-sky-400/30" : "border-white/30"}`}
-                                />
-                              </>
-                            )}
-
-                            <div
-                              className={`relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden border-[3px] transition-all duration-200 ${feed.isRinging
-                                ? "border-amber-500/30 opacity-60 grayscale-[20%]"
-                                : feed.isConnecting
-                                  ? "border-sky-400/50 ring-2 ring-sky-400/25 shadow-[0_0_20px_rgba(56,189,248,0.25)] opacity-90 animate-pulse"
-                                  : feed.isDisconnected
-                                    ? "border-dashed border-white/25 opacity-55 grayscale-[20%]"
-                                    : feed.isSpeaking
-                                      ? "border-white ring-4 ring-white/40 shadow-[0_0_30px_rgba(255,255,255,0.35)] scale-[1.05] opacity-100"
-                                      : "border-white/10 opacity-100"
-                                }`}
-                            >
-                              {feed.avatar ? (
-                                <img src={feed.avatar} alt="" className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-white/10 text-2xl sm:text-3xl font-black text-white border border-white/10">
-                                  {feed.title.slice(0, 2).toUpperCase()}
+                              </div>
+                            ) : (
+                              // Live Video Tile (screen share)
+                              <div className="relative h-full w-full flex items-center justify-center">
+                                <VideoRenderer stream={feed.stream} fitMode="contain" />
+                                <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/80 border border-white/10 backdrop-blur-md">
+                                  <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse" />
+                                  <span className="text-xs font-bold text-white truncate max-w-[130px]">{feed.title}</span>
                                 </div>
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleFocus(feed.id)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs shadow-lg hover:scale-105 transition cursor-pointer"
+                                  >
+                                    <Pin className="h-3.5 w-3.5" />
+                                    <span>Focar no Palco</span>
+                                  </button>
+                                  {feed.id === "remote-screen" && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setWatchedStreams((prev) => ({ ...prev, [feed.id]: false }));
+                                      }}
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-black/80 hover:bg-black text-white/80 hover:text-white font-bold text-xs border border-white/15 transition cursor-pointer"
+                                    >
+                                      <Tv className="h-3.5 w-3.5" />
+                                      <span>Pausar</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          ) : (
+                            // ── Voice-only card: Discord-style avatar with bottom-left pill badge ──
+                            <div className="relative flex h-full w-full flex-col items-center justify-center">
+                              {/* Animated Calling / Connecting Radar Rings */}
+                              {(feed.isRinging || feed.isConnecting) && (
+                                <>
+                                  <motion.div
+                                    animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                    className={`absolute h-36 w-36 rounded-full ${feed.isConnecting ? "bg-sky-500/15" : "bg-white/10"}`}
+                                  />
+                                  <motion.div
+                                    animate={{ scale: [1, 1.18, 1], opacity: [0.7, 0.1, 0.7] }}
+                                    transition={{ repeat: Infinity, duration: 2, delay: 0.3, ease: "easeInOut" }}
+                                    className={`absolute h-30 w-30 rounded-full border ${feed.isConnecting ? "border-sky-400/30" : "border-white/30"}`}
+                                  />
+                                </>
                               )}
-                            </div>
-                            {feed.isDeafened ? (
+
+                              {/* Center Large Avatar */}
                               <div
-                                className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg animate-pulse"
-                                title="Mutou tudo (Microfone e Som desativados)"
-                              >
-                                <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              </div>
-                            ) : feed.isMuted ? (
-                              <div
-                                className="absolute bottom-0 right-0 flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-600 text-white border-2 border-[#12131a] shadow-lg"
-                                title="Microfone Mutado"
-                              >
-                                <MicOff className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              </div>
-                            ) : null}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm sm:text-base font-black text-white tracking-tight">{feed.title}</h4>
-                            {feed.isLocal && inputMode === "push-to-talk" && (
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${isPttPressed
-                                  ? "bg-white/20 text-white border-white/40 animate-pulse"
-                                  : "bg-white/5 text-white/50 border-white/10"
+                                className={`relative h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32 rounded-full overflow-hidden border-[3px] transition-all duration-200 ${feed.isRinging
+                                  ? "border-amber-500/30 opacity-60 grayscale-[20%]"
+                                  : feed.isConnecting
+                                    ? "border-sky-400/50 ring-4 ring-sky-400/25 shadow-[0_0_20px_rgba(56,189,248,0.25)] opacity-90 animate-pulse"
+                                    : isSpeaking
+                                      ? "border-[#23a55a] ring-4 ring-[#23a55a]/35 shadow-[0_0_25px_rgba(35,165,90,0.4)] scale-105 opacity-100"
+                                      : "border-white/10 opacity-100"
                                   }`}
                               >
-                                PTT [{pushToTalkKey}]
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-1 text-xs text-white/50 flex items-center justify-center gap-1.5">
-                            {feed.isRinging ? (
-                              <span className="text-amber-300 font-bold flex items-center gap-1.5 animate-pulse">
-                                <Phone className="h-3 w-3 animate-bounce text-amber-300" /> Chamando...
-                              </span>
-                            ) : feed.isConnecting ? (
-                              <span className="text-sky-300 font-bold flex items-center gap-1.5 animate-pulse">
-                                <Loader2 className="h-3 w-3 animate-spin text-sky-300" /> Conectando...
-                              </span>
-                            ) : feed.isDisconnected ? (
-                              <span className="text-amber-400/90 font-medium flex items-center gap-1 text-[11px]">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping shrink-0" /> Desconectou (Aguardando retorno)
-                              </span>
-                            ) : feed.isDeafened ? (
-                              <span className="text-rose-400 font-bold flex items-center gap-1">
-                                <VolumeX className="h-3 w-3 text-rose-400" /> Mutou tudo (Som & Mic)
-                              </span>
-                            ) : feed.isMuted ? (
-                              <span className="text-rose-400/90 font-bold flex items-center gap-1">
-                                <MicOff className="h-3 w-3 text-rose-400" /> Mutado
-                              </span>
-                            ) : feed.isSpeaking ? (
-                              <span className="text-white font-bold flex items-center gap-1">
-                                <Activity className="h-3 w-3 animate-pulse" /> Falando
-                              </span>
-                            ) : (
-                              <span className="text-white/40">{feed.subtitle}</span>
-                            )}
-                          </p>
-                          <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleFocus(feed.id)}
-                              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 hover:bg-white text-white hover:text-black font-bold text-xs transition cursor-pointer"
-                            >
-                              <Pin className="h-3 w-3" />
-                              <span>Focar</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
+                                {feed.avatar ? (
+                                  <img src={feed.avatar} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center bg-white/10 text-2xl sm:text-3xl md:text-4xl font-black text-white border border-white/10">
+                                    {feed.title.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Discord-style Bottom-Left Name & Status Pill */}
+                              <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-28px)]">
+                                {isSpeaking && (
+                                  <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse shrink-0" />
+                                )}
+                                <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
+                                  {feed.title}
+                                </span>
+                                {feed.isDeafened ? (
+                                  <span className="flex items-center text-rose-400 shrink-0" title="Áudio e Mic Desativados">
+                                    <VolumeX className="h-3.5 w-3.5" />
+                                  </span>
+                                ) : feed.isMuted ? (
+                                  <span className="flex items-center text-rose-400 shrink-0" title="Microfone Mutado">
+                                    <MicOff className="h-3.5 w-3.5" />
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {/* PTT Indicator (Top Right) */}
+                              {feed.isLocal && inputMode === "push-to-talk" && (
+                                <div className="absolute top-3.5 right-3.5 pointer-events-none">
+                                  <span
+                                    className={`text-[9px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${isPttPressed
+                                      ? "bg-[#23a55a]/30 text-[#23a55a] border-[#23a55a]/50 animate-pulse"
+                                      : "bg-black/60 text-white/50 border-white/10"
+                                      }`}
+                                  >
+                                    PTT [{pushToTalkKey}]
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Hover Focus Button (Top-Right) */}
+                              <div className="absolute top-3.5 right-3.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFocus(feed.id)}
+                                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/70 hover:bg-white text-white/80 hover:text-black font-bold text-xs border border-white/10 transition cursor-pointer shadow-md"
+                                  title="Focar no palco"
+                                >
+                                  <Pin className="h-3 w-3" />
+                                  <span className="hidden sm:inline">Focar</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </motion.div>
               </div>
             )}
           </div>
