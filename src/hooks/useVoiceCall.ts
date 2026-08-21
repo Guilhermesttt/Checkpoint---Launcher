@@ -2067,7 +2067,8 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
       },
       onMemberJoined: async (joined: CallMemberJoinedPayload) => {
-        notify(`${joined.name} entrou na sala.`, "info");
+        if (joined.uid === user?.uid) return;
+        notify(`${joined.name} entrou na chamada.`, "info");
         playRingtone("connect");
 
         setSession((prev) => {
@@ -2080,8 +2081,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               ...current,
               { uid: joined.uid, name: joined.name, avatar: joined.avatar || undefined },
             ],
+            friendUid: prev.friendUid || joined.uid,
           };
         });
+
+        if (user?.uid) {
+          void sendCallAnswer(chatId, joined.uid, {
+            responderId: user.uid,
+            accepted: true,
+            chatId,
+          });
+        }
 
         // Only create P2P mesh peer connection if NOT using LiveKit SFU as primary
         const useLiveKitPrimary = useLiveKitPrimaryRef.current && livekitConnectedRef.current;
@@ -2216,6 +2226,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               playRingtone("disconnect");
             }
           }, 35000);
+        } else if (sessionRef.current?.chatId === invite.chatId) {
+          // O amigo está reconectando na mesma chamada em que já estamos!
+          // Auto-aceita e confirma a chamada para restabelecer a conexão imediatamente
+          void sendCallAnswer(invite.chatId, invite.callerId, {
+            responderId: user.uid,
+            accepted: true,
+            chatId: invite.chatId,
+          });
         } else {
           void sendCallEnd(invite.chatId, invite.callerId, {
             senderId: user.uid,
@@ -2346,6 +2364,14 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           chatId,
           hasVideo: actualWithVideo,
           timestamp: Date.now(),
+        });
+
+        // Notifica a sala caso o participante já esteja nela aguardando
+        await sendCallMemberJoined(chatId, {
+          uid: user.uid,
+          name: displayName,
+          avatar: avatarUrl || null,
+          chatId,
         });
 
         // If LiveKit failed, fall back to P2P mesh for media

@@ -4,6 +4,7 @@ import { ImagePlus, MessageSquare, Phone, Send, Video, X } from "lucide-react";
 import ModalShell from "../ui/ModalShell";
 import { useNotification } from "../NotificationCenter";
 import { useAuth } from "../../auth/AuthProvider";
+import { useVoiceCallContext } from "../../context/VoiceCallContext";
 import {
   MessageGroup,
   Message,
@@ -123,66 +124,95 @@ const ChatHeaderBar: React.FC<{
   onCall: () => void;
   onVideoCall: () => void;
   onClose: () => void;
-}> = ({ friend, onStartVoiceCall, onCall, onVideoCall, onClose }) => (
-  <div className="flex shrink-0 items-center justify-between border-b border-white/8 bg-black/35 backdrop-blur-md px-5 py-3.5 md:px-7">
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <img
-          src={friend.avatar || FALLBACK_FRIEND_AVATAR}
-          alt={friend.name}
-          className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
-        />
-        <span
-          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${friend.status === "playing"
-            ? "animate-pulse bg-green-500"
-            : friend.status === "online"
-              ? "bg-green-400"
-              : "bg-white/20"
-            }`}
-        />
-      </div>
-      <div>
-        <h4 className="text-sm font-bold leading-none text-white">{friend.name}</h4>
-        <span className="mt-1 block text-[10px] uppercase tracking-wider text-white/40">
-          {friend.status === "playing" ? `Jogando ${friend.playing}` : friend.status}
-        </span>
-      </div>
-    </div>
+}> = ({ friend, onStartVoiceCall, onCall, onVideoCall, onClose }) => {
+  const voiceCall = useVoiceCallContext();
+  const cleanFriendUid = String(friend.id || "").replace(/^cp-friend:/, "").trim();
+  const isCallActiveWithFriend = Boolean(
+    voiceCall.session &&
+    voiceCall.callState === "active" &&
+    (voiceCall.session.friendUid === cleanFriendUid || voiceCall.session.chatId?.includes(cleanFriendUid))
+  );
 
-    <div className="flex items-center gap-2">
-      {onStartVoiceCall && (
-        <>
-          <button
-            type="button"
-            onClick={onCall}
-            aria-label="Iniciar chamada de voz"
-            title="Iniciar chamada de voz"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.025] text-white/45 transition hover:bg-white/[0.08] hover:text-white"
-          >
-            <Phone className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onVideoCall}
-            aria-label="Compartilhar tela / Vídeo"
-            title="Compartilhar tela / Vídeo"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.06] bg-white/[0.025] text-white/45 transition hover:bg-white/[0.08] hover:text-white"
-          >
-            <Video className="h-3.5 w-3.5" />
-          </button>
-        </>
-      )}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Fechar conversa"
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition"
-      >
-        <X className="h-4 w-4" />
-      </button>
+  const handleCallClick = () => {
+    if (isCallActiveWithFriend) {
+      voiceCall.setIsVoiceWindowOpen(true);
+    } else {
+      onCall();
+    }
+  };
+
+  return (
+    <div className="flex shrink-0 items-center justify-between border-b border-white/8 bg-black/35 backdrop-blur-md px-5 py-3.5 md:px-7">
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <img
+            src={friend.avatar || FALLBACK_FRIEND_AVATAR}
+            alt={friend.name}
+            className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
+          />
+          <span
+            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${
+              isCallActiveWithFriend
+                ? "bg-[#23a55a] animate-pulse ring-2 ring-[#23a55a]/40"
+                : friend.status === "playing"
+                ? "animate-pulse bg-green-500"
+                : friend.status === "online"
+                ? "bg-green-400"
+                : "bg-white/20"
+            }`}
+          />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold leading-none text-white">{friend.name}</h4>
+          <span className="mt-1 block text-[10px] uppercase tracking-wider text-white/40">
+            {isCallActiveWithFriend
+              ? "🟢 Em Chamada de Voz"
+              : friend.status === "playing"
+              ? `Jogando ${friend.playing}`
+              : friend.status}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {onStartVoiceCall && (
+          <>
+            <button
+              type="button"
+              onClick={handleCallClick}
+              aria-label={isCallActiveWithFriend ? "Voltar para a chamada" : "Iniciar chamada de voz"}
+              title={isCallActiveWithFriend ? "Chamada ativa — Clique para voltar à chamada" : "Iniciar chamada de voz"}
+              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-all cursor-pointer ${
+                isCallActiveWithFriend
+                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.55)] animate-pulse hover:bg-emerald-600 hover:scale-105"
+                  : "border-white/[0.08] bg-white/[0.04] text-white/60 hover:bg-white/[0.1] hover:text-white"
+              }`}
+            >
+              <Phone className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={onVideoCall}
+              aria-label="Compartilhar tela / Vídeo"
+              title="Compartilhar tela / Vídeo"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 transition hover:bg-white/[0.1] hover:text-white cursor-pointer"
+            >
+              <Video className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar conversa"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition cursor-pointer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const ChatIdentityHero: React.FC<{ friend: SocialFriend }> = ({ friend }) => (
   <section className="flex flex-col items-center pb-8 pt-2 text-center" aria-label="Identidade da amizade">
