@@ -636,13 +636,15 @@ const Home: React.FC = () => {
       updateCheckpointPresence(
         currentPresenceGame ? "playing" : "online",
         currentPresenceGame || undefined,
+        userProfile?.displayName || undefined,
+        userProfile?.photoURL,
       ).catch(() => undefined);
     };
 
     heartbeat();
     const interval = window.setInterval(heartbeat, 45_000);
     return () => window.clearInterval(interval);
-  }, [currentPresenceGame, user?.uid]);
+  }, [currentPresenceGame, user?.uid, userProfile?.displayName, userProfile?.photoURL]);
 
   useEffect(() => {
     const handleGameLaunch = (event: Event) => {

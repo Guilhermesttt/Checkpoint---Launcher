@@ -313,6 +313,7 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }}
         onKickParticipant={voiceCall.kickParticipant}
         onHangUp={voiceCall.hangUp}
+        onEndCallForEveryone={voiceCall.endCallForEveryone}
         socialFriends={socialFriends}
         roomConfig={voiceCall.roomConfig}
         onUpdateRoomPrivacy={voiceCall.updateRoomPrivacy}
@@ -432,6 +433,7 @@ const safeFallbackVoiceCallContext: Partial<VoiceCallContextType> = {
   answerCall: async () => {},
   rejectCall: async () => {},
   hangUp: async () => {},
+  endCallForEveryone: async () => {},
   joinRoom: async () => {},
   createAndJoinRoom: async () => {},
   updateRoomPrivacy: async () => {},

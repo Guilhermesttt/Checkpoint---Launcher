@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage } = require("electron");
 
 const crypto = require("node:crypto");
-app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization");
+app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization,WebRtcHWEncoding,WebRtcHWDecoding");
 app.commandLine.appendSwitch("enable-accelerated-video-decode");
 app.commandLine.appendSwitch("enable-accelerated-mjpeg-decode");
 const { execFile, spawn } = require("node:child_process");
@@ -75,7 +75,6 @@ app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
 
 // ── Hardware WebRTC Encoding (H.264 via NVENC/QuickSync/VideoToolbox) ────────
 // Reduz uso de CPU durante screen share com jogo rodando em paralelo
-app.commandLine.appendSwitch("enable-features", "WebRtcHWEncoding,WebRtcHWDecoding,WebRtcHideLocalIpsWithMdns");
 app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enabled/");
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
@@ -908,11 +907,21 @@ const configureHidAccess = (electronSession) => {
   const ALLOWED_PERMISSIONS = new Set([
     "hid",
     "media",
+    "microphone",
+    "camera",
     "audioCapture",
     "videoCapture",
+    "speaker-selection",
     "mediaKeySystem",
     "display-capture",
+    "screen",
     "notifications",
+    "fullscreen",
+    "accessibility-events",
+    "clipboard-read",
+    "clipboard-sanitized-write",
+    "idle-detection",
+    "window-management",
   ]);
 
   electronSession.setPermissionRequestHandler((_webContents, permission, callback) => {

@@ -180,9 +180,14 @@ export function useFriendsSystem({
             const status = statusById.get(uid);
             if (!status) return friend;
 
+            const cleanName =
+              (friend.name && friend.name !== "Amigo" && friend.name !== "Jogador")
+                ? friend.name
+                : (status.displayName || friend.name || "Amigo");
+
             const newFriend = {
               ...friend,
-              name: status.displayName || friend.name,
+              name: cleanName,
               avatar: status.photoURL || friend.avatar,
               status: status.status || "offline",
               playing: status.playing || undefined,
@@ -246,9 +251,14 @@ export function useFriendsSystem({
             const status = statusById.get(uid);
             if (!status) return friend;
 
+            const cleanName =
+              (friend.name && friend.name !== "Amigo" && friend.name !== "Jogador")
+                ? friend.name
+                : (status.displayName || friend.name || "Amigo");
+
             const nextFriend = {
               ...friend,
-              name: status.displayName || friend.name,
+              name: cleanName,
               avatar: status.photoURL || friend.avatar,
               status: status.status || "offline",
               playing: status.playing || undefined,
@@ -297,9 +307,14 @@ export function useFriendsSystem({
           const updated = current.map((friend) => {
             if (!friend.id.includes(presence.uid)) return friend;
 
+            const cleanName =
+              (friend.name && friend.name !== "Amigo" && friend.name !== "Jogador")
+                ? friend.name
+                : (presence.displayName || friend.name || "Amigo");
+
             const newFriend = {
               ...friend,
-              name: presence.displayName || friend.name,
+              name: cleanName,
               avatar: presence.photoURL || friend.avatar,
               status: presence.status || "offline",
               playing: presence.playing || undefined,

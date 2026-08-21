@@ -82,23 +82,28 @@ export const removeCheckpointFriend = async (uid: string) => {
 export const updateCheckpointPresence = async (
   status: "online" | "playing" | "offline",
   currentGameTitle?: string,
+  customDisplayName?: string,
+  customPhotoURL?: string | null,
 ) => {
   const session = (await supabase.auth.getSession()).data.session;
   if (!session?.user) {
     throw new Error("Sessao expirada. Entre novamente.");
   }
 
+  const displayName =
+    customDisplayName ||
+    session.user.user_metadata?.displayName ||
+    session.user.user_metadata?.display_name ||
+    session.user.user_metadata?.full_name ||
+    session.user.user_metadata?.name ||
+    session.user.user_metadata?.nickname ||
+    "Jogador";
+
   // Fast-path via WebSocket Realtime Broadcast
   void broadcastPresenceStatus({
     uid: session.user.id,
-    displayName:
-      session.user.user_metadata?.displayName ||
-      session.user.user_metadata?.full_name ||
-      session.user.user_metadata?.name ||
-      session.user.user_metadata?.nickname ||
-      session.user.email?.split("@")[0] ||
-      "Jogador",
-    photoURL: session.user.user_metadata?.photoURL || null,
+    displayName,
+    photoURL: customPhotoURL !== undefined ? customPhotoURL : (session.user.user_metadata?.photoURL || null),
     status,
     playing: currentGameTitle || null,
     updatedAt: Date.now(),

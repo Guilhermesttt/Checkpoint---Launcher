@@ -168,8 +168,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                     : isConnecting
                     ? "bg-sky-400 animate-pulse"
                     : isCurrentlySpeaking
-                    ? "bg-white animate-pulse"
-                    : "bg-white/60"
+                    ? "bg-emerald-400 animate-pulse ring-2 ring-emerald-400/40"
+                    : "bg-emerald-400"
                 }`}
               />
               <span
@@ -181,8 +181,8 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                     : isConnecting
                     ? "text-sky-300"
                     : isCurrentlySpeaking
-                    ? "text-white"
-                    : "text-white/70"
+                    ? "text-emerald-300"
+                    : "text-emerald-400"
                 }`}
               >
                 {isReconnecting
@@ -193,7 +193,7 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                   ? "Conectando..."
                   : isCurrentlySpeaking
                   ? "Voz Ativa"
-                  : "Voz Conectada"}
+                  : "Conectado"}
               </span>
               {inputMode === "push-to-talk" && (
                 <span

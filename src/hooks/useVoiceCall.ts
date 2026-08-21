@@ -1867,6 +1867,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           setIsReconnecting(false);
           reconnectAttemptsRef.current = 0;
           playRingtone("connect");
+          notify("Chamada de voz conectada!", "success");
           if (!callDurationTimerRef.current) {
             callDurationTimerRef.current = window.setInterval(() => {
               setCallDuration((prev) => prev + 1);
@@ -2653,7 +2654,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     cleanUpCall();
   }, [cleanUpCall, incomingInvite, playRingtone, stopRingtone, user?.uid]);
 
-  // HANGUP / DISCONNECT
+  // HANGUP / DISCONNECT - User leaves the call but call stays active for others
   const hangUp = useCallback(async () => {
     stopRingtone();
     try {
@@ -2662,7 +2663,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setPendingReconnectSession(null);
 
     if (session && user?.uid) {
-      await sendCallEnd(session.chatId, session.friendUid || "room-all", {
+      await sendCallMemberLeft(session.chatId, {
+        uid: user.uid,
+        chatId: session.chatId,
+      });
+    }
+    playRingtone("disconnect");
+    cleanUpCall();
+  }, [cleanUpCall, playRingtone, session, stopRingtone, user?.uid]);
+
+  // END CALL FOR EVERYONE - Host/admin terminates the call completely
+  const endCallForEveryone = useCallback(async () => {
+    stopRingtone();
+    try {
+      sessionStorage.removeItem("checkpoint_last_voice_session");
+    } catch {}
+    setPendingReconnectSession(null);
+
+    if (session && user?.uid) {
+      await sendCallEnd(session.chatId, "room-all", {
         senderId: user.uid,
         chatId: session.chatId,
         reason: "hangup",
@@ -3460,6 +3479,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     answerCall,
     rejectCall,
     hangUp,
+    endCallForEveryone,
     kickParticipant,
     updateRoomPrivacy,
     updateRoomAppearance,

@@ -112,6 +112,7 @@ interface VoiceCallWindowProps {
   onKickParticipant?: (targetUserId: string) => void;
   onUpdateRoomPrivacy?: (isPrivate: boolean, password?: string) => Promise<void> | void;
   onUpdateRoomAppearance?: (config: CallRoomConfig) => Promise<void> | void;
+  onEndCallForEveryone?: () => void;
   socialFriends?: SocialFriend[];
   roomConfig?: CallRoomConfig | null;
   notify?: (msg: string, type: "success" | "error" | "info") => void;
@@ -283,6 +284,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   onToggleScreenShare,
   onKickParticipant,
   onHangUp,
+  onEndCallForEveryone,
   socialFriends = [],
   roomConfig,
   onUpdateRoomPrivacy,
@@ -628,8 +630,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     userProfile?.uid,
   ]);
 
-  // Remap focused feed cleanup: local-camera and remote-camera no longer exist as separate feeds
-  // Use local-user / remote-user instead if focused feed was on a removed camera feed
+  // Identify remote participant count and if user is alone in room
+  const remoteParticipantsCount = activeFeeds.filter((f) => !f.isLocal && !f.isScreen).length;
+  const isOnlyOnePersonInRoom = remoteParticipantsCount === 0;
 
   // Identify currently focused feed
   const focusedFeed = activeFeeds.find((f) => f.id === focusedFeedId) || null;
@@ -778,8 +781,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       <Loader2 className="h-3 w-3 animate-spin text-sky-300" /> Conectando...
                     </span>
                   ) : (
-                    <span className="text-xs font-mono font-normal text-white/90 bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
-                      {formatDuration(duration)}
+                    <span className="text-xs font-mono font-medium text-emerald-300 bg-emerald-500/15 px-2.5 py-0.5 rounded-md border border-emerald-500/30 flex items-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>{formatDuration(duration)}</span>
                     </span>
                   )}
                   {isFocusedMode && focusedFeed && (
@@ -2167,16 +2171,16 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               <Settings className="h-5 w-5" />
             </Button>
 
-            {/* 6. Disconnect Button */}
+            {/* Unified Disconnect / End Call Button */}
             <Button
               type="button"
               variant="destructive"
               onClick={onHangUp}
               className="h-12 gap-2 rounded-2xl bg-rose-600 px-6 text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-600/35 transition-all duration-200 hover:bg-rose-500 hover:scale-105 active:scale-95 ml-2"
-              title="Desconectar"
+              title={isOnlyOnePersonInRoom ? "Encerrar chamada" : "Desconectar da chamada"}
             >
               <PhoneOff className="h-4.5 w-4.5" />
-              <span>Desconectar</span>
+              <span>{isOnlyOnePersonInRoom ? "Encerrar Chamada" : "Desconectar"}</span>
             </Button>
           </div>
 

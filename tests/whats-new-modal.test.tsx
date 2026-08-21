@@ -12,14 +12,14 @@ describe("modal completo de novidades", () => {
 
   afterEach(cleanup);
 
-  it("apresenta os tres destaques da versao 3.1.2", () => {
+  it("apresenta os tres destaques da versao mais recente", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={vi.fn()} />);
 
-    expect(screen.getByText("Áudio WebRTC Instantâneo, Barramento U2U e Overlays")).toBeInTheDocument();
-    expect(screen.getByText("VERSÃO 3.1.2")).toBeInTheDocument();
+    expect(screen.getByText(LATEST_RELEASE.title)).toBeInTheDocument();
+    expect(screen.getByText(`VERSÃO ${LATEST_RELEASE.version}`)).toBeInTheDocument();
     expect(screen.getAllByTestId("release-highlight")).toHaveLength(3);
-    expect(screen.getByText("Áudio WebRTC Sem Latência")).toBeInTheDocument();
-    expect(screen.getByText("Barramento Global U2U em Tempo Real")).toBeInTheDocument();
+    expect(screen.getByText(LATEST_RELEASE.highlights[0].title)).toBeInTheDocument();
+    expect(screen.getByText(LATEST_RELEASE.highlights[1].title)).toBeInTheDocument();
   });
 
   it("confirma as novidades pelo botao principal", async () => {
@@ -41,9 +41,7 @@ describe("modal completo de novidades", () => {
     render(<WhatsNewModal release={LATEST_RELEASE} onClose={onClose} />);
 
     await userEvent.click(screen.getByRole("button", { name: "Ver notas completas" }));
-    expect(openExternalUrl).toHaveBeenCalledWith(
-      "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.2",
-    );
+    expect(openExternalUrl).toHaveBeenCalledWith(LATEST_RELEASE.releaseUrl);
 
     await userEvent.click(screen.getByRole("button", { name: "Fechar novidades" }));
     expect(onClose).toHaveBeenCalledOnce();
