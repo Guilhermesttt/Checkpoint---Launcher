@@ -378,7 +378,7 @@ const ChatMessageList: React.FC<{
   onViewImage: (image: ViewingImage) => void;
   onJoinCall: () => void;
   playSound: (type: SoundEffectType) => void;
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }> = ({ messages, friendUid, friend, selfAvatarUrl, friendTyping, onViewImage, onJoinCall, playSound, messagesEndRef }) => (
   <div className="chat-scrollbar flex-1 space-y-2 overflow-y-auto px-7 py-6 pr-4 md:px-9">
     {messages.length === 0 ? (
@@ -427,7 +427,7 @@ const ChatComposer: React.FC<{
   onPasteImage: (e: React.ClipboardEvent<HTMLInputElement>) => void;
   onPickImage: () => void;
   onImageSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  imageInputRef: React.RefObject<HTMLInputElement>;
+  imageInputRef: React.RefObject<HTMLInputElement | null>;
   pendingImage: PendingImage | null;
   onRemovePendingImage: () => void;
   isSendingImage: boolean;

@@ -233,7 +233,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                 <ContactCard
                   key={request.uid}
                   name={request.displayName || copy.user}
-                  avatarUrl={request.photoURL}
+                  avatarUrl={request.photoURL || undefined}
                   status="busy"
                   statusText={copy.wantsFriend}
                   actions={
