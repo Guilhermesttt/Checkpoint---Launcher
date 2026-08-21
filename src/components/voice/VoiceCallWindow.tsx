@@ -464,23 +464,20 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     const remoteParticipants = (session.participants || []).filter((p) => p.uid !== userProfile?.uid);
 
     if (isRoom) {
-      // 1. Participantes remotos reais da sala (mesclando lista estática com peers ativos conectados)
-      const knownUids = new Set<string>();
+      // 1. Participantes remotos reais da sala (apenas quem está na lista de participantes da sala ou com stream ativo)
+      const activeUids = new Set<string>();
       (session.participants || []).forEach((p) => {
-        if (p.uid && p.uid !== userProfile?.uid) knownUids.add(p.uid);
+        if (p.uid && p.uid !== userProfile?.uid) activeUids.add(p.uid);
       });
       if (remoteStreams && remoteStreams instanceof Map) {
-        remoteStreams.forEach((_, peerId) => {
-          if (peerId && peerId !== userProfile?.uid && peerId !== "local-user") knownUids.add(peerId);
-        });
-      }
-      if (remoteStatesMap && remoteStatesMap instanceof Map) {
-        remoteStatesMap.forEach((_, peerId) => {
-          if (peerId && peerId !== userProfile?.uid && peerId !== "local-user") knownUids.add(peerId);
+        remoteStreams.forEach((stream, peerId) => {
+          if (peerId && peerId !== userProfile?.uid && peerId !== "local-user" && stream && stream.active) {
+            activeUids.add(peerId);
+          }
         });
       }
 
-      const participantList = Array.from(knownUids).map((uid) => {
+      const participantList = Array.from(activeUids).map((uid) => {
         const explicit = (session.participants || []).find((p) => p.uid === uid);
         const social = socialFriends?.find((f) => f.id === uid || f.id === `cp-friend:${uid}`);
         return {
@@ -527,10 +524,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         }
       });
     } else if (session.friendUid && session.friendUid !== userProfile?.uid) {
-      // 2. Chamada 1:1 direta ou auto-teste echo-bot
+      // 2. Chamada 1:1 direta
       const isRingingOut = callState === "ringing-out";
       const isConnecting = callState === "connecting";
-      const isDisconnected = !remoteStream && callState === "active" && !isSpeakingRemote;
+
       feeds.push({
         id: "remote-user",
         type: "voice",
@@ -539,11 +536,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           ? "Chamando..."
           : isConnecting
             ? "Conectando..."
-            : isDisconnected
-              ? "Desconectou (Aguardando retorno...)"
-              : isSpeakingRemote
-                ? "Falando..."
-                : "Conectado",
+            : isSpeakingRemote
+              ? "Falando..."
+              : "Conectado",
         avatar: session.friendAvatar,
         cameraStream: isRemoteCameraOn && !isRemoteSharingScreen ? remoteStream : null,
         isLocal: false,
@@ -553,7 +548,6 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         isCamera: isRemoteCameraOn && !isRemoteSharingScreen,
         isRinging: isRingingOut,
         isConnecting: isConnecting,
-        isDisconnected,
       });
     }
 

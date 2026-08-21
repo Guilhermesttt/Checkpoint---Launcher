@@ -1873,6 +1873,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               setCallDuration((prev) => prev + 1);
             }, 1000);
           }
+        } else if (pc.connectionState === "closed" || pc.connectionState === "disconnected") {
+          remoteStreamsRef.current.delete(targetPeerUid);
+          setRemoteStreams(new Map(remoteStreamsRef.current));
+          if (sessionRef.current?.friendUid === targetPeerUid || peerConnectionsRef.current.size <= 1) {
+            setRemoteStream(null);
+          }
+          setRemoteStatesMap((prev) => {
+            const next = new Map(prev);
+            next.delete(targetPeerUid);
+            return next;
+          });
+          setSession((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              participants: (prev.participants || []).filter((p) => p.uid !== targetPeerUid),
+              friendUid: prev.friendUid === targetPeerUid ? undefined : prev.friendUid,
+            };
+          });
         } else if (pc.connectionState === "failed") {
           void attemptPeerReconnect();
         }
@@ -2076,6 +2095,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return {
             ...prev,
             participants: (prev.participants || []).filter((p) => p.uid !== left.uid),
+            friendUid: prev.friendUid === left.uid ? undefined : prev.friendUid,
           };
         });
 
@@ -2088,6 +2108,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
         remoteStreamsRef.current.delete(left.uid);
         setRemoteStreams(new Map(remoteStreamsRef.current));
+        if (sessionRef.current?.friendUid === left.uid || peerConnectionsRef.current.size === 0) {
+          setRemoteStream(null);
+        }
 
         const pipeline = remotePipelinesRef.current.get(left.uid);
         if (pipeline) {
@@ -2101,11 +2124,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return updated;
         });
 
+        setRemoteStatesMap((prev) => {
+          const updated = new Map(prev);
+          updated.delete(left.uid);
+          return updated;
+        });
+
         if (peerConnectionsRef.current.size === 0) {
-          notify("O participante se desconectou. A sala permanece aberta para retorno.", "info");
+          notify("O participante se desconectou.", "info");
           playRingtone("disconnect");
         } else {
-          notify("Um participante saiu da sala.", "info");
+          notify("Um participante saiu da chamada.", "info");
           playRingtone("disconnect");
         }
       },
