@@ -463,6 +463,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     const isRoom = Boolean(session.roomName || (session.participants && session.participants.length > 0));
     const remoteParticipants = (session.participants || []).filter((p) => p.uid !== userProfile?.uid);
 
+    const isRingingOut = callState === "ringing-out";
+    const isConnecting = callState === "connecting";
+
     if (isRoom) {
       // 1. Participantes remotos reais da sala (apenas quem está na lista de participantes da sala ou com stream ativo)
       const activeUids = new Set<string>();
@@ -496,7 +499,13 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           id: `remote-user:${p.uid}`,
           type: "voice",
           title: p.name,
-          subtitle: isSpeaking ? "Falando..." : "Conectado",
+          subtitle: isRingingOut
+            ? "Chamando..."
+            : isConnecting
+              ? "Conectando..."
+              : isSpeaking
+                ? "Falando..."
+                : "Conectado",
           avatar: p.avatar,
           stream,
           cameraStream: remoteState?.isCameraOn && !remoteState?.isSharingScreen ? stream : null,
@@ -505,6 +514,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           isMuted: remoteState?.isMuted ?? false,
           isDeafened: remoteState?.isDeafened ?? false,
           isCamera: remoteState?.isCameraOn ?? false,
+          isRinging: isRingingOut,
+          isConnecting: isConnecting,
         });
 
         if (remoteState?.isSharingScreen && stream) {
@@ -525,9 +536,6 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       });
     } else if (session.friendUid && session.friendUid !== userProfile?.uid) {
       // 2. Chamada 1:1 direta
-      const isRingingOut = callState === "ringing-out";
-      const isConnecting = callState === "connecting";
-
       feeds.push({
         id: "remote-user",
         type: "voice",
@@ -590,7 +598,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       id: "local-user",
       type: "voice",
       title: userProfile?.displayName || "Você",
-      subtitle: isSpeakingLocal ? "Falando..." : "Conectado",
+      subtitle: isConnecting ? "Conectando..." : isSpeakingLocal ? "Falando..." : "Conectado",
       avatar: userProfile?.photoURL,
       cameraStream: isCameraOn ? localCameraStream : null,
       isLocal: true,
@@ -598,11 +606,13 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
       isMuted: isMuted,
       isDeafened: isDeafened,
       isCamera: isCameraOn,
+      isConnecting: isConnecting,
     });
 
     return feeds;
   }, [
     session,
+    callState,
     isRemoteSharingScreen,
     remoteStream,
     remoteStreams,
@@ -622,6 +632,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
     userProfile?.displayName,
     userProfile?.photoURL,
     userProfile?.uid,
+    socialFriends,
   ]);
 
   // Identify remote participant count and if user is alone in room
@@ -1612,23 +1623,45 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               </div>
 
                               {/* Discord-style Bottom-Left Name & Status Pill */}
-                              <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-28px)]">
-                                {isSpeaking && (
-                                  <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse shrink-0" />
-                                )}
-                                <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
-                                  {feed.title}
-                                </span>
-                                {feed.isDeafened ? (
-                                  <span className="flex items-center text-rose-400 shrink-0" title="Áudio e Mic Desativados">
-                                    <VolumeX className="h-3.5 w-3.5" />
+                              {feed.isConnecting ? (
+                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)] pointer-events-none max-w-[calc(100%-28px)]">
+                                  <Loader2 className="h-3.5 w-3.5 text-sky-400 animate-spin shrink-0" />
+                                  <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
+                                    {feed.title}
                                   </span>
-                                ) : feed.isMuted ? (
-                                  <span className="flex items-center text-rose-400 shrink-0" title="Microfone Mutado">
-                                    <MicOff className="h-3.5 w-3.5" />
+                                  <span className="text-[10px] font-black text-sky-300 uppercase tracking-wider bg-sky-500/20 px-1.5 py-0.5 rounded border border-sky-400/30 shrink-0">
+                                    Conectando...
                                   </span>
-                                ) : null}
-                              </div>
+                                </div>
+                              ) : feed.isRinging ? (
+                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.2)] pointer-events-none max-w-[calc(100%-28px)]">
+                                  <Phone className="h-3.5 w-3.5 text-amber-300 animate-bounce shrink-0" />
+                                  <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
+                                    {feed.title}
+                                  </span>
+                                  <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/30 shrink-0">
+                                    Chamando...
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-28px)]">
+                                  {isSpeaking && (
+                                    <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse shrink-0" />
+                                  )}
+                                  <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
+                                    {feed.title}
+                                  </span>
+                                  {feed.isDeafened ? (
+                                    <span className="flex items-center text-rose-400 shrink-0" title="Áudio e Mic Desativados">
+                                      <VolumeX className="h-3.5 w-3.5" />
+                                    </span>
+                                  ) : feed.isMuted ? (
+                                    <span className="flex items-center text-rose-400 shrink-0" title="Microfone Mutado">
+                                      <MicOff className="h-3.5 w-3.5" />
+                                    </span>
+                                  ) : null}
+                                </div>
+                              )}
 
                               {/* PTT Indicator (Top Right) */}
                               {feed.isLocal && inputMode === "push-to-talk" && (
