@@ -428,6 +428,8 @@ const safeFallbackVoiceCallContext: Partial<VoiceCallContextType> = {
   remoteStreams: new Map(),
   remoteStatesMap: new Map(),
   roomConfig: null,
+  activeCallsByFriend: new Map(),
+  isCallActiveWithFriend: () => false,
   startCall: async () => {},
   startTestCall: async () => {},
   answerCall: async () => {},

@@ -194,6 +194,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const [callDuration, setCallDuration] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
+  const [activeCallsByFriend, setActiveCallsByFriend] = useState<Map<string, string>>(new Map());
+
+  const isCallActiveWithFriend = useCallback(
+    (friendIdOrUid: string) => {
+      const cleanId = String(friendIdOrUid || "").replace(/^cp-friend:/, "").trim();
+      if (!cleanId) return false;
+      // 1. O usuário atual está em chamada ativa com este amigo
+      if (session && callState === "active" && (session.friendUid === cleanId || session.chatId?.includes(cleanId))) {
+        return true;
+      }
+      // 2. A chamada continua aberta com este amigo (o usuário saiu da tela, mas a chamada ainda existe para retornar)
+      if (activeCallsByFriend.has(cleanId)) {
+        return true;
+      }
+      return false;
+    },
+    [activeCallsByFriend, callState, session],
+  );
+
   const [pendingReconnectSession, setPendingReconnectSession] = useState<{
     chatId: string;
     friendUid: string;
@@ -2181,6 +2200,15 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         );
       },
       onEnd: (endPayload: CallEndPayload) => {
+        setActiveCallsByFriend((prev) => {
+          const next = new Map(prev);
+          for (const [fUid, cId] of next.entries()) {
+            if (cId === endPayload.chatId || fUid === endPayload.senderId) {
+              next.delete(fUid);
+            }
+          }
+          return next;
+        });
         notify(
           endPayload.reason === "busy"
             ? "O usuário está em outra chamada."
@@ -2718,6 +2746,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setPendingReconnectSession(null);
 
     if (session && user?.uid) {
+      if (session.friendUid) {
+        setActiveCallsByFriend((prev) => new Map(prev).set(session.friendUid!, session.chatId));
+      }
       await sendCallMemberLeft(session.chatId, {
         uid: user.uid,
         chatId: session.chatId,
@@ -2736,6 +2767,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     setPendingReconnectSession(null);
 
     if (session && user?.uid) {
+      if (session.friendUid) {
+        setActiveCallsByFriend((prev) => {
+          const next = new Map(prev);
+          next.delete(session.friendUid!);
+          return next;
+        });
+      }
       await sendCallEnd(session.chatId, "room-all", {
         senderId: user.uid,
         chatId: session.chatId,
@@ -3526,6 +3564,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     calibrateNoiseFloor,
     isCalibratingNoise,
     currentNoiseFloor,
+    // Active Friend Calls State
+    activeCallsByFriend,
+    isCallActiveWithFriend,
     // Actions
     startCall,
     joinRoom,

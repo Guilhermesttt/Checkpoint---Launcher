@@ -126,15 +126,10 @@ const ChatHeaderBar: React.FC<{
   onClose: () => void;
 }> = ({ friend, onStartVoiceCall, onCall, onVideoCall, onClose }) => {
   const voiceCall = useVoiceCallContext();
-  const cleanFriendUid = String(friend.id || "").replace(/^cp-friend:/, "").trim();
-  const isCallActiveWithFriend = Boolean(
-    voiceCall.session &&
-    voiceCall.callState === "active" &&
-    (voiceCall.session.friendUid === cleanFriendUid || voiceCall.session.chatId?.includes(cleanFriendUid))
-  );
+  const isCallActiveWithFriend = voiceCall.isCallActiveWithFriend(friend.id);
 
   const handleCallClick = () => {
-    if (isCallActiveWithFriend) {
+    if (isCallActiveWithFriend && voiceCall.callState === "active") {
       voiceCall.setIsVoiceWindowOpen(true);
     } else {
       onCall();
