@@ -20,13 +20,13 @@ const DownloadPage = () => {
 
           <div className="mt-10 grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div>
-              <p className="mb-4 text-[11px] font-black uppercase tracking-[0.28em] text-white/35">
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/35 font-ui">
                 Download • Versão {CURRENT_LAUNCHER_VERSION}
               </p>
-              <h1 className="max-w-3xl text-5xl font-black tracking-tight text-white lg:text-7xl">
-                Baixe o Checkpoint Launcher para Windows.
+              <h1 className="max-w-3xl text-5xl font-heading font-black tracking-tight text-white lg:text-7xl">
+                Baixe o Pherielium para Windows.
               </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/55">
+              <p className="mt-6 max-w-2xl text-lg leading-relaxed text-white/55 font-body">
                 Acesse a página oficial de lançamentos no GitHub para baixar o instalador oficial (<code className="text-white/80">.exe</code>) da versão v{CURRENT_LAUNCHER_VERSION}, conferir notas de atualização e versões anteriores.
               </p>
 

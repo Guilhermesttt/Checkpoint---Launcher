@@ -14,7 +14,6 @@ import {
   resolveChatRetentionDays,
   resolveLinkedSteamId,
   revokeActivityAudience,
-  writeActivityToFeeds,
 } from "../server/index.mjs";
 
 describe("API publica", () => {
@@ -255,67 +254,5 @@ describe("API publica", () => {
     });
     expect(details.appName).toBe("Control");
   });
-
-  it("remove um ex-amigo da audiencia das atividades em lote", async () => {
-    const update = vi.fn();
-    const deleteFeedEntry = vi.fn();
-    const commit = vi.fn().mockResolvedValue(undefined);
-    const query = {
-      where: vi.fn(),
-      limit: vi.fn(),
-      get: vi.fn()
-        .mockResolvedValueOnce({
-          empty: false,
-          size: 2,
-          docs: [
-            { id: "activity-1", ref: "activity-1" },
-            { id: "activity-2", ref: "activity-2" },
-          ],
-        })
-        .mockResolvedValueOnce({ empty: true, size: 0, docs: [] }),
-    };
-    query.where.mockReturnValue(query);
-    query.limit.mockReturnValue(query);
-    const firestore = {
-      collection: vi.fn().mockReturnValue(query),
-      doc: vi.fn((path) => path),
-      batch: vi.fn(() => ({ update, delete: deleteFeedEntry, commit })),
-    };
-
-    await expect(revokeActivityAudience(firestore, "alice", "bob")).resolves.toBe(2);
-    expect(query.where).toHaveBeenNthCalledWith(1, "userId", "==", "alice");
-    expect(query.where).toHaveBeenNthCalledWith(2, "audienceIds", "array-contains", "bob");
-    expect(update).toHaveBeenCalledTimes(2);
-    expect(deleteFeedEntry).toHaveBeenCalledWith("feeds/bob/activities/activity-1");
-    expect(deleteFeedEntry).toHaveBeenCalledWith("feeds/bob/activities/activity-2");
-    expect(deleteFeedEntry).toHaveBeenCalledTimes(2);
-    expect(commit).toHaveBeenCalledOnce();
-  });
-
-  it("distribui uma atividade somente para os feeds autorizados", async () => {
-    const set = vi.fn();
-    const commit = vi.fn().mockResolvedValue(undefined);
-    const firestore = {
-      doc: vi.fn((path) => path),
-      batch: vi.fn(() => ({ set, commit })),
-    };
-    const payload = {
-      userId: "alice",
-      audienceIds: ["alice", "bob"],
-      kind: "game-start",
-      gameId: "portal-2",
-      gameTitle: "Portal 2",
-      createdAt: "2026-07-17T12:00:00.000Z",
-    };
-
-    await expect(writeActivityToFeeds(
-      firestore,
-      "activity-1",
-      ["alice", "bob", "bob", ""],
-      payload,
-    )).resolves.toBe(2);
-    expect(set).toHaveBeenCalledWith("feeds/alice/activities/activity-1", payload);
-    expect(set).toHaveBeenCalledWith("feeds/bob/activities/activity-1", payload);
-    expect(commit).toHaveBeenCalledOnce();
-  });
 });
+

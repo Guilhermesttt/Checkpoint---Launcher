@@ -5,9 +5,9 @@ export default function PrivacyPolicy() {
     <main className="min-h-screen bg-[#050507] text-white">
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-6 py-16 sm:px-8 lg:px-10">
         <div className="flex items-center gap-3">
-          <img src="/Checkpoint_Logo.png" alt="" className="h-10 w-10 object-contain" />
-          <span className="text-lg font-semibold tracking-[0.18em] text-white/70">
-            CHECKPOINT
+          <img src="/Pherielium_logo.png" alt="Pherielium" className="h-10 w-10 object-contain" />
+          <span className="text-lg font-heading font-bold tracking-[0.18em] text-white/90">
+            PHERIELIUM
           </span>
         </div>
 
@@ -15,12 +15,12 @@ export default function PrivacyPolicy() {
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-sky-300">
             Privacy Policy
           </p>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-            Checkpoint Privacy Policy
+          <h1 className="text-4xl font-heading font-bold tracking-tight sm:text-5xl">
+            Pherielium Privacy Policy
           </h1>
-          <p className="max-w-2xl text-base leading-7 text-white/65">
-            Last updated: {updatedAt}. This policy explains how Checkpoint
-            handles information when you use our website, launcher, and account
+          <p className="max-w-2xl text-base leading-7 text-white/65 font-body">
+            Last updated: {updatedAt}. This policy explains how Pherielium
+            handles information when you use our platform, game hub, and account
             linking features.
           </p>
         </header>

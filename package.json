@@ -1,10 +1,10 @@
 {
-  "name": "checkpoint",
+  "name": "pherielium",
   "private": true,
   "version": "3.1.4",
-  "description": "Checkpoint Launcher is a Windows game launcher with an integrated Nexus Mods management experience.",
+  "description": "Pherielium Game Hub is a modern Windows gaming hub with an integrated Nexus Mods management experience.",
   "author": "Guilherme Sant'Ana",
-  "homepage": "https://checkpointlauncher.com",
+  "homepage": "https://github.com/Guilhermesttt/Checkpoint---Launcher",
   "type": "module",
   "main": "electron/main.cjs",
   "engines": {
@@ -39,18 +39,19 @@
     "url": "git+https://github.com/Guilhermesttt/Checkpoint---Launcher.git"
   },
   "build": {
-    "appId": "com.checkpoint.launcher",
-    "productName": "Checkpoint Launcher",
+    "appId": "com.pherielium.hub",
+    "productName": "Pherielium",
     "protocols": [
       {
-        "name": "Checkpoint Launcher",
+        "name": "Pherielium Game Hub",
         "schemes": [
+          "pherielium",
           "checkpoint",
           "nxm"
         ]
       }
     ],
-    "artifactName": "Checkpoint-Launcher-Setup-${version}.${ext}",
+    "artifactName": "Pherielium-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -124,7 +125,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Checkpoint Launcher"
+      "shortcutName": "Pherielium"
     }
   },
   "dependencies": {

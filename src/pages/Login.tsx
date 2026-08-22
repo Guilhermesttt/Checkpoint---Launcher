@@ -313,10 +313,10 @@ const LoginContent: React.FC = () => {
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
               className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4"
             >
-              <img src="/Checkpoint_Logo.png" className="w-8 h-8 object-contain" alt="Checkpoint Logo" />
+              <img src="/Pherielium_logo.png" className="w-9 h-9 object-contain" alt="Pherielium Logo" />
             </motion.div>
-            <h1 className="text-3.5xl font-display tracking-tight text-white font-bold mb-1">
-              Checkpoint Launcher
+            <h1 className="text-3.5xl font-heading tracking-tight text-white font-bold mb-1">
+              Pherielium
             </h1>
             <AnimatePresence mode="wait">
               <motion.p

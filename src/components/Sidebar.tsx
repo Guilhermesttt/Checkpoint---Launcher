@@ -612,12 +612,12 @@ const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <div className="relative w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300 group-hover:scale-105 shadow-lg shrink-0">
-            <img src="/Checkpoint_Logo.png" alt="Checkpoint" className="h-6 w-6 object-contain" />
+            <img src="/Pherielium_logo.png" alt="Pherielium" className="h-7 w-7 object-contain" />
           </div>
           {isExpanded && (
             <div className="flex flex-1 items-center justify-between min-w-0 pr-1">
-              <span className="font-display font-black text-lg text-white tracking-tight uppercase group-hover:text-white/90">
-                Checkpoint
+              <span className="font-heading font-black text-lg text-white tracking-tight uppercase group-hover:text-white/90">
+                Pherielium
               </span>
             </div>
           )}

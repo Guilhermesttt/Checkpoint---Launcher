@@ -1,4 +1,4 @@
-const PROD_BACKEND_URL = "https://checkpoint-backend-vgvx.onrender.com";
+const PROD_BACKEND_URL = "https://checkpoint-launcher.onrender.com";
 
 const resolveBackendUrl = () => {
   const configured = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, "");

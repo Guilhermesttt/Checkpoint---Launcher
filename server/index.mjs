@@ -193,7 +193,7 @@ app.use(
           "https://api.nexusmods.com",
           "https://api.spotify.com",
           "https://steamcommunity.com",
-          "https://checkpoint-backend-vgvx.onrender.com",
+          "https://checkpoint-launcher.onrender.com",
           "http://localhost:*",
           "ws://localhost:*",
           "http://127.0.0.1:*",

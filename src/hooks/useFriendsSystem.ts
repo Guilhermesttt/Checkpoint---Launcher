@@ -137,7 +137,7 @@ export function useFriendsSystem({
               try {
                 new Notification(`Mensagem de ${senderName}`, {
                   body: displayContent,
-                  icon: avatarUrl || "/Checkpoint_Logo.png",
+                  icon: avatarUrl || "/Pherielium_logo.png",
                 });
               } catch {
                 // Ignore notification permission / Electron background errors

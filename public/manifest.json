@@ -1,14 +1,14 @@
 {
-  "short_name": "Checkpoint",
-  "name": "Checkpoint - Game Launcher",
+  "short_name": "Pherielium",
+  "name": "Pherielium - Game Hub",
   "icons": [
     {
-      "src": "Checkpoint_Logo.png",
+      "src": "Pherielium_logo.png",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/png"
     },
     {
-      "src": "Checkpoint_Logo.png",
+      "src": "Pherielium_logo.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
@@ -16,6 +16,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#050507",
-  "background_color": "#050507"
+  "theme_color": "#060608",
+  "background_color": "#060608"
 }

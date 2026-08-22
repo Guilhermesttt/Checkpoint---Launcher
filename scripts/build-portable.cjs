@@ -40,6 +40,7 @@ const cleanReleaseDirectories = () => {
     "win-unpacked.tmp",
     "builder-debug.yml",
     "builder-effective-config.yaml",
+    "Pherielium-Windows.zip",
     "Checkpoint-Launcher-Windows.zip",
   ]) {
     const target = path.join(projectRoot, "release", entryName);
@@ -69,7 +70,7 @@ const buildPortable = () => {
     console.warn("[build-portable] AVISO: Não foi possível carregar o arquivo .env:", e.message);
   }
 
-  process.env.VITE_BACKEND_URL = process.env.VITE_BACKEND_URL || "https://checkpoint-backend-vgvx.onrender.com";
+  process.env.VITE_BACKEND_URL = process.env.VITE_BACKEND_URL || "https://checkpoint-launcher.onrender.com";
   run(process.execPath, [path.join(projectRoot, "node_modules", "vite", "bin", "vite.js"), "build"]);
   cleanReleaseDirectories();
 
@@ -85,7 +86,7 @@ const buildPortable = () => {
 const zipPortable = () => {
   const releaseDir = path.join(projectRoot, "release");
   const unpackedDir = path.join(releaseDir, "win-unpacked");
-  const zipPath = path.join(releaseDir, "Checkpoint-Launcher-Windows.zip");
+  const zipPath = path.join(releaseDir, "Pherielium-Windows.zip");
 
   if (!fs.existsSync(unpackedDir)) {
     throw new Error(`Windows folder not found: ${unpackedDir}`);

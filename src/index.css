@@ -68,7 +68,10 @@ html[data-launcher-theme="sunset"] {
 
 @theme {
   --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-heading: 'Unbounded', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
@@ -76,11 +79,15 @@ html[data-launcher-theme="sunset"] {
   --color-border: var(--border);
 }
 
-.font-display {
+.font-display,
+.font-heading {
   font-family: var(--font-display);
 }
 
-.font-body {
+.font-body,
+.font-ui,
+.font-sans,
+.font-inter {
   font-family: var(--font-body);
 }
 
@@ -156,6 +163,14 @@ html[data-launcher-theme="sunset"] {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+
+  p {
+    font-family: var(--font-body);
   }
 
   /* Subtle film-grain noise layer — evokes console/CRT nostalgia */

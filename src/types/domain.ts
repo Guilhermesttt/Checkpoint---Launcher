@@ -242,7 +242,7 @@ export interface VoiceCallParticipant {
 
 export interface VoiceCallSession {
   chatId: string;
-  friendUid: string;
+  friendUid?: string;
   friendName: string;
   friendAvatar?: string;
   isInitiator: boolean;

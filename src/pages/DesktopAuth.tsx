@@ -18,7 +18,7 @@ const DesktopAuth: React.FC = () => {
     "idle",
   );
   const [message, setMessage] = React.useState(
-    "Entre com sua conta Google para voltar ao Checkpoint Launcher.",
+    "Entre com sua conta Google para voltar ao Pherielium Game Hub.",
   );
 
   const handleGoogleLogin = async () => {
@@ -50,12 +50,12 @@ const DesktopAuth: React.FC = () => {
             ) : status === "error" ? (
               <AlertCircle className="w-7 h-7 text-red-300" />
             ) : (
-              <Gamepad2 className="w-7 h-7" />
+              <img src="/Pherielium_logo.png" className="w-8 h-8 object-contain" alt="Pherielium" />
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Checkpoint Launcher</h1>
-            <p className="mt-2 text-sm text-white/55">{message}</p>
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">Pherielium Game Hub</h1>
+            <p className="mt-2 text-sm text-white/55 font-body">{message}</p>
           </div>
         </div>
 
