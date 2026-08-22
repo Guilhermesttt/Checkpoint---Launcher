@@ -636,7 +636,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   ]);
 
   // Identify remote participant count and if user is alone in room
-  const remoteParticipantsCount = activeFeeds.filter((f) => !f.isLocal && !f.isScreen).length;
+  const remoteParticipantsCount = activeFeeds.filter((f) => !f.isLocal && !f.isScreen && !f.isRinging && !f.isConnecting).length;
   const isOnlyOnePersonInRoom = remoteParticipantsCount === 0;
 
   // Identify currently focused feed

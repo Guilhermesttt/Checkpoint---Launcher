@@ -2159,6 +2159,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           return updated;
         });
 
+        setActiveCallsByFriend((prev) => {
+          const updated = new Map(prev);
+          updated.delete(left.uid);
+          return updated;
+        });
+
         if (peerConnectionsRef.current.size === 0) {
           notify("O participante se desconectou.", "info");
           playRingtone("disconnect");
@@ -2745,14 +2751,24 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     } catch {}
     setPendingReconnectSession(null);
 
+    const hasRemotePeers = peerConnectionsRef.current.size > 0 || (session?.participants && session.participants.length > 1);
+
     if (session && user?.uid) {
-      if (session.friendUid) {
+      if (hasRemotePeers && session.friendUid) {
         setActiveCallsByFriend((prev) => new Map(prev).set(session.friendUid!, session.chatId));
+      } else {
+        setActiveCallsByFriend((prev) => {
+          const next = new Map(prev);
+          if (session.friendUid) next.delete(session.friendUid);
+          return next;
+        });
       }
       await sendCallMemberLeft(session.chatId, {
         uid: user.uid,
         chatId: session.chatId,
       });
+    } else {
+      setActiveCallsByFriend(new Map());
     }
     playRingtone("disconnect");
     cleanUpCall();
@@ -2765,15 +2781,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       sessionStorage.removeItem("checkpoint_last_voice_session");
     } catch {}
     setPendingReconnectSession(null);
+    setActiveCallsByFriend(new Map());
 
     if (session && user?.uid) {
-      if (session.friendUid) {
-        setActiveCallsByFriend((prev) => {
-          const next = new Map(prev);
-          next.delete(session.friendUid!);
-          return next;
-        });
-      }
       await sendCallEnd(session.chatId, "room-all", {
         senderId: user.uid,
         chatId: session.chatId,
