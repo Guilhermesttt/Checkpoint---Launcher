@@ -17,6 +17,7 @@ import ControllerVirtualKeyboard from "./components/ui/ControllerVirtualKeyboard
 import WhatsNewModal from "./components/WhatsNewModal";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
 import { isBackendHealthy } from "./services/api";
+import { usePrefersReducedMotion } from "./hooks/usePrefersReducedMotion";
 import type { SoundTheme } from "./context/PreferencesContext";
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
@@ -53,6 +54,8 @@ const menuMusicGain: Record<SoundTheme, number> = {
 const AppContent: React.FC = () => {
   const { user, loading } = useAuth();
   const { musicVolume, soundTheme, lowPerformanceMode } = usePreferences();
+  const prefersReduced = usePrefersReducedMotion();
+  const reducedMotionProp = lowPerformanceMode || prefersReduced ? "always" : "never";
   useControllerLed();
   const [isIntroVisible, setIsIntroVisible] = React.useState<boolean | null>(null);
 
@@ -376,7 +379,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <MotionConfig reducedMotion={lowPerformanceMode ? "always" : "never"}>
+    <MotionConfig reducedMotion={reducedMotionProp}>
       <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
         {isIntroVisible ? (
           <AnimatePresence mode="wait">

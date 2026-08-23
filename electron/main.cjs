@@ -3592,8 +3592,17 @@ registerSecureIpcHandler("overlay:set-achievement-notification-settings", async 
   return applyAchievementNotificationSettings(requestedSettings);
 });
 
+const OVERLAY_ALLOWED_ACTIONS = new Set(["open-friend", "accept-request", "open-chat", "custom"]);
+
+function safeString(v, max = 200) {
+  if (!v) return undefined;
+  return String(v).slice(0, max);
+}
+
 registerSecureIpcHandler("overlay:show-notification", async (_event, payload) => {
-  const type = String(payload?.type || "info");
+  if (!payload || typeof payload !== "object") throw new Error("Invalid payload");
+
+  const type = safeString(payload.type, 32) || "info";
   const defaultTitle =
     type === "error"
       ? "Erro"
@@ -3604,12 +3613,24 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
       : type === "incoming-call"
       ? "Chamada de Voz"
       : "Notificação";
-  const title = String(payload?.title || defaultTitle).trim();
-  const message = String(payload?.message || payload?.description || "").trim();
-  const avatarUrl = sanitizeOverlayImageSource(payload?.imageUrl);
-  const duration = typeof payload?.duration === "number" ? payload.duration : undefined;
-  const sound = typeof payload?.sound === "boolean" ? payload.sound : undefined;
-  const action = payload?.action ? { label: String(payload.action.label), actionId: String(payload.action.actionId || "custom") } : undefined;
+  const title = safeString(payload.title, 200) || defaultTitle;
+  const message = safeString(payload.message || payload.description || "", 2000) || "";
+  const duration = typeof payload.duration === "number" ? payload.duration : undefined;
+  const sound = typeof payload.sound === "boolean" ? payload.sound : undefined;
+  const friendId = payload?.friendId ? safeString(payload.friendId, 128) : undefined;
+  const avatarUrl = typeof sanitizeOverlayImageSource === "function" ? sanitizeOverlayImageSource(payload?.imageUrl) : undefined;
+
+  // action whitelist
+  let action;
+  if (payload.action && typeof payload.action === "object") {
+    const actionId = safeString(payload.action.actionId || "custom", 64);
+    const label = safeString(payload.action.label, 100);
+    action = {
+      actionId: OVERLAY_ALLOWED_ACTIONS.has(actionId) ? actionId : "custom",
+      label,
+    };
+  }
+
   const metadata = payload?.metadata && typeof payload.metadata === "object" ? payload.metadata : undefined;
 
   sendOverlayEvent("overlay:social", {
@@ -3618,7 +3639,7 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
     message,
     description: message,
     avatarUrl: avatarUrl || (type === "achievement" ? undefined : overlayIconUrl()),
-    friendId: payload?.friendId ? String(payload.friendId).slice(0, 128) : undefined,
+    friendId,
     duration,
     sound,
     action,
