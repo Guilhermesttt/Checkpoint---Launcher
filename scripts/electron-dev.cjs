@@ -103,10 +103,16 @@ const main = async () => {
 
   attachFailureGuard(vite, "vite");
 
-  process.env.FRONTEND_URL = "http://127.0.0.1:5173";
-  process.env.BACKEND_PUBLIC_URL = "http://localhost:8787";
-  process.env.DISCORD_REDIRECT_URI = "http://localhost:8787/auth/discord/callback";
-  process.env.GOOGLE_REDIRECT_URI = "http://localhost:8787/auth/google/callback";
+  const isProdBackend =
+    (process.env.VITE_BACKEND_URL && !process.env.VITE_BACKEND_URL.includes("localhost")) ||
+    (process.env.BACKEND_PUBLIC_URL && !process.env.BACKEND_PUBLIC_URL.includes("localhost"));
+
+  if (!isProdBackend) {
+    process.env.FRONTEND_URL = "http://127.0.0.1:5173";
+    process.env.BACKEND_PUBLIC_URL = "http://localhost:8787";
+    process.env.DISCORD_REDIRECT_URI = "http://localhost:8787/auth/discord/callback";
+    process.env.GOOGLE_REDIRECT_URI = "http://localhost:8787/auth/google/callback";
+  }
 
   await import(pathToFileURL(path.join(projectRoot, "server", "index.mjs")).href);
 

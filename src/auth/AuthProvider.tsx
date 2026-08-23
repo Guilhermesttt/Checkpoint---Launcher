@@ -178,6 +178,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const statusRes = await fetch(apiUrl(`/auth/desktop/google/status?state=${encodeURIComponent(state)}`));
         if (statusRes.ok) {
           const data = await statusRes.json();
+          if (data.status === "error") {
+            throw new Error(data.error || "Falha na autenticação do Google.");
+          }
           if (data.status === "complete" && data.email && data.emailOtp) {
             const { error } = await supabase.auth.verifyOtp({
               email: data.email,

@@ -62,7 +62,7 @@ const {
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
 const PROD_BACKEND_URL = "https://checkpoint-launcher.onrender.com";
-const APP_URL = (process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
+const APP_URL = (process.env.VITE_BACKEND_URL || process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
 const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
 const AUTO_START_ARG = "--checkpoint-autostart";
 const IS_AUTO_START = process.argv.includes(AUTO_START_ARG);

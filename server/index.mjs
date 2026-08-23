@@ -413,11 +413,16 @@ const buildLauncherAuthCallback = (provider, status) => {
   return callbackUrl.toString();
 };
 
-const buildDiscordRedirectUri = () => {
-  const redirectUri = (
-    process.env.DISCORD_REDIRECT_URI?.trim() ||
-    `${backendPublicUrl}/auth/discord/callback`
-  ).replace(/\/$/, "");
+export const buildDiscordRedirectUri = () => {
+  const configured = process.env.DISCORD_REDIRECT_URI?.trim();
+  let redirectUri = "";
+  if (configured && !configured.includes("localhost")) {
+    redirectUri = configured.replace(/\/$/, "");
+  } else if (backendPublicUrl && !backendPublicUrl.includes("localhost")) {
+    redirectUri = `${backendPublicUrl}/auth/discord/callback`;
+  } else {
+    redirectUri = (configured || `${backendPublicUrl}/auth/discord/callback`).replace(/\/$/, "");
+  }
 
   if (/\.supabase\.co\/auth\/v1\/callback$/i.test(redirectUri)) {
     throw new Error(
@@ -428,11 +433,16 @@ const buildDiscordRedirectUri = () => {
   return redirectUri;
 };
 
-const buildGoogleRedirectUri = () =>
-  (
-    process.env.GOOGLE_REDIRECT_URI?.trim() ||
-    `${backendPublicUrl}/auth/google/callback`
-  ).replace(/\/$/, "");
+export const buildGoogleRedirectUri = () => {
+  const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (configured && !configured.includes("localhost")) {
+    return configured.replace(/\/$/, "");
+  }
+  if (backendPublicUrl && !backendPublicUrl.includes("localhost")) {
+    return `${backendPublicUrl}/auth/google/callback`;
+  }
+  return (configured || `${backendPublicUrl}/auth/google/callback`).replace(/\/$/, "");
+};
 
 const createGoogleOauthClient = () => {
   if (!googleClientId || !googleClientSecret) {
@@ -2883,17 +2893,31 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
   }
 
   if (oauthError) {
-    pendingDesktopGoogleStates.delete(state);
+    pendingDesktopGoogleStates.set(state, {
+      status: "error",
+      error: "Login Google cancelado ou negado.",
+      createdAt: Date.now(),
+    });
     res.status(400).send("Login Google cancelado ou negado.");
     return;
   }
 
   if (!code) {
+    pendingDesktopGoogleStates.set(state, {
+      status: "error",
+      error: "Codigo Google ausente.",
+      createdAt: Date.now(),
+    });
     res.status(400).send("Codigo Google ausente.");
     return;
   }
 
   if (!supabaseAdmin) {
+    pendingDesktopGoogleStates.set(state, {
+      status: "error",
+      error: "Supabase Admin nao configurado no backend.",
+      createdAt: Date.now(),
+    });
     res.status(500).send("Supabase Admin nao configurado no backend.");
     return;
   }
@@ -2990,6 +3014,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
     }
 
     pendingDesktopGoogleStates.set(state, {
+      status: "complete",
       email: userEmail,
       emailOtp,
       uid: supaUid,
@@ -2998,7 +3023,11 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
 
     res.type("html").send(renderAuthSuccessScreen("Google"));
   } catch (error) {
-    pendingDesktopGoogleStates.delete(state);
+    pendingDesktopGoogleStates.set(state, {
+      status: "error",
+      error: error instanceof Error ? error.message : "Falha ao concluir login Google.",
+      createdAt: Date.now(),
+    });
     res
       .status(500)
       .send(error instanceof Error ? error.message : "Falha ao concluir login Google.");
@@ -3019,7 +3048,18 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
   }
 
   const pending = pendingDesktopGoogleStates.get(state);
-  if (!pending || (!pending.emailOtp && !pending.email)) {
+  if (!pending) {
+    res.json({ status: "pending" });
+    return;
+  }
+
+  if (pending.status === "error") {
+    pendingDesktopGoogleStates.delete(state);
+    res.json({ status: "error", error: pending.error || "Falha no login Google." });
+    return;
+  }
+
+  if (!pending.emailOtp && !pending.email) {
     res.json({ status: "pending" });
     return;
   }

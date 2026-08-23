@@ -2,7 +2,9 @@ import request from "supertest";
 import { describe, expect, it, vi } from "vitest";
 import {
   app,
+  buildDiscordRedirectUri,
   buildEpicDetails,
+  buildGoogleRedirectUri,
   canViewDetailedProfile,
   normalizeFriendAchievementAggregate,
   normalizeNexusTrendingMods,
@@ -253,6 +255,19 @@ describe("API publica", () => {
       ],
     });
     expect(details.appName).toBe("Control");
+  });
+
+  it("garante que buildGoogleRedirectUri e buildDiscordRedirectUri apontam para endpoints corretos do backend", () => {
+    const googleUri = buildGoogleRedirectUri();
+    const discordUri = buildDiscordRedirectUri();
+    expect(googleUri).toContain("/auth/google/callback");
+    expect(discordUri).toContain("/auth/discord/callback");
+  });
+
+  it("responde com erro ou pending para status de autenticacao Google desktop", async () => {
+    await request(app).get("/auth/desktop/google/status").expect(400);
+    const res = await request(app).get("/auth/desktop/google/status?state=fake-state").expect(200);
+    expect(res.body).toEqual({ status: "pending" });
   });
 });
 
