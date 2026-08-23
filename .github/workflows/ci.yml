@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, chore/remove-three-and-reduce-assets]
   pull_request:
   workflow_dispatch:
 

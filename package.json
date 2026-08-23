@@ -21,6 +21,7 @@
     "build:portable": "node scripts/build-portable.cjs",
     "publish": "npm run build && electron-builder --win --publish always",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:typecheck": "tsc -p tsconfig.test.json",

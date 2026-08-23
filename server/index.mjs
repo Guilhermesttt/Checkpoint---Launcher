@@ -1415,6 +1415,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+app.post("/rum", (req, res) => {
+  res.status(204).end();
+});
+
 let cachedTurnCredentials = null;
 let turnCacheExpiry = 0;
 const TURN_CACHE_TTL_MS = 10 * 60 * 1000;

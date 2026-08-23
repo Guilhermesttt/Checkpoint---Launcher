@@ -35,6 +35,9 @@ html[data-launcher-theme="checkpoint"] {
   --launcher-accent-soft: rgba(255, 255, 255, 0.22);
   --launcher-tint: rgba(255, 255, 255, 0.08);
   --cosmos-glow: 0 0 35px rgba(255, 255, 255, 0.08);
+  --dur-fast: 120ms;
+  --dur-medium: 240ms;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html[data-launcher-theme="playstation"] {
