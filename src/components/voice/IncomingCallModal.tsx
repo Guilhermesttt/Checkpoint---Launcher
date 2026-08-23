@@ -45,7 +45,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               </Badge>
 
               <span className="text-[10px] font-semibold text-white/30">
-                Checkpoint
+                Phelierium
               </span>
             </div>
 

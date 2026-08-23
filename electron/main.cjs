@@ -152,12 +152,12 @@ let overlayPanelState = {
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
 const overlayEventCopy = {
-  "pt-BR": { enjoy: "Divirta-se", active: "O overlay está ativo enquanto você joga.", playing: "Você está jogando agora", open: "Abra sem sair do jogo", shortcut: "Use o botão central do controle ou Ctrl + Shift + O.", player: "Jogador", now: "agora", friendPlaying: "Está jogando agora", request: "Enviou um pedido de amizade", accepted: "Aceitou seu pedido de amizade", firstKill: "Primeiro Abate", testAchievement: "Teste visual do overlay do Checkpoint.", newMessage: "Nova mensagem", newImage: "Nova imagem", imageMessage: "Enviou uma nova imagem", captureSaved: "Captura salva" },
-  "en-US": { enjoy: "Have fun", active: "The overlay is active while you play.", playing: "You are now playing", open: "Open without leaving the game", shortcut: "Use the controller’s center button or Ctrl + Shift + O.", player: "Player", now: "now", friendPlaying: "Is now playing", request: "Sent you a friend request", accepted: "Accepted your friend request", firstKill: "First Kill", testAchievement: "Checkpoint overlay visual test.", newMessage: "New message", newImage: "New image", imageMessage: "Sent a new image", captureSaved: "Capture saved" },
-  "es-ES": { enjoy: "Diviértete", active: "El overlay está activo mientras juegas.", playing: "Ahora estás jugando a", open: "Ábrelo sin salir del juego", shortcut: "Usa el botón central del mando o Ctrl + Shift + O.", player: "Jugador", now: "ahora", friendPlaying: "Está jugando ahora a", request: "Te envió una solicitud de amistad", accepted: "Aceptó tu solicitud de amistad", firstKill: "Primera baja", testAchievement: "Prueba visual del overlay de Checkpoint.", newMessage: "Nuevo mensaje", captureSaved: "Captura guardada" },
-  "fr-FR": { enjoy: "Amusez-vous", active: "L’overlay est actif pendant que vous jouez.", playing: "Vous jouez maintenant à", open: "Ouvrez-le sans quitter le jeu", shortcut: "Utilisez le bouton central de la manette ou Ctrl + Shift + O.", player: "Joueur", now: "maintenant", friendPlaying: "Joue maintenant à", request: "Vous a envoyé une demande d’ami", accepted: "A accepté votre demande d’ami", firstKill: "Première élimination", testAchievement: "Test visuel de l’overlay Checkpoint.", newMessage: "Nouveau message", captureSaved: "Capture enregistrée" },
-  "de-DE": { enjoy: "Viel Spaß", active: "Das Overlay ist während des Spielens aktiv.", playing: "Du spielst jetzt", open: "Öffnen, ohne das Spiel zu verlassen", shortcut: "Verwende die mittlere Controllertaste oder Strg + Umschalt + O.", player: "Spieler", now: "jetzt", friendPlaying: "Spielt jetzt", request: "Hat dir eine Freundschaftsanfrage gesendet", accepted: "Hat deine Freundschaftsanfrage angenommen", firstKill: "Erster Abschuss", testAchievement: "Visueller Test des Checkpoint-Overlays.", newMessage: "Neue Nachricht", captureSaved: "Aufnahme gespeichert" },
-  "it-IT": { enjoy: "Buon divertimento", active: "L’overlay è attivo mentre giochi.", playing: "Ora stai giocando a", open: "Apri senza uscire dal gioco", shortcut: "Usa il pulsante centrale del controller o Ctrl + Maiusc + O.", player: "Giocatore", now: "ora", friendPlaying: "Sta giocando ora a", request: "Ti ha inviato una richiesta di amicizia", accepted: "Ha accettato la tua richiesta di amicizia", firstKill: "Prima eliminazione", testAchievement: "Test visivo dell’overlay Checkpoint.", newMessage: "Nuovo messaggio", captureSaved: "Cattura salvata" },
+  "pt-BR": { enjoy: "Divirta-se", active: "O overlay está ativo enquanto você joga.", playing: "Você está jogando agora", open: "Abra sem sair do jogo", shortcut: "Use o botão central do controle ou Ctrl + Shift + O.", player: "Jogador", now: "agora", friendPlaying: "Está jogando agora", request: "Enviou um pedido de amizade", accepted: "Aceitou seu pedido de amizade", firstKill: "Primeiro Abate", testAchievement: "Teste visual do overlay do Phelierium.", newMessage: "Nova mensagem", newImage: "Nova imagem", imageMessage: "Enviou uma nova imagem", captureSaved: "Captura salva" },
+  "en-US": { enjoy: "Have fun", active: "The overlay is active while you play.", playing: "You are now playing", open: "Open without leaving the game", shortcut: "Use the controller’s center button or Ctrl + Shift + O.", player: "Player", now: "now", friendPlaying: "Is now playing", request: "Sent you a friend request", accepted: "Accepted your friend request", firstKill: "First Kill", testAchievement: "Phelierium overlay visual test.", newMessage: "New message", newImage: "New image", imageMessage: "Sent a new image", captureSaved: "Capture saved" },
+  "es-ES": { enjoy: "Diviértete", active: "El overlay está activo mientras juegas.", playing: "Ahora estás jugando a", open: "Ábrelo sin salir del juego", shortcut: "Usa el botón central del mando o Ctrl + Shift + O.", player: "Jugador", now: "ahora", friendPlaying: "Está jugando ahora a", request: "Te envió una solicitud de amistad", accepted: "Aceptó tu solicitud de amistad", firstKill: "Primera baja", testAchievement: "Prueba visual del overlay de Phelierium.", newMessage: "Nuevo mensaje", captureSaved: "Captura guardada" },
+  "fr-FR": { enjoy: "Amusez-vous", active: "L’overlay est actif pendant que vous jouez.", playing: "Vous jouez maintenant à", open: "Ouvrez-le sans quitter le jeu", shortcut: "Utilisez le bouton central de la manette ou Ctrl + Shift + O.", player: "Joueur", now: "maintenant", friendPlaying: "Joue maintenant à", request: "Vous a envoyé une demande d’ami", accepted: "A accepté votre demande d’ami", firstKill: "Première élimination", testAchievement: "Test visuel de l’overlay Phelierium.", newMessage: "Nouveau message", captureSaved: "Capture enregistrée" },
+  "de-DE": { enjoy: "Viel Spaß", active: "Das Overlay ist während des Spielens aktiv.", playing: "Du spielst jetzt", open: "Öffnen, ohne das Spiel zu verlassen", shortcut: "Verwende die mittlere Controllertaste oder Strg + Umschalt + O.", player: "Spieler", now: "jetzt", friendPlaying: "Spielt jetzt", request: "Hat dir eine Freundschaftsanfrage gesendet", accepted: "Hat deine Freundschaftsanfrage angenommen", firstKill: "Erster Abschuss", testAchievement: "Visueller Test des Phelierium-Overlays.", newMessage: "Neue Nachricht", captureSaved: "Aufnahme gespeichert" },
+  "it-IT": { enjoy: "Buon divertimento", active: "L’overlay è attivo mentre giochi.", playing: "Ora stai giocando a", open: "Apri senza uscire dal gioco", shortcut: "Usa il pulsante centrale del controller o Ctrl + Maiusc + O.", player: "Giocatore", now: "ora", friendPlaying: "Sta giocando ora a", request: "Ti ha inviato una richiesta di amicizia", accepted: "Ha accettato la tua richiesta di amicizia", firstKill: "Prima eliminazione", testAchievement: "Test visivo dell’overlay Phelierium.", newMessage: "Nuovo messaggio", captureSaved: "Cattura salvata" },
 };
 const getOverlayEventCopy = () => overlayEventCopy[overlayPanelState.language] || overlayEventCopy["pt-BR"];
 const nativeAchievementFallbackCopy = {
@@ -252,11 +252,11 @@ if (!hasSingleInstanceLock) {
 
 Menu.setApplicationMenu(null);
 if (process.platform === "win32") {
-  app.setAppUserModelId("com.checkpoint.launcher");
+  app.setAppUserModelId("com.phelierium.launcher");
 }
 
 if (!IS_SMOKE_TEST) {
-  for (const protocol of ["checkpoint", "nxm"]) {
+  for (const protocol of ["phelierium", "pherielium", "checkpoint", "nxm"]) {
     if (!app.isPackaged) {
       app.setAsDefaultProtocolClient(protocol, process.execPath, [
         path.resolve(app.getAppPath()),
@@ -292,7 +292,12 @@ const appendStartupLog = (message, error) => {
 const parseAccountAuthCallback = (rawUrl) => {
   try {
     const callbackUrl = new URL(String(rawUrl || ""));
-    if (callbackUrl.protocol !== "checkpoint:" || callbackUrl.hostname !== "auth") {
+    if (
+      (callbackUrl.protocol !== "phelierium:" &&
+        callbackUrl.protocol !== "pherielium:" &&
+        callbackUrl.protocol !== "checkpoint:") ||
+      callbackUrl.hostname !== "auth"
+    ) {
       return null;
     }
     if (callbackUrl.pathname.replace(/\/$/, "") !== "/callback") {
@@ -885,7 +890,13 @@ registerSecureIpcHandler("nexus:open-download-location", async (_event, rawGameD
 const isExternalProtocol = (rawUrl) => {
   try {
     const protocol = new URL(rawUrl).protocol;
-    return protocol === "steam:" || protocol === "com.epicgames.launcher:" || protocol === "checkpoint:";
+    return (
+      protocol === "steam:" ||
+      protocol === "com.epicgames.launcher:" ||
+      protocol === "phelierium:" ||
+      protocol === "pherielium:" ||
+      protocol === "checkpoint:"
+    );
   } catch {
     return false;
   }
@@ -1030,7 +1041,7 @@ const showFatalStartupError = (error) => {
   startupErrorShown = true;
   appendStartupLog("Fatal desktop startup error.", error);
   dialog.showErrorBox(
-    "Checkpoint Launcher",
+    "Phelierium",
     [
       "O app nao conseguiu iniciar.",
       error instanceof Error ? error.message : String(error),
@@ -1421,7 +1432,7 @@ const requestOverlayPanelToggle = (source = "unknown") => {
 };
 
 const overlaySettingsFile = () => path.join(app.getPath("userData"), "overlay-settings.json");
-const captureDirectory = () => path.join(app.getPath("pictures"), "Checkpoint Captures");
+const captureDirectory = () => path.join(app.getPath("pictures"), "Phelierium Captures");
 
 // Debounce de 500ms para salvar configurações do overlay — evita múltiplas
 // escritas síncronas consecutivas quando várias configs mudam de uma vez.
@@ -3925,10 +3936,10 @@ app.whenReady().then(async () => {
       if (fs.existsSync(iconPath)) {
         tray = new Tray(iconPath);
         const contextMenu = Menu.buildFromTemplate([
-          { label: "Abrir Checkpoint", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+          { label: "Abrir Phelierium", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
           { label: "Sair", click: () => { windowBehaviorController.requestAppQuit(); } }
         ]);
-        tray.setToolTip("Checkpoint Launcher");
+        tray.setToolTip("Phelierium");
         tray.setContextMenu(contextMenu);
         tray.on("double-click", () => {
           if (mainWindow) {

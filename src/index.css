@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
 
-:root {
-  --background: #060608;
-  --foreground: #E5E5E5;
-  --muted: #171717;
-  --muted-foreground: #8A8A8A;
-  --border: #262626;
-  --launcher-accent: 229 229 229;
-  --launcher-accent-soft: rgba(229, 229, 229, 0.18);
-  --launcher-tint: rgba(229, 229, 229, 0.06);
+:root,
+html[data-launcher-theme="phelierium"],
+html[data-launcher-theme="checkpoint"] {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  --muted: #0c0c10;
+  --muted-foreground: #94A3B8;
+  --border: rgba(255, 255, 255, 0.12);
+  --launcher-accent: 255 255 255;
+  --launcher-accent-soft: rgba(255, 255, 255, 0.22);
+  --launcher-tint: rgba(255, 255, 255, 0.08);
+  --cosmos-glow: 0 0 35px rgba(255, 255, 255, 0.08);
 }
 
 html[data-launcher-theme="playstation"] {

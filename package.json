@@ -1,8 +1,8 @@
 {
-  "name": "pherielium",
+  "name": "phelierium",
   "private": true,
   "version": "3.1.4",
-  "description": "Pherielium Game Hub is a modern Windows gaming hub with an integrated Nexus Mods management experience.",
+  "description": "Phelierium Game Hub is a modern Windows gaming hub with an integrated Nexus Mods management experience.",
   "author": "Guilherme Sant'Ana",
   "homepage": "https://github.com/Guilhermesttt/Checkpoint---Launcher",
   "type": "module",
@@ -39,19 +39,20 @@
     "url": "git+https://github.com/Guilhermesttt/Checkpoint---Launcher.git"
   },
   "build": {
-    "appId": "com.pherielium.hub",
-    "productName": "Pherielium",
+    "appId": "com.phelierium.hub",
+    "productName": "Phelierium",
     "protocols": [
       {
-        "name": "Pherielium Game Hub",
+        "name": "Phelierium Game Hub",
         "schemes": [
+          "phelierium",
           "pherielium",
           "checkpoint",
           "nxm"
         ]
       }
     ],
-    "artifactName": "Pherielium-Setup-${version}.${ext}",
+    "artifactName": "Phelierium-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },

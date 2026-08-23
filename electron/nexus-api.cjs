@@ -2,7 +2,7 @@
 
 const NEXUS_API_BASE_URL = "https://api.nexusmods.com/v1";
 const NEXUS_API_V3_BASE_URL = "https://api.nexusmods.com/v3";
-const NEXUS_APPLICATION_NAME = "Checkpoint Launcher";
+const NEXUS_APPLICATION_NAME = "Phelierium";
 const REQUEST_TIMEOUT_MS = 15_000;
 const BATCH_REQUEST_TIMEOUT_MS = 30_000;
 const NEXUS_MOD_BATCH_SIZE = 2_000;

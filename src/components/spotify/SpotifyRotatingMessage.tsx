@@ -10,10 +10,10 @@ interface SpotifyHeroMessage {
 }
 
 const MESSAGES: readonly SpotifyHeroMessage[] = [
-  { eyebrow: "Curte o Checkpoint?", text: "Dê uma estrela no GitHub", href: GITHUB_URL },
+  { eyebrow: "Curte o Phelierium?", text: "Dê uma estrela no GitHub", href: GITHUB_URL },
   { eyebrow: "Seu jogo, seu som", text: "Jogue e crie sua própria vibe" },
-  { eyebrow: "Cada partida merece uma trilha", text: "Sua música. Seu checkpoint." },
-  { eyebrow: "Checkpoint Jam", text: "Convide os amigos e aumente o volume" },
+  { eyebrow: "Cada partida merece uma trilha", text: "Sua música. Seu universo." },
+  { eyebrow: "Phelierium Jam", text: "Convide os amigos e aumente o volume" },
 ];
 
 interface SpotifyRotatingMessageProps {

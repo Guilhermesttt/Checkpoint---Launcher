@@ -1,6 +1,6 @@
 {
-  "short_name": "Pherielium",
-  "name": "Pherielium - Game Hub",
+  "short_name": "Phelierium",
+  "name": "Phelierium - Game Hub",
   "icons": [
     {
       "src": "Pherielium_logo.png",
@@ -16,6 +16,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#060608",
-  "background_color": "#060608"
+  "theme_color": "#000000",
+  "background_color": "#000000"
 }

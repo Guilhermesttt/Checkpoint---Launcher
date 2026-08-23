@@ -163,7 +163,7 @@ const OverlayApp: React.FC = () => {
       const toast: SocialToast = {
         id: String(Date.now() + Math.random()),
         kind: "hint",
-        title: `Bem-vindo a ${payload.gameTitle || "Checkpoint"}`,
+        title: `Bem-vindo a ${payload.gameTitle || "Phelierium"}`,
         subtitle: payload.userDisplay ? `Jogando como ${payload.userDisplay}` : "Overlay ativo",
         avatar: payload.userAvatar,
       };

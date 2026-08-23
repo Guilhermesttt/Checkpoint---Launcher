@@ -72,7 +72,7 @@ export function SecuritySection() {
               }`}
             >
               Privacidade não é um recurso adicional. É o padrão. Construímos
-              o Checkpoint com segurança em mente desde o primeiro dia.
+              o Phelierium com segurança em mente desde o primeiro dia.
             </p>
 
             <div

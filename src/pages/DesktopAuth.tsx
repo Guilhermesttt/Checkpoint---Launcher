@@ -18,7 +18,7 @@ const DesktopAuth: React.FC = () => {
     "idle",
   );
   const [message, setMessage] = React.useState(
-    "Entre com sua conta Google para voltar ao Pherielium Game Hub.",
+    "Entre com sua conta Google para voltar ao Phelierium Game Hub.",
   );
 
   const handleGoogleLogin = async () => {
@@ -41,8 +41,8 @@ const DesktopAuth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#05070a] text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md border border-white/10 bg-white/0.04 rounded-2xl p-8 shadow-2xl">
+    <div className="min-h-screen w-full bg-[#000000] text-white flex items-center justify-center px-6">
+      <div className="w-full max-w-md border border-white/12 bg-white/5 backdrop-blur-2xl rounded-3xl p-8 shadow-2xl">
         <div className="flex flex-col items-center text-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
             {status === "done" ? (
@@ -50,11 +50,11 @@ const DesktopAuth: React.FC = () => {
             ) : status === "error" ? (
               <AlertCircle className="w-7 h-7 text-red-300" />
             ) : (
-              <img src="/Pherielium_logo.png" className="w-8 h-8 object-contain" alt="Pherielium" />
+              <img src="/Pherielium_logo.png" className="w-8 h-8 object-contain" alt="Phelierium" />
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-heading font-semibold tracking-tight">Pherielium Game Hub</h1>
+            <h1 className="text-2xl font-heading font-semibold tracking-tight">Phelierium Game Hub</h1>
             <p className="mt-2 text-sm text-white/55 font-body">{message}</p>
           </div>
         </div>

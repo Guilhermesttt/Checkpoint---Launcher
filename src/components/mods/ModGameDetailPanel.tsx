@@ -1071,7 +1071,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                               {filesLoading
                                 ? <LoaderCircle className="h-4 w-4 animate-spin" />
                                 : <Download className="h-4 w-4" />}
-                              Listar arquivos no Checkpoint
+                              Listar arquivos no Phelierium
                             </button>
                             <button
                               type="button"
@@ -1088,7 +1088,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                 Escolha o download gratuito na Nexus
                               </p>
                               <p className="mt-1 text-[9px] leading-relaxed text-sky-100/35">
-                                Na tela aberta, clique em Slow download. Após a contagem, permita que o navegador abra o Checkpoint pelo link NXM.
+                                Na tela aberta, clique em Slow download. Após a contagem, permita que o navegador abra o Phelierium pelo link NXM.
                               </p>
                             </div>
                           )}
@@ -1478,7 +1478,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                       : !mod.filePath
                                   )}
                                   title={displayedEnabled && !mod.manifestPath
-                                    ? "O Checkpoint verificará os arquivos antes de vincular este mod"
+                                    ? "O Phelierium verificará os arquivos antes de vincular este mod"
                                     : undefined}
                                   aria-label={`${displayedEnabled ? "Desativar" : "Ativar"} ${mod.name}`}
                                 />
@@ -1716,7 +1716,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                           <>
                             <p className="mb-4 text-xs leading-relaxed text-white/35">
                               Durante a avaliação, cada pessoa usa sua própria chave pessoal. Ela não é enviada ao Render,
-                              Netlify, Supabase ou aos servidores do Checkpoint.
+                              Netlify, Supabase ou aos servidores do Phelierium.
                             </p>
                             {!nexusConnection.encryptionAvailable ? (
                               <p className="rounded-xl border border-red-400/15 bg-red-400/[0.06] px-4 py-3 text-xs text-red-200/65">

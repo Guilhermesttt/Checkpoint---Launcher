@@ -80,7 +80,7 @@ export function IntegrationsSection() {
                 : "opacity-0 translate-y-4"
                 }`}
             >
-              O Checkpoint reúne Steam, entradas assistidas da Epic e jogos locais
+              O Phelierium reúne Steam, entradas assistidas da Epic e jogos locais
               em uma única interface premium para organizar sua biblioteca.
             </p>
           </div>
@@ -112,7 +112,7 @@ export function IntegrationsSection() {
                       className="h-15 w-15 object-contain invert"
                     />
                   ) : (
-                    <img src="/Checkpoint_Logo.png" alt="" className="h-16 w-16 object-contain opacity-80" />
+                    <img src="/Pherielium_logo.png" alt="Phelierium" className="h-16 w-16 object-contain opacity-80" />
                   )}
                 </div>
                 <h3 className="text-2xl font-display mb-2">

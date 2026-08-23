@@ -121,7 +121,7 @@ const fetchFeed = async ({ name, url }) => {
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     headers: {
       Accept: "application/rss+xml, application/xml;q=0.9, text/xml;q=0.8",
-      "User-Agent": "CheckpointLauncher/2.0 (+gaming-news)",
+      "User-Agent": "Phelierium/3.0 (+gaming-news)",
     },
   });
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);

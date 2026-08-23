@@ -645,7 +645,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
   const handleCopyInviteLink = () => {
     if (!session?.chatId) return;
-    const inviteUrl = `https://checkpointlauncher.com/call?id=${session.chatId}`;
+    const inviteUrl = `https://phelierium.com/call?id=${session.chatId}`;
     void navigator.clipboard.writeText(inviteUrl);
     setIsCopiedInvite(true);
     setTimeout(() => setIsCopiedInvite(false), 2500);
@@ -855,7 +855,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                   )}
                 </h2>
                 <p className="text-[10px] text-white/35 mt-0.5">
-                  {isRoomSession ? (session.roomName || "Canal de Voz Checkpoint") : "Chamada Direta Checkpoint"}
+                  {isRoomSession ? (session.roomName || "Canal de Voz Phelierium") : "Chamada Direta Phelierium"}
                 </p>
               </div>
             </div>

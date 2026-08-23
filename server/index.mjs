@@ -408,7 +408,7 @@ const buildSteamReturnTo = (token) =>
   `${backendPublicUrl}/auth/steam/callback?token=${encodeURIComponent(token)}`;
 
 const buildLauncherAuthCallback = (provider, status) => {
-  const callbackUrl = new URL("checkpoint://auth/callback");
+  const callbackUrl = new URL("phelierium://auth/callback");
   callbackUrl.searchParams.set(`${provider}Status`, status);
   return callbackUrl.toString();
 };
@@ -448,124 +448,203 @@ const createGoogleOauthClient = () => {
   if (!googleClientId || !googleClientSecret) {
     throw new Error("GOOGLE_CLIENT_ID ou GOOGLE_CLIENT_SECRET nao configurado no backend.");
   }
-
   return new OAuth2Client(googleClientId, googleClientSecret, buildGoogleRedirectUri());
 };
 
-const buildOAuthSuccessPage = (platform, launcherCallbackUrl = "") => {
+const buildAuthCallbackHtml = ({ platform, launcherCallbackUrl }) => {
   const platformColors = {
-    discord: "#5865F2",
-    steam: "#66c0f4",
-    xbox: "#107C10",
-    playstation: "#0070D1",
-    google: "#4285F4",
-    github: "#8b8b8b",
+    steam: "#ffffff",
+    discord: "#ffffff",
+    playstation: "#ffffff",
+    google: "#ffffff",
+    github: "#ffffff",
   };
-  const color = platformColors[String(platform).toLowerCase()] || "#22c55e";
+  const color = platformColors[String(platform).toLowerCase()] || "#ffffff";
 
   return `<!doctype html>
-  <html lang="pt-BR">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Checkpoint Launcher</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-          min-height: 100vh;
-          display: grid;
-          place-items: center;
-          background: #000;
-          color: #fff;
-          font-family: Inter, system-ui, sans-serif;
-        }
-        main { width: 100%; max-width: 360px; padding: 24px; text-align: center; }
-        .brand {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          margin-bottom: 40px;
-        }
-        .brand-logo {
-          width: 22px;
-          height: 22px;
-          object-fit: contain;
-          filter: drop-shadow(0 0 8px rgba(255,255,255,.12));
-        }
-        .brand-name {
-          font-size: 13px;
-          font-weight: 500;
-          color: rgba(255,255,255,.55);
-          letter-spacing: .02em;
-        }
-        h1 {
-          font-size: 24px;
-          font-weight: 500;
-          letter-spacing: -0.01em;
-          margin-bottom: 10px;
-        }
-        p.sub {
-          font-size: 14px;
-          color: rgba(255,255,255,.5);
-          line-height: 1.6;
-          margin-bottom: 28px;
-        }
-        .divider { height: 1px; background: rgba(255,255,255,.08); margin-bottom: 20px; }
-        .footer { font-size: 12px; color: rgba(255,255,255,.35); }
-        .footer .dot { color: rgba(255,255,255,.15); margin: 0 6px; }
-        .footer a { color: ${color}; text-decoration: none; cursor: pointer; }
-        .check-path {
-          stroke-dasharray: 40;
-          stroke-dashoffset: 40;
-          animation: draw 0.6s ease forwards 0.15s;
-        }
-        @keyframes draw { to { stroke-dashoffset: 0; } }
-        @media (prefers-reduced-motion: reduce) {
-          .check-path { animation: none; stroke-dashoffset: 0; }
-        }
-      </style>
-    </head>
-    <body>
-      <main>
-        <div class="brand">
-          <img
-            class="brand-logo"
-            src="${backendPublicUrl}/Checkpoint_Logo.png"
-            alt="Checkpoint"
-          />
-          <span class="brand-name">Checkpoint Launcher</span>
-        </div>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phelierium Game Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #000000;
+        color: #ffffff;
+        font-family: 'Inter', system-ui, sans-serif;
+        position: relative;
+        overflow: hidden;
+      }
+      /* Cosmic Deep Space Background */
+      .cosmos-bg {
+        position: absolute;
+        inset: 0;
+        background: 
+          radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.08) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.04) 0%, transparent 50%),
+          radial-gradient(circle at 20% 70%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
+          #000000;
+        z-index: 0;
+        pointer-events: none;
+      }
+      .stars {
+        position: absolute;
+        inset: 0;
+        background-image: 
+          radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.7), rgba(0,0,0,0)),
+          radial-gradient(1.5px 1.5px at 100px 150px, rgba(255,255,255,0.8), rgba(0,0,0,0)),
+          radial-gradient(1px 1px at 240px 90px, rgba(255,255,255,0.6), rgba(0,0,0,0)),
+          radial-gradient(2px 2px at 320px 280px, rgba(255,255,255,0.9), rgba(0,0,0,0)),
+          radial-gradient(1px 1px at 450px 200px, rgba(255,255,255,0.5), rgba(0,0,0,0));
+        background-size: 500px 500px;
+        opacity: 0.6;
+        z-index: 1;
+      }
+      main {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        max-width: 400px;
+        padding: 36px 28px;
+        text-align: center;
+        background: rgba(10, 10, 15, 0.7);
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        box-shadow: 0 0 50px rgba(255, 255, 255, 0.04), 0 20px 40px rgba(0, 0, 0, 0.8);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 32px;
+      }
+      .brand-logo {
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+        filter: drop-shadow(0 0 12px rgba(255,255,255,0.3));
+      }
+      .brand-name {
+        font-family: 'Unbounded', system-ui, sans-serif;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: #ffffff;
+        text-transform: uppercase;
+      }
+      .status-orb {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+        margin-bottom: 24px;
+        animation: pulseOrb 3s ease-in-out infinite alternate;
+      }
+      @keyframes pulseOrb {
+        0% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
+        100% { box-shadow: 0 0 40px rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.4); }
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin-bottom: 10px;
+        color: #ffffff;
+      }
+      p.sub {
+        font-size: 13.5px;
+        color: rgba(255, 255, 255, 0.6);
+        line-height: 1.6;
+        margin-bottom: 28px;
+      }
+      .divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+        margin-bottom: 20px;
+      }
+      .footer {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+      .footer .dot { color: rgba(255, 255, 255, 0.2); margin: 0 8px; }
+      .footer a {
+        color: #ffffff;
+        font-weight: 500;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+      }
+      .footer a:hover { opacity: 0.8; }
+      .check-path {
+        stroke-dasharray: 40;
+        stroke-dashoffset: 40;
+        animation: draw 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.2s;
+      }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        .check-path { animation: none; stroke-dashoffset: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="cosmos-bg"></div>
+    <div class="stars"></div>
+    <main>
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="${backendPublicUrl}/Pherielium_logo.png"
+          alt="Phelierium"
+        />
+        <span class="brand-name">Phelierium</span>
+      </div>
 
-        <svg width="52" height="52" viewBox="0 0 52 52" style="margin-bottom:28px;">
-          <circle cx="26" cy="26" r="23" fill="none" stroke="${color}" stroke-width="2" stroke-opacity="0.25"/>
-          <path class="check-path" d="M15 27 L22 34 L37 18" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <div class="status-orb">
+        <svg width="32" height="32" viewBox="0 0 52 52">
+          <path class="check-path" d="M15 27 L23 35 L38 17" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
+      </div>
 
-        <h1>${platform} conectado.</h1>
-        <p class="sub">Sua conta foi vinculada com sucesso.<br/>Pode voltar pro launcher.</p>
+      <h1>${platform} conectado.</h1>
+      <p class="sub">Sua conta foi vinculada com sucesso.<br/>Pode voltar para o launcher.</p>
 
-        <div class="divider"></div>
+      <div class="divider"></div>
 
-        <p class="footer">
-          Fechando em instantes<span class="dot">·</span><a id="close-now">fechar agora</a>
-        </p>
-      </main>
-      <script>
-        const launcherCallbackUrl = ${JSON.stringify(launcherCallbackUrl)};
-        document.getElementById('close-now').addEventListener('click', () => {
-          try { window.close(); } catch (e) {}
-        });
-        if (launcherCallbackUrl) {
-          setTimeout(() => {
-            try { window.location.assign(launcherCallbackUrl); } catch (e) {}
-          }, 350);
-        }
-        setTimeout(() => { try { window.close(); } catch (e) {} }, 1800);
-      </script>
-    </body>
-  </html>
-  `;
+      <p class="footer">
+        Fechando em instantes<span class="dot">·</span><a id="close-now">fechar agora</a>
+      </p>
+    </main>
+    <script>
+      const launcherCallbackUrl = ${JSON.stringify(launcherCallbackUrl)};
+      document.getElementById('close-now').addEventListener('click', () => {
+        try { window.close(); } catch (e) {}
+      });
+      if (launcherCallbackUrl) {
+        setTimeout(() => {
+          try { window.location.assign(launcherCallbackUrl); } catch (e) {}
+        }, 350);
+      }
+      setTimeout(() => { try { window.close(); } catch (e) {} }, 1800);
+    </script>
+  </body>
+</html>
+`;
 };
 
 const cleanupPendingStates = () => {
@@ -726,14 +805,57 @@ const resolveStoreLocale = (value) =>
   STORE_LOCALES[String(value || "").trim()] || STORE_LOCALES["pt-BR"];
 
 const EPIC_CATALOG_ITEM_QUERY = `
-  query catalogItemQuery($namespace: String!, $id: String!, $locale: String, $withOffers: Boolean!) {
-    Catalog {
-      catalogItem(namespace: $namespace, id: $id, locale: $locale) {
+query catalogItemQuery($namespace: String!, $id: String!, $locale: String, $withOffers: Boolean!) {
+  Catalog {
+    catalogItem(namespace: $namespace, id: $id, locale: $locale) {
+      id
+      namespace
+      title
+      description
+      releaseDate
+      seller {
+        name
+      }
+      keyImages {
+        type
+        url
+      }
+      categories {
+        path
+      }
+      releaseInfo {
+        appId
+        platform
+      }
+      customAttributes {
+        key
+        value
+      }
+      dlcItemList {
+        id
+      }
+      mainGameItem {
+        id
+      }
+      offers @include(if: $withOffers) {
+        urlSlug
+      }
+    }
+  }
+}
+`;
+
+const EPIC_SEARCH_STORE_QUERY = `
+query searchStoreQuery($keywords: String, $locale: String, $country: String!, $count: Int, $start: Int) {
+  Catalog {
+    searchStore(keywords: $keywords, locale: $locale, country: $country, count: $count, start: $start) {
+      elements {
         id
         namespace
         title
         description
-        releaseDate
+        productSlug
+        urlSlug
         seller {
           name
         }
@@ -741,57 +863,14 @@ const EPIC_CATALOG_ITEM_QUERY = `
           type
           url
         }
-        categories {
-          path
-        }
-        releaseInfo {
-          appId
-          platform
-        }
         customAttributes {
           key
           value
         }
-        dlcItemList {
-          id
-        }
-        mainGameItem {
-          id
-        }
-        offers @include(if: $withOffers) {
-          urlSlug
-        }
       }
     }
   }
-`;
-
-const EPIC_SEARCH_STORE_QUERY = `
-  query searchStoreQuery($keywords: String, $locale: String, $country: String!, $count: Int, $start: Int) {
-    Catalog {
-      searchStore(keywords: $keywords, locale: $locale, country: $country, count: $count, start: $start) {
-        elements {
-          id
-          namespace
-          title
-          description
-          productSlug
-          urlSlug
-          seller {
-            name
-          }
-          keyImages {
-            type
-            url
-          }
-          customAttributes {
-            key
-            value
-          }
-        }
-      }
-    }
-  }
+}
 `;
 
 const pickEpicImage = (images, preferredTypes) => {
@@ -1236,10 +1315,10 @@ const saveLocalSteamId = (uid, steamId) => {
     }
 
     db.prepare(`
-      INSERT INTO library_state (owner_uid, device_id, steam_id)
-      VALUES (?, ?, ?)
-      ON CONFLICT(owner_uid) DO UPDATE SET steam_id = excluded.steam_id
-    `).run(uid, crypto.randomUUID(), steamId);
+    INSERT INTO library_state (owner_uid, device_id, steam_id)
+    VALUES (?, ?, ?)
+    ON CONFLICT(owner_uid) DO UPDATE SET steam_id = excluded.steam_id
+  `).run(uid, crypto.randomUUID(), steamId);
     db.close();
   } catch (error) {
     console.error("Erro ao salvar SteamID no SQLite local:", error);
@@ -1262,8 +1341,8 @@ const clearLocalSteamId = (uid) => {
       // Ignora se a coluna já existir
     }
     db.prepare(`
-      UPDATE library_state SET steam_id = NULL WHERE owner_uid = ?
-    `).run(uid);
+    UPDATE library_state SET steam_id = NULL WHERE owner_uid = ?
+  `).run(uid);
     db.close();
   } catch (error) {
     console.error("Erro ao limpar SteamID no SQLite local:", error);
@@ -1571,20 +1650,20 @@ app.get("/api/voice/rooms/public", steamPrivateLimiter, requireFirebaseUser, asy
     let query = supabaseAdmin
       .from("voice_rooms")
       .select(`
-        id,
-        host_uid,
-        room_name,
-        category,
-        is_private,
-        icon,
-        avatar_url,
-        theme_color,
-        max_participants,
-        status,
-        created_at,
-        updated_at,
-        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
-      `)
+      id,
+      host_uid,
+      room_name,
+      category,
+      is_private,
+      icon,
+      avatar_url,
+      theme_color,
+      max_participants,
+      status,
+      created_at,
+      updated_at,
+      members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+    `)
       .eq("is_private", false)
       .eq("status", "active")
       .order("created_at", { ascending: false });
@@ -1650,21 +1729,21 @@ app.get("/api/voice/rooms/my", steamPrivateLimiter, requireFirebaseUser, async (
     const { data: hostedRooms, error: hostError } = await supabaseAdmin
       .from("voice_rooms")
       .select(`
-        id,
-        host_uid,
-        room_name,
-        category,
-        is_private,
-        password_hash,
-        icon,
-        avatar_url,
-        theme_color,
-        max_participants,
-        status,
-        created_at,
-        updated_at,
-        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
-      `)
+      id,
+      host_uid,
+      room_name,
+      category,
+      is_private,
+      password_hash,
+      icon,
+      avatar_url,
+      theme_color,
+      max_participants,
+      status,
+      created_at,
+      updated_at,
+      members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+    `)
       .eq("host_uid", uid)
       .eq("status", "active")
       .order("updated_at", { ascending: false });
@@ -1724,18 +1803,18 @@ app.get("/api/voice/rooms/:roomId", steamPrivateLimiter, requireFirebaseUser, as
     const { data: room, error } = await supabaseAdmin
       .from("voice_rooms")
       .select(`
-        id,
-        host_uid,
-        room_name,
-        category,
-        is_private,
-        password_hash,
-        max_participants,
-        status,
-        created_at,
-        updated_at,
-        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
-      `)
+      id,
+      host_uid,
+      room_name,
+      category,
+      is_private,
+      password_hash,
+      max_participants,
+      status,
+      created_at,
+      updated_at,
+      members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+    `)
       .eq("id", roomId)
       .single();
 
@@ -2073,7 +2152,7 @@ app.get("/api/nexus/games/:gameDomain/trending-mods", steamPublicLimiter, async 
       {
         headers: {
           Accept: "application/json",
-          "Application-Name": "Checkpoint Launcher",
+          "Application-Name": "Phelierium Game Hub",
           "Application-Version": "3.0.0",
         },
         signal: AbortSignal.timeout(12_000),
@@ -2848,8 +2927,11 @@ app.post("/auth/discord/start", steamAuthLimiter, requireFirebaseUser, (req, res
   }
 });
 
+const buildOAuthSuccessPage = (platform = "Conta", launcherCallbackUrl = "") =>
+  buildAuthCallbackHtml({ platform, launcherCallbackUrl });
+
 const renderAuthSuccessScreen = (serviceName = "Conta", launcherCallbackUrl = "") =>
-  buildOAuthSuccessPage(serviceName, launcherCallbackUrl);
+  buildAuthCallbackHtml({ platform: serviceName, launcherCallbackUrl });
 
 app.get("/auth/google/start", steamAuthLimiter, (req, res) => {
   cleanupPendingDesktopGoogleStates();

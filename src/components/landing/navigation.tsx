@@ -36,14 +36,14 @@ export function Navigation() {
             isScrolled ? "h-14" : "h-20"
           }`}
         >
-          <a href="#" className="flex items-center gap-2 group">
+          <a href="#" className="flex items-center gap-2.5 group">
             <img
-              src="/Checkpoint_Logo.png"
-              alt=""
+              src="/Pherielium_logo.png"
+              alt="Phelierium"
               className={`transition-all duration-500 object-contain ${isScrolled ? "w-6 h-6" : "w-7 h-7"}`}
             />
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
-              CHECKPOINT
+            <span className={`font-display tracking-tight transition-all duration-500 font-bold ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>
+              PHELIERIUM
             </span>
           </a>
 

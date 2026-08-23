@@ -22,7 +22,7 @@ const removeEmptyParents = async (startDirectory, stopDirectory) => {
 const assertAllowedArchive = (archivePath, downloadRoots) => {
   const resolved = path.resolve(String(archivePath || ""));
   if (!(downloadRoots || []).some((root) => isInside(root, resolved) && resolved !== path.resolve(root))) {
-    throw new Error("O arquivo do mod nao pertence a uma pasta de downloads do Checkpoint.");
+    throw new Error("O arquivo do mod nao pertence a uma pasta de downloads do Phelierium.");
   }
   return resolved;
 };

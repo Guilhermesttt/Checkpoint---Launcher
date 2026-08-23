@@ -102,7 +102,7 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
     if (!track || selectedFriends.size === 0 || inviting) return;
     setInviting(true);
     const message = [
-      "🎧 Convite para uma Checkpoint Session",
+      "🎧 Convite para uma Phelierium Session",
       `${track.title} — ${track.artist}`,
       track.spotifyUrl,
       "Entre na conversa para sugerir a proxima faixa.",
@@ -139,7 +139,7 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
                 <span className="h-2.5 w-2.5 rounded-full bg-[#1ed760] shadow-[0_0_14px_rgba(30,215,96,.55)]" />
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">Spotify</p>
-                  <p className="text-[9px] text-white/35">Checkpoint Player</p>
+                  <p className="text-[9px] text-white/35">Phelierium Player</p>
                 </div>
               </div>
               <button type="button" aria-label="Fechar Spotify" onClick={() => setExpanded(false)} className="rounded-full p-2 text-white/35 hover:bg-white/10 hover:text-white">
@@ -167,7 +167,7 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
               <div className="p-5">
                 <div className="rounded-2xl border border-white/[0.07] bg-white/[0.035] p-4">
                   <p className="text-sm font-bold text-white">Sua música, dentro do jogo.</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-white/40">Conecte uma conta Premium para transformar o Checkpoint em um dispositivo Spotify Connect.</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-white/40">Conecte uma conta Premium para transformar o Phelierium em um dispositivo Spotify Connect.</p>
                   {player.error && <p className="mt-2 text-[10px] text-red-300/80">{player.error}</p>}
                   <button type="button" onClick={() => void player.connect()} className="mt-4 w-full rounded-xl bg-[#1ed760] px-4 py-2.5 text-[11px] font-black text-black transition hover:brightness-110">
                     Conectar Spotify
@@ -187,7 +187,7 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
                 <div className="p-5">
                   {player.remoteMode && (
                     <div className="mb-4 rounded-xl border border-[#1ed760]/15 bg-[#1ed760]/[0.06] px-3 py-2 text-[9px] leading-relaxed text-white/50">
-                      Áudio no dispositivo Spotify ativo; controles e fila permanecem no Checkpoint.
+                      Áudio no dispositivo Spotify ativo; controles e fila permanecem no Phelierium.
                     </div>
                   )}
                   <div className="flex items-center gap-4">
@@ -242,7 +242,7 @@ const SpotifyDock: React.FC<SpotifyDockProps> = ({ friends, onNotify }) => {
                     <div className="mt-2 rounded-xl border border-white/[0.06] bg-black/30 p-3">
                       <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-white/35">Convidar amigos</p>
                       <div className="max-h-28 space-y-1 overflow-y-auto">
-                        {checkpointFriends.length === 0 && <p className="py-2 text-[10px] text-white/35">Adicione amigos Checkpoint para criar uma Session.</p>}
+                        {checkpointFriends.length === 0 && <p className="py-2 text-[10px] text-white/35">Adicione amigos Phelierium para criar uma Session.</p>}
                         {checkpointFriends.map((friend) => <label key={friend.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/[0.05]"><input aria-label={friend.name} type="checkbox" checked={selectedFriends.has(friend.id)} onChange={() => toggleFriend(friend.id)} className="accent-[#1ed760]" />{friend.avatar ? <img src={friend.avatar} alt="" className="h-6 w-6 rounded-full object-cover" /> : <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-[9px]">{friend.name.slice(0, 1)}</span>}<span className="text-[10px] text-white/70">{friend.name}</span></label>)}
                       </div>
                       <button type="button" onClick={() => void inviteFriends()} disabled={selectedFriends.size === 0 || inviting} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-[10px] font-black text-black disabled:opacity-35"><Send className="h-3 w-3" />{inviting ? "Enviando..." : "Enviar convite"}</button>

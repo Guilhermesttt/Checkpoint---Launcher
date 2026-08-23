@@ -142,11 +142,11 @@ const APP_THEME_OPTIONS: Array<{
 }> = [
     {
       id: "default",
-      label: "PlayStation 5",
-      hint: "Visual Checkpoint + sons PS5 Plus",
+      label: "Phelierium Space",
+      hint: "Estética Espaço Preto & Branco + sons PS5",
       swatch: "rgb(255 255 255)",
       soundTheme: "ps5",
-      visualTheme: "checkpoint",
+      visualTheme: "phelierium",
     },
     {
       id: "ps4",
@@ -531,7 +531,7 @@ const Home: React.FC = () => {
         notify(
           `Nova atualização pendente${version ? ` (v${version})` : ""}. Abra as Configurações para baixar e atualizar.`,
           "success",
-          { id: "checkpoint-app-update", title: "Atualização do Checkpoint", duration: Infinity },
+          { id: "checkpoint-app-update", title: "Atualização do Phelierium", duration: Infinity },
         );
       } else if (status === "update-downloaded") {
         notify(
@@ -2391,7 +2391,7 @@ const Home: React.FC = () => {
 
       <ConfirmationModal
         isOpen={exitConfirmationOpen}
-        title="Sair do Checkpoint"
+        title="Sair do Phelierium"
         description="O launcher e os recursos em segundo plano serão encerrados."
         confirmLabel="Sair do aplicativo"
         onClose={() => setExitConfirmationOpen(false)}

@@ -316,7 +316,7 @@ const LoginContent: React.FC = () => {
               <img src="/Pherielium_logo.png" className="w-9 h-9 object-contain" alt="Pherielium Logo" />
             </motion.div>
             <h1 className="text-3.5xl font-heading tracking-tight text-white font-bold mb-1">
-              Pherielium
+              Phelierium
             </h1>
             <AnimatePresence mode="wait">
               <motion.p

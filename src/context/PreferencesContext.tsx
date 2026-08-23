@@ -9,7 +9,7 @@ export type LauncherLanguage =
   | "de-DE"
   | "it-IT";
 export type SoundTheme = "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
-export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "cyberpunk";
+export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "phelierium" | "cyberpunk";
 export type AchievementNotificationPosition =
   | "top-left"
   | "top-right"
@@ -75,7 +75,7 @@ const translations = {
     themesHint: "Cada tema aplica visual e sons do mesmo pacote.",
     playstationTheme: "PlayStation",
     xbox360Theme: "Xbox 360",
-    checkpointTheme: "Checkpoint",
+    checkpointTheme: "Phelierium Space",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
     sunsetTheme: "Sunset",
@@ -98,22 +98,22 @@ const translations = {
     openAtLogin: "Iniciar com o Windows",
     openAtLoginHint: "Inicia o launcher silenciosamente em segundo plano ao ligar o PC.",
     closeOnLaunch: "Ocultar ao Jogar",
-    closeOnLaunchHint: "Minimiza/Esconde o launcher completamente para liberar memória.",
+    closeOnLaunchHint: "Minimiza/Oculta o launcher completamente enquanto você joga para liberar memória.",
     new: "Novo",
-    searchPlaceholder: "Buscar jogo... (S)",
+    searchPlaceholder: "Pesquisar jogo... (S)",
     connectSteam: "Conectar Steam",
     connecting: "Conectando...",
     unlink: "Desvincular",
-    sync: "Sync",
-    syncing: "Sync...",
+    sync: "Sincronizar",
+    syncing: "Sincronizando...",
     identity: "Identidade",
     playNow: "Jogar Agora",
     viaSteam: "Via Steam",
     favorite: "Favorito",
     emptyLibrary: "Biblioteca vazia",
     noResults: "Nenhum resultado",
-    noResultsHint: "Tente buscar por outro termo.",
-    emptyHintConnected: "Você não possui jogos salvos. Adicione um jogo manualmente.",
+    noResultsHint: "Tente pesquisar por outro termo.",
+    emptyHintConnected: "Você não tem jogos salvos. Adicione um manualmente.",
     emptyHintDisconnected: "Adicione um jogo ou conecte sua conta Steam.",
     newGame: "Novo Jogo",
     editMetadata: "Editar Metadados",
@@ -122,46 +122,46 @@ const translations = {
     removeFromLibrary: "Remover da Biblioteca",
     cancel: "Cancelar",
     confirm: "Confirmar",
-    signOutTitle: "Encerrar Sessão",
-    signOutDescription: "Você será desconectado e retornará à tela de entrada.",
-    signOutConfirm: "Sair Agora",
+    signOutTitle: "Sair da Conta",
+    signOutDescription: "Você será desconectado e voltará para a tela de login.",
+    signOutConfirm: "Sair",
     disconnectSteamTitle: "Desconectar Steam",
     disconnectSteamDescription:
-      "Desvincular sua conta Steam removerá os jogos sincronizados da biblioteca.",
+      "Desvincular a Steam removerá os jogos sincronizados da sua biblioteca.",
     launching: "Iniciando...",
     play: "Jogar",
     connectedAccounts: "Contas conectadas",
-    connectedAccountsHint: "Vincule Steam e Discord. A Epic usa catálogo e atalhos, sem sync de conta.",
+    connectedAccountsHint: "Vincule Steam e Discord. A Epic usa busca de catálogo e atalhos, sem sincronizar conta.",
     connectEpic: "Catálogo Epic",
     connectDiscord: "Conectar Discord",
     disconnectEpicTitle: "Desconectar Epic",
     disconnectEpicDescription:
-      "A Epic é usada apenas para catálogo, capas, detalhes e atalhos.",
+      "A Epic é usada apenas para busca de catálogo, artes, detalhes e atalhos.",
     disconnectDiscordTitle: "Desconectar Discord",
     disconnectDiscordDescription:
-      "Desvincular sua conta Discord removerá a integração.",
+      "Desvincular o Discord removerá a integração.",
     connected: "Conectado",
     notConnected: "Não conectado",
     friends: "Amigos",
-    friendsHint: "Veja seus amigos de Steam, Discord e Checkpoint.",
+    friendsHint: "Veja seus amigos de Steam, Discord e Phelierium.",
     overviewContinue: "Continuar",
     overviewResumeSession: "Retomar sessão",
     overviewNextReturn: "Seu próximo retorno aparece aqui.",
     overviewFriends: "Amigos",
     overviewPlayingNow: "Jogando agora",
     overviewSocial: "Social",
-    overviewNobodyPlaying: "Ninguém em jogo agora.",
+    overviewNobodyPlaying: "Ninguém está jogando no momento.",
     overviewPulse: "Pulso",
     overviewQuickSummary: "Resumo rápido",
     overviewFavorites: "Favoritos",
     overviewActivity: "Atividade",
-    overviewNoRecentNews: "Sem novidades recentes.",
+    overviewNoRecentNews: "Nenhuma novidade recente.",
     overviewNoRecord: "sem registro",
     overviewHoursPlayed: "h jogadas",
     overviewOnline: "Online",
-    activityFriendPlaying: "entrou em jogo",
-    activityFriendPlayingDetail: "Agora está jogando",
-    activityFriendOnlineDetail: "Está online no Checkpoint.",
+    activityFriendPlaying: "começou a jogar",
+    activityFriendPlayingDetail: "Jogando agora",
+    activityFriendOnlineDetail: "Está online no Phelierium.",
     activityReturnedTo: "Você voltou para",
     activityLibraryHours: "h registradas na biblioteca.",
     activityFavoriteStill: "segue entre seus favoritos",
@@ -216,7 +216,7 @@ const translations = {
     themesHint: "Each theme applies matching visuals and sounds.",
     playstationTheme: "PlayStation",
     xbox360Theme: "Xbox 360",
-    checkpointTheme: "Checkpoint",
+    checkpointTheme: "Phelierium Space",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
     sunsetTheme: "Sunset",
@@ -284,7 +284,7 @@ const translations = {
     connected: "Connected",
     notConnected: "Not connected",
     friends: "Friends",
-    friendsHint: "View your friends from Steam, Discord and Checkpoint.",
+    friendsHint: "View your friends from Steam, Discord and Phelierium.",
     overviewContinue: "Continue",
     overviewResumeSession: "Resume session",
     overviewNextReturn: "Your next return appears here.",
@@ -302,7 +302,7 @@ const translations = {
     overviewOnline: "Online",
     activityFriendPlaying: "started playing",
     activityFriendPlayingDetail: "Now playing",
-    activityFriendOnlineDetail: "Is online on Checkpoint.",
+    activityFriendOnlineDetail: "Is online on Phelierium.",
     activityReturnedTo: "You returned to",
     activityLibraryHours: "h recorded in your library.",
     activityFavoriteStill: "is still one of your favorites",
@@ -357,7 +357,7 @@ const translations = {
     themesHint: "Cada tema aplica visual y sonidos del mismo paquete.",
     playstationTheme: "PlayStation",
     xbox360Theme: "Xbox 360",
-    checkpointTheme: "Checkpoint",
+    checkpointTheme: "Phelierium Space",
     carbonTheme: "Carbon",
     neonTheme: "Neon",
     sunsetTheme: "Sunset",
@@ -425,7 +425,7 @@ const translations = {
     connected: "Conectado",
     notConnected: "No conectado",
     friends: "Amigos",
-    friendsHint: "Ver tus amigos de Steam, Discord y Checkpoint.",
+    friendsHint: "Ver tus amigos de Steam, Discord y Phelierium.",
     overviewContinue: "Continuar",
     overviewResumeSession: "Retomar sesión",
     overviewNextReturn: "Tu próximo regreso aparece aquí.",
@@ -443,7 +443,7 @@ const translations = {
     overviewOnline: "Online",
     activityFriendPlaying: "empezó a jugar",
     activityFriendPlayingDetail: "Ahora está jugando",
-    activityFriendOnlineDetail: "Está online en Checkpoint.",
+    activityFriendOnlineDetail: "Está online en Phelierium.",
     activityReturnedTo: "Volviste a",
     activityLibraryHours: "h registradas en la biblioteca.",
     activityFavoriteStill: "sigue entre tus favoritos",
@@ -560,7 +560,7 @@ const additionalTranslations: Record<
     connected: "Connecté",
     notConnected: "Non connecté",
     friends: "Amis",
-    friendsHint: "Consultez vos amis Steam, Discord et Checkpoint.",
+    friendsHint: "Consultez vos amis Steam, Discord et Phelierium.",
     overviewContinue: "Continuer",
     overviewResumeSession: "Reprendre la session",
     overviewFriends: "Amis",
@@ -671,7 +671,7 @@ const additionalTranslations: Record<
     connected: "Verbunden",
     notConnected: "Nicht verbunden",
     friends: "Freunde",
-    friendsHint: "Sieh deine Freunde von Steam, Discord und Checkpoint.",
+    friendsHint: "Sieh deine Freunde von Steam, Discord und Phelierium.",
     overviewContinue: "Fortsetzen",
     overviewResumeSession: "Sitzung fortsetzen",
     overviewFriends: "Freunde",
@@ -782,7 +782,7 @@ const additionalTranslations: Record<
     connected: "Collegato",
     notConnected: "Non collegato",
     friends: "Amici",
-    friendsHint: "Visualizza gli amici di Steam, Discord e Checkpoint.",
+    friendsHint: "Visualizza gli amici di Steam, Discord e Phelierium.",
     overviewContinue: "Continua",
     overviewResumeSession: "Riprendi sessione",
     overviewFriends: "Amici",
@@ -860,7 +860,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     useState<AchievementNotificationPosition>("top-right");
   const [musicVolume, setMusicVolume] = useState(9);
   const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
-  const [visualTheme, setVisualTheme] = useState<VisualTheme>("checkpoint");
+  const [visualTheme, setVisualTheme] = useState<VisualTheme>("phelierium");
   const [openAtLogin, setOpenAtLoginState] = useState(false);
   const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
   const [closeOnLaunch, setCloseOnLaunch] = useState(true);
@@ -967,10 +967,14 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setSoundTheme(savedSoundTheme);
     }
     if (
+      savedVisualTheme === "phelierium" ||
       savedVisualTheme === "checkpoint" ||
       savedVisualTheme === "playstation" ||
+      savedVisualTheme === "ps4" ||
+      savedVisualTheme === "psp" ||
       savedVisualTheme === "gamecube" ||
-      savedVisualTheme === "xbox360"
+      savedVisualTheme === "xbox360" ||
+      savedVisualTheme === "cyberpunk"
     ) {
       setVisualTheme(savedVisualTheme);
     }

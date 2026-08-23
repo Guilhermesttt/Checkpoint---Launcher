@@ -55,7 +55,7 @@ export function CtaSection() {
 
                 <p className="text-xl text-muted-foreground mb-12 leading-relaxed max-w-xl">
                   Junte-se a milhares de jogadores que já transformaram sua
-                  experiência com o Checkpoint. Grátis, sem cartão de crédito.
+                  experiência com o Phelierium. Grátis, sem cartão de crédito.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -82,8 +82,8 @@ export function CtaSection() {
                       <div className="flex justify-center mb-4 text-foreground">
                         <Gamepad2 className="w-16 h-16" />
                       </div>
-                      <div className="text-2xl font-display text-foreground/30">
-                        CHECKPOINT
+                      <div className="text-2xl font-display text-foreground/30 font-bold">
+                        PHELIERIUM
                       </div>
                       <div className="text-xs font-mono text-muted-foreground mt-2">
                         Seu launcher definitivo

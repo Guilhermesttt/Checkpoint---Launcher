@@ -85,7 +85,7 @@ const downloadNexusFile = async ({
     throw new Error("A Nexus retornou um endereço de download inseguro.");
   }
   if (!path.isAbsolute(destinationRoot)) {
-    throw new Error("A pasta de downloads do Checkpoint é inválida.");
+    throw new Error("A pasta de downloads do Phelierium é inválida.");
   }
 
   const response = await fetchImpl(sourceUrl, {
@@ -93,7 +93,7 @@ const downloadNexusFile = async ({
     redirect: "follow",
     headers: {
       Accept: "application/octet-stream",
-      "User-Agent": "Checkpoint-Launcher",
+      "User-Agent": "Phelierium",
     },
   });
   if (!response.ok || !response.body) {

@@ -302,7 +302,7 @@ async function installUniversalMod({
     }
     if (error && (error.code === "EACCES" || error.code === "EPERM")) {
       const permErr = new Error(
-        `Permissão de arquivo negada (${error.code}). A pasta do jogo está protegida pelo Windows (ex: Program Files). Execute o Checkpoint Launcher como Administrador para poder instalar mods neste jogo.`,
+        `Permissão de arquivo negada (${error.code}). A pasta do jogo está protegida pelo Windows (ex: Program Files). Execute o Phelierium como Administrador para poder instalar mods neste jogo.`,
       );
       permErr.code = error.code;
       throw permErr;

@@ -8,6 +8,7 @@ export interface RgbColor {
 
 /** Mesmos valores de --launcher-accent em index.css. */
 export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
+  phelierium: { r: 255, g: 255, b: 255 },
   checkpoint: { r: 255, g: 255, b: 255 },
   playstation: { r: 37, g: 99, b: 235 },
   ps4: { r: 0, g: 112, b: 209 },
@@ -19,6 +20,7 @@ export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
 
 /** Presets ajustados visualmente para a lightbar física do controle. */
 export const THEME_LED_COLORS: Record<VisualTheme, RgbColor> = {
+  phelierium: { r: 255, g: 255, b: 255 },
   checkpoint: { r: 255, g: 255, b: 255 },
   playstation: { r: 0, g: 4, b: 255 }, // #0004FF
   ps4: { r: 0, g: 112, b: 209 },

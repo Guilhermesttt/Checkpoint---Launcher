@@ -5,7 +5,7 @@ import { LazySection } from "./components/landing/LazySection";
 
 export default function Landing() {
   useEffect(() => {
-    document.title = "Checkpoint // Sua Biblioteca Universal de Jogos";
+    document.title = "Phelierium // Sua Biblioteca Universal de Jogos";
   }, []);
 
   return (

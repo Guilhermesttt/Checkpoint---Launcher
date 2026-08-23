@@ -5,7 +5,7 @@ const steps = [
     number: "01",
     title: "Conecte",
     subtitle: "sua conta",
-    description: "Entre com Google e vincule sua conta Steam. O Checkpoint importa toda sua biblioteca automaticamente.",
+    description: "Entre com Google e vincule sua conta Steam. O Phelierium importa toda sua biblioteca automaticamente.",
     code: `// Autenticação simples
 await signInWithGoogle();
 await linkSteamAccount(steamId);
@@ -92,7 +92,7 @@ export function HowItWorksSection() {
                 <div className="w-3 h-3 rounded-full bg-red-500/60" />
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
-                <span className="ml-3 text-xs text-white/30 font-mono">checkpoint.ts</span>
+                <span className="ml-3 text-xs text-white/30 font-mono">phelierium.ts</span>
               </div>
               <pre className="p-6 text-sm font-mono text-green-400/80 leading-relaxed overflow-hidden">
                 {steps[activeStep].code}

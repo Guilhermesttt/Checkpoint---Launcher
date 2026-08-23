@@ -29,8 +29,7 @@ export default function PrivacyPolicy() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">Who We Are</h2>
             <p>
-              Checkpoint is a game library and launcher experience available at
-              checkpointlauncher.com. For privacy questions, contact us at{" "}
+              Phelierium is a game library and launcher experience. For privacy questions, contact us at{" "}
               <a className="text-sky-300 underline-offset-4 hover:underline" href="mailto:dev.guilhermesantana@gmail.com">
                 dev.guilhermesantana@gmail.com
               </a>
@@ -63,7 +62,7 @@ export default function PrivacyPolicy() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">Third-Party Services</h2>
             <p>
-              Checkpoint may use third-party services such as Supabase, Epic
+              Phelierium may use third-party services such as Supabase, Epic
               Games, Steam, Discord, hosting providers, and analytics or
               infrastructure providers. These services process information under
               their own privacy policies when you use or authorize their
@@ -84,7 +83,7 @@ export default function PrivacyPolicy() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">Data Retention</h2>
             <p>
-              We keep information for as long as needed to provide Checkpoint,
+              We keep information for as long as needed to provide Phelierium,
               maintain security, resolve disputes, and comply with legal
               obligations. You may request deletion of your account data by
               contacting us.
@@ -103,7 +102,7 @@ export default function PrivacyPolicy() {
           <section className="space-y-3">
             <h2 className="text-xl font-semibold text-white">Children</h2>
             <p>
-              Checkpoint is not directed to children under 13. We do not
+              Phelierium is not directed to children under 13. We do not
               knowingly collect personal information from children under 13.
             </p>
           </section>
@@ -118,7 +117,7 @@ export default function PrivacyPolicy() {
         </div>
 
         <a className="inline-flex w-fit rounded-md border border-white/15 px-4 py-2 text-sm font-medium text-white/80 hover:bg-white/10" href="/">
-          Back to Checkpoint
+          Back to Phelierium
         </a>
       </section>
     </main>

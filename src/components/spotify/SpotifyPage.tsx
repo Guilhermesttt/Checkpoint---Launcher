@@ -41,12 +41,12 @@ const formatTime = (milliseconds: number) => {
 };
 
 const SPOTIFY_COPY = {
-  "pt-BR": { connectTitle: "Spotify no Checkpoint", connectHint: "Conecte sua conta para ouvir, controlar músicas e criar uma Jam com seus amigos sem sair do launcher.", connect: "Conectar Spotify", preparing: "Preparando o player..." },
-  "en-US": { connectTitle: "Spotify on Checkpoint", connectHint: "Connect your account to listen, control music, and create a Jam with friends without leaving the launcher.", connect: "Connect Spotify", preparing: "Preparing player..." },
-  "es-ES": { connectTitle: "Spotify en Checkpoint", connectHint: "Conecta tu cuenta para escuchar, controlar música y crear una Jam con amigos sin salir del launcher.", connect: "Conectar Spotify", preparing: "Preparando el reproductor..." },
-  "fr-FR": { connectTitle: "Spotify sur Checkpoint", connectHint: "Connectez votre compte pour écouter, contrôler la musique et créer une Jam avec vos amis sans quitter le launcher.", connect: "Connecter Spotify", preparing: "Préparation du lecteur..." },
-  "de-DE": { connectTitle: "Spotify in Checkpoint", connectHint: "Verbinde dein Konto, höre und steuere Musik und erstelle eine Jam mit Freunden, ohne den Launcher zu verlassen.", connect: "Spotify verbinden", preparing: "Player wird vorbereitet..." },
-  "it-IT": { connectTitle: "Spotify su Checkpoint", connectHint: "Collega il tuo account per ascoltare, controllare la musica e creare una Jam con gli amici senza uscire dal launcher.", connect: "Collega Spotify", preparing: "Preparazione del player..." },
+  "pt-BR": { connectTitle: "Spotify no Phelierium", connectHint: "Conecte sua conta para ouvir, controlar músicas e criar uma Jam com seus amigos sem sair do launcher.", connect: "Conectar Spotify", preparing: "Preparando o player..." },
+  "en-US": { connectTitle: "Spotify on Phelierium", connectHint: "Connect your account to listen, control music, and create a Jam with friends without leaving the launcher.", connect: "Connect Spotify", preparing: "Preparing player..." },
+  "es-ES": { connectTitle: "Spotify en Phelierium", connectHint: "Conecta tu cuenta para escuchar, controlar música y crear una Jam con amigos sin salir del launcher.", connect: "Conectar Spotify", preparing: "Preparando el reproductor..." },
+  "fr-FR": { connectTitle: "Spotify sur Phelierium", connectHint: "Connectez votre compte pour écouter, contrôler la musique et créer une Jam avec vos amis sans quitter le launcher.", connect: "Connecter Spotify", preparing: "Préparation du lecteur..." },
+  "de-DE": { connectTitle: "Spotify in Phelierium", connectHint: "Verbinde dein Konto, höre und steuere Musik und erstelle eine Jam mit Freunden, ohne den Launcher zu verlassen.", connect: "Spotify verbinden", preparing: "Player wird vorbereitet..." },
+  "it-IT": { connectTitle: "Spotify su Phelierium", connectHint: "Collega il tuo account per ascoltare, controllare la musica e creare una Jam con gli amici senza uscire dal launcher.", connect: "Collega Spotify", preparing: "Preparazione del player..." },
 } as const;
 
 const controlClass = "flex h-9 w-9 items-center justify-center rounded-xl text-white/45 transition duration-200 hover:bg-white/[.07] hover:text-white disabled:pointer-events-none disabled:opacity-25";
@@ -94,7 +94,7 @@ const SpotifyReadyDashboard: React.FC<Omit<SpotifyPageProps, "language">> = ({ p
     await perform(async () => {
       const created = await playlists.createPlaylist({
         name: playlistName,
-        description: "Criada no Checkpoint Launcher",
+        description: "Criada no Phelierium Game Hub",
         isPublic: playlistPublic,
       });
       setPlaylistName("");
@@ -107,7 +107,7 @@ const SpotifyReadyDashboard: React.FC<Omit<SpotifyPageProps, "language">> = ({ p
   const inviteFriends = async () => {
     if (!track || selectedFriends.size === 0 || inviting) return;
     setInviting(true);
-    const message = ["🎧 Convite para uma Checkpoint Jam", `${track.title} — ${track.artist}`, track.spotifyUrl, "Entre na conversa para sugerir a próxima faixa."].join("\n");
+    const message = ["🎧 Convite para uma Phelierium Jam", `${track.title} — ${track.artist}`, track.spotifyUrl, "Entre na conversa para sugerir a próxima faixa."].join("\n");
     try {
       await Promise.all(Array.from(selectedFriends, (friendId) =>
         sendChatMessage(friendId.replace(/^cp-friend:/, ""), message)));
@@ -159,7 +159,7 @@ const SpotifyReadyDashboard: React.FC<Omit<SpotifyPageProps, "language">> = ({ p
               <input value={search.query} onChange={(event) => search.setQuery(event.target.value)} placeholder="Buscar música ou artista" className="h-11 w-full rounded-2xl border border-white/[.08] bg-white/[.045] pl-11 pr-12 text-xs text-white outline-none transition duration-200 placeholder:text-white/25 focus:border-[#1ed760]/35 focus:bg-white/[.06]" />
               {search.status === "searching" && <LoaderCircle className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[#1ed760]" />}
             </div>
-            <span className="flex items-center gap-2 rounded-xl border border-[#1ed760]/15 bg-[#1ed760]/[.06] px-3 py-2.5 text-[9px] font-bold text-white/45"><i className="h-1.5 w-1.5 rounded-full bg-[#1ed760]" />{player.remoteMode ? "Dispositivo Spotify" : "Checkpoint ativo"}</span>
+            <span className="flex items-center gap-2 rounded-xl border border-[#1ed760]/15 bg-[#1ed760]/[.06] px-3 py-2.5 text-[9px] font-bold text-white/45"><i className="h-1.5 w-1.5 rounded-full bg-[#1ed760]" />{player.remoteMode ? "Dispositivo Spotify" : "Phelierium ativo"}</span>
           </header>
 
           {creatingPlaylist && (
@@ -237,7 +237,7 @@ const SpotifyReadyDashboard: React.FC<Omit<SpotifyPageProps, "language">> = ({ p
             {player.queue.upcoming.length === 0 && <p className="rounded-xl border border-dashed border-white/[.08] px-3 py-8 text-center text-[9px] leading-relaxed text-white/25">Sua próxima faixa aparecerá aqui.</p>}
           </div>
           <div className="my-5 h-px bg-white/[.07]" />
-          <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1ed760]/10"><Users className="h-4 w-4 text-[#1ed760]" /></span><div><h3 className="text-xs font-black text-white">Checkpoint Jam</h3><p className="text-[8px] text-white/30">Convide amigos para sugerir faixas</p></div></div>
+          <div className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1ed760]/10"><Users className="h-4 w-4 text-[#1ed760]" /></span><div><h3 className="text-xs font-black text-white">Phelierium Jam</h3><p className="text-[8px] text-white/30">Convide amigos para sugerir faixas</p></div></div>
           <div className="mt-3 max-h-44 space-y-1 overflow-y-auto">{checkpointFriends.map((friend) => <label key={friend.id} className="flex cursor-pointer items-center gap-2.5 rounded-xl p-2 hover:bg-white/[.04]"><input type="checkbox" aria-label={friend.name} checked={selectedFriends.has(friend.id)} onChange={() => setSelectedFriends((current) => { const next = new Set(current); if (next.has(friend.id)) next.delete(friend.id); else next.add(friend.id); return next; })} className="accent-[#1ed760]" />{friend.avatar ? <img src={friend.avatar} alt="" className="h-7 w-7 rounded-full object-cover" /> : <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[9px] text-white">{friend.name.slice(0, 1)}</span>}<span className="truncate text-[9px] text-white/55">{friend.name}</span></label>)}</div>
           <button type="button" onClick={() => void inviteFriends()} disabled={!track || selectedFriends.size === 0 || inviting} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1ed760] px-3 py-2.5 text-[9px] font-black text-black transition hover:brightness-110 disabled:opacity-30"><Send className="h-3.5 w-3.5" />{inviting ? "Enviando..." : "Enviar convite"}</button>
         </aside>

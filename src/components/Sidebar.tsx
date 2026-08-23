@@ -617,7 +617,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {isExpanded && (
             <div className="flex flex-1 items-center justify-between min-w-0 pr-1">
               <span className="font-heading font-black text-lg text-white tracking-tight uppercase group-hover:text-white/90">
-                Pherielium
+                Phelierium
               </span>
             </div>
           )}
