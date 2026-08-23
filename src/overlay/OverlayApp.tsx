@@ -234,6 +234,59 @@ const OverlayApp: React.FC = () => {
     (window as any).achievementOverlay?.panelAction?.({ kind: "close" });
   };
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (viewingImage) {
+          setViewingImage(null);
+        } else if (isPanelVisible) {
+          closePanel();
+        }
+      } else if (e.key === "Enter" && !e.shiftKey) {
+        if (
+          document.activeElement &&
+          document.activeElement !== document.body &&
+          (document.activeElement as HTMLElement).tagName !== "INPUT" &&
+          (document.activeElement as HTMLElement).tagName !== "TEXTAREA"
+        ) {
+          (document.activeElement as HTMLElement).click?.();
+        }
+      }
+    }
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isPanelVisible, viewingImage]);
+
+  useEffect(() => {
+    if (!isPanelVisible) return;
+    let raf = 0;
+    const prevButtons = new Map<number, boolean>();
+
+    function poll() {
+      const gps = navigator.getGamepads?.() ?? [];
+      for (const g of gps) {
+        if (!g) continue;
+        g.buttons.forEach((b, i) => {
+          const pressed = b.pressed;
+          const prev = prevButtons.get(i) || false;
+          if (pressed && !prev) {
+            if (i === 0) {
+              const active = document.activeElement as HTMLElement | null;
+              active?.click?.();
+            } else if (i === 1) {
+              closePanel();
+            }
+          }
+          prevButtons.set(i, pressed);
+        });
+      }
+      raf = requestAnimationFrame(poll);
+    }
+    raf = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(raf);
+  }, [isPanelVisible]);
+
   const handleSelectChat = (friendId: string) => {
     setActiveView("chats");
     (window as any).achievementOverlay?.panelAction?.({
