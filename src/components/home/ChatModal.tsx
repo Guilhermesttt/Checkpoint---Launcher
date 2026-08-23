@@ -253,37 +253,24 @@ const DaySeparator: React.FC<{ label: string }> = ({ label }) => (
 
 const TypingBubble: React.FC<{ friendName: string; avatarUrl?: string }> = ({ friendName, avatarUrl }) => (
   <motion.div
-    initial={{ opacity: 0, y: 8 }}
+    initial={{ opacity: 0, y: 6 }}
     animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: 8 }}
+    exit={{ opacity: 0, y: 6 }}
     transition={{ duration: 0.2, ease: "easeOut" }}
-    className="flex items-end gap-2.5 py-1"
+    className="flex items-center gap-2.5 py-1 px-1"
     role="status"
     aria-label={`${friendName} está digitando`}
   >
-    <div className="h-7 w-7 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/[0.06]">
+    <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/[0.06]">
       <img
         src={avatarUrl || FALLBACK_FRIEND_AVATAR}
         alt=""
         className="h-full w-full object-cover"
       />
     </div>
-    <div className="flex h-9 items-center gap-1 rounded-[18px] rounded-bl-[5px] border border-white/[0.07] bg-[#202124] px-3.5 shadow-[0_5px_18px_rgba(0,0,0,.22)]">
-      {[0, 1, 2].map((index) => (
-        <motion.span
-          key={index}
-          className="h-1.5 w-1.5 rounded-full bg-white/55"
-          animate={{ y: [0, -3, 0], opacity: [0.35, 1, 0.35] }}
-          transition={{
-            duration: 0.9,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: index * 0.14,
-          }}
-        />
-      ))}
-    </div>
-    <span className="mb-1 text-[11px] font-medium text-white/35">{friendName} está digitando...</span>
+    <span className="text-[12px] font-medium text-white/40 italic">
+      {friendName} está digitando...
+    </span>
   </motion.div>
 );
 
@@ -480,7 +467,7 @@ const ChatComposer: React.FC<{
       <form onSubmit={onSubmit} className="shrink-0 border-t border-white/8 bg-black/35 backdrop-blur-md px-5 py-4 md:px-7">
         <div className="mb-2 flex min-h-4 items-center justify-between px-1">
           <span className="text-[10px] uppercase tracking-[0.24em] text-white/25">
-            {friendTyping ? `${friendName} está digitando...` : "Chat em tempo real"}
+            Chat em tempo real
           </span>
           {isSpamLocked ? (
             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">DEVAGAR PAE</span>

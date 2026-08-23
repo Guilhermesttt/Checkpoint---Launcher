@@ -1,5 +1,23 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Allowed overlay action IDs to prevent arbitrary commands
+const ALLOWED_OVERLAY_ACTION_IDS = new Set(["open-friend", "accept-request", "open-chat", "custom"]);
+
+function sanitizeString(value, max = 1024) {
+  if (typeof value !== "string") return undefined;
+  return value.slice(0, max);
+}
+
+function sanitizeMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  try {
+    // shallow clone only JSON-serializable properties
+    return JSON.parse(JSON.stringify(metadata));
+  } catch {
+    return undefined;
+  }
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
   launchExecutable: (executablePath, launchProfile, launchOptions) =>
     ipcRenderer.invoke("launcher:open-executable", executablePath, launchProfile, launchOptions),
@@ -23,32 +41,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("nexus:get-mod-files", request),
   getNexusDownloadState: () =>
     ipcRenderer.invoke("nexus:get-download-state"),
-  listNexusDownloadedFiles: (gameDomain) =>
-    ipcRenderer.invoke("nexus:list-downloaded-files", gameDomain),
-  prepareNexusFreeDownload: (request) =>
-    ipcRenderer.invoke("nexus:prepare-free-download", request),
-  installNexusDownloadedMod: (request) =>
-    ipcRenderer.invoke("nexus:install-downloaded-mod", request),
-  adoptNexusInstalledMod: (request) =>
-    ipcRenderer.invoke("nexus:adopt-installed-mod", request),
-  removeNexusInstalledMod: (request) =>
-    ipcRenderer.invoke("nexus:remove-installed-mod", request),
-  openNexusDownloadLocation: (gameDomain) =>
-    ipcRenderer.invoke("nexus:open-download-location", gameDomain),
+  listNexusDownloadedFiles: (gameDomain) => ipcRenderer.invoke("nexus:list-downloaded-files", gameDomain),
+  prepareNexusFreeDownload: (request) => ipcRenderer.invoke("nexus:prepare-free-download", request),
+  installNexusDownloadedMod: (request) => ipcRenderer.invoke("nexus:install-downloaded-mod", request),
+  adoptNexusInstalledMod: (request) => ipcRenderer.invoke("nexus:adopt-installed-mod", request),
+  removeNexusInstalledMod: (request) => ipcRenderer.invoke("nexus:remove-installed-mod", request),
+  openNexusDownloadLocation: (gameDomain) => ipcRenderer.invoke("nexus:open-download-location", gameDomain),
   onNexusDownloadState: (callback) => {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on("nexus:download-state", handler);
     return () => ipcRenderer.removeListener("nexus:download-state", handler);
   },
-  searchEpicStore: (query) =>
-    ipcRenderer.invoke("launcher:search-epic-store", query),
-  fetchEpicStoreDetails: (request) =>
-    ipcRenderer.invoke("launcher:fetch-epic-store-details", request),
+  searchEpicStore: (query) => ipcRenderer.invoke("launcher:search-epic-store", query),
+  fetchEpicStoreDetails: (request) => ipcRenderer.invoke("launcher:fetch-epic-store-details", request),
   getDisplays: () => ipcRenderer.invoke("launcher:get-displays"),
-  isExecutableRunning: (executablePath) =>
-    ipcRenderer.invoke("launcher:is-executable-running", executablePath),
-  detectRunningGames: (executablePaths) =>
-    ipcRenderer.invoke("launcher:detect-running-games", executablePaths),
+  isExecutableRunning: (executablePath) => ipcRenderer.invoke("launcher:is-executable-running", executablePath),
+  detectRunningGames: (executablePaths) => ipcRenderer.invoke("launcher:detect-running-games", executablePaths),
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
   onAccountAuthCallback: (callback) => {
     const handler = (_event, payload) => callback(payload);
@@ -58,8 +66,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getSpotifyStatus: () => ipcRenderer.invoke("spotify:get-status"),
   connectSpotify: (clientId) => ipcRenderer.invoke("spotify:connect", clientId),
   disconnectSpotify: () => ipcRenderer.invoke("spotify:disconnect"),
-  getSpotifyAccessToken: (clientId) =>
-    ipcRenderer.invoke("spotify:get-access-token", clientId),
+  getSpotifyAccessToken: (clientId) => ipcRenderer.invoke("spotify:get-access-token", clientId),
   setOpenAtLogin: (open) => ipcRenderer.invoke("system:set-open-at-login", open),
   setWindowBehavior: (behavior) => ipcRenderer.invoke("system:set-window-behavior", behavior),
   requestAppQuit: () => ipcRenderer.invoke("system:request-app-quit"),
@@ -74,34 +81,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
   listLocalGames: (uid) => ipcRenderer.invoke("library:list", uid),
   createLocalGame: (uid, game) => ipcRenderer.invoke("library:create", uid, game),
-  updateLocalGame: (uid, gameId, patch) =>
-    ipcRenderer.invoke("library:update", uid, gameId, patch),
+  updateLocalGame: (uid, gameId, patch) => ipcRenderer.invoke("library:update", uid, gameId, patch),
   deleteLocalGame: (uid, gameId) => ipcRenderer.invoke("library:delete", uid, gameId),
-  deleteLocalGamesByLauncher: (uid, launcherType) =>
-    ipcRenderer.invoke("library:delete-by-launcher", uid, launcherType),
-  recordLocalGameSession: (uid, gameId, session) =>
-    ipcRenderer.invoke("library:record-session", uid, gameId, session),
-  bulkUpsertLocalGames: (uid, games) =>
-    ipcRenderer.invoke("library:bulk-upsert", uid, games),
-  importLegacyGames: (uid, games) =>
-    ipcRenderer.invoke("library:import-legacy", uid, games),
-  needsLegacyGameImport: (uid) =>
-    ipcRenderer.invoke("library:needs-legacy-import", uid),
+  deleteLocalGamesByLauncher: (uid, launcherType) => ipcRenderer.invoke("library:delete-by-launcher", uid, launcherType),
+  recordLocalGameSession: (uid, gameId, session) => ipcRenderer.invoke("library:record-session", uid, gameId, session),
+  bulkUpsertLocalGames: (uid, games) => ipcRenderer.invoke("library:bulk-upsert", uid, games),
+  importLegacyGames: (uid, games) => ipcRenderer.invoke("library:import-legacy", uid, games),
+  needsLegacyGameImport: (uid) => ipcRenderer.invoke("library:needs-legacy-import", uid),
   getLocalLibrarySummary: (uid) => ipcRenderer.invoke("library:get-summary", uid),
-  markLocalLibrarySummarySynced: (uid, revision) =>
-    ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
+  markLocalLibrarySummarySynced: (uid, revision) => ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
   clearLocalSteamId: (uid) => ipcRenderer.invoke("library:clear-steam-id", uid),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),
   setAchievementSoundTheme: (theme) => ipcRenderer.invoke("overlay:set-achievement-sound-theme", theme),
-  setAchievementNotificationSettings: (settings) =>
-    ipcRenderer.invoke("overlay:set-achievement-notification-settings", settings),
+  setAchievementNotificationSettings: (settings) => ipcRenderer.invoke("overlay:set-achievement-notification-settings", settings),
   toggleOverlayPanel: () => ipcRenderer.invoke("overlay:toggle-panel"),
   showNotificationOverlay: (payload) => ipcRenderer.invoke("overlay:show-notification", payload),
   dismissNotificationOverlay: (payload) => ipcRenderer.invoke("overlay:dismiss-notification", payload),
   showGameStartOverlay: (payload) => ipcRenderer.invoke("overlay:show-game-start", payload),
-
   showFriendPlayingOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-playing", payload),
   showFriendRequestOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-request", payload),
   showFriendAcceptedOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-accepted", payload),
@@ -133,36 +131,3 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update:message", handler);
     return () => ipcRenderer.removeListener("update:message", handler);
   },
-  onDownloadProgress: (callback) => {
-    const handler = (_event, progressInfo) => callback(progressInfo);
-    ipcRenderer.on("update:download-progress", handler);
-    return () => ipcRenderer.removeListener("update:download-progress", handler);
-  },
-  // ─ Real-time achievement events (push from main → renderer) ─────────────────
-  onRealtimeAchievementUnlock: (callback) => {
-    const handler = (_event, payload) => callback(payload);
-    ipcRenderer.on("achievement:realtime-unlock", handler);
-    return handler; // retorna o handler para o renderer poder removê-lo depois
-  },
-  removeRealtimeAchievementUnlock: (handler) => {
-    ipcRenderer.removeListener("achievement:realtime-unlock", handler);
-  },
-  // ─ Push-to-Talk ─────────────────────────────────────────────────────────────
-  registerPushToTalk: (accelerator) => ipcRenderer.invoke("ptt:register", accelerator),
-  unregisterPushToTalk: () => ipcRenderer.invoke("ptt:unregister"),
-  sendPttRelease: () => ipcRenderer.send("ptt:release"),
-  onPttPress: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("ptt:press", handler);
-    return () => ipcRenderer.removeListener("ptt:press", handler);
-  },
-  onPttRelease: (callback) => {
-    const handler = () => callback();
-    ipcRenderer.on("ptt:release", handler);
-    return () => ipcRenderer.removeListener("ptt:release", handler);
-  },
-  // ─ Fullscreen APIs ──────────────────────────────────────────────────────────
-  toggleFullScreen: () => ipcRenderer.invoke("window:fullscreen-toggle"),
-  setFullScreen: (flag) => ipcRenderer.invoke("window:fullscreen-set", flag),
-  isFullScreen: () => ipcRenderer.invoke("window:fullscreen-get"),
-});
