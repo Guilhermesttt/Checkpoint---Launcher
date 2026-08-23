@@ -26,12 +26,26 @@ const ensureFreshFile = (filePath) => {
   }
 };
 
+const sharp = require("sharp");
+
 const regenerateWindowsIcon = async () => {
   const sourcePng = path.join(projectRoot, "assets", "icon.png");
   const targetIco = path.join(projectRoot, "assets", "icon.ico");
-  const icoBuffer = await pngToIco.default(sourcePng);
-  fs.writeFileSync(targetIco, icoBuffer);
-  console.log(`[build-portable] regenerated ${path.relative(projectRoot, targetIco)}`);
+  try {
+    const squarePngBuffer = await sharp(sourcePng)
+      .resize(512, 512, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+    const icoBuffer = await pngToIco.default(squarePngBuffer);
+    fs.writeFileSync(targetIco, icoBuffer);
+    console.log(`[build-portable] regenerated ${path.relative(projectRoot, targetIco)}`);
+  } catch (err) {
+    if (fs.existsSync(targetIco)) {
+      console.warn(`[build-portable] using existing icon.ico (${err.message})`);
+    } else {
+      throw err;
+    }
+  }
 };
 
 const cleanReleaseDirectories = () => {
