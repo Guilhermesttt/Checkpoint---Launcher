@@ -1,43 +1,14 @@
 @import "tailwindcss";
 
-/* ===== Accessibility: focus-visible and hit targets ===== */
+/* ===== Accessibility: focus-visible and reduced motion ===== */
 
-/* Hide default focus outline for mouse users; keep for keyboard via :focus-visible */
-:focus {
+:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Show clear focus ring for keyboard navigation */
 :focus-visible {
-  outline: 3px solid rgba(var(--launcher-accent), 0.95);
+  outline: 2px solid rgba(var(--launcher-accent), 0.7);
   outline-offset: 2px;
-  border-radius: 6px;
-  box-shadow: 0 0 0 6px rgba(var(--launcher-accent), 0.10);
-}
-
-/* Optional polyfill fallback: add .js-focus-visible on <html> when polyfill used */
-.js-focus-visible :focus:not(.focus-visible) { outline: none; }
-.js-focus-visible .focus-visible {
-  outline: 3px solid rgba(var(--launcher-accent), 0.95);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 6px rgba(var(--launcher-accent), 0.10);
-}
-
-/* Minimum tappable/clickable target area (WCAG recommends ~44px) */
-button, a[role="button"], .btn, .icon-button, input[type="button"], input[type="submit"] {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0.5rem 0.75rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Icon-only buttons (smaller visual, larger hit target) */
-.icon-button {
-  padding: 0.5rem;
-  border-radius: 8px;
-  line-height: 0;
 }
 
 /* Reduce animations for users who prefer reduced motion */
