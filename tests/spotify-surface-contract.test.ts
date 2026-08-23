@@ -40,6 +40,6 @@ describe("superficies compartilhadas do Spotify", () => {
     const home = source("src/pages/Home.tsx");
     const notifications = source("src/components/NotificationCenter.tsx");
     expect(home).toContain("imageUrl: track.coverUrl");
-    expect(notifications).toContain("imageUrl={options?.imageUrl}");
+    expect(notifications).toContain("imageUrl: options?.imageUrl");
   });
 });

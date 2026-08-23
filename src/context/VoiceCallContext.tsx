@@ -10,6 +10,7 @@ import { VoiceCallWindow } from "../components/voice/VoiceCallWindow";
 import { ScreenPickerModal } from "../components/voice/ScreenPickerModal";
 import { getCheckpointFriendStatuses } from "../services/checkpointFriends";
 import { audioContextManager } from "../services/audio/AudioContextManager";
+import { CallConnectionBanner } from "../components/CallConnectionBanner";
 import type { SocialFriend } from "../types/domain";
 
 type VoiceCallContextType = ReturnType<typeof useVoiceCall>;
@@ -249,6 +250,19 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             onHangUp={voiceCall.hangUp}
           />
         )}
+
+      <CallConnectionBanner
+        status={
+          voiceCall.isReconnecting
+            ? "connecting"
+            : voiceCall.callState === "calling" || voiceCall.callState === "connecting"
+            ? "connecting"
+            : voiceCall.callState === "connected"
+            ? "connected"
+            : "idle"
+        }
+        onRetry={voiceCall.pendingReconnectSession ? () => void voiceCall.reconnectCall() : undefined}
+      />
 
       {/* Expanded Main Call Window */}
       <VoiceCallWindow
