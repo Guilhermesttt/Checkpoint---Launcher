@@ -84,7 +84,7 @@ cd Checkpoint---Launcher
 npm install
 
 # Rode em modo desenvolvimento
-npm run dev
+npm run electron:dev
 ```
 
 > Ajuste os comandos acima conforme os scripts reais definidos no `package.json` do projeto.
