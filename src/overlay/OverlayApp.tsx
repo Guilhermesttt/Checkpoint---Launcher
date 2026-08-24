@@ -384,6 +384,10 @@ const OverlayApp: React.FC = () => {
                     <UserPlus className="h-5 w-5 text-blue-400" />
                   ) : toast.kind === "achievement" ? (
                     <Trophy className="h-5 w-5 text-yellow-400" />
+                  ) : toast.kind === "hint" ? (
+                    <div className="h-full w-full p-1 bg-black/60 flex items-center justify-center">
+                      <img src="./assets/icon.png" alt="Phelierium" className="h-6 w-6 object-contain" />
+                    </div>
                   ) : toast.screenshotUrl ? (
                     <Camera className="h-4.5 w-4.5 text-cyan-300" />
                   ) : (
