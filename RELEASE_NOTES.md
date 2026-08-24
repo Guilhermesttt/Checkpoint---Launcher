@@ -1,5 +1,24 @@
 # Release Notes — Phelierium Game Hub
 
+## Phelierium Game Hub — v3.2.1
+
+Atualização de estabilidade, acessibilidade e refinamentos de qualidade de vida do overlay e navegação.
+
+### Destaques da versão 3.2.1
+
+#### 🚀 Estabilidade & Overlay
+- **Deduplicação e Tratamento de Alertas:** Deduplicação inteligente de notificações no overlay com suporte a `aria-live` para melhor acessibilidade.
+- **Validação de Payload:** Sanitização e validação de schema via Zod nos eventos do processo principal e IPC do Electron.
+
+#### 🎮 Acessibilidade e Navegação
+- **Suporte a Gamepad e Teclado:** Navegação fluida no OverlayApp e modais de chamada de voz com foco visual nativo.
+- **Detecção de Motion Reduzido:** Integração com preferências do sistema operacional (`usePrefersReducedMotion`) e suavização adaptativa em transições de UI.
+
+#### 🛠️ Empacotamento e Qualidade
+- **Verificação de Integridade de Release:** Suíte de validação automatizada de checksum SHA-512, blockmaps do auto-updater e instalador NSIS.
+
+---
+
 ## Phelierium Game Hub — v3.2.0
 
 Atualização de performance, modernização estética da biblioteca e otimização abrangente de assets e renderização.
