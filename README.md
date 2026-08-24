@@ -1,83 +1,81 @@
 <div align="center">
 
-# 🎮 Checkpoint Launcher
+<img src="src/assets/Pherielium_logo.png" alt="Pherielium Logo" width="160" />
 
-**O hub definitivo para a sua biblioteca de jogos — com voz, chat e comunidade embutidos.**
+# PHERIELIUM
 
-Um gerenciador de jogos de alto desempenho para Windows que reúne toda a sua biblioteca (Steam, Epic, GOG, EA, Ubisoft, Xbox e mais) em um único lugar — com conquistas, overlay in-game, mods via Nexus e um sistema social completo com **chamadas de voz, compartilhamento de tela e salas em grupo**, direto no launcher.
+**Seus jogos. Seu mundo. Seu Pherielium.**
 
-[![Latest Release](https://img.shields.io/github/v/release/Guilhermesttt/Checkpoint---Launcher?style=for-the-badge&color=6366f1&label=vers%C3%A3o)](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Guilhermesttt/Checkpoint---Launcher/total?style=for-the-badge&color=6366f1&label=downloads)](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows-6366f1?style=for-the-badge&logo=windows11&logoColor=white)](#-instalação)
-[![License](https://img.shields.io/badge/licença-Todos%20os%20direitos%20reservados-6366f1?style=for-the-badge)](#-licença)
+Um hub de jogos unificado, construído para trazer a experiência de console definitiva para o seu PC.
 
-[**⬇️ Baixar agora**](https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/latest) · [Notas da versão](RELEASE_NOTES.md) · [Reportar um bug](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues) · [Sugerir uma feature](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues/new)
+[![Landing Page](https://img.shields.io/badge/site-pherielium.netlify.app-000000?style=for-the-badge)](https://pherielium.netlify.app)
+[![GitHub](https://img.shields.io/badge/GitHub-repo-black?style=for-the-badge&logo=github)](https://github.com/Guilhermesttt/Checkpoint---Launcher)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-blueviolet?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-3.1.4-informational?style=for-the-badge)
 
 </div>
 
 ---
 
-## 🗣️ Fale, jogue, compartilhe — sem sair do launcher
+## Sobre o projeto
 
-O Checkpoint nasceu de um problema real: plataformas de chamada foram cortando funcionalidades que gamers usam todo dia. Por isso construímos um sistema de comunicação nativo, pensado do zero para quem joga:
+**Pherielium** (antigo *Checkpoint Launcher*) é um hub gamer unificado que reúne biblioteca, controles, conquistas, mods, voz e transmissão em um único lugar — sem depender de um emaranhado de launchers separados. A proposta é simples: trazer a fluidez e a imersão de um console para dentro do seu PC, mantendo tudo local-first, rápido e sob seu controle.
 
-| | |
-|---|---|
-| 🎙️ **Chamadas de voz em WebRTC** | Baixa latência, ponto a ponto, sem depender de servidor de mídia de terceiros. |
-| 🖥️ **Compartilhamento de tela em 1080p** | Mostre sua gameplay pro grupo em alta qualidade, direto do desktop. |
-| 👥 **Salas em grupo** | Chame a squad inteira pra call antes, durante ou depois da partida. |
-| 🔇 **Controles completos de call** | Mute, ativação por voz (PTT/VAD), indicadores de fala e seleção de dispositivo. |
-| 🟢 **Presença em tempo real** | Veja quem tá online, o que cada amigo está jogando, e entre na conversa. |
-
-> Tudo isso integrado ao mesmo lugar onde você já gerencia sua biblioteca — sem alternar entre launcher, Discord e outro app de call.
+Construído com **Electron + React + TypeScript**, o Pherielium recentemente passou por um rebrand completo: novo nome, nova identidade visual (paleta monocromática em preto puro `#030405`, com uma linguagem visual orgânica de nós e conexões inspirada em constelações) e um novo logo.
 
 ---
 
-## 🚀 Principais Recursos
+## ✨ Principais recursos
 
-### 🎮 Biblioteca & Jogos
-- **Biblioteca Unificada** — Steam, Epic Games Store, GOG, EA App, Ubisoft Connect, Xbox, Battle.net, Riot Games, Rockstar e executáveis locais, tudo num só lugar.
-- **Central de Conquistas** — acompanhamento de progresso da Steam, Epic e conquistas locais (com suporte a emuladores Steam compatíveis).
-- **Overlay In-game** — atalho personalizável (`Ctrl + Shift + O` ou botão Guide do controle), galeria de capturas nativa e feed de atividades.
-- **Perfis Avançados de Inicialização** — seleção de monitor, modo de janela, resolução, prioridade de processo e argumentos de linha de comando por jogo.
-
-### 🧩 Mods
-- **Integrado com Nexus Mods** — navegação no catálogo, busca de mods, downloads assistidos por protocolo `nxm://`, instalação e gerenciamento de arquivos por jogo.
-
-### 💬 Social & Comunicação
-- **Hub Social & Chat** — amigos no Checkpoint, chat integrado com indicador de digitação e mensagens não lidas.
-- **Voz, tela e grupos** — veja a seção acima ☝️.
-
-### 🎨 Experiência
-- **Estética Visual Premium** — cores adaptadas dinamicamente às capas dos jogos (com clamping automático de contraste), raios aninhados e suporte total a temas escuros.
-- **Navegação Elegante** — breadcrumbs funcionais e sistema padronizado de sub-tabs (`Amigos`, `Chat`, `Solicitações`, `Mods`, `Gerenciar`).
-- **Atualizações Confiáveis** — atualizador automático via GitHub Releases, com inspeção detalhada de erros e tratamento amigável de logs.
+- **Biblioteca Universal** — Steam, Epic Games, EA App, Ubisoft, Riot Games, Rockstar Games, Xbox, Battle.net, GOG e jogos locais, tudo em um só lugar.
+- **Suporte total a controles** — reconhecimento automático de DualSense, Xbox, Switch e controles genéricos, com mapeamento customizado.
+- **Conquistas locais & Steam Verde** — sistema próprio de achievements para jogos offline, locais e sem launcher.
+- **Mod Manager integrado** — busca e instalação de mods do Nexus Mods com 1 clique, direto pelo launcher.
+- **Calls & transmissão 1080p** — salas de voz P2P via WebRTC e compartilhamento de tela Full HD a 60 FPS, sem assinatura.
+- **In-Game Overlay** — menu rápido sobreposto ao jogo com conquistas, amigos, chat e call em tempo real.
+- **Radar Gamer** — feed de notícias e lançamentos da indústria em tempo real.
+- **100% Local-First** — dados, jogos e progresso vivem na sua máquina, sem login forçado.
+- **Zero Bloatware** — feito em C++/Rust/TypeScript para máximo desempenho e mínimo consumo de recursos.
 
 ---
 
-## 🛠️ Arquitetura Técnica
+## 🖥️ Tech Stack
 
 | Camada | Tecnologias |
 |---|---|
-| **Frontend** | React 19 · TypeScript · TailwindCSS · Framer Motion · Lucide Icons |
-| **Desktop Runtime** | Electron 39 — arquitetura Multi-Window (Janela Principal + Overlay In-Game) |
-| **Comunicação em tempo real** | WebRTC (`simple-peer`) + `desktopCapturer` para voz, vídeo e screen share |
-| **Bundler** | Vite 8 |
-| **Banco de Dados Local** | SQLite (via `userData`) para biblioteca, sessões e arquivos de mods |
-| **Backend & Cloud** | Supabase + backend Node.js próprio para autenticação, presença social e chat |
-| **Publicação & Auto-update** | Electron Builder + `electron-updater` via GitHub Releases |
+| Desktop App | Electron, React, TypeScript |
+| Landing Page | Next.js / React, Three.js (shaders), Vengeance UI |
+| Backend | Node.js (hospedado no Render.com) |
+| Comunicação em tempo real | WebRTC (voz, screen share) |
+| Integrações | Steam API, RetroAchievements, Nexus Mods, Discord/Google OAuth, Epic Games (manifest local) |
 
 ---
 
-## 💻 Desenvolvimento Local
+## 🗺️ Roadmap
 
-### Pré-requisitos
-- Node.js >= 22.0.0
-- npm >= 10.0.0
+**✅ Disponível agora**
+- Hub Gamer Unificado
+- Suporte a controles multiplataforma
+- Conquistas para jogos locais
+- Visual monocromático de console
 
-### Instalação
+**🚧 Em desenvolvimento**
+- Calls & transmissão 1080p 60fps
+- In-Game Overlay completo
+- Mod Manager Nexus integrado
+- Radar Gamer de notícias
 
-```powershell
+**🔭 No horizonte**
+- Sincronização em nuvem opcional
+- Temas customizáveis avançados
+- Hub de comunidade aberto
+- Plugins e extensões da comunidade
+
+---
+
+## 🚀 Rodando localmente
+
+```bash
 # Clone o repositório
 git clone https://github.com/Guilhermesttt/Checkpoint---Launcher.git
 cd Checkpoint---Launcher
@@ -85,48 +83,24 @@ cd Checkpoint---Launcher
 # Instale as dependências
 npm install
 
-# Inicie o ambiente de desenvolvimento (Vite + Electron)
-npm run electron:dev
+# Rode em modo desenvolvimento
+npm run dev
 ```
 
-### Comandos de Teste e Build
-
-```powershell
-# Executar a suíte de testes unitários e checagem de tipos
-npm run test:ci
-
-# Validar compilação e empacotamento
-npm run build
-
-# Empacotar instalador Windows (NSIS)
-npm run dist
-```
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Supressão de ruído nativa nas chamadas de voz
-- [ ] Melhorias de estabilidade e arquitetura no sistema de chamadas em grupo
-- [ ] Refino visual da aba retrô/CRT
-- [ ] Suporte a mais launchers de terceiros
-
-> Acompanhe o desenvolvimento e sugira ideias na aba [Issues](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues).
-
----
-
-## 🤝 Contribuindo
-
-O Checkpoint está em desenvolvimento ativo. Encontrou um bug ou tem uma sugestão? Abra uma [issue](https://github.com/Guilhermesttt/Checkpoint---Launcher/issues) — todo feedback ajuda a moldar o projeto.
+> Ajuste os comandos acima conforme os scripts reais definidos no `package.json` do projeto.
 
 ---
 
 ## 📄 Licença
 
-Desenvolvido por **Guilherme Sant'Ana**. Todos os direitos reservados.
+Código aberto e auditável — transparência total sobre como arquivos e credenciais são manuseados. *(Defina aqui a licença oficial do projeto, ex. MIT.)*
+
+---
 
 <div align="center">
 
-**[⬆ Voltar ao topo](#-checkpoint-launcher)**
+**[Download](https://pherielium.netlify.app/download)** · **[Site](https://pherielium.netlify.app)** · **[GitHub](https://github.com/Guilhermesttt/Checkpoint---Launcher)**
+
+<sub>© 2026 Pherielium — Personal Gaming Hub</sub>
 
 </div>
