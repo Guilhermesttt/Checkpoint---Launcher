@@ -13,30 +13,33 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.2.0",
-  title: "Modernização Visual, Performance GPU & Otimização de Assets",
-  description: "Redução de bundle com remoção de dependências pesadas, GameCard com aceleração pura por hardware, navegação fluida por controle e estabilidade aprimorada.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.2.0",
+  version: "3.2.1",
+  title: "Overlay Refinado, Correção de Dependências & Sons GameCube",
+  description: "Correção de dependências no app.asar, ícone oficial no overlay Divirta-se, suporte a efeitos sonoros do GameCube e refinamentos de vídeo de fundo.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.2.1",
   highlights: [
     {
       id: "stability",
-      title: "Performance & GPU Acceleration",
-      description: "Transições 3D suaves aceleradas por hardware e remoção de overhead para inicialização ultra-rápida.",
+      title: "Overlay & Identidade Visual",
+      description: "Logo oficial Phelierium nos cards sociais de overlay e transparência aprimorada para vídeos de fundo.",
     },
     {
       id: "controller",
-      title: "Navegação Fluida por Controle",
-      description: "Suporte completo e responsivo a gamepads e teclados em toda a interface e overlays.",
+      title: "Mapeamento de Áudio GameCube",
+      description: "Integração do efeito sonoro fly-out nas interações do tema GameCube e navegação fluida.",
     },
     {
       id: "voice",
-      title: "Áudio WebRTC Sem Latência",
-      description: "Comunicação em tempo real de alta fidelidade com proteção de áudio e barramento U2U instantâneo.",
+      title: "Estabilidade & Pacote app.asar",
+      description: "Inclusão do Zod nas dependências de produção para execução sem erros no bundle distribuído.",
     },
   ],
 };
 
-const releasesByVersion = new Map([[LATEST_RELEASE.version, LATEST_RELEASE]]);
+const releasesByVersion = new Map([
+  [LATEST_RELEASE.version, LATEST_RELEASE],
+  ["3.2.0", LATEST_RELEASE],
+]);
 
 export const getReleaseHighlights = (version: string) =>
-  releasesByVersion.get(String(version || "").trim()) ?? null;
+  releasesByVersion.get(String(version || "").trim()) ?? LATEST_RELEASE;
