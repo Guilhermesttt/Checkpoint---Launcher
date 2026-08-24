@@ -70,7 +70,7 @@ describe("launcher sound effects", () => {
     ["ps4", "PS4/deck_ui_out_of_game_detail.wav"],
     ["psp", "PSP%20Sounds/deck_ui_out_of_game_detail.wav"],
     ["ps2", "PS2%20System%20Sounds/deck_ui_out_of_game_detail.wav"],
-    ["gamecube", "Nintendo%20GameCube%20Menu%20SFX/deck_ui_out_of_game_detail.wav"],
+    ["gamecube", "Nintendo%20GameCube%20Menu%20SFX/deck_ui_side_menu_fly_out.wav"],
     ["cyberpunk", "Cyberpunk%202077%20UI%20SFX%20PACK/deck_ui_out_of_game_detail.wav"],
     ["xbox360", "Xbox%20One/deck_ui_out_of_game_detail.wav"],
   ] as const)("usa o retorno nativo do tema %s", (theme, expectedPath) => {

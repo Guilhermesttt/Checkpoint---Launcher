@@ -83,15 +83,14 @@ import ps2ToastSound from "../sounds/PS2 System Sounds/deck_ui_toast.wav";
 import gcNavigateSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_navigation.wav";
 import gcHoverSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
 import gcActivationSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav";
-import gcBackSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
+import gcFlyOutSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_out.wav";
 import gcEditModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_hide_modal.wav";
-import gcFavoriteOnSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_up.wav";
-import gcFavoriteOffSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
-import gcDetailOpenSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_into_game_detail.wav";
+import gcFavoriteSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_misc_10.wav";
+import gcDetailOpenSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_in.wav";
+import gcOpenPhotosSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_into_game_detail.wav";
+import gcClosePhotosSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
 import gcLaunchGameSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
 import gcShowModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
-import gcMiscSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_misc_10.wav";
-import gcFlyInSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_in.wav";
 
 const soundThemes = {
   ps5: {
@@ -236,24 +235,32 @@ const soundThemes = {
     navigate: gcNavigateSound,
     hover: gcHoverSound,
     select: gcActivationSound,
-    back: gcBackSound,
+    // Fechar painel de detalhes
+    back: gcFlyOutSound,
     edit: gcEditModalSound,
-    modalClose: gcBackSound,
-    favoriteOn: gcFavoriteOnSound,
-    favoriteOff: gcFavoriteOffSound,
-    delete: gcBackSound,
+    // Fechar painel de detalhes
+    modalClose: gcFlyOutSound,
+    // Favoritar / desfavoritar
+    favoriteOn: gcFavoriteSound,
+    favoriteOff: gcFavoriteSound,
+    delete: gcClosePhotosSound,
     play: gcLaunchGameSound,
     boot: gcLaunchGameSound,
     search: gcShowModalSound,
+    // Abrir painel de detalhes
     detailOpen: gcDetailOpenSound,
-    friendRequest: gcFlyInSound,
-    chatSent: gcMiscSound,
-    chatReceived: gcFlyInSound,
-    switchOn: gcFavoriteOnSound,
-    switchOff: gcFavoriteOffSound,
-    screenshot: gcFlyInSound,
+    // Mensagens, pedidos de amizade, notificacoes
+    friendRequest: gcShowModalSound,
+    chatSent: gcFavoriteSound,
+    chatReceived: gcShowModalSound,
+    // Abrir fotos
+    switchOn: gcOpenPhotosSound,
+    // Fechar fotos
+    switchOff: gcClosePhotosSound,
+    screenshot: gcShowModalSound,
     showModal: gcShowModalSound,
-    overlayAchievement: gcLaunchGameSound,
+    // Conquistas
+    overlayAchievement: gcEditModalSound,
   },
 };
 

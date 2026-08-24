@@ -3551,7 +3551,8 @@ registerSecureIpcHandler("overlay:test-welcome", async () => {
 registerSecureIpcHandler("overlay:test-achievement", async () => {
   const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
-  dispatchAchievementNotification({
+  // Sempre envia direto para o overlay visual, independente das preferências do usuário
+  sendOverlayEvent("achievement:unlock", {
     gameId: "checkpoint-lab",
     achievementId: "overlay-smoke-test",
     achievement: {
@@ -3562,7 +3563,9 @@ registerSecureIpcHandler("overlay:test-achievement", async () => {
     },
     unlockedAt: new Date().toISOString(),
     duplicate: false,
+    position: achievementNotificationPosition,
   });
+  playOverlaySound("achievement-unlock");
 });
 
 registerSecureIpcHandler("overlay:set-achievement-volume", async (_event, requestedVolume) => {
@@ -3973,12 +3976,15 @@ app.whenReady().then(async () => {
         ]);
         tray.setToolTip("Phelierium");
         tray.setContextMenu(contextMenu);
-        tray.on("double-click", () => {
+        const openMainWindow = () => {
           if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.show();
             mainWindow.focus();
           }
-        });
+        };
+        tray.on("click", openMainWindow);
+        tray.on("double-click", openMainWindow);
       }
     } catch (e) {
       console.warn("Não foi possível inicializar a System Tray:", e);

@@ -331,7 +331,7 @@ const OverlayApp: React.FC = () => {
                 {toast.icon ? (
                   <img src={toast.icon} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <Trophy className="h-5 w-5 text-emerald-300" />
+                  <img src="./assets/icon.png" alt="Phelierium" className="h-7 w-7 object-contain" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
