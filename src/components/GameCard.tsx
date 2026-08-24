@@ -215,19 +215,15 @@ const GameCard: React.FC<GameCardProps> = ({
       }}
     >
       <div
-        className={`relative overflow-hidden rounded-2xl bg-[#0a0a0f] transition-all duration-200 ease-out will-change-transform ${
-          visuallyActive
-            ? "scale-[1.05] -translate-y-2 ring-2 shadow-[0_16px_40px_rgba(0,0,0,0.85),0_0_24px_rgba(var(--launcher-accent),0.3)] z-20"
+        className={`relative overflow-hidden rounded-2xl bg-[#0a0a0f] transition-all duration-200 ease-out will-change-transform ${visuallyActive
+            ? "scale-[1.05] -translate-y-2 z-20"
             : "scale-95 opacity-80 hover:opacity-100 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-[0_10px_28px_rgba(0,0,0,0.6)] ring-1 ring-white/10 hover:ring-white/25 z-10"
-        }`}
+          }`}
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          borderColor: visuallyActive
-            ? "rgba(var(--launcher-accent), 0.8)"
-            : undefined,
           boxShadow: visuallyActive
-            ? "0 18px 42px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.2), 0 0 24px rgba(var(--launcher-accent), 0.3)"
+            ? "0 0 0 2.5px var(--game-color, rgba(255, 255, 255, 0.95)), 0 16px 44px rgba(0, 0, 0, 0.9), 0 0 32px var(--game-color, rgba(255, 255, 255, 0.45))"
             : undefined,
         }}
       >
@@ -255,11 +251,10 @@ const GameCard: React.FC<GameCardProps> = ({
 
         {/* Dark Vignette & gradient for contrast */}
         <div
-          className={`absolute inset-0 transition-opacity duration-200 ${
-            visuallyActive
+          className={`absolute inset-0 transition-opacity duration-200 ${visuallyActive
               ? "bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-100"
               : "bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-80 group-hover:opacity-95"
-          }`}
+            }`}
         />
 
         {/* Top Badges (Platform + Favorite) */}
@@ -293,15 +288,23 @@ const GameCard: React.FC<GameCardProps> = ({
 
         {/* Bottom Title & Play action */}
         <div
-          className={`absolute bottom-0 left-0 right-0 z-20 p-3 transition-all duration-200 ease-out ${
-            visuallyActive ? "translate-y-0 opacity-100" : "translate-y-1 opacity-90 group-hover:translate-y-0 group-hover:opacity-100"
-          }`}
+          className={`absolute bottom-0 left-0 right-0 z-20 p-3 transition-all duration-200 ease-out ${visuallyActive ? "translate-y-0 opacity-100" : "translate-y-1 opacity-90 group-hover:translate-y-0 group-hover:opacity-100"
+            }`}
         >
           {visuallyActive && (
-            <div className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-emerald-400 drop-shadow-sm">
+            <div
+              className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest drop-shadow-sm"
+              style={{ color: "var(--game-color, #10b981)" }}
+            >
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                <span
+                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                  style={{ background: "var(--game-color, #10b981)" }}
+                />
+                <span
+                  className="relative inline-flex rounded-full h-1.5 w-1.5"
+                  style={{ background: "var(--game-color, #10b981)" }}
+                />
               </span>
               Jogar
             </div>
@@ -314,7 +317,14 @@ const GameCard: React.FC<GameCardProps> = ({
         {/* Refined clean Play Button on active */}
         {visuallyActive && (
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 border border-white/30 backdrop-blur-md shadow-[0_4px_16px_rgba(0,0,0,0.5)] transition-transform duration-200 group-hover:scale-110">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md shadow-[0_6px_20px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:scale-110"
+              style={{
+                background: "rgba(0, 0, 0, 0.4)",
+                border: "1.5px solid var(--game-color, rgba(255, 255, 255, 0.7))",
+                boxShadow: "0 0 24px var(--game-color, rgba(255, 255, 255, 0.35))",
+              }}
+            >
               <Play className="h-4 w-4 fill-white text-white ml-0.5" />
             </div>
           </div>

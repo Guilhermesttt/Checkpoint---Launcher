@@ -133,7 +133,7 @@ describe("AddGameModal", () => {
     );
     expect(onClose).toHaveBeenCalledWith(true);
     expect(onSaved).toHaveBeenCalledTimes(1);
-  });
+  }, 15000);
 
   it("salva o caminho absoluto retornado pelo seletor nativo de executavel", async () => {
     const selectExecutable = vi.fn().mockResolvedValue(

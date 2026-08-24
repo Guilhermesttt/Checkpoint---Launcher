@@ -3,17 +3,17 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-async function getStoreFilePath(userDataPath, gameId) {
+function getStoreFilePath(userDataPath, gameId) {
   const safeGameId = String(gameId || "").replace(/[^a-zA-Z0-9_-]/g, "_");
   const profilesDir = path.join(userDataPath, "mod_profiles");
-  await fs.promises.mkdir(profilesDir, { recursive: true });
+  fs.mkdirSync(profilesDir, { recursive: true });
   return path.join(profilesDir, `${safeGameId}.json`);
 }
 
-async function loadModProfiles(userDataPath, gameId) {
-  const filePath = await getStoreFilePath(userDataPath, gameId);
+function loadModProfiles(userDataPath, gameId) {
+  const filePath = getStoreFilePath(userDataPath, gameId);
   try {
-    const raw = await fs.promises.readFile(filePath, "utf-8");
+    const raw = fs.readFileSync(filePath, "utf-8");
     const data = JSON.parse(raw);
     return Array.isArray(data) ? data : [];
   } catch {
@@ -21,8 +21,8 @@ async function loadModProfiles(userDataPath, gameId) {
   }
 }
 
-async function saveModProfile(userDataPath, gameId, profileName, activeInstallIds) {
-  const profiles = await loadModProfiles(userDataPath, gameId);
+function saveModProfile(userDataPath, gameId, profileName, activeInstallIds) {
+  const profiles = loadModProfiles(userDataPath, gameId);
   const now = new Date().toISOString();
   const cleanName = String(profileName || "").trim() || "Perfil Personalizado";
 
@@ -41,20 +41,20 @@ async function saveModProfile(userDataPath, gameId, profileName, activeInstallId
     });
   }
 
-  const filePath = await getStoreFilePath(userDataPath, gameId);
+  const filePath = getStoreFilePath(userDataPath, gameId);
   const tmpPath = `${filePath}.tmp`;
-  await fs.promises.writeFile(tmpPath, JSON.stringify(profiles, null, 2), "utf-8");
-  await fs.promises.rename(tmpPath, filePath);
+  fs.writeFileSync(tmpPath, JSON.stringify(profiles, null, 2), "utf-8");
+  fs.renameSync(tmpPath, filePath);
   return profiles;
 }
 
-async function deleteModProfile(userDataPath, gameId, profileId) {
-  let profiles = await loadModProfiles(userDataPath, gameId);
+function deleteModProfile(userDataPath, gameId, profileId) {
+  let profiles = loadModProfiles(userDataPath, gameId);
   profiles = profiles.filter((p) => p.id !== profileId);
-  const filePath = await getStoreFilePath(userDataPath, gameId);
+  const filePath = getStoreFilePath(userDataPath, gameId);
   const tmpPath = `${filePath}.tmp`;
-  await fs.promises.writeFile(tmpPath, JSON.stringify(profiles, null, 2), "utf-8");
-  await fs.promises.rename(tmpPath, filePath);
+  fs.writeFileSync(tmpPath, JSON.stringify(profiles, null, 2), "utf-8");
+  fs.renameSync(tmpPath, filePath);
   return profiles;
 }
 

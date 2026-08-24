@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import bgVideo from "../assets/morpxd_pindown.io_1785615286.mp4";
+import bgVideo from "../assets/karavanbraam_pindown.io.mp4";
 
 const MainVideoBackground: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -64,7 +64,7 @@ const MainVideoBackground: React.FC = () => {
           loop
           muted
           playsInline
-          className="absolute h-[100vw] w-[100vh] max-w-none object-cover opacity-20 transition-opacity duration-1000"
+          className="absolute h-[100vw] w-[100vh] max-w-none object-cover opacity-75 transition-opacity duration-1000"
           style={{
             transform: "rotate(90deg)",
           }}

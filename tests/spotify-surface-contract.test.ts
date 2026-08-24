@@ -4,13 +4,11 @@ import { describe, expect, it } from "vitest";
 const source = (path: string) => readFileSync(path, "utf8");
 
 describe("superficies compartilhadas do Spotify", () => {
-  it("expoe uma categoria e pagina dedicada sem dock permanente", () => {
+  it("nao expoe a categoria Spotify no launcher", () => {
     const sidebar = source("src/components/Sidebar.tsx");
     const home = source("src/pages/Home.tsx");
-    expect(sidebar).toContain('id: "SPOTIFY"');
-    expect(home).toContain("<SpotifyPage");
-    expect(home).not.toContain("<SpotifyDock");
-    expect(home).toContain("language={launcherLanguage}");
+    expect(sidebar).not.toContain('{ id: "SPOTIFY"');
+    expect(home).not.toContain("<SpotifyPage");
   });
 
   it("localiza a superficie Spotify em todos os idiomas do launcher", () => {
@@ -36,10 +34,8 @@ describe("superficies compartilhadas do Spotify", () => {
     expect(app.match(/if \(spotifyPlayingRef\.current\) return/g)?.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("usa a capa da faixa na notificacao compacta do launcher", () => {
-    const home = source("src/pages/Home.tsx");
+  it("suporta imageUrl na notificacao compacta do launcher", () => {
     const notifications = source("src/components/NotificationCenter.tsx");
-    expect(home).toContain("imageUrl: track.coverUrl");
     expect(notifications).toContain("imageUrl: options?.imageUrl");
   });
 });

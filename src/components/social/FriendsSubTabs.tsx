@@ -1,4 +1,5 @@
 import { Users, MessageSquare, UserPlus, Radio } from "lucide-react";
+import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 export type SocialSubTab = "AMIGOS" | "CHAT" | "SALAS" | "SOLICITAÇÕES";
 
@@ -9,6 +10,7 @@ interface FriendsSubTabsProps {
   totalFriendsCount: number;
   unreadCount?: number;
   activeRoomsCount?: number;
+  playSound?: (type: SoundEffectType) => void;
 }
 
 export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
@@ -18,6 +20,7 @@ export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
   totalFriendsCount,
   unreadCount = 0,
   activeRoomsCount = 0,
+  playSound,
 }) => {
   const tabs: { id: SocialSubTab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: "AMIGOS", label: "Amigos", icon: <Users className="h-3.5 w-3.5" /> },
@@ -27,14 +30,18 @@ export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
   ];
 
   return (
-    <div className="mb-6 flex items-center gap-1.5 rounded-2xl border border-white/10 bg-black/40 p-1.5 backdrop-blur-2xl">
+    <div className="mb-5 flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#080808] p-1.5 shadow-md">
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
           <button
             key={tab.id}
             type="button"
-            onClick={() => onTabChange(tab.id)}
+            onMouseEnter={() => playSound?.("hover")}
+            onClick={() => {
+              playSound?.("select");
+              onTabChange(tab.id);
+            }}
             className={`flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all ${
               isActive
                 ? "bg-white text-black shadow-lg"

@@ -662,4 +662,23 @@ body.low-performance::before {
     transform: none !important;
     transition: none !important;
   }
-}
+}
+
+@keyframes pixel-on {
+  0%, 100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer-text {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+

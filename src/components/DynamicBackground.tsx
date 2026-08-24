@@ -1,7 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PVideoBackground, PGlow, useLowPerf } from "./PerformanceComponents";
-import bgVideo from "../assets/morpxd_pindown.io_1785615286.mp4";
+import bgVideo from "../assets/karavanbraam_pindown.io.mp4";
 
 interface DynamicBackgroundProps {
   backgroundImage: string;
@@ -17,7 +17,7 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
       <PVideoBackground
         src={bgVideo}
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vh] h-[100vw] rotate-90 object-cover"
-        opacity={0.18}
+        opacity={0.70}
       />
 
       <AnimatePresence mode="popLayout">

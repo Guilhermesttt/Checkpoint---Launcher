@@ -13,25 +13,25 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.1.3",
-  title: "Áudio WebRTC Instantâneo, Barramento U2U e Overlays",
-  description: "Reprodução automática de áudio WebRTC em DOM nativo, barramento WebSocket U2U em tempo real, edição de canais de voz e overlays reativos instantâneos.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.1.3",
+  version: "3.2.0",
+  title: "Modernização Visual, Performance GPU & Otimização de Assets",
+  description: "Redução de bundle com remoção de dependências pesadas, GameCard com aceleração pura por hardware, navegação fluida por controle e estabilidade aprimorada.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.2.0",
   highlights: [
+    {
+      id: "stability",
+      title: "Performance & GPU Acceleration",
+      description: "Transições 3D suaves aceleradas por hardware e remoção de overhead para inicialização ultra-rápida.",
+    },
+    {
+      id: "controller",
+      title: "Navegação Fluida por Controle",
+      description: "Suporte completo e responsivo a gamepads e teclados em toda a interface e overlays.",
+    },
     {
       id: "voice",
       title: "Áudio WebRTC Sem Latência",
-      description: "Captura ontrack e reprodução automática imediata via DOM AutoPlay e Soft Limiter profissional.",
-    },
-    {
-      id: "stability",
-      title: "Barramento Global U2U em Tempo Real",
-      description: "Status de amigos (Jogando/Online), mensagens diretas e convites trafegam por via rápida WebSocket (<50ms).",
-    },
-    {
-      id: "platforms",
-      title: "Edição de Canais & Overlays Reativos",
-      description: "Personalização de canais criados (tema, nome, ícone), simulador de chamadas e pop-ups instantâneos.",
+      description: "Comunicação em tempo real de alta fidelidade com proteção de áudio e barramento U2U instantâneo.",
     },
   ],
 };

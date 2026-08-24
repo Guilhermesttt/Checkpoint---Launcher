@@ -20,7 +20,7 @@ const { createOverlayVideoLayer, appendOverlayVideoLayer } = (window as typeof w
 
 describe("videos decorativos dos overlays", () => {
   it.each([
-    ["social", "Kristina_Lane__pindown.io_1785615277.mp4", true],
+    ["social", "hedrabionics_pindown.io.mp4", true],
     ["achievement", "Overlay_Background.mp4", true],
   ] as const)("cria uma camada %s muda e sem interacao", (kind, filename, rotated) => {
     const layer = createOverlayVideoLayer(kind, document);
@@ -67,7 +67,7 @@ describe("videos decorativos dos overlays", () => {
       readFileSync(path.join(process.cwd(), "package.json"), "utf8"),
     ) as { build: { files: string[]; asarUnpack: string[] } };
     const videos = [
-      "src/assets/Kristina_Lane__pindown.io_1785615277.mp4",
+      "src/assets/hedrabionics_pindown.io.mp4",
       "src/assets/Overlay_Background.mp4",
     ];
 

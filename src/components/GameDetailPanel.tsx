@@ -15,6 +15,7 @@ import {
 } from "../services/steam";
 import ModalShell from "./ui/ModalShell";
 import GlassButton from "./ui/GlassButton";
+import { ShinyButton } from "./ui/shiny-button";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import {
@@ -1013,10 +1014,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
         if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementState) {
           try {
-            const retroactiveState = await window.electronAPI.getLocalAchievementState(resolvedAppId);
+            const appIdToQuery = (game.launcherType === "local" && game.id ? String(game.id).trim() : "") || resolvedAppId;
+            const retroactiveState = await window.electronAPI.getLocalAchievementState(appIdToQuery);
             if (retroactiveState && Object.keys(retroactiveState).length > 0) {
               result.achievements = result.achievements.map((ach) => {
-                const emuState = retroactiveState[ach.apiName];
+                const emuState = retroactiveState[ach.apiName] || retroactiveState[ach.apiName.toLowerCase()];
                 if (emuState && emuState.earned) {
                   return {
                     ...ach,
@@ -1919,34 +1921,25 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               </div>
 
               <div className="mb-14 flex flex-col items-end">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <ShinyButton
                   onClick={handleLaunch}
                   disabled={isLaunching}
+                  onMouseEnter={() => playSound("hover")}
                   aria-label={isLaunching ? t("launching") : t("play")}
-                  className="rounded-3xl px-8 py-5 flex items-center gap-4 group w-[260px] justify-between relative overflow-hidden transition-all duration-500 font-display"
-                  style={{
-                    background: "var(--game-color, #ffffff)",
-                    boxShadow: "0 8px 32px var(--game-color, transparent)",
-                  }}
+                  className="relative shrink-0 flex items-center gap-3 w-[260px] justify-center py-4 px-8"
                 >
-                  <span
-                    className="text-sm font-black tracking-[0.15em] uppercase transition-colors"
-                    style={{ color: "var(--game-text-color, #000)" }}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`w-4 h-4 fill-white text-white shrink-0 transition-transform duration-300 group-hover:scale-115 ${
+                      isLaunching ? "animate-pulse" : ""
+                    }`}
                   >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  <span className="font-display font-black tracking-widest text-white text-sm">
                     {isLaunching ? t("launching") : t("play")}
                   </span>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform bg-white/20">
-                    <Play
-                      className={`w-5 h-5 ml-0.5 transition-colors ${isLaunching ? "animate-pulse" : ""}`}
-                      style={{
-                        color: "var(--game-text-color, #000)",
-                        fill: "var(--game-text-color, #000)",
-                      }}
-                    />
-                  </div>
-                </motion.button>
+                </ShinyButton>
                 {launchError && (
                   <p className="mt-3 text-xs text-amber-300/90 max-w-[260px] text-right">
                     {launchError}

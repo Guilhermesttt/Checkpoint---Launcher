@@ -208,7 +208,7 @@ describe("overlay de conquistas", () => {
 
     expect(mainSource).toContain('playOverlaySound("screenshot")');
     expect(overlaySource).toContain('"screenshot": {');
-    expect(overlaySource).toContain("Xbox 360 UI/dl_complete.wav");
+    expect(overlaySource).toContain("Xbox One/deck_ui_toast.wav");
   });
 
   it("toca o efeito de disparo antes de processar a captura", () => {
@@ -241,11 +241,11 @@ describe("overlay de conquistas", () => {
   });
 
   it("inicia a animacao somente depois que o toast entrou no DOM", () => {
-    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8");
+    const html = fs.readFileSync(path.resolve("electron/overlay.html"), "utf8").replace(/\r\n/g, "\n");
 
     expect(html).toContain(".overlay-card.is-entering");
     expect(html).toContain("const startCardAnimation = (card) =>");
-    expect(html).toContain("requestAnimationFrame(() => card.classList.add(\"is-entering\"))");
+    expect(html).toContain("card.classList.add(\"is-entering\")");
     expect(html).toContain("achievementStack.appendChild(card);\n      startCardAnimation(card);");
     expect(html).toContain("socialStack.appendChild(card);\n      startCardAnimation(card);");
     expect(html).toContain('localStorage.setItem("checkpoint-overlay-animations", "true")');

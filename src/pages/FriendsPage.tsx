@@ -50,6 +50,7 @@ export interface FriendsPageProps {
   onOpenChat: (friend: SocialFriend) => void;
   onStartVoiceCall?: (friend: SocialFriend, withVideo?: boolean) => void;
   onStartTestCall?: () => void;
+  playSound?: (type: SoundEffectType) => void;
 }
 
 export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
@@ -74,6 +75,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
   onOpenChat,
   onStartVoiceCall,
   onStartTestCall,
+  playSound,
 }) => {
   const copy = FRIENDS_COPY[language] || FRIENDS_COPY["pt-BR"];
   const [friendSearch, setFriendSearch] = useState("");
@@ -103,13 +105,14 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
         incomingRequestsCount={incomingRequests.length}
         totalFriendsCount={friends.length}
         unreadCount={totalUnreadCount}
+        playSound={playSound}
       />
 
       {/* Profile Header & Controls */}
-      <section className="mb-6 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
-        <div className="mb-6 flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-[#171717] shadow-lg">
+      <section className="mb-5 rounded-xl border border-white/[0.08] bg-[#080808] p-5 shadow-lg">
+        <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-3.5">
+            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-[#141414]">
               {discordAvatar ? (
                 <img src={discordAvatar} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -144,23 +147,29 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
+            <motion.button
               type="button"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onMouseEnter={() => playSound?.("hover")}
               onClick={onAddFriendClick}
-              className="cursor-pointer flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-wider text-black shadow-md transition-all hover:bg-white/90 active:scale-95"
+              className="cursor-pointer flex h-9 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black uppercase tracking-wider text-black shadow-md transition-colors hover:bg-white/90"
             >
               <span>+ {t("addFriendTitle")}</span>
-            </button>
+            </motion.button>
             {onStartTestCall && (
-              <button
+              <motion.button
                 type="button"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onMouseEnter={() => playSound?.("hover")}
                 onClick={onStartTestCall}
                 title="Testar microfone, áudio e compartilhamento de tela"
-                className="cursor-pointer flex h-9 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-bold uppercase tracking-wider text-white/70 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white active:scale-95"
+                className="cursor-pointer flex h-9 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-bold uppercase tracking-wider text-white/70 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
               >
                 <Phone className="h-3.5 w-3.5" />
                 <span>Auto-Teste</span>
-              </button>
+              </motion.button>
             )}
           </div>
         </div>
@@ -193,26 +202,29 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             value={onlineCount}
             icon={<UserCheck className="h-4 w-4" />}
             hint="Amigos conectados agora"
+            playSound={playSound}
           />
           <MetricMiniCard
             label={copy.playing}
             value={playingCount}
             icon={<Gamepad2 className="h-4 w-4" />}
             hint="Em uma sessão de jogo"
+            playSound={playSound}
           />
           <MetricMiniCard
             label={copy.total}
             value={friends.length}
             icon={<Users className="h-4 w-4" />}
             hint="Total de conexões"
+            playSound={playSound}
           />
         </div>
       </section>
 
       {/* ABA SOLICITAÇÕES */}
       {activeSubTab === "SOLICITAÇÕES" && (
-        <section className="mb-6 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
-          <div className="mb-5 flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
+        <section className="mb-5 rounded-xl border border-white/[0.08] bg-[#080808] p-5 shadow-lg">
+          <div className="mb-4 flex items-center justify-between gap-4 border-b border-white/[0.06] pb-3.5">
             <div>
               <p className="text-base font-black text-white uppercase tracking-tight">{copy.requests}</p>
               <p className="mt-0.5 text-xs font-medium text-white/40">{copy.requestHint}</p>
@@ -223,7 +235,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           </div>
 
           {incomingRequests.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-[#0E0E0E] p-8 text-center">
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-[#0a0a0a] p-8 text-center">
               <Users className="mb-3 h-8 w-8 text-white/20" />
               <p className="text-sm font-bold text-white/50">Nenhuma solicitação de amizade pendente</p>
             </div>
@@ -236,10 +248,12 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   avatarUrl={request.photoURL || undefined}
                   status="busy"
                   statusText={copy.wantsFriend}
+                  playSound={playSound}
                   actions={
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
+                        onMouseEnter={() => playSound?.("hover")}
                         onClick={() => onRejectRequest(request.uid)}
                         className="cursor-pointer h-8.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-bold uppercase tracking-wider text-white/60 hover:bg-white/[0.08] hover:text-white"
                       >
@@ -247,6 +261,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                       </button>
                       <button
                         type="button"
+                        onMouseEnter={() => playSound?.("hover")}
                         onClick={() => onAcceptRequest(request.uid)}
                         className="cursor-pointer h-8.5 rounded-lg bg-white px-3.5 text-xs font-black uppercase tracking-wider text-black hover:bg-white/90"
                       >
@@ -263,8 +278,8 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
       {/* ABA CHAT & CONVERSAS */}
       {activeSubTab === "CHAT" && (
-        <section className="mb-6 rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
-          <div className="mb-5 flex items-center justify-between gap-4 border-b border-white/[0.06] pb-4">
+        <section className="mb-5 rounded-xl border border-white/[0.08] bg-[#080808] p-5 shadow-lg">
+          <div className="mb-4 flex items-center justify-between gap-4 border-b border-white/[0.06] pb-3.5">
             <div>
               <p className="text-base font-black text-white uppercase tracking-tight">Chat & Conversas</p>
               <p className="mt-0.5 text-xs font-medium text-white/40">Selecione um amigo para abrir o chat em tempo real.</p>
@@ -272,7 +287,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           </div>
 
           {checkpointFriends.length === 0 ? (
-            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-[#0E0E0E] p-8 text-center">
+            <div className="flex min-h-[160px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.08] bg-[#0a0a0a] p-8 text-center">
               <MessageSquare className="mb-3 h-8 w-8 text-white/20" />
               <p className="text-sm font-bold text-white/50">Nenhuma conversa recente</p>
             </div>
@@ -295,10 +310,12 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     status={statusState}
                     statusText={statusLabel}
                     badge={unreadCount > 0 ? unreadCount : undefined}
+                    playSound={playSound}
                     onCardClick={() => onOpenChat(friend)}
                     actions={
                       <button
                         type="button"
+                        onMouseEnter={() => playSound?.("hover")}
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpenChat(friend);
@@ -333,15 +350,15 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   value={friendSearch}
                   onChange={(event) => setFriendSearch(event.target.value)}
                   placeholder={copy.search}
-                  className="h-11 w-full rounded-xl border border-white/[0.08] bg-[#0E0E0E] pl-11 pr-4 text-xs font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 shadow-inner"
+                  className="h-11 w-full rounded-xl border border-white/[0.08] bg-[#0a0a0a] pl-11 pr-4 text-xs font-bold text-white outline-none transition-all placeholder:text-white/25 focus:border-white/25 shadow-inner"
                 />
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-3.5 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {visibleFriends.length === 0 ? (
-              <div className="rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-8 text-center md:col-span-2 shadow-2xl">
+              <div className="rounded-xl border border-white/[0.08] bg-[#080808] p-6 text-center md:col-span-2 shadow-lg">
                 <Users className="mx-auto mb-3 h-8 w-8 text-white/25" />
                 <p className="text-sm font-bold text-white/70">
                   {friends.length === 0 ? copy.noFriends : copy.noSearch}
@@ -373,13 +390,17 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     status={statusState}
                     statusText={isCallActiveWithFriend ? "Chamada ativa (Clique para entrar)" : statusLabel}
                     badge={unreadCount > 0 ? unreadCount : undefined}
+                    playSound={playSound}
                     onCardClick={() => onOpenChat(friend)}
                     actions={
                       <div className="flex items-center gap-1.5">
                         {friend.source === "checkpoint" && onStartVoiceCall && (
                           <>
-                            <button
+                            <motion.button
                               type="button"
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.92 }}
+                              onMouseEnter={() => playSound?.("hover")}
                               onClick={() => {
                                 if (isCallActiveWithFriend && voiceCall.callState === "active") {
                                   voiceCall.setIsVoiceWindowOpen(true);
@@ -389,33 +410,39 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                               }}
                               title={isCallActiveWithFriend ? "Chamada em andamento — Clique para voltar à chamada" : "Ligar (Voz)"}
                               aria-label="Ligar por voz"
-                              className={`cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border transition-all ${
+                              className={`cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border transition-colors ${
                                 isCallActiveWithFriend
-                                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse hover:bg-emerald-600 hover:scale-105"
+                                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse hover:bg-emerald-600"
                                   : "border-white/10 bg-white/[0.04] text-white/60 hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                               }`}
                             >
                               <Phone className="h-3.5 w-3.5" />
-                            </button>
-                            <button
+                            </motion.button>
+                            <motion.button
                               type="button"
+                              whileHover={{ scale: 1.08 }}
+                              whileTap={{ scale: 0.92 }}
+                              onMouseEnter={() => playSound?.("hover")}
                               onClick={() => onStartVoiceCall(friend, true)}
                               title="Compartilhar Tela / Vídeo"
                               aria-label="Compartilhar tela ou vídeo"
-                              className="cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/60 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                              className="cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
                             >
                               <Video className="h-3.5 w-3.5" />
-                            </button>
+                            </motion.button>
                           </>
                         )}
 
                         {friend.source === "checkpoint" && (
-                          <button
+                          <motion.button
                             type="button"
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            onMouseEnter={() => playSound?.("hover")}
                             disabled={friendProfileLoadingId === friend.id}
                             onClick={() => onViewFriendProfile(friend)}
                             title={copy.viewProfile}
-                            className="cursor-pointer flex h-8.5 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[10.5px] font-bold uppercase tracking-wider text-white/70 transition-all hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
+                            className="cursor-pointer flex h-8.5 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-[10.5px] font-bold uppercase tracking-wider text-white/70 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white disabled:opacity-50"
                           >
                             <User className="h-3.5 w-3.5" />
                             <span>
@@ -423,18 +450,21 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                                 ? copy.openingProfile
                                 : copy.profile}
                             </span>
-                          </button>
+                          </motion.button>
                         )}
 
                         {friend.source === "checkpoint" && (
-                          <button
+                          <motion.button
                             type="button"
+                            whileHover={{ scale: 1.08 }}
+                            whileTap={{ scale: 0.92 }}
+                            onMouseEnter={() => playSound?.("hover")}
                             onClick={() => onRemoveFriend(friend)}
                             title={copy.remove}
-                            className="cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/35 transition-all hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
+                            className="cursor-pointer flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-white/35 transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          </motion.button>
                         )}
                       </div>
                     }

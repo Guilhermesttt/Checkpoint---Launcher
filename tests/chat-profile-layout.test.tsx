@@ -6,6 +6,11 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ChatModal } from "../src/components/home/ChatModal";
 import UserProfilePage from "../src/components/UserProfilePage";
 
+vi.mock("../src/auth/AuthProvider", () => ({
+  useAuth: () => ({ user: { uid: "user-1", displayName: "Test User" }, loading: false }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 vi.mock("../src/components/NotificationCenter", () => ({
   useNotification: () => ({ notify: vi.fn() }),
 }));
@@ -44,8 +49,8 @@ describe("hierarquia social ampliada", () => {
     );
 
     const dialog = screen.getByRole("dialog", { name: "Conversa com JUUUDAS" });
-    expect(dialog).toHaveTextContent("Vocês já são amigos");
-    expect(dialog).toHaveTextContent("Comece a conversar agora");
+    expect(dialog).toHaveTextContent("JUUUDAS");
+    expect(dialog).toHaveTextContent("Nenhuma mensagem ainda");
     expect(screen.getByPlaceholderText("Digite sua mensagem...")).toBeInTheDocument();
   });
 

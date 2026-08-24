@@ -15,29 +15,6 @@ import ps5PlusMessageToastSound from "../sounds/PS5_Plus/deck_ui_message_toast.w
 import ps5PlusToastSound from "../sounds/PS5_Plus/deck_ui_toast.wav";
 import ps5AchievementUnlockSound from "../sounds/PS5_Plus/deck_ui_achievement_toast.wav";
 
-// Glitch Noises Theme for Retro/Arcade Mode
-import glitchNavigate from "../sounds/Glitch Noises/UIMvmt_Scroll 001_VZ_GN.wav";
-import glitchHover from "../sounds/Glitch Noises/UIMvmt_Scroll 002_VZ_GN.wav";
-import glitchSelect from "../sounds/Glitch Noises/UIClick_Click 001_VZ_GN.wav";
-import glitchBack from "../sounds/Glitch Noises/UIAlert_Cancel 001_VZ_GN.wav";
-import glitchEdit from "../sounds/Glitch Noises/UIBeep_Clicky 001_VZ_GN.wav";
-import glitchModalClose from "../sounds/Glitch Noises/UIAlert_Cancel 002_VZ_GN.wav";
-import glitchFavoriteOn from "../sounds/Glitch Noises/UIClick_Select 001_VZ_GN.wav";
-import glitchFavoriteOff from "../sounds/Glitch Noises/UIAlert_Cancel 003_VZ_GN.wav";
-import glitchDelete from "../sounds/Glitch Noises/UIAlert_Warning 001_VZ_GN.wav";
-import glitchPlay from "../sounds/Glitch Noises/UIData_Processing Complete 001_VZ_GN.wav";
-import glitchBoot from "../sounds/Glitch Noises/UIData_Processing Complete 002_VZ_GN.wav";
-import glitchSearch from "../sounds/Glitch Noises/UIBeep_Button 001_VZ_GN.wav";
-import glitchDetailOpen from "../sounds/Glitch Noises/UIMvmt_Transition 001_VZ_GN.wav";
-import glitchFriendRequest from "../sounds/Glitch Noises/UIAlert_Notification 001_VZ_GN.wav";
-import glitchChatSent from "../sounds/Glitch Noises/UIBeep_Button Tiny 001_VZ_GN.wav";
-import glitchChatReceived from "../sounds/Glitch Noises/UIAlert_Notification 002_VZ_GN.wav";
-import glitchSwitchOn from "../sounds/Glitch Noises/UIBeep_Button Tiny 002_VZ_GN.wav";
-import glitchSwitchOff from "../sounds/Glitch Noises/UIBeep_Button Tiny 003_VZ_GN.wav";
-import glitchScreenshot from "../sounds/Glitch Noises/UIClick_Select 002_VZ_GN.wav";
-import glitchShowModal from "../sounds/Glitch Noises/UIMvmt_Transition 002_VZ_GN.wav";
-import glitchAchievementUnlock from "../sounds/Glitch Noises/UIData_Processing Complete 003_VZ_GN.wav";
-
 import ps4NavigateSound from "../sounds/PS4/deck_ui_navigation.wav";
 import ps4ShowModalSound from "../sounds/PS4/deck_ui_show_modal.wav";
 import ps4ReturnSound from "../sounds/PS4/deck_ui_side_menu_fly_out.wav";
@@ -62,17 +39,20 @@ import pspIntoGameDetailSound from "../sounds/PSP Sounds/deck_ui_into_game_detai
 import pspToastSound from "../sounds/PSP Sounds/deck_ui_toast.wav";
 import pspAchievementToastSound from "../sounds/PSP Sounds/deck_ui_achievement_toast.wav";
 
-import xbSelect2Sound from "../sounds/Xbox 360 UI/Select2.wav";
-import xbSelectSound from "../sounds/Xbox 360 UI/Select.wav";
-import xbBackSound from "../sounds/Xbox 360 UI/Back.wav";
-import xbSelectASound from "../sounds/Xbox 360 UI/SelectA.wav";
-import xbSelectA2Sound from "../sounds/Xbox 360 UI/SelectA2.wav";
-import xbSelectBSound from "../sounds/Xbox 360 UI/SelectB.wav";
-import xbStartupSound from "../sounds/Xbox 360 UI/Startup.wav";
-import xbBingSound from "../sounds/Xbox 360 UI/Bing.wav";
-import xbPageLeftSound from "../sounds/Xbox 360 UI/PageLeft.wav";
-import xbAchievementSound from "../sounds/Xbox 360 UI/Achievement.wav";
-import xbDownloadCompleteSound from "../sounds/Xbox 360 UI/dl_complete.wav";
+import xbNavigateSound from "../sounds/Xbox One/deck_ui_navigation.wav";
+import xbHoverSound from "../sounds/Xbox One/deck_ui_slider_down.wav";
+import xbActivationSound from "../sounds/Xbox One/deck_ui_default_activation.wav";
+import xbBackSound from "../sounds/Xbox One/deck_ui_out_of_game_detail.wav";
+import xbEditModalSound from "../sounds/Xbox One/deck_ui_hide_modal.wav";
+import xbFavoriteOnSound from "../sounds/Xbox One/deck_ui_slider_up.wav";
+import xbFavoriteOffSound from "../sounds/Xbox One/deck_ui_slider_down.wav";
+import xbDetailOpenSound from "../sounds/Xbox One/deck_ui_into_game_detail.wav";
+import xbLaunchGameSound from "../sounds/Xbox One/deck_ui_launch_game.wav";
+import xbShowModalSound from "../sounds/Xbox One/deck_ui_show_modal.wav";
+import xbToastSound from "../sounds/Xbox One/deck_ui_toast.wav";
+import xbAchievementSound from "../sounds/Xbox One/deck_ui_achievement_toast.wav";
+import xbFriendJoinSound from "../sounds/Xbox One/ui_steam_smoother_friend_online.m4a";
+import xbChatReceivedSound from "../sounds/Xbox One/steam_at_mention.m4a";
 
 import cyberpunkNavigateSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_navigation.wav";
 import cyberpunkHoverSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_slider_down.wav";
@@ -88,28 +68,30 @@ import cyberpunkToastSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_to
 import cyberpunkAchievementToastSound from "../sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav";
 
 import ps2NavigateSound from "../sounds/PS2 System Sounds/deck_ui_navigation.wav";
-import ps2ClickSound from "../sounds/PS2 System Sounds/deck_ui_toast.wav";
+import ps2HoverSound from "../sounds/PS2 System Sounds/deck_ui_misc_10.wav";
 import ps2ActivationSound from "../sounds/PS2 System Sounds/deck_ui_default_activation.wav";
+import ps2BackSound from "../sounds/PS2 System Sounds/deck_ui_out_of_game_detail.wav";
 import ps2EditModalSound from "../sounds/PS2 System Sounds/deck_ui_hide_modal.wav";
 import ps2FavoriteOnSound from "../sounds/PS2 System Sounds/deck_ui_switch_toggle_on.wav";
 import ps2FavoriteOffSound from "../sounds/PS2 System Sounds/deck_ui_switch_toggle_off.wav";
-import ps2OutOfGameDetailSound from "../sounds/PS2 System Sounds/deck_ui_out_of_game_detail.wav";
-import ps2PlaySoundEffect from "../sounds/PS2 System Sounds/deck_ui_achievement_toast.wav";
-import ps2GameBootSound from "../sounds/PS2 System Sounds/deck_ui_launch_game.wav";
-import ps2SearchSound from "../sounds/PS2 System Sounds/deck_ui_tab_transition_01.wav";
+import ps2AchievementSound from "../sounds/PS2 System Sounds/deck_ui_achievement_toast.wav";
+import ps2LaunchGameSound from "../sounds/PS2 System Sounds/deck_ui_launch_game.wav";
+import ps2ShowModalSound from "../sounds/PS2 System Sounds/deck_ui_show_modal.wav";
 import ps2DetailOpenSound from "../sounds/PS2 System Sounds/deck_ui_into_game_detail.wav";
+import ps2ToastSound from "../sounds/PS2 System Sounds/deck_ui_toast.wav";
 
-import gcNavigateSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
-import gcHoverSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_navigation.wav";
-import gcClickSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav";
+import gcNavigateSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_navigation.wav";
+import gcHoverSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
+import gcActivationSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_default_activation.wav";
+import gcBackSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
 import gcEditModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_hide_modal.wav";
 import gcFavoriteOnSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_up.wav";
 import gcFavoriteOffSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_slider_down.wav";
-import gcOutOfGameDetailSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out_of_game_detail.wav";
-import gcPlaySoundEffect from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
-import gcGameBootSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
-import gcSearchSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
-import gcDetailOpenSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_in.wav";
+import gcDetailOpenSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_into_game_detail.wav";
+import gcLaunchGameSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
+import gcShowModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
+import gcMiscSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_misc_10.wav";
+import gcFlyInSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_side_menu_fly_in.wav";
 
 const soundThemes = {
   ps5: {
@@ -182,26 +164,26 @@ const soundThemes = {
     overlayAchievement: pspAchievementToastSound,
   },
   xbox360: {
-    navigate: xbSelect2Sound,
-    hover: xbSelect2Sound,
-    select: xbSelectSound,
+    navigate: xbNavigateSound,
+    hover: xbHoverSound,
+    select: xbActivationSound,
     back: xbBackSound,
-    edit: xbSelectA2Sound,
+    edit: xbEditModalSound,
     modalClose: xbBackSound,
-    favoriteOn: xbSelectASound,
-    favoriteOff: xbSelectBSound,
+    favoriteOn: xbFavoriteOnSound,
+    favoriteOff: xbFavoriteOffSound,
     delete: xbBackSound,
-    play: xbSelectSound,
-    boot: xbStartupSound,
-    search: xbBingSound,
-    detailOpen: xbPageLeftSound,
-    friendRequest: xbAchievementSound,
-    chatSent: xbSelectSound,
-    chatReceived: xbAchievementSound,
-    switchOn: xbSelectASound,
-    switchOff: xbSelectBSound,
-    screenshot: xbDownloadCompleteSound,
-    showModal: xbSelectA2Sound,
+    play: xbLaunchGameSound,
+    boot: xbLaunchGameSound,
+    search: xbShowModalSound,
+    detailOpen: xbDetailOpenSound,
+    friendRequest: xbFriendJoinSound,
+    chatSent: xbActivationSound,
+    chatReceived: xbChatReceivedSound,
+    switchOn: xbFavoriteOnSound,
+    switchOff: xbFavoriteOffSound,
+    screenshot: xbToastSound,
+    showModal: xbShowModalSound,
     overlayAchievement: xbAchievementSound,
   },
   cyberpunk: {
@@ -229,74 +211,50 @@ const soundThemes = {
   },
   ps2: {
     navigate: ps2NavigateSound,
-    hover: ps2NavigateSound,
+    hover: ps2HoverSound,
     select: ps2ActivationSound,
-    back: ps2OutOfGameDetailSound,
+    back: ps2BackSound,
     edit: ps2EditModalSound,
-    modalClose: ps2OutOfGameDetailSound,
+    modalClose: ps2BackSound,
     favoriteOn: ps2FavoriteOnSound,
     favoriteOff: ps2FavoriteOffSound,
-    delete: ps2OutOfGameDetailSound,
-    play: ps2GameBootSound,
-    boot: ps2GameBootSound,
-    search: ps2SearchSound,
+    delete: ps2BackSound,
+    play: ps2LaunchGameSound,
+    boot: ps2LaunchGameSound,
+    search: ps2ShowModalSound,
     detailOpen: ps2DetailOpenSound,
-    friendRequest: ps2ClickSound,
+    friendRequest: ps2ToastSound,
     chatSent: ps2ActivationSound,
-    chatReceived: ps2ClickSound,
+    chatReceived: ps2ToastSound,
     switchOn: ps2FavoriteOnSound,
     switchOff: ps2FavoriteOffSound,
-    screenshot: ps2ClickSound,
-    showModal: ps2SearchSound,
-    overlayAchievement: ps2PlaySoundEffect,
+    screenshot: ps2ToastSound,
+    showModal: ps2ShowModalSound,
+    overlayAchievement: ps2AchievementSound,
   },
   gamecube: {
-    navigate: gcHoverSound,
-    hover: gcNavigateSound,
-    select: gcClickSound,
-    back: gcOutOfGameDetailSound,
+    navigate: gcNavigateSound,
+    hover: gcHoverSound,
+    select: gcActivationSound,
+    back: gcBackSound,
     edit: gcEditModalSound,
-    modalClose: gcOutOfGameDetailSound,
+    modalClose: gcBackSound,
     favoriteOn: gcFavoriteOnSound,
     favoriteOff: gcFavoriteOffSound,
-    delete: gcOutOfGameDetailSound,
-    play: gcPlaySoundEffect,
-    boot: gcGameBootSound,
-    search: gcSearchSound,
+    delete: gcBackSound,
+    play: gcLaunchGameSound,
+    boot: gcLaunchGameSound,
+    search: gcShowModalSound,
     detailOpen: gcDetailOpenSound,
-    friendRequest: gcSearchSound,
-    chatSent: gcClickSound,
-    chatReceived: gcSearchSound,
+    friendRequest: gcFlyInSound,
+    chatSent: gcMiscSound,
+    chatReceived: gcFlyInSound,
     switchOn: gcFavoriteOnSound,
     switchOff: gcFavoriteOffSound,
-    screenshot: gcSearchSound,
-    showModal: gcSearchSound,
-    overlayAchievement: gcGameBootSound,
+    screenshot: gcFlyInSound,
+    showModal: gcShowModalSound,
+    overlayAchievement: gcLaunchGameSound,
   },
-};
-
-const retroSoundTheme = {
-  navigate: glitchNavigate,
-  hover: glitchHover,
-  select: glitchSelect,
-  back: glitchBack,
-  edit: glitchEdit,
-  modalClose: glitchModalClose,
-  favoriteOn: glitchFavoriteOn,
-  favoriteOff: glitchFavoriteOff,
-  delete: glitchDelete,
-  play: glitchPlay,
-  boot: glitchPlay,
-  search: glitchSearch,
-  detailOpen: glitchDetailOpen,
-  friendRequest: glitchFriendRequest,
-  chatSent: glitchChatSent,
-  chatReceived: glitchChatReceived,
-  switchOn: glitchSwitchOn,
-  switchOff: glitchSwitchOff,
-  screenshot: glitchScreenshot,
-  showModal: glitchShowModal,
-  overlayAchievement: glitchAchievementUnlock,
 };
 
 export type SoundEffectType = keyof (typeof soundThemes)["ps5"];

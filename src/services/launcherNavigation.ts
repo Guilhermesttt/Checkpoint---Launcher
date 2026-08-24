@@ -42,7 +42,6 @@ export const SIDEBAR_NAVIGATION_GROUPS = [
   { key: "filters", ids: ["ALL", "FAVORITES"] },
   { key: "platforms", ids: ["STEAM", "EPIC", "EA", "UBISOFT", "GOG", "XBOX", "RIOT", "BATTLENET", "ROCKSTAR", "LOCAL"] },
   { key: "community", ids: ["FRIENDS", "FEED"] },
-  { key: "music", ids: ["SPOTIFY"] },
   { key: "mods", ids: ["MODS"] },
 ] as const;
 

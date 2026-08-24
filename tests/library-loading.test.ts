@@ -18,8 +18,7 @@ describe("apresentacao do carregamento da biblioteca", () => {
 });
 
 describe("rodape da biblioteca", () => {
-  it("nao mostra contador e atalhos dentro da pagina Spotify", () => {
-    expect(shouldShowLibraryFooter("SPOTIFY")).toBe(false);
+  it("mostra contador e atalhos na biblioteca", () => {
     expect(shouldShowLibraryFooter("ALL")).toBe(true);
   });
 });

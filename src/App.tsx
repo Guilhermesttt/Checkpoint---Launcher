@@ -29,10 +29,7 @@ const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
     import("./sounds/PS2 System Sounds/menu_music.mp3").then((module) => module.default),
   gamecube: () =>
     import("./sounds/Nintendo GameCube Menu SFX/menu_music.mp3").then((module) => module.default),
-  xbox360: () =>
-    import("./sounds/Xbox 360 UI/01. Amb 05 Engineroom Lr.mp3").then(
-      (module) => module.default,
-    ),
+  xbox360: () => Promise.resolve(null),
   cyberpunk: () =>
     import(
       "./sounds/Cyberpunk 2077 UI SFX PACK/Cyberpunk_2077_-_Pause_Menu_Theme_KLICKAUD.mp3"

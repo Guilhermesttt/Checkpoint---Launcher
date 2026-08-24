@@ -72,7 +72,7 @@ describe("launcher sound effects", () => {
     ["ps2", "PS2%20System%20Sounds/deck_ui_out_of_game_detail.wav"],
     ["gamecube", "Nintendo%20GameCube%20Menu%20SFX/deck_ui_out_of_game_detail.wav"],
     ["cyberpunk", "Cyberpunk%202077%20UI%20SFX%20PACK/deck_ui_out_of_game_detail.wav"],
-    ["xbox360", "Xbox%20360%20UI/Back.wav"],
+    ["xbox360", "Xbox%20One/deck_ui_out_of_game_detail.wav"],
   ] as const)("usa o retorno nativo do tema %s", (theme, expectedPath) => {
     vi.stubGlobal("Audio", FakeAudio);
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
