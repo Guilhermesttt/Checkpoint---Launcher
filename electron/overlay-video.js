@@ -4,7 +4,7 @@
   if (root) root.CheckpointOverlayVideo = api;
 })(typeof window !== "undefined" ? window : globalThis, function createApi() {
   const sources = {
-    social: "../src/assets/Kristina_Lane__pindown.io_1785615277.mp4",
+    social: "../src/assets/hedrabionics_pindown.io.mp4",
     achievement: "../src/assets/Overlay_Background.mp4",
   };
 

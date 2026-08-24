@@ -77,7 +77,6 @@ describe("navegacao sequencial da sidebar pelo controle", () => {
       "LOCAL",
       "FRIENDS",
       "FEED",
-      "SPOTIFY",
       "MODS",
       "PROFILE",
     ]);

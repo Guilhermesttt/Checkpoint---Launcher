@@ -137,7 +137,7 @@ const ChatHeaderBar: React.FC<{
   };
 
   return (
-    <div className="flex shrink-0 items-center justify-between border-b border-white/8 bg-black/35 backdrop-blur-md px-5 py-3.5 md:px-7">
+    <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#080808] px-5 py-3.5 md:px-7">
       <div className="flex items-center gap-3">
         <div className="relative">
           <img
@@ -146,20 +146,20 @@ const ChatHeaderBar: React.FC<{
             className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
           />
           <span
-            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#050507] ${
+            className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#080808] ${
               isCallActiveWithFriend
                 ? "bg-[#23a55a] animate-pulse ring-2 ring-[#23a55a]/40"
                 : friend.status === "playing"
-                ? "animate-pulse bg-green-500"
+                ? "animate-pulse bg-emerald-400"
                 : friend.status === "online"
-                ? "bg-green-400"
+                ? "bg-emerald-400"
                 : "bg-white/20"
             }`}
           />
         </div>
         <div>
           <h4 className="text-sm font-bold leading-none text-white">{friend.name}</h4>
-          <span className="mt-1 block text-[10px] uppercase tracking-wider text-white/40">
+          <span className="mt-1 block text-[10px] uppercase tracking-wider text-white/40 font-body">
             {isCallActiveWithFriend
               ? "🟢 Em Chamada de Voz"
               : friend.status === "playing"
@@ -172,38 +172,44 @@ const ChatHeaderBar: React.FC<{
       <div className="flex items-center gap-2">
         {onStartVoiceCall && (
           <>
-            <button
+            <motion.button
               type="button"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
               onClick={handleCallClick}
               aria-label={isCallActiveWithFriend ? "Voltar para a chamada" : "Iniciar chamada de voz"}
               title={isCallActiveWithFriend ? "Chamada ativa — Clique para voltar à chamada" : "Iniciar chamada de voz"}
-              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-all cursor-pointer ${
+              className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors cursor-pointer ${
                 isCallActiveWithFriend
-                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.55)] animate-pulse hover:bg-emerald-600 hover:scale-105"
+                  ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.55)] animate-pulse hover:bg-emerald-600"
                   : "border-white/[0.08] bg-white/[0.04] text-white/60 hover:bg-white/[0.1] hover:text-white"
               }`}
             >
               <Phone className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               type="button"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
               onClick={onVideoCall}
               aria-label="Compartilhar tela / Vídeo"
               title="Compartilhar tela / Vídeo"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 transition hover:bg-white/[0.1] hover:text-white cursor-pointer"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-white/60 transition-colors hover:bg-white/[0.1] hover:text-white cursor-pointer"
             >
               <Video className="h-3.5 w-3.5" />
-            </button>
+            </motion.button>
           </>
         )}
-        <button
+        <motion.button
           type="button"
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
           onClick={onClose}
           aria-label="Fechar conversa"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/[0.02] text-white/60 hover:bg-white/10 hover:text-white transition cursor-pointer"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
-        </button>
+        </motion.button>
       </div>
     </div>
   );
@@ -300,84 +306,90 @@ const ChatMessageRow: React.FC<{
   }
 
   return (
-    <Message align={isMe ? "end" : "start"} className="gap-2.5">
-      {/* Avatar sempre primeiro no DOM — o flex-row-reverse do Message
-          cuida de jogar pra direita quando align="end" */}
-      <MessageAvatar className="h-7 w-7 border border-white/10 !translate-y-0">
-        <img
-          src={isMe ? selfAvatarUrl : friend.avatar || FALLBACK_FRIEND_AVATAR}
-          alt={isMe ? "Você" : friend.name}
-          className="h-full w-full object-cover"
-        />
-      </MessageAvatar>
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+    >
+      <Message align={isMe ? "end" : "start"} className="gap-2.5">
+        {/* Avatar sempre primeiro no DOM — o flex-row-reverse do Message
+            cuida de jogar pra direita quando align="end" */}
+        <MessageAvatar className="h-7 w-7 border border-white/10 !translate-y-0">
+          <img
+            src={isMe ? selfAvatarUrl : friend.avatar || FALLBACK_FRIEND_AVATAR}
+            alt={isMe ? "Você" : friend.name}
+            className="h-full w-full object-cover"
+          />
+        </MessageAvatar>
 
-      <MessageContent className="max-w-[76%] gap-1">
-        <div className={`px-1 text-[11px] font-medium text-white/38 ${isMe ? "text-right" : "text-left"}`}>
-          {isMe ? "Você" : friend.name}
-        </div>
+        <MessageContent className="max-w-[76%] gap-1">
+          <div className={`px-1 text-[11px] font-medium text-white/38 ${isMe ? "text-right" : "text-left"}`}>
+            {isMe ? "Você" : friend.name}
+          </div>
 
-        <Bubble
-          align={isMe ? "end" : "start"}
-          variant={isMe ? "default" : "outline"}
-          className={
-            isMe
-              ? "rounded-[20px] rounded-br-[5px] bg-white text-black shadow-[0_8px_26px_rgba(0,0,0,.35)] border-0"
-              : "rounded-[20px] rounded-tl-[5px] border border-white/[0.07] bg-[#202124] text-white shadow-[0_8px_26px_rgba(0,0,0,.22)]"
-          }
-        >
-          <BubbleContent className={`px-4 py-2.5 text-[13px] leading-[1.45] ${isMe ? "font-semibold" : "font-normal"}`}>
-            {visibleImages.length > 0 ? (
-              <div className="mb-2 space-y-2">
-                {visibleImages.map((imageUrl) => (
-                  <button
-                    type="button"
-                    key={imageUrl}
-                    onClick={() => {
-                      playSound("select");
-                      onViewImage({
-                        url: imageUrl,
-                        text: imageUrl === msg.attachmentUrl ? msg.text : msg.text.replace(imageUrl, "").trim(),
-                        createdAt: msg.createdAt,
-                      });
-                    }}
-                    aria-label="Visualizar imagem compartilhada"
-                    className={`block w-full overflow-hidden rounded-xl border p-1 text-left transition-all ${isMe
-                      ? "border-black/10 bg-black/5 hover:bg-black/10"
-                      : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-                      }`}
-                  >
-                    <img src={imageUrl} alt="Imagem compartilhada" className="max-h-56 w-full rounded-lg object-cover" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {msg.text ? <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p> : null}
-          </BubbleContent>
-        </Bubble>
+          <Bubble
+            align={isMe ? "end" : "start"}
+            variant={isMe ? "default" : "outline"}
+            className={
+              isMe
+                ? "rounded-[18px] rounded-br-[4px] bg-white text-black shadow-md border-0"
+                : "rounded-[18px] rounded-tl-[4px] border border-white/[0.08] bg-[#141414] text-white shadow-sm"
+            }
+          >
+            <BubbleContent className={`px-4 py-2.5 text-[13px] leading-[1.45] ${isMe ? "font-semibold text-black" : "font-normal text-white/90"}`}>
+              {visibleImages.length > 0 ? (
+                <div className="mb-2 space-y-2">
+                  {visibleImages.map((imageUrl) => (
+                    <button
+                      type="button"
+                      key={imageUrl}
+                      onClick={() => {
+                        playSound("select");
+                        onViewImage({
+                          url: imageUrl,
+                          text: imageUrl === msg.attachmentUrl ? msg.text : msg.text.replace(imageUrl, "").trim(),
+                          createdAt: msg.createdAt,
+                        });
+                      }}
+                      aria-label="Visualizar imagem compartilhada"
+                      className={`block w-full overflow-hidden rounded-xl border p-1 text-left transition-all ${isMe
+                        ? "border-black/10 bg-black/5 hover:bg-black/10"
+                        : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+                        }`}
+                    >
+                      <img src={imageUrl} alt="Imagem compartilhada" className="max-h-56 w-full rounded-lg object-cover" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {msg.text ? <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p> : null}
+            </BubbleContent>
+          </Bubble>
 
-        <MessageFooter
-          className={`mt-0.5 min-h-3 px-1 text-[9px] font-medium tracking-normal ${isMe ? "justify-end text-white/35" : "justify-start text-white/22"
-            }`}
-        >
-          {isMe ? (
-            <span>
-              {msg.id?.startsWith("local-")
-                ? "Enviando..."
-                : msg.read
-                  ? "Lida"
-                  : "Enviada"}
-            </span>
-          ) : (
-            <span>
-              {new Date(msg.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          )}
-        </MessageFooter>
-      </MessageContent>
-    </Message>
+          <MessageFooter
+            className={`mt-0.5 min-h-3 px-1 text-[9px] font-medium tracking-normal ${isMe ? "justify-end text-white/35" : "justify-start text-white/22"
+              }`}
+          >
+            {isMe ? (
+              <span>
+                {msg.id?.startsWith("local-")
+                  ? "Enviando..."
+                  : msg.read
+                    ? "Lida"
+                    : "Enviada"}
+              </span>
+            ) : (
+              <span>
+                {new Date(msg.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </MessageFooter>
+        </MessageContent>
+      </Message>
+    </motion.div>
   );
 };
 
@@ -464,25 +476,25 @@ const ChatComposer: React.FC<{
     const isSpamLocked = Boolean(spamLockedUntil && spamLockedUntil > Date.now());
 
     return (
-      <form onSubmit={onSubmit} className="shrink-0 border-t border-white/8 bg-black/35 backdrop-blur-md px-5 py-4 md:px-7">
+      <form onSubmit={onSubmit} className="shrink-0 border-t border-white/[0.08] bg-[#080808] px-5 py-4 md:px-7">
         <div className="mb-2 flex min-h-4 items-center justify-between px-1">
-          <span className="text-[10px] uppercase tracking-[0.24em] text-white/25">
+          <span className="text-[10px] uppercase tracking-[0.24em] text-white/30 font-body">
             Chat em tempo real
           </span>
           {isSpamLocked ? (
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">DEVAGAR PAE</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400">DEVAGAR PAE</span>
           ) : null}
         </div>
 
         {pendingImage ? (
-          <div className="relative mb-3 w-fit max-w-full rounded-2xl border border-white/10 bg-white/4 p-2">
-            <img src={pendingImage.previewUrl} alt="Prévia da imagem anexada" className="max-h-32 max-w-full rounded-xl object-cover" />
+          <div className="relative mb-3 w-fit max-w-full rounded-xl border border-white/10 bg-[#141414] p-2">
+            <img src={pendingImage.previewUrl} alt="Prévia da imagem anexada" className="max-h-32 max-w-full rounded-lg object-cover" />
             <button
               type="button"
               onClick={onRemovePendingImage}
               aria-label="Remover imagem anexada"
               title="Remover imagem"
-              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-[#17171a] text-white shadow-lg transition-colors hover:bg-red-600"
+              className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-[#1a1a1a] text-white shadow-lg transition-colors hover:bg-red-600"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -490,7 +502,7 @@ const ChatComposer: React.FC<{
           </div>
         ) : null}
 
-        <div className="flex items-center gap-2 rounded-[22px] border border-white/[0.07] bg-white/[0.025] p-1.5 shadow-[0_10px_35px_rgba(0,0,0,.2)]">
+        <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-[#121212] p-1.5 shadow-md">
           <input
             ref={imageInputRef}
             type="file"
@@ -498,16 +510,18 @@ const ChatComposer: React.FC<{
             className="hidden"
             onChange={onImageSelected}
           />
-          <button
+          <motion.button
             type="button"
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
             onClick={onPickImage}
             disabled={isSendingImage}
             aria-label="Anexar imagem"
             title="Anexar imagem"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:bg-white/10 hover:text-white"
           >
             <ImagePlus className="h-4 w-4" />
-          </button>
+          </motion.button>
           <input
             type="text"
             value={inputText}
@@ -515,16 +529,18 @@ const ChatComposer: React.FC<{
             onChange={(e) => onChangeInputText(e.target.value)}
             onPaste={onPasteImage}
             placeholder={pendingImage ? "Adicionar uma legenda (opcional)..." : "Digite sua mensagem..."}
-            className="h-10 flex-1 rounded-full border-0 bg-transparent px-4 text-[13px] text-white placeholder-white/25 outline-none ring-0 focus:outline-none focus:ring-0 disabled:cursor-wait"
+            className="h-10 flex-1 rounded-full border-0 bg-transparent px-3 text-[13px] text-white placeholder-white/30 outline-none ring-0 focus:outline-none focus:ring-0 disabled:cursor-wait"
           />
-          <button
+          <motion.button
             type="submit"
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.94 }}
             disabled={isSendingImage || (!inputText.trim() && !pendingImage) || isSpamLocked}
             aria-label="Enviar mensagem"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-md transition-all hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-black shadow-md transition-all hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
           >
             <Send className="h-4 w-4" />
-          </button>
+          </motion.button>
         </div>
       </form>
     );
@@ -909,10 +925,10 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
         containerClassName={
           controllerKeyboardOpen ? "items-start justify-center p-2 md:items-center md:justify-start md:p-3" : undefined
         }
-        className="overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] p-0 shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
+        className="overflow-hidden rounded-2xl border border-white/10 bg-[#050505] p-0 shadow-2xl"
         ariaLabel={`Conversa com ${friend.name}`}
       >
-        <div className="flex h-[calc(100dvh-2rem)] max-h-[760px] min-h-[560px] w-full flex-col bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] md:h-[calc(100dvh-4rem)]">
+        <div className="flex h-[calc(100dvh-2rem)] max-h-[760px] min-h-[560px] w-full flex-col bg-[#050505] md:h-[calc(100dvh-4rem)]">
           <ChatHeaderBar
             friend={friend}
             onStartVoiceCall={onStartVoiceCall}

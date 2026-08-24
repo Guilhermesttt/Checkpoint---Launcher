@@ -315,6 +315,29 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
   // Focus & Display Controls (Discord style Spotlight / Grid)
   const [focusedFeedId, setFocusedFeedId] = useState<CallFeedId | null>(null);
   const [videoFitMode, setVideoFitMode] = useState<"contain" | "cover">("contain");
+  const [isStreamFullscreen, setIsStreamFullscreen] = useState(false);
+  const [showControlsInStreamFullscreen, setShowControlsInStreamFullscreen] = useState(true);
+  const controlsTimeoutRef = useRef<number | null>(null);
+
+  const handleStreamMouseMove = () => {
+    setShowControlsInStreamFullscreen(true);
+    if (controlsTimeoutRef.current) {
+      window.clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      setShowControlsInStreamFullscreen(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isStreamFullscreen) {
+        setIsStreamFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isStreamFullscreen]);
 
   // Live test meter level (RMS) for Settings popover with strict AudioContext cleanup
   const [micVolumeLevel, setMicVolumeLevel] = useState(0);
@@ -766,10 +789,10 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 10 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
-          className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-[28px] border border-white/[0.12] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1c1d28]/98 via-[#111218]/99 to-[#08090c] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
+          className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
         >
           {/* Top Bar Header */}
-          <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/8 bg-black/35 backdrop-blur-md z-20">
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/[0.08] bg-[#0a0a0a] z-20">
             {/* Left Info: Friend & Duration & Focus Indicator & Category */}
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/15">
@@ -1042,9 +1065,15 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
                 {/* Big Main Spotlight Stage */}
                 <div
-                  onDoubleClick={() => handleToggleFocus(focusedFeed.id)}
+                  onDoubleClick={() => {
+                    if ((focusedFeed.type === "video" && focusedFeed.stream) || Boolean(focusedFeed.cameraStream)) {
+                      setIsStreamFullscreen(true);
+                    } else {
+                      handleToggleFocus(focusedFeed.id);
+                    }
+                  }}
                   onContextMenu={(e) => handleFeedContextMenu(e, focusedFeed)}
-                  className="group relative flex-1 w-full rounded-2xl overflow-hidden bg-black/90 border border-white/10 shadow-2xl flex items-center justify-center"
+                  className="group relative flex-1 w-full rounded-2xl overflow-hidden bg-[#050505] border border-white/10 shadow-2xl flex items-center justify-center"
                 >
                   {(focusedFeed.type === "video" && focusedFeed.stream) || Boolean(focusedFeed.cameraStream) ? (
                     // Video Feed Stage (Screen Share or Camera)
@@ -1235,12 +1264,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             <PictureInPicture2 className="h-4 w-4" />
                           </button>
 
-                          {/* Fullscreen Button */}
+                          {/* Fullscreen Button (Stream Fullscreen) */}
                           <button
                             type="button"
-                            onClick={() => void toggleFullscreen()}
+                            onClick={() => setIsStreamFullscreen(true)}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                            title="Tela cheia"
+                            title="Tela cheia da transmissão"
                           >
                             <Maximize2 className="h-4 w-4" />
                           </button>
@@ -1430,12 +1459,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                       const hasCameraFill = feed.type === "voice" && Boolean(feed.cameraStream);
                       const isSpeaking = Boolean(feed.isSpeaking);
 
-                      // Discord surface tints
+                      // Neutral dark surface tints
                       const cardBgTints = [
-                        "bg-[#2b2d31]",
-                        "bg-[#313338]",
-                        "bg-[#2e3035]",
-                        "bg-[#383a40]",
+                        "bg-[#0e0e0e]",
+                        "bg-[#121212]",
+                        "bg-[#101010]",
+                        "bg-[#141414]",
                       ];
                       const assignedBg = cardBgTints[idx % cardBgTints.length];
 
@@ -2362,6 +2391,148 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             />
           )}
         </motion.div>
+
+        {/* Dedicated Stream Fullscreen Cinematic Mode */}
+        {isStreamFullscreen && focusedFeed && ((focusedFeed.type === "video" && focusedFeed.stream) || focusedFeed.cameraStream) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onMouseMove={handleStreamMouseMove}
+            className="fixed inset-0 z-[100000] bg-black flex items-center justify-center select-none"
+          >
+            {/* The Fullscreen Video */}
+            <div
+              onDoubleClick={() => setIsStreamFullscreen(false)}
+              className="relative w-full h-full flex items-center justify-center cursor-default"
+            >
+              <VideoRenderer
+                stream={focusedFeed.stream || focusedFeed.cameraStream!}
+                fitMode={videoFitMode}
+                muted={focusedFeed.isLocal}
+                onVideoElement={(el) => {
+                  activeVideoElRef.current = el;
+                }}
+              />
+            </div>
+
+            {/* Floating Top Bar Header */}
+            <AnimatePresence>
+              {showControlsInStreamFullscreen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-auto z-20"
+                >
+                  <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-black/80 border border-white/10 backdrop-blur-xl shadow-2xl">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-sm font-bold text-white">{focusedFeed.title}</span>
+                    {focusedFeed.tag && (
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-white/20 text-white">
+                        {focusedFeed.tag}
+                      </span>
+                    )}
+                    <span className="text-xs font-mono text-white/50">{formatDuration(duration)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-black/80 border border-white/10 backdrop-blur-xl shadow-2xl">
+                    {/* Aspect ratio toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setVideoFitMode((prev) => (prev === "contain" ? "cover" : "contain"))}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title={videoFitMode === "contain" ? "Preencher tela (Zoom)" : "Ajustar à tela"}
+                    >
+                      {videoFitMode === "contain" ? <Scan className="h-4 w-4" /> : <Scaling className="h-4 w-4" />}
+                    </button>
+
+                    {/* PiP */}
+                    <button
+                      type="button"
+                      onClick={() => void handleTogglePip()}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Mini-player flutuante (PiP)"
+                    >
+                      <PictureInPicture2 className="h-4 w-4" />
+                    </button>
+
+                    {/* Exit Fullscreen */}
+                    <button
+                      type="button"
+                      onClick={() => setIsStreamFullscreen(false)}
+                      className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-white text-black font-bold text-xs hover:bg-white/90 transition-colors cursor-pointer"
+                      title="Sair da tela cheia (ESC)"
+                    >
+                      <Minimize2 className="h-4 w-4" />
+                      <span>Sair da Tela Cheia</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Floating Bottom Control Bar */}
+            <AnimatePresence>
+              {showControlsInStreamFullscreen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 p-2 rounded-2xl bg-black/85 border border-white/15 backdrop-blur-2xl shadow-2xl pointer-events-auto z-20"
+                >
+                  {/* Mute Mic */}
+                  <button
+                    type="button"
+                    onClick={onToggleMute}
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                      isMuted ? "bg-rose-500 text-white shadow-lg" : "bg-white/10 text-white hover:bg-white/20"
+                    }`}
+                    title={isMuted ? "Desmutar microfone" : "Mutar microfone"}
+                  >
+                    {isMuted ? <MicOff className="h-4.5 w-4.5" /> : <Mic className="h-4.5 w-4.5" />}
+                  </button>
+
+                  {/* Deafen */}
+                  <button
+                    type="button"
+                    onClick={onToggleDeafen}
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                      isDeafened ? "bg-rose-500 text-white shadow-lg" : "bg-white/10 text-white hover:bg-white/20"
+                    }`}
+                    title={isDeafened ? "Reativar áudio" : "Desativar áudio"}
+                  >
+                    {isDeafened ? <VolumeX className="h-4.5 w-4.5" /> : <Volume2 className="h-4.5 w-4.5" />}
+                  </button>
+
+                  {/* Stop screen share */}
+                  {focusedFeed.isLocal && (
+                    <button
+                      type="button"
+                      onClick={onToggleScreenShare}
+                      className="flex h-11 items-center gap-2 px-4 rounded-xl bg-white text-black text-xs font-bold shadow-lg hover:bg-white/90 cursor-pointer"
+                    >
+                      <MonitorOff className="h-4 w-4" />
+                      <span>Parar Transmissão</span>
+                    </button>
+                  )}
+
+                  {/* Hang up */}
+                  <button
+                    type="button"
+                    onClick={onHangUp}
+                    className="flex h-11 items-center gap-2 px-5 rounded-xl bg-rose-600 text-white text-xs font-bold shadow-lg hover:bg-rose-500 cursor-pointer"
+                  >
+                    <PhoneOff className="h-4 w-4" />
+                    <span>Desconectar</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </AnimatePresence>
   );

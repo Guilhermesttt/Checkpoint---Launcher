@@ -120,7 +120,7 @@ describe("integração Nexus no desktop", () => {
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
       expect(init?.headers).toMatchObject({
         apikey: apiKey,
-        "Application-Name": "Checkpoint Launcher",
+        "Application-Name": "Phelierium",
         "Application-Version": "3.0.0",
       });
       return new Response(JSON.stringify({

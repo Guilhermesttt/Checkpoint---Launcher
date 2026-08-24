@@ -299,7 +299,6 @@ export const CATEGORIES = [
   { id: "FAVORITES", label: "Favoritos", Icon: Star, AnimatedIcon: AnimatedStarIcon },
   { id: "FRIENDS", label: "Amigos", Icon: Users, AnimatedIcon: AnimatedUsersIcon },
   { id: "FEED", label: "Radar", Icon: Newspaper, AnimatedIcon: AnimatedRadioIcon },
-  { id: "SPOTIFY", label: "Spotify", Icon: SpotifyBrandIcon },
   { id: "MODS", label: "Mods", Icon: Puzzle },
   { id: "STEAM", label: "Steam", Icon: SteamBrandIcon },
   { id: "EPIC", label: "Epic", Icon: EpicBrandIcon },

@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowRight, MessageSquare, Phone, User, Users } from "lucide-react";
+import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 export type ContactStatus = "online" | "playing" | "offline" | "busy";
 
@@ -16,6 +17,8 @@ export interface ContactCardProps {
   onPrimaryAction?: () => void;
   onSecondaryAction?: () => void;
   onCardClick?: () => void;
+  onMouseEnter?: () => void;
+  playSound?: (type: SoundEffectType) => void;
   className?: string;
 }
 
@@ -31,6 +34,8 @@ export const ContactCard: React.FC<ContactCardProps> = ({
   onPrimaryAction,
   onSecondaryAction,
   onCardClick,
+  onMouseEnter,
+  playSound,
   className = "",
 }) => {
   const isClickable = Boolean(onCardClick);
@@ -38,15 +43,19 @@ export const ContactCard: React.FC<ContactCardProps> = ({
   return (
     <div
       onClick={onCardClick}
-      className={`group relative flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-[#0E0E0E] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition-all duration-200 hover:border-white/20 hover:bg-[#171717] ${
+      onMouseEnter={() => {
+        playSound?.("hover");
+        onMouseEnter?.();
+      }}
+      className={`group relative flex items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-[#0a0a0a] p-3.5 transition-all duration-150 ease-out hover:border-white/20 hover:bg-[#141414] hover:-translate-y-0.5 ${
         isClickable ? "cursor-pointer active:scale-[0.99]" : ""
       } ${className}`}
     >
-      <div className="flex min-w-0 items-center gap-3.5">
+      <div className="flex min-w-0 items-center gap-3">
         {/* Avatar Container with rounded container and subtle functional status indicator */}
-        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#171717] shadow-inner">
+        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#141414]">
           {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
           ) : customIcon ? (
             customIcon
           ) : (
@@ -55,12 +64,12 @@ export const ContactCard: React.FC<ContactCardProps> = ({
 
           {/* Functional status indicator: subtle green for online/playing, subtle red for offline */}
           <span
-            className={`absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-[#0E0E0E] ${
+            className={`absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#0a0a0a] ${
               status === "online" || status === "playing"
-                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
                 : status === "busy"
-                ? "bg-amber-500"
-                : "bg-red-500/70"
+                ? "bg-amber-400"
+                : "bg-red-400/80"
             }`}
           />
         </div>

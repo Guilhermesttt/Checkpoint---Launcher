@@ -31,6 +31,7 @@ import {
 import { useNotification } from "../components/NotificationCenter";
 import ModalShell from "../components/ui/ModalShell";
 import { ProfileDropdown } from "../components/ui/ProfileDropdown";
+import { ShinyButton } from "../components/ui/shiny-button";
 import { InteractiveBreadcrumb } from "../components/home/InteractiveBreadcrumb";
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../services/supabase";
@@ -58,8 +59,6 @@ import { useAchievementLibrarySync } from '../hooks/useAchievementLibrarySync';
 import { useAccountConnections } from '../hooks/useAccountConnections';
 import { buildLocalFriendProfile, useFriendsSystem } from '../hooks/useFriendsSystem';
 import { useVoiceCallContext } from '../context/VoiceCallContext';
-import SpotifyPage from '../components/spotify/SpotifyPage';
-import { useSpotifyPlayer } from '../hooks/useSpotifyPlayer';
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import {
   usePreferences,
@@ -267,8 +266,6 @@ const Home: React.FC = () => {
   const lastOverlayWelcomeGameRef = useRef<string | null>(null);
 
   const { notify } = useNotification();
-  const spotifyPlayer = useSpotifyPlayer();
-  const lastSpotifyTrackNotificationRef = useRef<string | null>(null);
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
   const {
     language: launcherLanguage,
@@ -1210,8 +1207,12 @@ const Home: React.FC = () => {
       }
 
       setOverlayAchievements((current) => ({ ...current, loading: true }));
-      const appId = String(game.steamAppId || "").trim();
-      if (!appId) {
+      // Prefer steamAppId quando disponível, senão para jogos locais use game.id como identificador para leitura retroativa.
+      const appIdFromSteam = String(game.steamAppId || "").trim();
+      const appIdForLocalReads = game.launcherType === "local" ? String(game.id || "").trim() : appIdFromSteam;
+      const appIdToQuery = appIdForLocalReads || appIdFromSteam;
+
+      if (!appIdToQuery && game.launcherType !== "local") {
         setOverlayAchievements({
           loading: false,
           items: [],
@@ -1223,8 +1224,10 @@ const Home: React.FC = () => {
 
       try {
         const result = userProfile?.steamId && game.launcherType !== "local"
-          ? await fetchSteamAchievementDetails(userProfile.steamId, appId)
-          : await fetchSteamAchievementSchema(appId);
+          ? await fetchSteamAchievementDetails(userProfile.steamId, appIdFromSteam)
+          : appIdFromSteam
+            ? await fetchSteamAchievementSchema(appIdFromSteam)
+            : { achievements: [] };
         let items = result.achievements;
 
         if (game.launcherType === "local" && window.electronAPI) {
@@ -1247,8 +1250,10 @@ const Home: React.FC = () => {
             }).filter((achievement) => achievement.apiName);
           }
           const [progress, localState] = await Promise.all([
+            // progress is keyed by game.id (renderer already used game.id)
             window.electronAPI.getLocalAchievementProgress(game.id).catch(() => null),
-            window.electronAPI.getLocalAchievementState(appId).catch(() => (
+            // localState: read retroactive saves — pass a useful app id: steam id or game.id for local builds
+            window.electronAPI.getLocalAchievementState(appIdToQuery).catch(() => (
               {} as Record<string, { earned: boolean; earnedTime: number }>
             )),
           ]);
@@ -1262,7 +1267,7 @@ const Home: React.FC = () => {
           );
           items = items.map((achievement) => {
             const saved = progressById.get(achievement.apiName.toLowerCase());
-            const retroactive = localState[achievement.apiName];
+            const retroactive = localState[achievement.apiName] || localState[achievement.apiName.toLowerCase()];
             if (!saved && !retroactive?.earned) return achievement;
             const unlockedAt = saved?.unlockedAt
               ? Math.floor(Date.parse(saved.unlockedAt) / 1000)
@@ -1388,14 +1393,6 @@ const Home: React.FC = () => {
         discordUsername: userProfile?.discordUsername || "",
         achievements: calculateAchievementTotals(games).unlocked,
       },
-      spotify: {
-        status: spotifyPlayer.status,
-        remoteMode: spotifyPlayer.remoteMode,
-        paused: spotifyPlayer.playback.paused,
-        positionMs: spotifyPlayer.playback.positionMs,
-        durationMs: spotifyPlayer.playback.durationMs,
-        track: spotifyPlayer.playback.track,
-      },
     }).catch(() => undefined);
   }, [
     overlayAchievements,
@@ -1422,49 +1419,11 @@ const Home: React.FC = () => {
     userProfile?.photoURL,
     userProfile?.steamAvatar,
     userProfile?.steamUsername,
-    spotifyPlayer.status,
-    spotifyPlayer.remoteMode,
-    spotifyPlayer.playback,
   ]);
-
-  useEffect(() => {
-    const track = spotifyPlayer.playback.track;
-    if (!track || spotifyPlayer.playback.paused || lastSpotifyTrackNotificationRef.current === track.id) return;
-    lastSpotifyTrackNotificationRef.current = track.id;
-    notify(`${track.title} — ${track.artist}`, "info", {
-      title: "Tocando agora",
-      imageUrl: track.coverUrl,
-    });
-    void window.electronAPI?.showSpotifyTrackOverlay?.({
-      title: track.title,
-      artist: track.artist,
-      coverUrl: track.coverUrl,
-    });
-  }, [notify, spotifyPlayer.playback.paused, spotifyPlayer.playback.track]);
 
   useEffect(() => {
     if (!window.electronAPI?.onOverlayPanelAction) return;
     return window.electronAPI.onOverlayPanelAction((action) => {
-      if (action.kind === "spotify-toggle") {
-        void spotifyPlayer.togglePlay().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao controlar o Spotify.", "error"));
-        return;
-      }
-      if (action.kind === "spotify-next") {
-        void spotifyPlayer.nextTrack().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao avançar a música.", "error"));
-        return;
-      }
-      if (action.kind === "spotify-previous") {
-        void spotifyPlayer.previousTrack().catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao voltar a música.", "error"));
-        return;
-      }
-      if (action.kind === "spotify-seek") {
-        void spotifyPlayer.seek(Number(action.positionMs) || 0).catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao alterar o tempo da música.", "error"));
-        return;
-      }
-      if (action.kind === "spotify-volume") {
-        void spotifyPlayer.setVolume(Math.max(0, Math.min(1, Number(action.volume) || 0))).catch((reason) => notify(reason instanceof Error ? reason.message : "Falha ao alterar o volume.", "error"));
-        return;
-      }
       if (action.kind === "open-launcher-chat" || action.kind === "open-launcher-friends") {
         selectCategory("FRIENDS");
         setIsDetailOpen(false);
@@ -1586,7 +1545,7 @@ const Home: React.FC = () => {
         setOverlayChatError(error instanceof Error ? error.message : "Não foi possível enviar a mensagem.");
       }).finally(() => setOverlayChatSending(false));
     });
-  }, [notify, overlayChatFriendUid, overlayChatSending, selectCategory, setActiveChatFriend, socialFriends, spotifyPlayer, user?.uid, voiceCallContext]);
+  }, [notify, overlayChatFriendUid, overlayChatSending, selectCategory, setActiveChatFriend, socialFriends, user?.uid, voiceCallContext]);
 
   const onSelectHandler = useCallback(
     (index: number, openGame?: Game) => {
@@ -1959,8 +1918,6 @@ const Home: React.FC = () => {
               initialTab={settingsTab}
               onTabChange={handleSettingsTabChange}
             />
-          ) : activeCategory === "SPOTIFY" ? (
-            <SpotifyPage player={spotifyPlayer} friends={socialFriends} language={launcherLanguage} onNotify={notify} />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
               t={t}
@@ -1993,6 +1950,7 @@ const Home: React.FC = () => {
               }}
               onStartVoiceCall={(friend, withVideo) => void startCall(friend, withVideo)}
               onStartTestCall={startTestCall}
+              playSound={playSound}
             />
           ) : activeCategory === "FEED" ? (
             <React.Suspense fallback={
@@ -2159,53 +2117,21 @@ const Home: React.FC = () => {
                       </div>
                     </div>
 
-                    <button
+                    <ShinyButton
                       onClick={() => currentGame && openDetails(currentGame)}
                       onMouseEnter={() => playSound("hover")}
-                      className="relative shrink-0 flex items-center gap-3 overflow-hidden rounded-2xl px-7 py-3 font-black text-[12px] tracking-wider uppercase transition-all duration-500 group font-display"
-                      style={{
-                        background: "var(--game-color, rgba(255,255,255,1))",
-                        color: "var(--game-text-color, #08080f)",
-                        boxShadow:
-                          "0 0 0 1.5px rgba(255,255,255,0.08), 0 20px 56px var(--game-color, rgba(0,0,0,0.7))",
-                      }}
-                      onMouseOver={(e) => {
-                        const b = e.currentTarget as HTMLButtonElement;
-                        b.style.transform = "scale(1.04)";
-                        b.style.boxShadow =
-                          "0 0 0 1.5px rgba(255,255,255,0.12), 0 24px 64px var(--game-color, rgba(0,0,0,0.8))";
-                      }}
-                      onMouseOut={(e) => {
-                        const b = e.currentTarget as HTMLButtonElement;
-                        b.style.transform = "scale(1)";
-                        b.style.boxShadow =
-                          "0 0 0 1.5px rgba(255,255,255,0.08), 0 20px 56px var(--game-color, rgba(0,0,0,0.7))";
-                      }}
+                      className="relative shrink-0 flex items-center gap-3"
                     >
-                      <span
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-                        style={{
-                          background:
-                            "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.38) 50%, transparent 62%)",
-                        }}
-                      />
                       <svg
                         viewBox="0 0 24 24"
-                        className="w-5 h-5 fill-current relative z-10 transition-colors"
-                        style={{
-                          color: "var(--game-text-color)",
-                          fill: "var(--game-text-color)",
-                        }}
+                        className="w-4 h-4 fill-white text-white shrink-0 transition-transform duration-300 group-hover:scale-115"
                       >
                         <path d="M8 5v14l11-7z" />
                       </svg>
-                      <span
-                        className="relative z-10 transition-colors"
-                        style={{ color: "var(--game-text-color)" }}
-                      >
+                      <span className="font-display font-black tracking-widest text-white">
                         {t("playNow")}
                       </span>
-                    </button>
+                    </ShinyButton>
                   </motion.div>
                 </AnimatePresence>
               </motion.div>

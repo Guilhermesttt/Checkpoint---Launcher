@@ -255,9 +255,9 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         status={
           voiceCall.isReconnecting
             ? "connecting"
-            : voiceCall.callState === "calling" || voiceCall.callState === "connecting"
+            : voiceCall.callState === "connecting" || voiceCall.callState === "ringing-out"
             ? "connecting"
-            : voiceCall.callState === "connected"
+            : voiceCall.callState === "active"
             ? "connected"
             : "idle"
         }

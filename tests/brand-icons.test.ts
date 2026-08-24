@@ -10,10 +10,8 @@ describe("official platform brand icons", () => {
     expect(addGameModal).not.toContain("label: copy.steam, icon: () => <Globe");
   });
 
-  it("uses the Font Awesome Spotify icon in the sidebar", () => {
+  it("uses the Font Awesome Spotify icon component", () => {
     expect(sidebar).toContain("faSpotify");
     expect(sidebar).toContain("export const SpotifyBrandIcon");
-    expect(sidebar).toContain('{ id: "SPOTIFY", label: "Spotify", Icon: SpotifyBrandIcon }');
-    expect(sidebar).not.toContain('{ id: "SPOTIFY", label: "Spotify", Icon: Music2 }');
   });
 });

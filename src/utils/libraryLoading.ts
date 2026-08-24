@@ -3,5 +3,4 @@ export const resolveLibraryLoadingState = (hasUsableSnapshot: boolean) => ({
   backgroundRefreshing: hasUsableSnapshot,
 });
 
-export const shouldShowLibraryFooter = (activeCategory: string) =>
-  activeCategory !== "SPOTIFY";
+export const shouldShowLibraryFooter = (_activeCategory?: string) => true;

@@ -53,18 +53,18 @@ describe("novidades no fluxo inicial do app", () => {
     });
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { getVersion: vi.fn().mockResolvedValue("3.1.0") },
+      value: { getVersion: vi.fn().mockResolvedValue("3.2.0") },
     });
   });
 
   it("abre o modal somente depois que a introducao termina", async () => {
     render(<App />);
 
-    expect(screen.queryByText("Chamadas de Voz e Transmissão de Tela")).not.toBeInTheDocument();
+    expect(screen.queryByText("Performance & GPU Acceleration")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Finalizar introdução" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Chamadas de Voz e Transmissão de Tela")).toBeInTheDocument();
+      expect(screen.getByText("Performance & GPU Acceleration")).toBeInTheDocument();
     });
     expect(screen.getByText("Home pronta")).toBeInTheDocument();
   });

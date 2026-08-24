@@ -1,10 +1,14 @@
 import React from "react";
+import LoadingState from "./ui/loading-state";
 
 const LoadingSkeleton: React.FC = () => {
   const items = [1, 2, 3, 4, 5, 6];
   
   return (
-    <div className="w-full pt-16 pb-10 overflow-hidden">
+    <div className="w-full pt-12 pb-10 overflow-hidden">
+      <div className="flex justify-center mb-6">
+        <LoadingState label="Carregando biblioteca" variant="Drive" />
+      </div>
       <div className="flex items-end px-[50vw] -translate-x-[110px]">
         {items.map((i) => (
           <div

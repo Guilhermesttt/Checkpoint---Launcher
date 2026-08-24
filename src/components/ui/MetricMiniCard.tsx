@@ -1,4 +1,5 @@
 import React from "react";
+import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 export interface MetricMiniCardProps {
   label: string;
@@ -9,6 +10,8 @@ export interface MetricMiniCardProps {
   isMono?: boolean;
   className?: string;
   onClick?: () => void;
+  onMouseEnter?: () => void;
+  playSound?: (type: SoundEffectType) => void;
 }
 
 export const MetricMiniCard: React.FC<MetricMiniCardProps> = ({
@@ -20,14 +23,20 @@ export const MetricMiniCard: React.FC<MetricMiniCardProps> = ({
   isMono = false,
   className = "",
   onClick,
+  onMouseEnter,
+  playSound,
 }) => {
   const isClickable = Boolean(onClick);
 
   return (
     <div
       onClick={onClick}
-      className={`relative flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-[#0E0E0E] p-4.5 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-md transition-all duration-200 ${
-        isClickable ? "cursor-pointer hover:border-white/20 hover:bg-[#171717] active:scale-[0.98]" : ""
+      onMouseEnter={() => {
+        playSound?.("hover");
+        onMouseEnter?.();
+      }}
+      className={`relative flex flex-col justify-between rounded-xl border border-white/[0.08] bg-[#0a0a0a] p-4 transition-all duration-150 ease-out hover:border-white/20 hover:bg-[#141414] hover:-translate-y-0.5 ${
+        isClickable ? "cursor-pointer hover:border-white/20 hover:bg-[#141414] active:scale-[0.98]" : ""
       } ${className}`}
     >
       <div className="flex items-center justify-between gap-3">
