@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Gamepad2, Play, Star } from "lucide-react";
+import React, { useState, useMemo, useCallback } from "react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { Play, Star, Gamepad2 } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
-import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
 import {
+  EpicBrandIcon,
   EaBrandIcon,
   UbisoftBrandIcon,
   GogBrandIcon,
@@ -13,227 +14,232 @@ import {
   RockstarBrandIcon,
 } from "./Sidebar";
 
-interface GameCardProps {
+export interface GameCardProps {
   title: string;
-  image: string;
-  isActive?: boolean;
-  onClick?: () => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
-  isFavorite?: boolean;
+  image?: string;
+  isActive: boolean;
   isSteam?: boolean;
   isEpic?: boolean;
   launcherType?: string;
-  steamAppId?: string;
+  steamAppId?: number;
+  isFavorite?: boolean;
+  onClick: () => void;
+  onKeyDown?: (e: React.KeyboardEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-const CARD_FRAME_WIDTH = 172;
-const CARD_FRAME_HEIGHT = 260;
-const CARD_WIDTH = 156;
-const CARD_HEIGHT = 236;
-const FALLBACK_CARD_BACKGROUND =
-  "radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(255,255,255,0.02) 40%, rgba(5,5,7,0.98) 100%)";
+const EPIC_GAMES_ICON_PATH = "/epic_games_store.ico";
+const FALLBACK_CARD_BACKGROUND = "linear-gradient(180deg, #161820 0%, #08090C 100%)";
+const CARD_WIDTH = 168;
+const CARD_HEIGHT = 252;
+const CARD_FRAME_WIDTH = 178;
+const CARD_FRAME_HEIGHT = 264;
 
 const GameCard: React.FC<GameCardProps> = ({
   title,
   image,
-  isActive = false,
-  onClick,
-  onContextMenu,
-  isFavorite = false,
-  isSteam = false,
-  isEpic = false,
+  isActive,
+  isSteam,
+  isEpic,
   launcherType,
   steamAppId,
+  isFavorite = false,
+  onClick,
+  onKeyDown,
+  onContextMenu,
 }) => {
-  const [currentImageSrc, setCurrentImageSrc] = useState<string>("");
-  const [hasAllFailed, setHasAllFailed] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [useFallbackSteamUrl, setUseFallbackSteamUrl] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-
-  useEffect(() => {
-    const initial =
-      image ||
-      (steamAppId
-        ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900_2x.jpg`
-        : "");
-    setCurrentImageSrc(initial);
-    setHasAllFailed(!initial);
-  }, [image, steamAppId]);
-
-  const handleImageError = useCallback(() => {
-    if (steamAppId) {
-      if (currentImageSrc.includes("library_600x900_2x.jpg")) {
-        setCurrentImageSrc(`https://cdn.akamai.steamstatic.com/steam/apps/${steamAppId}/header.jpg`);
-        return;
-      }
-      if (currentImageSrc.includes("header.jpg")) {
-        setCurrentImageSrc(
-          `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${steamAppId}/library_600x900.jpg`,
-        );
-        return;
-      }
-    }
-    setHasAllFailed(true);
-  }, [currentImageSrc, steamAppId]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onClick?.();
-      }
-    },
-    [onClick],
-  );
 
   const visuallyActive = isActive || isFocused;
 
+  // 3D Parallax Tilt Effect with Spring Physics
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springConfig = { damping: 22, stiffness: 160 };
+  const rotateX = useSpring(useTransform(mouseY, [-CARD_HEIGHT / 2, CARD_HEIGHT / 2], [8, -8]), springConfig);
+  const rotateY = useSpring(useTransform(mouseX, [-CARD_WIDTH / 2, CARD_WIDTH / 2], [-8, 8]), springConfig);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left - rect.width / 2;
+    const y = e.clientY - rect.top - rect.height / 2;
+    mouseX.set(x);
+    mouseY.set(y);
+  };
+
+  const handleMouseLeave = () => {
+    mouseX.set(0);
+    mouseY.set(0);
+  };
+
+  const currentImageSrc = useMemo(() => {
+    if (steamAppId && !imageFailed) {
+      if (useFallbackSteamUrl) {
+        return `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamAppId}/library_600x900.jpg`;
+      }
+      return image || `https://cdn.cloudflare.steamstatic.com/steam/apps/${steamAppId}/library_600x900.jpg`;
+    }
+    return image || "";
+  }, [steamAppId, imageFailed, useFallbackSteamUrl, image]);
+
+  const hasAllFailed = imageFailed || !currentImageSrc;
+
+  const handleImageError = useCallback(() => {
+    if (steamAppId && !useFallbackSteamUrl) {
+      setUseFallbackSteamUrl(true);
+    } else {
+      setImageFailed(true);
+    }
+  }, [steamAppId, useFallbackSteamUrl]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick();
+      }
+      onKeyDown?.(e);
+    },
+    [onClick, onKeyDown],
+  );
+
   const platformBadge = useMemo(() => {
     const type = (launcherType || "").toLowerCase() || (isSteam ? "steam" : isEpic ? "epic" : "local");
+    const badgeStyle = {
+      color: "#FFFFFF",
+      border: "rgba(255, 255, 255, 0.2)",
+      background: "rgba(18, 20, 26, 0.92)",
+    };
+
     if (type === "steam") {
       return {
         label: "Steam",
-        color: "#66C0F4",
-        border: "rgba(102,192,244,0.3)",
-        background: "rgba(20,30,45,0.75)",
-        icon: <FontAwesomeIcon icon={faSteam} className="h-2.5 w-2.5 text-[#66C0F4]" />,
+        ...badgeStyle,
+        icon: <FontAwesomeIcon icon={faSteam} className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "epic") {
       return {
         label: "Epic",
-        color: "#f5f5f5",
-        border: "rgba(255,255,255,0.2)",
-        background: "rgba(15, 15, 15, 0.7)",
-        icon: (
-          <img
-            src={EPIC_GAMES_ICON_PATH}
-            alt=""
-            className="h-2.5 w-2.5 object-contain invert"
-            referrerPolicy="no-referrer"
-            draggable={false}
-          />
-        ),
+        ...badgeStyle,
+        icon: <EpicBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "ea") {
       return {
         label: "EA",
-        color: "#f87171",
-        border: "rgba(239,68,68,0.35)",
-        background: "rgba(127,29,29,0.7)",
-        icon: <EaBrandIcon className="h-2.5 w-2.5 text-red-400" />,
+        ...badgeStyle,
+        icon: <EaBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "ubisoft") {
       return {
         label: "Ubisoft",
-        color: "#22d3ee",
-        border: "rgba(6,182,212,0.35)",
-        background: "rgba(22,78,99,0.7)",
-        icon: <UbisoftBrandIcon className="h-2.5 w-2.5 text-cyan-400" />,
+        ...badgeStyle,
+        icon: <UbisoftBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "gog") {
       return {
         label: "GOG",
-        color: "#c084fc",
-        border: "rgba(168,85,247,0.35)",
-        background: "rgba(88,28,135,0.7)",
-        icon: <GogBrandIcon className="h-2.5 w-2.5 text-purple-400" />,
+        ...badgeStyle,
+        icon: <GogBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "xbox") {
       return {
         label: "Xbox",
-        color: "#34d399",
-        border: "rgba(16,185,129,0.35)",
-        background: "rgba(6,78,59,0.7)",
-        icon: <XboxBrandIcon className="h-2.5 w-2.5 text-emerald-400" />,
+        ...badgeStyle,
+        icon: <XboxBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "riot") {
       return {
         label: "Riot",
-        color: "#fb7185",
-        border: "rgba(244,63,94,0.35)",
-        background: "rgba(136,19,55,0.7)",
-        icon: <RiotBrandIcon className="h-2.5 w-2.5 text-rose-400" />,
+        ...badgeStyle,
+        icon: <RiotBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "battlenet") {
       return {
         label: "B.net",
-        color: "#38bdf8",
-        border: "rgba(14,165,233,0.35)",
-        background: "rgba(12,74,110,0.7)",
-        icon: <BattlenetBrandIcon className="h-2.5 w-2.5 text-sky-400" />,
+        ...badgeStyle,
+        icon: <BattlenetBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     if (type === "rockstar") {
       return {
         label: "Rockstar",
-        color: "#fbbf24",
-        border: "rgba(245,158,11,0.35)",
-        background: "rgba(120,53,15,0.7)",
-        icon: <RockstarBrandIcon className="h-2.5 w-2.5 text-amber-400" />,
+        ...badgeStyle,
+        icon: <RockstarBrandIcon className="h-3 w-3 text-white" />,
       };
     }
 
     return {
       label: "Local",
-      color: "#a7f3d0",
-      border: "rgba(52,211,153,0.3)",
-      background: "rgba(6,78,59,0.6)",
-      icon: <Gamepad2 className="h-2.5 w-2.5 text-emerald-400" />,
+      ...badgeStyle,
+      icon: <Gamepad2 className="h-3 w-3 text-white" />,
     };
   }, [isEpic, isSteam, launcherType]);
 
   return (
-    <button
-      type="button"
+    <div
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={onContextMenu}
-      aria-label={title}
-      aria-pressed={visuallyActive}
-      tabIndex={0}
-      data-game-card={true}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
-      className="group relative flex items-center justify-center rounded-2xl border-0 bg-transparent p-0 text-left select-none focus:outline-none cursor-pointer"
+      role="button"
+      tabIndex={0}
+      aria-label={title}
+      aria-pressed={visuallyActive}
+      data-game-card={true}
+      className="group relative flex items-center justify-center p-0 text-left select-none focus:outline-none cursor-pointer perspective-1000"
       style={{
         width: CARD_FRAME_WIDTH,
         height: CARD_FRAME_HEIGHT,
       }}
     >
-      <div
-        className={`relative overflow-hidden rounded-2xl bg-[#0a0a0f] transition-all duration-200 ease-out will-change-transform ${visuallyActive
-            ? "scale-[1.05] -translate-y-2 z-20"
-            : "scale-95 opacity-80 hover:opacity-100 hover:scale-[1.01] hover:-translate-y-1 hover:shadow-[0_10px_28px_rgba(0,0,0,0.6)] ring-1 ring-white/10 hover:ring-white/25 z-10"
-          }`}
+      <motion.div
+        style={{ rotateX, rotateY }}
+        animate={{
+          scale: visuallyActive ? 1.05 : 0.95,
+          y: visuallyActive ? -8 : 0,
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 220,
+          damping: 20,
+        }}
+        className={`relative overflow-hidden rounded-[28px] bg-[#090A0D] border transition-all duration-300 backdrop-blur-2xl flex flex-col justify-between ${
+          visuallyActive
+            ? "border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
+            : "border-white/[0.08] hover:border-white/25 shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
+        }`}
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          boxShadow: visuallyActive
-            ? "0 0 0 2.5px var(--game-color, rgba(255, 255, 255, 0.95)), 0 16px 44px rgba(0, 0, 0, 0.9), 0 0 32px var(--game-color, rgba(255, 255, 255, 0.45))"
-            : undefined,
         }}
       >
-        {/* Cover image or fallback */}
+        {/* Full-Bleed Cover Image Artwork */}
         {hasAllFailed ? (
           <div
-            className="absolute inset-0 flex items-end p-3.5"
+            className="absolute inset-0 flex items-center justify-center p-5 text-center"
             style={{ background: FALLBACK_CARD_BACKGROUND }}
           >
-            <span className="line-clamp-3 text-xs font-semibold leading-snug text-white/80">
+            <span className="line-clamp-3 text-xs font-display font-medium text-white/70">
               {title}
             </span>
           </div>
@@ -241,7 +247,7 @@ const GameCard: React.FC<GameCardProps> = ({
           <img
             src={currentImageSrc}
             alt={title}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-108"
             loading="lazy"
             decoding="async"
             draggable={false}
@@ -249,88 +255,60 @@ const GameCard: React.FC<GameCardProps> = ({
           />
         )}
 
-        {/* Dark Vignette & gradient for contrast */}
-        <div
-          className={`absolute inset-0 transition-opacity duration-200 ${visuallyActive
-              ? "bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-100"
-              : "bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-80 group-hover:opacity-95"
-            }`}
-        />
+        {/* Cinematic Vignette Overlay (Darker at bottom for text contrast) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/20 pointer-events-none" />
 
-        {/* Top Badges (Platform + Favorite) */}
-        <div className="absolute left-2.5 right-2.5 top-2.5 z-20 flex items-center justify-between pointer-events-none">
-          {platformBadge ? (
+        {/* Top Badges (Platform & Favorite) */}
+        <div className="absolute left-3 right-3 top-3 z-20 flex items-center justify-between pointer-events-none">
+          {platformBadge && (
             <div
-              className="flex items-center gap-1.5 rounded-md px-2 py-0.5 shadow-sm backdrop-blur-md"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1 shadow-md backdrop-blur-md"
               style={{
                 background: platformBadge.background,
                 border: `1px solid ${platformBadge.border}`,
               }}
             >
               {platformBadge.icon}
-              <span
-                className="text-[10px] font-bold uppercase tracking-wider"
-                style={{ color: platformBadge.color }}
-              >
+              <span className="text-[10.5px] font-semibold tracking-tight text-white">
                 {platformBadge.label}
               </span>
             </div>
-          ) : (
-            <div />
           )}
 
           {isFavorite && (
-            <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-500/20 border border-amber-400/40 backdrop-blur-md shadow-sm">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.6)]" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#16171c]/95 border border-white/20 backdrop-blur-md shadow-md">
+              <Star className="h-3 w-3 fill-white text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
             </div>
           )}
         </div>
 
-        {/* Bottom Title & Play action */}
+        {/* Central Interactive Play/Action Indicator */}
         <div
-          className={`absolute bottom-0 left-0 right-0 z-20 p-3 transition-all duration-200 ease-out ${visuallyActive ? "translate-y-0 opacity-100" : "translate-y-1 opacity-90 group-hover:translate-y-0 group-hover:opacity-100"
-            }`}
+          className={`absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-all duration-300 ${
+            visuallyActive
+              ? "opacity-100 scale-100"
+              : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-95"
+          }`}
         >
-          {visuallyActive && (
-            <div
-              className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest drop-shadow-sm"
-              style={{ color: "var(--game-color, #10b981)" }}
-            >
-              <span className="relative flex h-1.5 w-1.5">
-                <span
-                  className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                  style={{ background: "var(--game-color, #10b981)" }}
-                />
-                <span
-                  className="relative inline-flex rounded-full h-1.5 w-1.5"
-                  style={{ background: "var(--game-color, #10b981)" }}
-                />
-              </span>
-              Jogar
-            </div>
-          )}
-          <h3 className="line-clamp-2 text-xs font-bold leading-snug text-white tracking-wide drop-shadow-md">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/40 backdrop-blur-xl shadow-[0_0_24px_rgba(255,255,255,0.3)] transition-transform duration-200 group-hover:scale-110">
+            <Play className="h-4 w-4 fill-white text-white ml-0.5" />
+          </div>
+        </div>
+
+        {/* Bottom Title and Source Metadata (Ultra Clean) */}
+        <div className="relative z-20 mt-auto p-4 flex flex-col justify-end">
+          <h3 className="line-clamp-2 text-sm font-display font-semibold text-white tracking-tight leading-snug drop-shadow-md">
             {title}
           </h3>
+          <p className="mt-0.5 text-[11px] font-body text-white/50 line-clamp-1 drop-shadow-sm">
+            {platformBadge?.label || "Jogo"} • Pherielium
+          </p>
         </div>
 
-        {/* Refined clean Play Button on active */}
-        {visuallyActive && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-            <div
-              className="flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md shadow-[0_6px_20px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:scale-110"
-              style={{
-                background: "rgba(0, 0, 0, 0.4)",
-                border: "1.5px solid var(--game-color, rgba(255, 255, 255, 0.7))",
-                boxShadow: "0 0 24px var(--game-color, rgba(255, 255, 255, 0.35))",
-              }}
-            >
-              <Play className="h-4 w-4 fill-white text-white ml-0.5" />
-            </div>
-          </div>
-        )}
-      </div>
-    </button>
+        {/* Ambient Gloss Highlight on Top Edge */}
+        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+      </motion.div>
+    </div>
   );
 };
 

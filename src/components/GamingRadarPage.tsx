@@ -13,9 +13,7 @@ import {
 import { apiUrl } from "../services/api";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
-import { PerspectiveGrid } from "./ui/PerspectiveGrid";
 import { NewsCard } from "./ui/NewsCard";
-import { MetricMiniCard } from "./ui/MetricMiniCard";
 
 const proxyImage = (url?: string) => {
   if (!url) return "";
@@ -124,25 +122,24 @@ const GamingRadarPage: React.FC = () => {
     <motion.div
       ref={scrollRef}
       data-system-page
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative flex-1 overflow-y-auto px-8 pb-14 pt-6 thin-scrollbar"
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="relative flex-1 overflow-y-auto px-8 pb-14 pt-4 thin-scrollbar font-sans"
     >
       <div className="relative mx-auto max-w-6xl space-y-6">
-        {/* Header with subtle dot perspective grid background */}
-        <header className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
-          <PerspectiveGrid opacity={0.2} dotSize={1.2} gap={22} />
-
+        {/* Editorial Atmospheric Header */}
+        <header className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#08090C]/90 p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl">
           <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
             <div>
-              <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-white/40">
-                <Radio className="h-3.5 w-3.5" />
-                <span>[{copy.eyebrow}]</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-medium tracking-wider text-white/70 mb-3">
+                <Radio className="h-3 w-3 text-white" />
+                <span>{copy.eyebrow}</span>
               </div>
-              <h1 className="mt-2 text-3xl md:text-4xl font-black tracking-tight text-white uppercase">
+              <h1 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-white">
                 {copy.title}
               </h1>
-              <p className="mt-2 max-w-xl text-xs md:text-sm font-medium leading-relaxed text-white/40 font-body">
+              <p className="mt-1 max-w-xl text-xs md:text-sm font-normal text-white/50">
                 {copy.subtitle}
               </p>
             </div>
@@ -152,34 +149,28 @@ const GamingRadarPage: React.FC = () => {
                 type="button"
                 disabled={loading}
                 onClick={() => void loadNews()}
-                className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-4 py-2.5 text-xs font-black uppercase tracking-wider text-white shadow-md transition-all hover:border-white/30 hover:bg-white/[0.12] disabled:opacity-50 active:scale-95"
+                className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-4 py-2 text-xs font-medium text-white shadow-md transition-all disabled:opacity-50 active:scale-95"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
                 <span>{copy.refresh}</span>
               </button>
             </div>
           </div>
 
-          {/* Metric Bar in Dashboard style */}
+          {/* Metric Bar in Clean Minimalist Style */}
           <div className="relative mt-6 grid grid-cols-2 gap-3.5 sm:grid-cols-3 border-t border-white/[0.06] pt-6">
-            <MetricMiniCard
-              label="Notícias Carregadas"
-              value={items.length}
-              icon={<Newspaper className="h-4 w-4" />}
-              hint="Artigos mais recentes"
-            />
-            <MetricMiniCard
-              label="Fontes Ativas"
-              value={activeSourcesCount || "Auto"}
-              icon={<Layers className="h-4 w-4" />}
-              hint="Agregadores configurados"
-            />
-            <MetricMiniCard
-              label="Status do Feed"
-              value={stale ? "Cache" : "Live"}
-              icon={<Flame className="h-4 w-4" />}
-              hint={stale ? copy.stale : "Conexão em tempo real"}
-            />
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-left">
+              <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider block">Notícias Carregadas</span>
+              <span className="text-xl font-display font-semibold text-white">{items.length}</span>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-left">
+              <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider block">Fontes Ativas</span>
+              <span className="text-xl font-display font-semibold text-white">{activeSourcesCount || "Auto"}</span>
+            </div>
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-left">
+              <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider block">Status do Feed</span>
+              <span className="text-xl font-display font-semibold text-white">{stale ? "Cache" : "Live"}</span>
+            </div>
           </div>
         </header>
 
@@ -190,33 +181,33 @@ const GamingRadarPage: React.FC = () => {
               key={source}
               type="button"
               onClick={() => setActiveSource(source)}
-              className={`cursor-pointer rounded-xl border px-3.5 py-2 font-mono text-[10px] font-bold uppercase tracking-wider transition-all ${
+              className={`cursor-pointer rounded-full border px-4 py-1.5 text-xs font-medium tracking-wide transition-all ${
                 activeSource === source
-                  ? "border-white bg-white text-black shadow-md"
-                  : "border-white/[0.08] bg-[#0E0E0E] text-white/50 hover:border-white/20 hover:text-white"
+                  ? "border-white bg-white text-black shadow-md font-semibold"
+                  : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white"
               }`}
             >
               {source === "__all__" ? copy.all : source}
             </button>
           ))}
           {stale && (
-            <span className="self-center font-mono text-[10px] font-bold text-amber-300/70">
-              [{copy.stale}]
+            <span className="self-center text-xs font-medium text-amber-300/80 px-2">
+              {copy.stale}
             </span>
           )}
         </div>
 
         {/* News Grid */}
         {error ? (
-          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-8 text-center">
+          <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-8 text-center">
             <AlertCircle className="mb-3 h-8 w-8 text-red-400/60" />
-            <p className="font-black text-white/80">{copy.unavailable}</p>
+            <p className="font-semibold text-white/80">{copy.unavailable}</p>
             <p className="mt-1 text-xs text-white/40">{error}</p>
           </div>
         ) : loading && !items.length ? (
           <div className="grid gap-4 md:grid-cols-2">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="h-64 animate-pulse rounded-2xl border border-white/[0.06] bg-[#0E0E0E]" />
+              <div key={index} className="h-64 animate-pulse rounded-2xl border border-white/[0.06] bg-[#0E1015]" />
             ))}
           </div>
         ) : (
@@ -237,11 +228,11 @@ const GamingRadarPage: React.FC = () => {
           </div>
         )}
 
-        {/* Communities Section with clean monochrome cards */}
-        <section className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0A0A0A]/90 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] backdrop-blur-2xl">
+        {/* Communities Section */}
+        <section className="relative overflow-hidden rounded-[28px] border border-white/[0.08] bg-[#08090C]/90 p-6 md:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.6)] backdrop-blur-xl">
           <div className="mb-4 flex items-center gap-2">
             <Users className="h-4 w-4 text-white/40" />
-            <h2 className="text-[10px] font-black uppercase tracking-[0.24em] text-white/40 font-body">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-white/50">
               {copy.communities}
             </h2>
           </div>
@@ -249,15 +240,15 @@ const GamingRadarPage: React.FC = () => {
             <button
               type="button"
               onClick={() => void openExternal("https://forum.adrenaline.com.br/")}
-              className="cursor-pointer group rounded-xl border border-white/[0.08] bg-[#0E0E0E] p-4.5 text-left transition-all duration-200 hover:border-white/25 hover:bg-[#151515]"
+              className="cursor-pointer group rounded-2xl border border-white/[0.08] bg-[#0E1015] p-5 text-left transition-all duration-200 hover:border-white/20 hover:bg-[#12151B]"
             >
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-white tracking-tight group-hover:text-white">
+                <p className="text-sm font-semibold text-white tracking-tight">
                   Fórum Adrenaline
                 </p>
                 <ExternalLink className="h-3.5 w-3.5 text-white/30 group-hover:text-white transition-colors" />
               </div>
-              <p className="mt-1 text-xs text-white/40 font-body leading-relaxed">
+              <p className="mt-1 text-xs text-white/40 leading-relaxed">
                 {copy.adrenaline}
               </p>
             </button>
@@ -265,15 +256,15 @@ const GamingRadarPage: React.FC = () => {
             <button
               type="button"
               onClick={() => void openExternal("https://steamcommunity.com/discussions/")}
-              className="cursor-pointer group rounded-xl border border-white/[0.08] bg-[#0E0E0E] p-4.5 text-left transition-all duration-200 hover:border-white/25 hover:bg-[#151515]"
+              className="cursor-pointer group rounded-2xl border border-white/[0.08] bg-[#0E1015] p-5 text-left transition-all duration-200 hover:border-white/20 hover:bg-[#12151B]"
             >
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-white tracking-tight group-hover:text-white">
+                <p className="text-sm font-semibold text-white tracking-tight">
                   Discussões Steam
                 </p>
                 <ExternalLink className="h-3.5 w-3.5 text-white/30 group-hover:text-white transition-colors" />
               </div>
-              <p className="mt-1 text-xs text-white/40 font-body leading-relaxed">
+              <p className="mt-1 text-xs text-white/40 leading-relaxed">
                 {copy.steam}
               </p>
             </button>

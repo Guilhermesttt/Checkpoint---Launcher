@@ -8,8 +8,8 @@ export type LauncherLanguage =
   | "fr-FR"
   | "de-DE"
   | "it-IT";
-export type SoundTheme = "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
-export type VisualTheme = "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "phelierium" | "cyberpunk";
+export type SoundTheme = "default" | "ps5" | "ps4" | "psp" | "ps2" | "gamecube" | "xbox360" | "cyberpunk";
+export type VisualTheme = "phelierium" | "ps5" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "checkpoint" | "cyberpunk";
 export type AchievementNotificationPosition =
   | "top-left"
   | "top-right"
@@ -859,7 +859,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [achievementNotificationPosition, setAchievementNotificationPosition] =
     useState<AchievementNotificationPosition>("top-right");
   const [musicVolume, setMusicVolume] = useState(9);
-  const [soundTheme, setSoundTheme] = useState<SoundTheme>("ps5");
+  const [soundTheme, setSoundTheme] = useState<SoundTheme>("default");
   const [visualTheme, setVisualTheme] = useState<VisualTheme>("phelierium");
   const [openAtLogin, setOpenAtLoginState] = useState(false);
   const [lowPerformanceMode, setLowPerformanceMode] = useState(false);
@@ -963,12 +963,22 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedMusicVolume != null && Number.isFinite(savedMusicVolume)) {
       setMusicVolume(clampVolume(savedMusicVolume));
     }
-    if (savedSoundTheme === "ps5" || savedSoundTheme === "ps2" || savedSoundTheme === "gamecube" || savedSoundTheme === "xbox360") {
+    if (
+      savedSoundTheme === "default" ||
+      savedSoundTheme === "ps5" ||
+      savedSoundTheme === "ps4" ||
+      savedSoundTheme === "psp" ||
+      savedSoundTheme === "ps2" ||
+      savedSoundTheme === "gamecube" ||
+      savedSoundTheme === "xbox360" ||
+      savedSoundTheme === "cyberpunk"
+    ) {
       setSoundTheme(savedSoundTheme);
     }
     if (
       savedVisualTheme === "phelierium" ||
       savedVisualTheme === "checkpoint" ||
+      savedVisualTheme === "ps5" ||
       savedVisualTheme === "playstation" ||
       savedVisualTheme === "ps4" ||
       savedVisualTheme === "psp" ||

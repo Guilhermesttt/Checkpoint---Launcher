@@ -142,11 +142,11 @@ const GameRow: React.FC<GameRowProps> = ({
 
       <div className="overflow-visible pb-2" ref={emblaRef}>
         <div
-          className="flex"
+          className="flex items-center"
           style={{
-            gap: 8,
-            paddingLeft: "calc(50vw - 86px)",
-            paddingRight: "calc(50vw - 86px)",
+            gap: 12,
+            paddingLeft: "calc(50vw - 89px)",
+            paddingRight: "calc(50vw - 89px)",
           }}
         >
           {games.map((game, idx) => (

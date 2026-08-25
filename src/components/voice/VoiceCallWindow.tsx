@@ -51,6 +51,9 @@ import { ParticipantContextMenu } from "./ParticipantContextMenu";
 import { ChannelInviteModal } from "./ChannelInviteModal";
 import { CallPrivacyPanel } from "./CallPrivacyPanel";
 import { CreateChannelModal } from "./CreateChannelModal";
+import spaceBgVideo from "../../assets/Space-BG.mp4";
+import friendCallingVideo from "../../assets/BG-Video-Calling.mp4";
+import friendConnectedVideo from "../../assets/BG-Video-Friend.mp4";
 
 interface VoiceCallWindowProps {
   isOpen: boolean;
@@ -1289,7 +1292,25 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     </div>
                   ) : (
                     // Voice Card Stage (Focused on User's Voice Profile)
-                    <div className="flex flex-col items-center justify-center p-8 text-center space-y-6">
+                    <div className="relative flex flex-col items-center justify-center p-8 text-center space-y-6 w-full h-full overflow-hidden rounded-2xl">
+                      {!isRoomSession && (
+                        <video
+                          key={focusedFeed.isLocal ? "local-focus-bg" : (focusedFeed.isRinging || focusedFeed.isConnecting || callState === "ringing-out" || callState === "connecting") ? "calling-focus-bg" : "friend-focus-bg"}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-45 transition-opacity duration-700"
+                          src={
+                            focusedFeed.isLocal
+                              ? spaceBgVideo
+                              : (focusedFeed.isRinging || focusedFeed.isConnecting || callState === "ringing-out" || callState === "connecting")
+                                ? friendCallingVideo
+                                : friendConnectedVideo
+                          }
+                        />
+                      )}
+
                       <div className="relative flex items-center justify-center">
                         {/* Animated Calling / Connecting Radar Rings in Stage */}
                         {(focusedFeed.isRinging || focusedFeed.isConnecting) && (
@@ -1614,7 +1635,26 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                             )
                           ) : (
                             // ── Voice-only card: Discord-style avatar with bottom-left pill badge ──
-                            <div className="relative flex h-full w-full flex-col items-center justify-center">
+                            <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-[26px]">
+                              {/* Direct 1-on-1 Call Cosmic Background Video */}
+                              {!isRoomSession && (
+                                <video
+                                  key={feed.isLocal ? "local-bg" : (feed.isRinging || feed.isConnecting || callState === "ringing-out" || callState === "connecting") ? "calling-bg" : "friend-bg"}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-45 transition-opacity duration-700"
+                                  src={
+                                    feed.isLocal
+                                      ? spaceBgVideo
+                                      : (feed.isRinging || feed.isConnecting || callState === "ringing-out" || callState === "connecting")
+                                        ? friendCallingVideo
+                                        : friendConnectedVideo
+                                  }
+                                />
+                              )}
+
                               {/* Animated Calling / Connecting Radar Rings */}
                               {(feed.isRinging || feed.isConnecting) && (
                                 <>

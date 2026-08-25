@@ -108,6 +108,7 @@ export interface UserProfile {
   pronouns?: string;
   website?: string;
   favoriteGenres?: string[];
+  level?: number;
   steamId?: string;
   discordId?: string;
   discordUsername?: string;
@@ -215,6 +216,8 @@ export interface SocialFriend {
   playing?: string;
   avatar?: string;
   source?: "discord" | "discord_friend" | "local" | "checkpoint";
+  level?: number;
+  lastSeen?: string | number;
 }
 
 export type CheckpointFriendRequest = NonNullable<

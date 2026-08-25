@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { SoundTheme } from "../context/PreferencesContext";
 
+import phelieriumSelectSound from "../sounds/Phelierium Default/ui_select.mp3";
+import phelieriumClickSound from "../sounds/Phelierium Default/ui_click.mp3";
+import phelieriumAlertSound from "../sounds/Phelierium Default/ui_alert.mp3";
+import phelieriumNotificationSound from "../sounds/Phelierium Default/ui_notification.mp3";
+import phelieriumFriendshipSound from "../sounds/Phelierium Default/ui_friendshipsent.mp3";
+import phelieriumOpenDetailSound from "../sounds/Phelierium Default/ui_open_game_detail.mp3";
+import phelieriumCloseDetailSound from "../sounds/Phelierium Default/ui_close_game_detail.mp3";
+import phelieriumEditSound from "../sounds/Phelierium Default/ui_edit_game.mp3";
+import phelieriumDeepSelectSound from "../sounds/Phelierium Default/ui_deep_selection.mp3";
+import phelieriumAchievementSound from "../sounds/Phelierium Default/Achievment_Unlock.mp3";
+import phelieriumUiAchievementSound from "../sounds/Phelierium Default/ui_achievment.mp3";
+import phelieriumCallEnterSound from "../sounds/Phelierium Default/ui_call_enter.mp3";
+
 import ps5PlusNavigateSound from "../sounds/PS5_Plus/deck_ui_navigation.wav";
 import ps5PlusHoverSound from "../sounds/PS5_Plus/deck_ui_slider_down.wav";
 import ps5PlusActivationSound from "../sounds/PS5_Plus/deck_ui_default_activation.wav";
@@ -93,6 +106,29 @@ import gcLaunchGameSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_laun
 import gcShowModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
 
 const soundThemes = {
+  default: {
+    navigate: phelieriumClickSound,
+    hover: phelieriumClickSound,
+    select: phelieriumSelectSound,
+    back: phelieriumCloseDetailSound,
+    edit: phelieriumEditSound,
+    modalClose: phelieriumAlertSound,
+    favoriteOn: phelieriumDeepSelectSound,
+    favoriteOff: phelieriumDeepSelectSound,
+    delete: phelieriumAlertSound,
+    play: phelieriumCallEnterSound,
+    boot: phelieriumCallEnterSound,
+    search: phelieriumSelectSound,
+    detailOpen: phelieriumOpenDetailSound,
+    friendRequest: phelieriumFriendshipSound,
+    chatSent: phelieriumSelectSound,
+    chatReceived: phelieriumNotificationSound,
+    switchOn: phelieriumDeepSelectSound,
+    switchOff: phelieriumDeepSelectSound,
+    screenshot: phelieriumUiAchievementSound,
+    showModal: phelieriumSelectSound,
+    overlayAchievement: phelieriumAchievementSound,
+  },
   ps5: {
     navigate: ps5PlusNavigateSound,
     hover: ps5PlusHoverSound,
@@ -287,14 +323,14 @@ const preloadAudio = (path: string) => {
 
 export const useSoundEffects = (
   volume = 0.35,
-  theme: SoundTheme = "ps5",
+  theme: SoundTheme = "default",
   notificationVolume = 0.4,
 ) => {
   const lastNavigateAtRef = useRef(0);
   const lastHoverAtRef = useRef(0);
   const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
   const activeNotificationAudiosRef = useRef(new Set<HTMLAudioElement>());
-  const sounds = soundThemes[theme] ?? soundThemes.ps5;
+  const sounds = soundThemes[theme] ?? soundThemes.default ?? soundThemes.ps5;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
   useEffect(() => {

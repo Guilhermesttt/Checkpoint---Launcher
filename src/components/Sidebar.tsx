@@ -93,7 +93,7 @@ export const EpicBrandIcon: React.FC<{ className?: string; style?: React.CSSProp
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${EPIC_GAMES_ICON_PATH})`,
         maskImage: `url(${EPIC_GAMES_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -122,7 +122,7 @@ export const EaBrandIcon: React.FC<{ className?: string; style?: React.CSSProper
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${EA_GAMES_ICON_PATH})`,
         maskImage: `url(${EA_GAMES_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -151,7 +151,7 @@ export const UbisoftBrandIcon: React.FC<{ className?: string; style?: React.CSSP
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${UBISOFT_ICON_PATH})`,
         maskImage: `url(${UBISOFT_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -180,7 +180,7 @@ export const GogBrandIcon: React.FC<{ className?: string; style?: React.CSSPrope
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${GOG_ICON_PATH})`,
         maskImage: `url(${GOG_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -220,7 +220,7 @@ export const RiotBrandIcon: React.FC<{ className?: string; style?: React.CSSProp
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${RIOT_GAMES_ICON_PATH})`,
         maskImage: `url(${RIOT_GAMES_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -249,7 +249,7 @@ export const BattlenetBrandIcon: React.FC<{ className?: string; style?: React.CS
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${BATTLENET_ICON_PATH})`,
         maskImage: `url(${BATTLENET_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -278,7 +278,7 @@ export const RockstarBrandIcon: React.FC<{ className?: string; style?: React.CSS
       style={{
         ...restStyle,
         display: "inline-block",
-        backgroundColor: (color as string) ?? "rgba(255,255,255,0.4)",
+        backgroundColor: (color as string) ?? "currentColor",
         WebkitMaskImage: `url(${ROCKSTAR_ICON_PATH})`,
         maskImage: `url(${ROCKSTAR_ICON_PATH})`,
         WebkitMaskSize: "contain",
@@ -392,8 +392,8 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   };
 
   const iconStyle = {
-    color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.45)",
-    filter: active ? "drop-shadow(0 0 6px rgb(var(--launcher-accent) / 0.5))" : "none",
+    color: active ? "#ffffff" : "rgba(255,255,255,0.45)",
+    filter: active ? "drop-shadow(0 0 6px rgba(255,255,255,0.6))" : "none",
   };
 
   const buttonContent = (
@@ -404,14 +404,14 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       aria-current={active ? "page" : undefined}
       data-sidebar-item={id}
       data-notification-count={notificationCount}
-      className={`relative group flex cursor-pointer items-center transition-all duration-300 ease-out
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--launcher-accent))] focus-visible:ring-offset-2 focus-visible:ring-offset-black
-        ${isExpanded ? "w-full h-11 px-3.5 gap-3.5 rounded-xl text-left" : "h-12 w-12 justify-center rounded-2xl"}
-        ${!active ? "hover:bg-white/[0.07]" : ""}`}
+      className={`relative group flex cursor-pointer items-center transition-all duration-200 ease-out
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40
+        ${isExpanded ? "w-full h-11 px-3.5 gap-3.5 rounded-2xl text-left" : "h-12 w-12 justify-center rounded-2xl"}
+        ${!active ? "hover:bg-white/[0.05]" : ""}`}
       style={{
-        background: active ? "var(--launcher-accent-soft)" : "transparent",
+        background: active ? "rgba(255, 255, 255, 0.08)" : "transparent",
         boxShadow: active
-          ? "0 4px 24px -2px rgb(var(--launcher-accent) / 0.25), inset 0 0 0 1px rgb(var(--launcher-accent) / 0.2)"
+          ? "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.15)"
           : "none",
       }}
     >
@@ -419,30 +419,29 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       {active && (
         <motion.div
           layoutId="sb-active"
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full shadow-[0_0_10px_rgb(var(--launcher-accent))]"
-          style={{ background: "rgb(var(--launcher-accent))" }}
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-5 rounded-r-full shadow-[0_0_10px_rgba(255,255,255,0.85)] bg-white"
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         />
       )}
 
       {/* Ícone */}
       <motion.div
-        whileTap={{ scale: 0.88 }}
-        className={`shrink-0 transform transition-transform duration-300 ${
-          AnimatedIcon ? "" : "group-hover:scale-110"
+        whileTap={{ scale: 0.9 }}
+        className={`shrink-0 transform transition-transform duration-200 ${
+          AnimatedIcon ? "" : "group-hover:scale-105"
         } ${rotateOnHover && !AnimatedIcon ? "group-hover:rotate-45" : ""}`}
       >
         {AnimatedIcon ? (
           <AnimatedIcon
             ref={animatedIconRef}
-            size={isExpanded ? 20 : 24}
+            size={isExpanded ? 22 : 24}
             duration={1}
-            className={`${isExpanded ? "h-5 w-5" : "h-6 w-6"} transition-colors duration-300`}
+            className={`${isExpanded ? "h-6 w-6" : "h-6.5 w-6.5"} transition-colors duration-200`}
             style={iconStyle}
           />
         ) : (
           <Icon
-            className={`${isExpanded ? "h-5 w-5" : "h-6 w-6"} transition-colors duration-300`}
+            className={`${isExpanded ? "h-6 w-6" : "h-6.5 w-6.5"} transition-colors duration-200`}
             style={iconStyle}
           />
         )}
@@ -452,8 +451,8 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       {isExpanded && (
         <div className="flex flex-1 items-center justify-between min-w-0">
           <span
-            className={`truncate text-sm font-semibold transition-colors duration-300 ${
-              active ? "text-white font-bold" : "text-white/70 group-hover:text-white"
+            className={`truncate text-[13px] font-body transition-colors duration-200 ${
+              active ? "text-white font-semibold" : "text-white/60 group-hover:text-white"
             }`}
           >
             {label}
@@ -463,14 +462,14 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
               <motion.span
                 animate={{ scale: [1, 1.35, 1], opacity: [0.7, 0, 0.7] }}
                 transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute inset-0 rounded-full bg-[rgb(var(--launcher-accent))]"
+                className="absolute inset-0 rounded-full bg-white"
               />
               <motion.span
                 key={notificationCount}
                 initial={{ scale: 1.5, rotate: -12 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 400, damping: 15 }}
-                className="relative z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[rgb(var(--launcher-accent))] px-1.5 text-[10px] font-black text-black shadow-[0_0_12px_rgb(var(--launcher-accent)/0.8)]"
+                className="relative z-10 flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-white px-1 text-[9px] font-bold text-black shadow-[0_0_10px_rgba(255,255,255,0.8)]"
               >
                 {notificationCount > 99 ? "99+" : notificationCount}
               </motion.span>
@@ -485,14 +484,14 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
           <motion.span
             animate={{ scale: [1, 1.4, 1], opacity: [0.8, 0, 0.8] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 rounded-full bg-[rgb(var(--launcher-accent))]"
+            className="absolute inset-0 rounded-full bg-white"
           />
           <motion.span
             key={notificationCount}
             initial={{ scale: 1.5 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            className="relative z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-black/50 bg-[rgb(var(--launcher-accent))] px-1 text-[10px] font-black text-black shadow-[0_0_12px_rgb(var(--launcher-accent)/0.9)]"
+            className="relative z-10 flex h-4.5 min-w-[18px] items-center justify-center rounded-full border border-black/50 bg-white px-1 text-[9px] font-bold text-black shadow-[0_0_10px_rgba(255,255,255,0.8)]"
           >
             {notificationCount > 99 ? "99+" : notificationCount}
           </motion.span>
@@ -513,7 +512,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
           side="right"
           align="center"
           sideOffset={14}
-          className="border border-white/10 bg-[rgba(14,14,22,0.96)] px-3.5 py-1.5 font-semibold text-xs text-white shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-xl [&>svg]:bg-[rgba(14,14,22,0.96)] [&>svg]:fill-[rgba(14,14,22,0.96)]"
+          className="border border-white/10 bg-[#0c0d12]/95 px-3 py-1.5 font-medium text-xs text-white shadow-xl backdrop-blur-xl"
         >
           {label}
         </TooltipContent>
@@ -586,15 +585,15 @@ const Sidebar: React.FC<SidebarProps> = ({
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
       className="fixed left-3.5 top-3.5 bottom-3.5 z-50 flex flex-col pointer-events-none transition-all duration-300 ease-out"
-      style={{ width: isExpanded ? 256 : 84 }}
+      style={{ width: isExpanded ? 240 : 80 }}
     >
       <div
-        className="pointer-events-auto flex-1 flex flex-col py-5 px-3 min-h-0 rounded-[28px] border border-white/10"
+        className="pointer-events-auto flex-1 flex flex-col py-4 px-2.5 min-h-0 rounded-[32px] border border-white/[0.06]"
         style={{
-          background: "rgba(6, 6, 8, 0.88)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08)",
-          backdropFilter: "blur(48px)",
-          WebkitBackdropFilter: "blur(48px)",
+          background: "rgba(10, 11, 15, 0.45)",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
+          backdropFilter: "blur(32px)",
+          WebkitBackdropFilter: "blur(32px)",
         }}
       >
         {/* Cabeçalho Topo - Clicar no Logo abre/fecha a sidebar */}
@@ -606,34 +605,34 @@ const Sidebar: React.FC<SidebarProps> = ({
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") toggleExpand();
           }}
-          className={`relative mb-3 flex items-center cursor-pointer group rounded-2xl p-1.5 transition-all duration-300 hover:bg-white/[0.06] active:scale-98 ${
-            isExpanded ? "justify-start gap-3 px-2" : "justify-center"
+          className={`relative mb-2 flex items-center cursor-pointer group rounded-2xl p-1.5 transition-all duration-200 hover:bg-white/[0.05] active:scale-98 ${
+            isExpanded ? "justify-start gap-2.5 px-2" : "justify-center"
           }`}
         >
-          <div className="relative w-10 h-10 rounded-xl flex items-center justify-center bg-white/5 ring-1 ring-white/10 group-hover:ring-white/30 transition-all duration-300 group-hover:scale-105 shadow-lg shrink-0">
-            <img src="/Pherielium_logo.png" alt="Pherielium" className="h-7 w-7 object-contain" />
+          <div className="relative w-10 h-10 rounded-2xl flex items-center justify-center bg-white/[0.05] border border-white/[0.08] group-hover:border-white/20 transition-all duration-200 group-hover:scale-105 shadow-md shrink-0">
+            <img src="/Pherielium_logo.png" alt="Pherielium" className="h-6 w-6 object-contain" />
           </div>
           {isExpanded && (
             <div className="flex flex-1 items-center justify-between min-w-0 pr-1">
-              <span className="font-heading font-black text-lg text-white tracking-tight uppercase group-hover:text-white/90">
-                Phelierium
+              <span className="font-display font-bold text-[15px] text-white tracking-tight group-hover:text-white">
+                Pherielium
               </span>
             </div>
           )}
         </div>
 
-        <div className="w-full h-px mb-3 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
+        <div className="w-full h-px mb-2 shrink-0 bg-white/[0.06]" />
 
-        {/* Lista de Navegação com Espaçamento Generoso */}
+        {/* Lista de Navegação */}
         <nav
           aria-label="Navegação principal"
-          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain px-1 no-scrollbar gap-5"
+          className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto overscroll-contain px-1 no-scrollbar gap-3.5"
         >
           {SIDEBAR_NAVIGATION_GROUPS.map((group) => {
             return (
-              <div key={group.key} role="group" aria-label={groupLabels[group.key]} className="flex w-full flex-col gap-2">
+              <div key={group.key} role="group" aria-label={groupLabels[group.key]} className="flex w-full flex-col gap-1">
                 {isExpanded && (
-                  <span className="px-3.5 mb-1 text-[10px] font-black uppercase tracking-[0.28em] text-white/30 font-body">
+                  <span className="px-3 mb-0.5 text-[9.5px] font-semibold uppercase tracking-[0.22em] text-white/30 font-body">
                     {groupLabels[group.key]}
                   </span>
                 )}
@@ -662,10 +661,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        <div className="w-full h-px mt-auto mb-3 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
+        <div className="w-full h-px mt-auto mb-2 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
         {/* Rodapé: Perfil e Ajustes */}
-        <div className="w-full flex flex-col gap-1.5 shrink-0 px-1">
+        <div className="w-full flex flex-col gap-1 shrink-0 px-1">
           <SidebarButton
             id="PROFILE"
             label={sidebarLabels.PROFILE || "Perfil"}

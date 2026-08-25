@@ -32,37 +32,43 @@ interface HomeOverviewPanelsProps {
 export const HomeOverviewPanels = React.memo(function HomeOverviewPanels({
   friendsPlaying,
   recentActivity,
+  onOpenFriends,
 }: HomeOverviewPanelsProps) {
   const topFriends = friendsPlaying.slice(0, 2);
   const topActivities = recentActivity.slice(0, 2);
 
   return (
-    <div className="absolute top-8 right-10 flex flex-col gap-4 z-50 pointer-events-none">
+    <div className="absolute top-7 right-8 flex flex-col gap-3 z-40 pointer-events-none">
       {topFriends.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="pointer-events-auto rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-3 w-64 shadow-2xl flex items-center gap-3"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={onOpenFriends}
+          className="pointer-events-auto rounded-2xl border border-white/[0.08] bg-[#08090C]/90 backdrop-blur-xl p-3 w-64 shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center gap-3 cursor-pointer hover:border-white/20 transition-colors"
         >
-          <Users2 className="h-4 w-4 text-white/50 shrink-0" />
+          <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
+            <Users2 className="h-4 w-4 text-white/80" />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Amigos online</p>
-            <p className="text-xs font-semibold text-white/80 truncate">{topFriends[0].name} e mais</p>
+            <p className="text-[10px] font-medium tracking-wider text-white/40 uppercase">Amigos online</p>
+            <p className="text-xs font-medium text-white truncate">{topFriends[0].name} e mais</p>
           </div>
         </motion.div>
       )}
 
       {topActivities.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="pointer-events-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-3 w-64 shadow-2xl flex items-center gap-3"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="pointer-events-auto rounded-2xl border border-white/[0.08] bg-[#08090C]/90 backdrop-blur-xl p-3 w-64 shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex items-center gap-3"
         >
-          <Flame className="h-4 w-4 text-white/50 shrink-0" />
+          <div className="w-8 h-8 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center shrink-0">
+            <Flame className="h-4 w-4 text-white/80" />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Pulso</p>
-            <p className="text-xs font-semibold text-white/80 truncate">{topActivities[0].title}</p>
+            <p className="text-[10px] font-medium tracking-wider text-white/40 uppercase">Atividade recente</p>
+            <p className="text-xs font-medium text-white truncate">{topActivities[0].title}</p>
           </div>
         </motion.div>
       )}

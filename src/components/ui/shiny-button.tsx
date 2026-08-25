@@ -45,11 +45,11 @@ export function ShinyButton({
         }
 
         .shiny-cta {
-          --shiny-cta-bg: #000000;
-          --shiny-cta-bg-subtle: #1a1818;
+          --shiny-cta-bg: #08090C;
+          --shiny-cta-bg-subtle: rgba(255, 255, 255, 0.12);
           --shiny-cta-fg: #ffffff;
-          --shiny-cta-highlight: var(--game-color, #3b82f6);
-          --shiny-cta-highlight-subtle: var(--game-color, #8484ff);
+          --shiny-cta-highlight: var(--game-color, rgba(255, 255, 255, 0.85));
+          --shiny-cta-highlight-subtle: var(--game-color, rgba(255, 255, 255, 0.4));
           --animation: gradient-angle linear infinite;
           --duration: 3s;
           --shadow-size: 2px;

@@ -10,6 +10,7 @@ export interface RgbColor {
 export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
   phelierium: { r: 255, g: 255, b: 255 },
   checkpoint: { r: 255, g: 255, b: 255 },
+  ps5: { r: 0, g: 114, b: 206 },
   playstation: { r: 37, g: 99, b: 235 },
   ps4: { r: 0, g: 112, b: 209 },
   psp: { r: 6, g: 182, b: 212 },
@@ -22,6 +23,7 @@ export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
 export const THEME_LED_COLORS: Record<VisualTheme, RgbColor> = {
   phelierium: { r: 255, g: 255, b: 255 },
   checkpoint: { r: 255, g: 255, b: 255 },
+  ps5: { r: 0, g: 114, b: 206 },
   playstation: { r: 0, g: 4, b: 255 }, // #0004FF
   ps4: { r: 0, g: 112, b: 209 },
   psp: { r: 6, g: 182, b: 212 },

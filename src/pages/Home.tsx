@@ -18,6 +18,7 @@ import {
 import DynamicBackground from "../components/DynamicBackground";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
+import LoadingState from "../components/ui/loading-state";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
 import {
   AddFriendModal,
@@ -76,7 +77,6 @@ import {
   setChatTyping,
   subscribeToChatMessages,
   subscribeToFriendTyping,
-  subscribeToNewMessages,
 } from "../services/chat";
 import {
   fetchSteamAchievementDetails,
@@ -132,7 +132,7 @@ const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: strin
 ];
 
 const APP_THEME_OPTIONS: Array<{
-  id: "default" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
+  id: "default" | "ps5" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
   label: string;
   hint: string;
   swatch: string;
@@ -141,11 +141,19 @@ const APP_THEME_OPTIONS: Array<{
 }> = [
     {
       id: "default",
-      label: "Phelierium Space",
-      hint: "Estética Espaço Preto & Branco + sons PS5",
+      label: "Phelierium Default",
+      hint: "Estética Espaço Preto & Branco + sons originais Phelierium",
       swatch: "rgb(255 255 255)",
-      soundTheme: "ps5",
+      soundTheme: "default",
       visualTheme: "phelierium",
+    },
+    {
+      id: "ps5",
+      label: "PlayStation 5",
+      hint: "Branco e azul PlayStation + sons PS5",
+      swatch: "rgb(0 114 206)",
+      soundTheme: "ps5",
+      visualTheme: "ps5",
     },
     {
       id: "ps4",
@@ -207,9 +215,9 @@ const Home: React.FC = () => {
   const [localLibraryReady, setLocalLibraryReady] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [signOutModalOpen, setSignOutModalOpen] = useState(false);
   const [disconnectSteamModalOpen, setDisconnectSteamModalOpen] =
     useState(false);
@@ -238,6 +246,7 @@ const Home: React.FC = () => {
   const { activeInputType } = useGamepad();
 
   const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
@@ -1082,9 +1091,9 @@ const Home: React.FC = () => {
           return next;
         });
       } else if (e.key === "Escape") {
-        if (searchOpen) {
-          setSearchOpen(false);
+        if (searchTerm || document.activeElement === searchInputRef.current) {
           setSearchTerm("");
+          searchInputRef.current?.blur();
           playSound("back");
         }
       } else if (e.key === "ArrowLeft") {
@@ -1099,9 +1108,10 @@ const Home: React.FC = () => {
         if (displayGames[selectedIndex])
           openDetails(displayGames[selectedIndex]);
       } else if (e.key.toLowerCase() === "s") {
-        if (!isAnyModalOpen) {
+        if (!isAnyModalOpen && !["SETTINGS", "FRIENDS", "MODS", "RADAR", "PROFILE"].includes(activeCategory)) {
           e.preventDefault();
-          setSearchOpen((prev) => !prev);
+          searchInputRef.current?.focus();
+          searchInputRef.current?.select();
           playSound("search");
         }
       }
@@ -1165,7 +1175,6 @@ const Home: React.FC = () => {
     try {
       const payload = await getCheckpointFriendProfile(profile.uid);
       setFriendProfileModal(payload);
-      setIsAddFriendModalOpen(false);
       playSound("detailOpen");
     } catch (error) {
       notify(
@@ -1695,7 +1704,7 @@ const Home: React.FC = () => {
           transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
           className="shrink-0 flex items-center justify-between px-10 pt-7 relative"
         >
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-6">
             <InteractiveBreadcrumb
               activeCategory={activeCategory}
               categoryLabel={
@@ -1707,55 +1716,35 @@ const Home: React.FC = () => {
               playSound={playSound}
             />
 
-            <div className="relative flex items-center h-4 ml-1">
-              <AnimatePresence>
-                {searchOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, x: -10 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, x: -10 }}
-                    className="absolute left-6 top-1/2 -translate-y-1/2 z-[60]"
-                  >
-                    <div className="relative">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder={t("searchPlaceholder")}
-                        className="h-8 w-48 rounded-xl bg-black/40 backdrop-blur-3xl border border-white/5 pl-3 pr-8 text-[11px] text-white outline-none shadow-2xl focus:border-white/10"
-                        onBlur={() => {
-                          if (!searchTerm) setSearchOpen(false);
-                        }}
-                      />
-                      {searchTerm && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSearchTerm("");
-                            playSound("back");
-                          }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-full transition-all"
-                        >
-                          <X className="w-2.5 h-2.5 text-white/30 hover:text-white" />
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <button
-                onClick={() => {
-                  setSearchOpen((s) => !s);
-                  playSound("search");
-                }}
-                onMouseEnter={() => playSound("hover")}
-                className="cursor-pointer p-1.5 hover:bg-white/10 hover:scale-110 active:scale-90 transition-all duration-200 rounded-full group"
-              >
-                <Search className="w-3.5 h-3.5 text-white/20 group-hover:text-white/50 transition-colors" />
-              </button>
-            </div>
+            {/* Clean Pill Search Bar - Only in Menu & Platform views */}
+            {!["SETTINGS", "FRIENDS", "MODS", "RADAR", "PROFILE"].includes(activeCategory) && (
+              <div className="relative flex items-center">
+                <div className="relative flex items-center">
+                  <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 pointer-events-none" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={t("searchPlaceholder") || "Pesquisar jogo... (S)"}
+                    className="h-9 w-44 md:w-56 rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.09] border border-white/[0.08] focus:border-white/20 pl-9 pr-8 text-xs text-white placeholder:text-white/30 outline-none transition-all duration-200"
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchTerm("");
+                        searchInputRef.current?.focus();
+                        playSound("back");
+                      }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-white/10 rounded-full transition-all"
+                    >
+                      <X className="w-3 h-3 text-white/40 hover:text-white" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -1783,31 +1772,31 @@ const Home: React.FC = () => {
                       setDisconnectSteamModalOpen(true);
                     }}
                     onMouseEnter={() => playSound("hover")}
-                    className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-red-500/10 active:scale-95 group/steam"
+                    className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 group/steam"
                   >
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)] group-hover/steam:bg-red-500 group-hover/steam:shadow-[0_0_8px_rgba(239,68,68,0.6)] transition-all" />
+                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.75)] group-hover/steam:bg-white/40 transition-all" />
                     <div className="relative h-3 overflow-hidden min-w-[40px]">
-                      <span className="block group-hover/steam:hidden text-[10px] font-black uppercase tracking-wider text-emerald-500/60">
+                      <span className="block group-hover/steam:hidden text-[10px] font-medium tracking-wider text-white/70">
                         Steam
                       </span>
-                      <span className="hidden group-hover/steam:block text-[10px] font-black uppercase tracking-wider text-red-500/60 whitespace-nowrap">
+                      <span className="hidden group-hover/steam:block text-[10px] font-medium tracking-wider text-white/40 whitespace-nowrap">
                         {t("unlink")}
                       </span>
                     </div>
                   </button>
 
-                  <div className="w-px h-3 bg-white/5" />
+                  <div className="w-px h-3 bg-white/10" />
 
                   <button
                     onClick={handleSyncSteam}
                     onMouseEnter={() => playSound("hover")}
                     disabled={steamSyncing}
-                    className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/5 active:scale-95 disabled:opacity-50 group"
+                    className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 disabled:opacity-50 group"
                   >
                     <RefreshCw
-                      className={`w-3 h-3 text-white/30 group-hover:text-white/60 ${steamSyncing ? "animate-spin" : ""}`}
+                      className={`w-3 h-3 text-white/40 group-hover:text-white/80 ${steamSyncing ? "animate-spin" : ""}`}
                     />
-                    <span className="text-[10px] font-black uppercase tracking-wider text-white/30 group-hover:text-white/60">
+                    <span className="text-[10px] font-medium tracking-wider text-white/40 group-hover:text-white/80">
                       {steamSyncing ? t("syncing") : t("sync")}
                     </span>
                   </button>
@@ -1817,10 +1806,10 @@ const Home: React.FC = () => {
                   onClick={connectSteam}
                   onMouseEnter={() => playSound("hover")}
                   disabled={steamConnecting}
-                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/10 active:scale-95 group"
+                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.08] active:scale-95 group"
                 >
-                  <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
-                  <span className="text-[10px] font-black uppercase tracking-wider text-red-500/60 group-hover:text-white transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-white/25" />
+                  <span className="text-[10px] font-medium tracking-wider text-white/45 group-hover:text-white transition-colors">
                     {steamConnecting ? t("connecting") : t("connectSteam")}
                   </span>
                 </button>
@@ -1954,20 +1943,24 @@ const Home: React.FC = () => {
             />
           ) : activeCategory === "FEED" ? (
             <React.Suspense fallback={
-              <div className="flex flex-1 items-center justify-center text-white/40">Carregando Radar Gamer...</div>
+              <div className="flex flex-1 items-center justify-center">
+                <LoadingState label="Carregando Radar Gamer" variant="Drive" />
+              </div>
             }>
               <GamingRadarPage />
             </React.Suspense>
           ) : activeCategory === "MODS" ? (
             <React.Suspense fallback={
-              <div className="flex flex-1 items-center justify-center text-white/40">Carregando gerenciador de mods...</div>
+              <div className="flex flex-1 items-center justify-center">
+                <LoadingState label="Carregando Gerenciador de Mods" variant="Drive" />
+              </div>
             }>
               <ModsPage uid={user?.uid || "local"} games={games} />
             </React.Suspense>
           ) : activeCategory === "PROFILE" ? (
             <React.Suspense fallback={
-              <div className="flex items-center justify-center flex-1">
-                <div className="text-white/40">Carregando perfil...</div>
+              <div className="flex flex-1 items-center justify-center">
+                <LoadingState label="Carregando Perfil" variant="Drive" />
               </div>
             }>
               <UserProfilePage
@@ -1981,7 +1974,7 @@ const Home: React.FC = () => {
               />
             </React.Suspense>
           ) : isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex flex-col justify-between w-full h-full">
               <LoadingSkeleton />
             </div>
           ) : displayGames.length === 0 ? (
@@ -2032,106 +2025,90 @@ const Home: React.FC = () => {
                   >
                     <div className="min-w-0 flex-1">
                       <p
-                        className="mb-2 text-[10px] font-black uppercase tracking-[0.28em]"
-                        style={{ color: "rgba(255,255,255,0.25)" }}
+                        className="mb-1 text-[11px] font-body font-medium tracking-wider text-white/40 uppercase"
                       >
-                        {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1}
-                        /{displayGames.length}
+                        {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1} de {displayGames.length}
                       </p>
                       <h1
-                        className="tracking-tight font-display font-black uppercase text-6xl text-white leading-none"
+                        className="tracking-tight font-display font-semibold text-3xl md:text-5xl text-white leading-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.75)] line-clamp-1"
                         style={{
-                          textShadow: "0 8px 48px rgba(0,0,0,0.85)",
-                          maxWidth: "75vw",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          letterSpacing: "-0.01em",
+                          maxWidth: "70vw",
                         }}
                       >
                         {currentGame?.title}
                       </h1>
-                      <div className="mt-2.5 flex items-center gap-4 flex-wrap font-body">
+                      <div className="mt-3 flex items-center gap-2.5 flex-wrap font-body">
                         {(currentGame?.launcherType === "steam" || currentGame?.source === "steam") ? (
-                          <span
-                            className="flex items-center gap-1.5 text-[11px] font-semibold"
-                            style={{ color: "#66C0F4" }}
-                          >
-                            <SteamBrandIcon className="w-3 h-3 text-[#66C0F4]" /> {t("viaSteam")}
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <SteamBrandIcon className="w-3.5 h-3.5 text-white" /> Steam
                           </span>
                         ) : (currentGame?.launcherType === "epic" || currentGame?.source === "epic") ? (
-                          <span
-                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90"
-                          >
-                            <EpicBrandIcon className="w-3 h-3 text-white" /> Via Epic
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <EpicBrandIcon className="w-3.5 h-3.5 text-white" /> Epic Games
                           </span>
                         ) : currentGame?.launcherType === "ea" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-red-400">
-                            <EaBrandIcon className="w-3 h-3 text-red-400" /> Via EA App
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <EaBrandIcon className="w-3.5 h-3.5 text-white" /> EA App
                           </span>
                         ) : currentGame?.launcherType === "ubisoft" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-cyan-400">
-                            <UbisoftBrandIcon className="w-3 h-3 text-cyan-400" /> Via Ubisoft
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <UbisoftBrandIcon className="w-3.5 h-3.5 text-white" /> Ubisoft
                           </span>
                         ) : currentGame?.launcherType === "gog" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-purple-400">
-                            <GogBrandIcon className="w-3 h-3 text-purple-400" /> Via GOG
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <GogBrandIcon className="w-3.5 h-3.5 text-white" /> GOG
                           </span>
                         ) : currentGame?.launcherType === "xbox" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400">
-                            <XboxBrandIcon className="w-3 h-3 text-emerald-400" /> Via Xbox
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <XboxBrandIcon className="w-3.5 h-3.5 text-white" /> Xbox
                           </span>
                         ) : currentGame?.launcherType === "riot" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-400">
-                            <RiotBrandIcon className="w-3 h-3 text-rose-400" /> Via Riot Games
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <RiotBrandIcon className="w-3.5 h-3.5 text-white" /> Riot Games
                           </span>
                         ) : currentGame?.launcherType === "battlenet" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-sky-400">
-                            <BattlenetBrandIcon className="w-3 h-3 text-sky-400" /> Via Battle.net
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <BattlenetBrandIcon className="w-3.5 h-3.5 text-white" /> Battle.net
                           </span>
                         ) : currentGame?.launcherType === "rockstar" ? (
-                          <span className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-400">
-                            <RockstarBrandIcon className="w-3 h-3 text-amber-400" /> Via Rockstar
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <RockstarBrandIcon className="w-3.5 h-3.5 text-white" /> Rockstar
                           </span>
                         ) : (
-                          <span
-                            className="flex items-center gap-1.5 text-[11px] font-semibold text-white/70"
-                          >
-                            <Gamepad2 className="w-3 h-3 text-emerald-400" /> Via Local
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
+                            <Gamepad2 className="w-3.5 h-3.5 text-white" /> Executável Local
                           </span>
                         )}
 
                         {currentGame && (
-                          <span
-                            className="text-[11px] font-medium text-white/40"
-                          >
+                          <span className="rounded-full bg-[#16171c]/70 border border-white/[0.08] px-3 py-1 text-xs font-medium text-white/50">
                             {formatPlayedHours(getGamePlayedHours(currentGame))}h jogadas
                           </span>
                         )}
 
                         {currentGame?.isFavorite && (
-                          <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-400/75">
-                            <Star className="w-3 h-3 fill-current" /> {t("favorite")}
+                          <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.15] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm">
+                            <Star className="w-3 h-3 fill-white text-white" /> Favorito
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <ShinyButton
-                      onClick={() => currentGame && openDetails(currentGame)}
-                      onMouseEnter={() => playSound("hover")}
-                      className="relative shrink-0 flex items-center gap-3"
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="w-4 h-4 fill-white text-white shrink-0 transition-transform duration-300 group-hover:scale-115"
+                    <div className="flex items-center gap-3 shrink-0">
+                      <ShinyButton
+                        onClick={() => currentGame && openDetails(currentGame)}
+                        onMouseEnter={() => playSound("hover")}
+                        className="relative shrink-0 flex items-center gap-2.5 h-12 px-7 rounded-full bg-white text-black font-body font-semibold text-xs tracking-wider"
                       >
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                      <span className="font-display font-black tracking-widest text-white">
-                        {t("playNow")}
-                      </span>
-                    </ShinyButton>
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="w-4 h-4 fill-white text-white shrink-0 transition-transform duration-300 group-hover:scale-110"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        <span>{t("playNow")}</span>
+                      </ShinyButton>
+                    </div>
                   </motion.div>
                 </AnimatePresence>
               </motion.div>
@@ -2247,7 +2224,11 @@ const Home: React.FC = () => {
           className="flex h-full flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#050507] shadow-2xl"
         >
           {friendProfileModal && (
-            <React.Suspense fallback={<div className="p-10 text-white/40">Carregando perfil...</div>}>
+            <React.Suspense fallback={
+              <div className="flex h-full items-center justify-center p-10">
+                <LoadingState label="Carregando Perfil" variant="Drive" />
+              </div>
+            }>
               <UserProfilePage
                 userProfile={friendProfileModal.profile}
                 user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
@@ -2387,25 +2368,53 @@ const Home: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[210] flex flex-col items-center justify-center"
-            style={{ background: "#050507" }}
+            className="fixed inset-0 z-[210] flex flex-col items-center justify-center overflow-hidden bg-[#030405]"
           >
+            {/* Onda de luz expandindo */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ scale: 0, opacity: 0.8 }}
+              animate={{ scale: 1, opacity: 0 }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute w-[60vmax] h-[60vmax] rounded-full bg-white blur-[100px] pointer-events-none"
+            />
+
+            {/* Anéis orbitais concêntricos */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+              className="absolute w-80 h-80 md:w-96 md:h-96 rounded-full border border-white/[0.08]"
+            />
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
+              className="absolute w-64 h-64 md:w-80 md:h-80 rounded-full border border-white/[0.06] border-dashed"
+            />
+
+            {/* Núcleo com Logo */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              className="text-center"
+              className="relative z-10 flex flex-col items-center text-center"
             >
-              <div className="w-16 h-16 mx-auto mb-8 rounded-full flex items-center justify-center animate-pulse">
-                <Gamepad2 className="w-7 h-7 text-black" />
+              <div className="relative mb-6">
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.5, 0.2] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 rounded-full bg-white blur-2xl"
+                />
+                <img
+                  src="/Pherielium_logo.png"
+                  alt="Pherielium"
+                  className="relative w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.6)]"
+                  draggable={false}
+                />
               </div>
-              <h3 className="text-3xl font-black text-white tracking-tighter uppercase mb-4">
+
+              <h3 className="text-2xl md:text-3xl font-display font-semibold text-white tracking-tight mb-2">
                 Encerrando Sessão
               </h3>
-              <p
-                className="text-[10px] tracking-[0.4em] uppercase"
-                style={{ color: "rgba(255,255,255,0.3)" }}
-              >
+              <p className="text-xs font-body tracking-wider text-white/40">
                 Até logo
               </p>
             </motion.div>

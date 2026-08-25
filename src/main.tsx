@@ -6,6 +6,8 @@ import "@fontsource/stix-two-text/700.css";
 import "./index.css";
 import { Navigate, createBrowserRouter, RouterProvider } from "react-router-dom";
 
+import LoadingState from "./components/ui/loading-state";
+
 const Landing = lazy(() => import("./Landing"));
 const DownloadPage = lazy(() => import("./pages/Download"));
 const Login = lazy(() => import("./pages/Login"));
@@ -15,8 +17,8 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const isDesktopRuntime = Boolean(window.electronAPI);
 
 const routeFallback = (
-  <div className="flex min-h-screen items-center justify-center bg-[#050507] text-sm font-bold text-white/50">
-    Carregando...
+  <div className="flex min-h-screen items-center justify-center bg-[#030405] text-white">
+    <LoadingState label="Iniciando Pherielium" variant="Drive" />
   </div>
 );
 

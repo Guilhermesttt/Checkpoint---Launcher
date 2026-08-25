@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Check, Plus, Link2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 
 export interface EmptyStateProps {
@@ -11,50 +12,54 @@ export interface EmptyStateProps {
 
 export const EmptyState: React.FC<EmptyStateProps> = React.memo(
   ({ searchTerm, onAddGame, onConnect, steamConnected }) => (
-    <div
-      className="w-full max-w-md rounded-3xl p-8 text-center"
-      style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        backdropFilter: "blur(24px)",
-      }}
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="w-full max-w-md rounded-[32px] p-10 text-center bg-[#08090C]/90 border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
     >
-      <h3 className="mb-2 text-2xl font-black text-white">
-        {searchTerm ? "Nenhum resultado" : "Biblioteca vazia"}
+      <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)]">
+        <img
+          src="/Pherielium_logo.png"
+          alt="Pherielium"
+          className="w-8 h-8 object-contain opacity-70"
+          draggable={false}
+        />
+      </div>
+
+      <h3 className="mb-2 text-2xl font-display font-semibold tracking-tight text-white">
+        {searchTerm ? "Nenhum jogo encontrado" : "Biblioteca vazia"}
       </h3>
-      <p className="mb-6 text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>
+      <p className="mb-8 text-xs md:text-sm font-body text-white/45 leading-relaxed">
         {searchTerm
-          ? "Tente buscar por outro termo."
+          ? "Não encontramos nenhum jogo correspondente à sua busca."
           : steamConnected
-            ? "Você não possui jogos salvos. Adicione um jogo manualmente."
-            : "Adicione um jogo ou conecte sua conta Steam."}
+            ? "Você não possui jogos salvos. Adicione um jogo executável manualmente."
+            : "Adicione seu primeiro jogo ou conecte sua conta Steam para sincronizar."}
       </p>
       {!searchTerm && (
-        <div className="flex justify-center gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           {!steamConnected && (
             <button
               type="button"
               onClick={onConnect}
-              className="h-10 rounded-full px-5 text-[11px] font-black uppercase tracking-wider transition-all hover:scale-[1.02]"
-              style={{
-                background: "rgba(103,182,118,0.1)",
-                border: "1px solid rgba(103,182,118,0.3)",
-                color: "#67b676",
-              }}
+              className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2"
             >
+              <Link2 className="w-3.5 h-3.5" />
               Conectar Steam
             </button>
           )}
           <button
             type="button"
             onClick={onAddGame}
-            className="h-10 rounded-full bg-white px-5 text-[11px] font-black uppercase tracking-wider text-black transition-all hover:scale-[1.02]"
+            className="cursor-pointer h-11 rounded-full bg-white hover:bg-white/90 px-6 text-xs font-body font-semibold text-black transition-all duration-200 flex items-center gap-2 shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
           >
+            <Plus className="w-3.5 h-3.5" />
             Novo Jogo
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   ),
 );
 
@@ -89,87 +94,117 @@ export const EmptyLibraryOnboarding: React.FC<EmptyLibraryOnboardingProps> = Rea
     };
 
     return (
-      <div
-        className="w-full max-w-2xl rounded-3xl p-8"
-        style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.09)",
-          backdropFilter: "blur(32px)",
-        }}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-xl rounded-[32px] p-8 md:p-10 bg-[#08090C]/90 border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.85)] backdrop-blur-2xl font-sans"
       >
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-[10px] uppercase tracking-[0.28em]" style={{ color: "rgba(255,255,255,0.3)" }}>
-            Primeiros passos • Passo {step + 1} de 3
+        <div className="flex items-center justify-between mb-8">
+          <p className="text-[11px] font-body tracking-wider uppercase text-white/35">
+            Primeiros passos • Etapa {step + 1} de 3
           </p>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {[0, 1, 2].map((idx) => (
               <span
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                  idx === step ? "w-6 bg-white" : "w-1.5 bg-white/20"
+                  idx === step
+                    ? "w-6 bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]"
+                    : "w-1.5 bg-white/20"
                 }`}
               />
             ))}
           </div>
         </div>
 
-        <div className="min-h-[140px]">
-          {step === 0 && (
-            <div>
-              <h3 className="mb-2 text-2xl font-black text-white">Sua biblioteca está vazia</h3>
-              <p className="text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.55)" }}>
-                Adicione seus jogos favoritos para ter um hub completo com estatísticas, conquistas e acompanhamento em tempo real.
-              </p>
-            </div>
-          )}
-
-          {step === 1 && (
-            <div>
-              <h3 className="mb-2 text-2xl font-black text-white">Conecte com a Steam</h3>
-              <p className="mb-5 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-                Vincule sua conta para importar jogos e conquistas automaticamente.
-              </p>
-              <button
-                type="button"
-                onClick={onConnectSteam}
-                className="h-10 rounded-full px-5 text-[11px] font-black uppercase tracking-wider transition-all hover:scale-[1.02]"
-                style={{
-                  background: "rgba(103,182,118,0.1)",
-                  border: "1px solid rgba(103,182,118,0.35)",
-                  color: "#67b676",
-                }}
+        <div className="min-h-[150px]">
+          <AnimatePresence mode="wait">
+            {step === 0 && (
+              <motion.div
+                key="step-0"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-3"
               >
-                Conectar Steam
-              </button>
-            </div>
-          )}
+                <h3 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-white">
+                  Sua biblioteca está vazia
+                </h3>
+                <p className="text-xs md:text-sm font-body text-white/50 leading-relaxed">
+                  Centralize todos os seus jogos, mods e acompanhe estatísticas em um único hub limpo e veloz.
+                </p>
+              </motion.div>
+            )}
 
-          {step === 2 && (
-            <div>
-              <h3 className="mb-2 text-2xl font-black text-white">Adicione manualmente</h3>
-              <p className="mb-5 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
-                Cadastre seu primeiro jogo local ou emulador manualmente agora.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  playSound("select");
-                  onOpenAddGame();
-                }}
-                className="h-10 rounded-full bg-white px-5 text-[11px] font-black uppercase tracking-wider text-black transition-all hover:scale-[1.02]"
+            {step === 1 && (
+              <motion.div
+                key="step-1"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
               >
-                Novo Jogo
-              </button>
-            </div>
-          )}
+                <h3 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-white">
+                  Conecte com a Steam
+                </h3>
+                <p className="text-xs md:text-sm font-body text-white/50 leading-relaxed">
+                  Vincule sua conta para importar seus jogos e conquistas automaticamente em segundos.
+                </p>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={onConnectSteam}
+                    className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white transition-all duration-200 flex items-center gap-2"
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    Conectar Steam
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div
+                key="step-2"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4"
+              >
+                <h3 className="text-2xl md:text-3xl font-display font-semibold tracking-tight text-white">
+                  Adicione manualmente
+                </h3>
+                <p className="text-xs md:text-sm font-body text-white/50 leading-relaxed">
+                  Cadastre qualquer jogo local, instalador ou emulador diretamente no seu launcher.
+                </p>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound("select");
+                      onOpenAddGame();
+                    }}
+                    className="cursor-pointer h-11 rounded-full bg-white hover:bg-white/90 px-6 text-xs font-body font-semibold text-black transition-all duration-200 flex items-center gap-2 shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Adicionar Jogo
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="flex items-center justify-between pt-6 border-t border-white/10 mt-4">
+        <div className="flex items-center justify-between pt-6 border-t border-white/[0.08] mt-6">
           <button
             type="button"
             onClick={handleBack}
             disabled={step === 0}
-            className="flex items-center gap-1 text-xs font-bold text-white/50 hover:text-white disabled:opacity-0 transition-opacity"
+            className="cursor-pointer flex items-center gap-1.5 text-xs font-body font-medium text-white/40 hover:text-white disabled:opacity-0 transition-all duration-200"
           >
             <ChevronLeft className="h-4 w-4" /> Voltar
           </button>
@@ -177,21 +212,21 @@ export const EmptyLibraryOnboarding: React.FC<EmptyLibraryOnboardingProps> = Rea
           <button
             type="button"
             onClick={handleNext}
-            className="flex items-center gap-1.5 h-9 rounded-full bg-white px-5 text-xs font-black uppercase tracking-wider text-black transition-all hover:scale-[1.02]"
+            className="cursor-pointer flex items-center gap-1.5 h-10 rounded-full bg-white hover:bg-white/90 px-6 text-xs font-body font-semibold text-black transition-all duration-200 shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
           >
             {step === 2 ? (
-              <>Concluir <Check className="h-4 w-4" /></>
+              <>Concluir <Check className="h-3.5 w-3.5" /></>
             ) : (
-              <>Próximo <ChevronRight className="h-4 w-4" /></>
+              <>Próximo <ChevronRight className="h-3.5 w-3.5" /></>
             )}
           </button>
         </div>
 
-        <p className="mt-5 flex items-center gap-2 text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-          Depois da primeira sincronização, seus jogos aparecem automaticamente.
+        <p className="mt-6 flex items-center gap-2 text-[11px] font-body text-white/35">
+          <CheckCircle2 className="h-3.5 w-3.5 text-white/60" />
+          Após a sincronização, seus jogos aparecem automaticamente na biblioteca.
         </p>
-      </div>
+      </motion.div>
     );
   },
 );

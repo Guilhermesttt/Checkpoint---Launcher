@@ -40,6 +40,12 @@ html[data-launcher-theme="checkpoint"] {
   --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+html[data-launcher-theme="ps5"] {
+  --launcher-accent: 0 114 206;
+  --launcher-accent-soft: rgba(0, 114, 206, 0.36);
+  --launcher-tint: rgba(0, 70, 170, 0.34);
+}
+
 html[data-launcher-theme="playstation"] {
   --launcher-accent: 37 99 235;
   --launcher-accent-soft: rgba(37, 99, 235, 0.34);
@@ -95,8 +101,8 @@ html[data-launcher-theme="sunset"] {
 }
 
 @theme {
-  --font-display: 'Unbounded', system-ui, sans-serif;
-  --font-heading: 'Unbounded', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-heading: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-ui: 'Inter', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;

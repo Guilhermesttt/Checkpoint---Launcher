@@ -657,19 +657,21 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   ];
 
   const activeAppTheme =
-    visualTheme === "phelierium" || visualTheme === "checkpoint"
-      ? "default"
-      : soundTheme === "cyberpunk" || visualTheme === "cyberpunk"
-        ? "cyberpunk"
-        : soundTheme === "ps4" || visualTheme === "ps4"
-          ? "ps4"
-          : soundTheme === "psp" || visualTheme === "psp"
-            ? "psp"
-            : soundTheme === "gamecube" || visualTheme === "gamecube"
-              ? "gamecube"
-              : soundTheme === "xbox360" || visualTheme === "xbox360"
-                ? "xbox360"
-                : "playstation";
+    visualTheme === "ps5" || soundTheme === "ps5"
+      ? "ps5"
+      : visualTheme === "phelierium" || visualTheme === "checkpoint" || soundTheme === "default"
+        ? "default"
+        : soundTheme === "cyberpunk" || visualTheme === "cyberpunk"
+          ? "cyberpunk"
+          : soundTheme === "ps4" || visualTheme === "ps4"
+            ? "ps4"
+            : soundTheme === "psp" || visualTheme === "psp"
+              ? "psp"
+              : soundTheme === "gamecube" || visualTheme === "gamecube"
+                ? "gamecube"
+                : soundTheme === "xbox360" || visualTheme === "xbox360"
+                  ? "xbox360"
+                  : "playstation";
 
   return (
     <SystemPageShell eyebrow={t("system")} title={t("settings")}>
@@ -1082,18 +1084,6 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                         {steamConnecting ? t("connecting") : t("connectSteam")}
                       </button>
                     )}
-                  </article>
-
-                  <article aria-label="Spotify" className="grid min-h-76px grid-cols-1 items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                        <FontAwesomeIcon icon={faSpotify} className="h-4.5 w-4.5 text-white/70" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white whitespace-nowrap">Spotify</p>
-                        <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">{shellCopy.spotifyDock}</p>
-                      </div>
-                    </div>
                   </article>
 
                   <article aria-label="Discord" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">

@@ -472,132 +472,222 @@ const buildAuthCallbackHtml = ({ platform, launcherCallbackUrl }) => {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet" />
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
+      html { color-scheme: dark; }
+
       body {
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: #000000;
+        background: #030405;
         color: #ffffff;
         font-family: 'Inter', system-ui, sans-serif;
         position: relative;
         overflow: hidden;
+        opacity: 0;
+        animation: pageIn 0.6s ease-out forwards;
+        transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1);
       }
+      @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
+
       /* Cosmic Deep Space Background */
       .cosmos-bg {
         position: absolute;
         inset: 0;
-        background: 
-          radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.08) 0%, transparent 60%),
+        background:
+          radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.07) 0%, transparent 60%),
           radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.04) 0%, transparent 50%),
           radial-gradient(circle at 20% 70%, rgba(255, 255, 255, 0.03) 0%, transparent 50%),
-          #000000;
+          #030405;
         z-index: 0;
         pointer-events: none;
       }
       .stars {
         position: absolute;
         inset: 0;
-        background-image: 
+        background-image:
           radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,0.7), rgba(0,0,0,0)),
           radial-gradient(1.5px 1.5px at 100px 150px, rgba(255,255,255,0.8), rgba(0,0,0,0)),
           radial-gradient(1px 1px at 240px 90px, rgba(255,255,255,0.6), rgba(0,0,0,0)),
           radial-gradient(2px 2px at 320px 280px, rgba(255,255,255,0.9), rgba(0,0,0,0)),
           radial-gradient(1px 1px at 450px 200px, rgba(255,255,255,0.5), rgba(0,0,0,0));
         background-size: 500px 500px;
-        opacity: 0.6;
+        opacity: 0;
         z-index: 1;
+        animation: starsIn 1.6s ease-out 0.1s forwards;
       }
-      main {
-        position: relative;
-        z-index: 2;
-        width: 100%;
-        max-width: 400px;
-        padding: 36px 28px;
-        text-align: center;
-        background: rgba(10, 10, 15, 0.7);
-        backdrop-filter: blur(28px);
-        -webkit-backdrop-filter: blur(28px);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 24px;
-        box-shadow: 0 0 50px rgba(255, 255, 255, 0.04), 0 20px 40px rgba(0, 0, 0, 0.8);
-      }
-      .brand {
+      @keyframes starsIn { to { opacity: 0.55; } }
+
+      /* Marca no canto, igual à tela de login */
+      .brand-corner {
+        position: absolute;
+        top: 28px;
+        left: 32px;
+        z-index: 20;
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 32px;
+        gap: 6px;
+        opacity: 0;
+        animation: fadeInUp 0.5s ease-out 0.15s forwards;
       }
-      .brand-logo {
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
-        filter: drop-shadow(0 0 12px rgba(255,255,255,0.3));
-      }
-      .brand-name {
+      .brand-corner .brand-name {
         font-family: 'Unbounded', system-ui, sans-serif;
         font-size: 13px;
         font-weight: 700;
-        letter-spacing: 0.18em;
+        letter-spacing: 0.1em;
         color: #ffffff;
-        text-transform: uppercase;
       }
-      .status-orb {
-        display: inline-flex;
+      .brand-corner .reg { font-size: 13px; color: rgba(255,255,255,0.4); }
+
+      /* Palco central: sem cartão, logo flutuando com anéis orbitais */
+      .stage {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
+      .orbit-wrap {
+        position: relative;
+        width: 300px;
+        height: 300px;
+        display: flex;
         align-items: center;
         justify-content: center;
-        width: 64px;
-        height: 64px;
+        margin-bottom: 12px;
+      }
+      .ring {
+        position: absolute;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
-        margin-bottom: 24px;
-        animation: pulseOrb 3s ease-in-out infinite alternate;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        opacity: 0;
+        animation: ringIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards, spin linear infinite;
       }
-      @keyframes pulseOrb {
-        0% { box-shadow: 0 0 20px rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); }
-        100% { box-shadow: 0 0 40px rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.4); }
+      .ring--outer { width: 300px; height: 300px; animation-delay: 0.25s, 0s; animation-duration: 0.8s, 46s; }
+      .ring--mid   { width: 240px; height: 240px; border-style: dashed; border-color: rgba(255,255,255,0.09); animation-delay: 0.35s, 0s; animation-duration: 0.8s, 30s; animation-direction: normal, reverse; }
+      .ring--inner { width: 190px; height: 190px; animation-delay: 0.45s, 0s; animation-duration: 0.8s, 20s; }
+      @keyframes ringIn { to { opacity: 1; } }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .core-glow {
+        position: absolute;
+        width: 170px;
+        height: 170px;
+        border-radius: 50%;
+        background: #ffffff;
+        filter: blur(60px);
+        opacity: 0;
+        animation: glowIn 0.9s ease-out 0.4s forwards, glowPulse 4s ease-in-out 1.3s infinite;
       }
-      h1 {
-        font-size: 22px;
-        font-weight: 600;
-        letter-spacing: -0.02em;
-        margin-bottom: 10px;
-        color: #ffffff;
+      @keyframes glowIn { to { opacity: 0.22; } }
+      @keyframes glowPulse { 0%, 100% { opacity: 0.18; transform: scale(1); } 50% { opacity: 0.32; transform: scale(1.12); } }
+
+      .status-burst {
+        position: absolute;
+        width: 118px;
+        height: 118px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        opacity: 0;
+        animation: burst 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
       }
-      p.sub {
-        font-size: 13.5px;
-        color: rgba(255, 255, 255, 0.6);
-        line-height: 1.6;
-        margin-bottom: 28px;
+      @keyframes burst {
+        0% { opacity: 0.9; transform: scale(0.4); }
+        100% { opacity: 0; transform: scale(2.1); }
       }
-      .divider {
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
-        margin-bottom: 20px;
+
+      .logo-badge {
+        position: relative;
+        z-index: 1;
+        opacity: 0;
+        transform: scale(0.5) rotate(-8deg);
+        animation: logoIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s forwards, floatY 5s ease-in-out 1.1s infinite;
       }
-      .footer {
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.4);
+      @keyframes logoIn { to { opacity: 1; transform: scale(1) rotate(0deg); } }
+      @keyframes floatY { 0%, 100% { transform: translateY(-6px); } 50% { transform: translateY(6px); } }
+
+      .logo-img {
+        display: block;
+        width: 104px;
+        height: 104px;
+        object-fit: contain;
+        filter: drop-shadow(0 0 40px rgba(255,255,255,0.55));
       }
-      .footer .dot { color: rgba(255, 255, 255, 0.2); margin: 0 8px; }
-      .footer a {
-        color: #ffffff;
-        font-weight: 500;
-        text-decoration: underline;
-        text-underline-offset: 3px;
-        cursor: pointer;
-        transition: opacity 0.2s ease;
+
+      .check-badge {
+        position: absolute;
+        bottom: -2px;
+        right: -2px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 18px rgba(255,255,255,0.6);
+        opacity: 0;
+        transform: scale(0);
+        animation: badgeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.75s forwards;
       }
-      .footer a:hover { opacity: 0.8; }
+      @keyframes badgeIn { to { opacity: 1; transform: scale(1); } }
+
       .check-path {
         stroke-dasharray: 40;
         stroke-dashoffset: 40;
-        animation: draw 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.2s;
+        animation: draw 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.85s;
       }
       @keyframes draw { to { stroke-dashoffset: 0; } }
+
+      h1 {
+        font-family: 'Unbounded', system-ui, sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin-bottom: 10px;
+        opacity: 0;
+        transform: translateY(8px);
+        animation: fadeInUp 0.5s ease-out 0.95s forwards;
+      }
+      p.sub {
+        font-size: 13.5px;
+        color: rgba(255, 255, 255, 0.55);
+        line-height: 1.6;
+        max-width: 340px;
+        margin-bottom: 24px;
+        opacity: 0;
+        transform: translateY(8px);
+        animation: fadeInUp 0.5s ease-out 1.05s forwards;
+      }
+      @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+
+      .divider {
+        width: 100%;
+        max-width: 220px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+        margin-bottom: 18px;
+        transform: scaleX(0);
+        animation: divIn 0.6s ease-out 1.15s forwards;
+      }
+      @keyframes divIn { to { transform: scaleX(1); } }
+
+      .footer {
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.45);
+        opacity: 0;
+        animation: fadeIn 0.5s ease-out 1.25s forwards;
+      }
+      @keyframes fadeIn { to { opacity: 1; } }
+
       @media (prefers-reduced-motion: reduce) {
+        body, .stars, .brand-corner, .ring, .core-glow, .status-burst, .logo-badge, h1, p.sub, .divider, .footer {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+        }
         .check-path { animation: none; stroke-dashoffset: 0; }
       }
     </style>
@@ -605,42 +695,44 @@ const buildAuthCallbackHtml = ({ platform, launcherCallbackUrl }) => {
   <body>
     <div class="cosmos-bg"></div>
     <div class="stars"></div>
-    <main>
-      <div class="brand">
-        <img
-          class="brand-logo"
-          src="${backendPublicUrl}/Pherielium_logo.png"
-          alt="Phelierium"
-        />
-        <span class="brand-name">Phelierium</span>
-      </div>
 
-      <div class="status-orb">
-        <svg width="32" height="32" viewBox="0 0 52 52">
-          <path class="check-path" d="M15 27 L23 35 L38 17" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+    <div class="brand-corner">
+      <span class="brand-name">PHELIERIUM</span>
+      <span class="reg">®</span>
+    </div>
+
+    <main class="stage">
+      <div class="orbit-wrap">
+        <div class="ring ring--outer"></div>
+        <div class="ring ring--mid"></div>
+        <div class="ring ring--inner"></div>
+        <div class="core-glow"></div>
+        <div class="status-burst"></div>
+        <div class="logo-badge">
+          <img class="logo-img" src="${backendPublicUrl}/Pherielium_logo.png" alt="Phelierium" />
+          <div class="check-badge">
+            <svg width="16" height="16" viewBox="0 0 52 52">
+              <path class="check-path" d="M15 27 L23 35 L38 17" fill="none" stroke="#000000" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
       </div>
 
       <h1>${platform} conectado.</h1>
-      <p class="sub">Sua conta foi vinculada com sucesso.<br/>Pode voltar para o launcher.</p>
+      <p class="sub">Sua conta foi vinculada com sucesso.<br/>Você pode fechar esta página.</p>
 
       <div class="divider"></div>
 
       <p class="footer">
-        Fechando em instantes<span class="dot">·</span><a id="close-now">fechar agora</a>
+        Você já pode fechar esta aba com segurança.
       </p>
     </main>
+
     <script>
       const launcherCallbackUrl = ${JSON.stringify(launcherCallbackUrl)};
-      document.getElementById('close-now').addEventListener('click', () => {
-        try { window.close(); } catch (e) {}
-      });
       if (launcherCallbackUrl) {
-        setTimeout(() => {
-          try { window.location.assign(launcherCallbackUrl); } catch (e) {}
-        }, 350);
+        try { window.location.assign(launcherCallbackUrl); } catch (e) {}
       }
-      setTimeout(() => { try { window.close(); } catch (e) {} }, 1800);
     </script>
   </body>
 </html>

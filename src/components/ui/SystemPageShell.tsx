@@ -5,11 +5,13 @@ import { useGamepadNavigation } from "../../hooks/useGamepadNavigation";
 export interface SystemPageShellProps {
   eyebrow: string;
   title: string;
+  description?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }
 
 export const SystemPageShell: React.FC<SystemPageShellProps> = React.memo(
-  ({ eyebrow, title, children }) => {
+  ({ eyebrow, title, description, actions, children }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useGamepadNavigation({
@@ -39,6 +41,12 @@ export const SystemPageShell: React.FC<SystemPageShellProps> = React.memo(
             >
               {title}
             </h1>
+            {description && (
+              <p className="mt-2 text-xs md:text-sm font-body text-white/50">
+                {description}
+              </p>
+            )}
+            {actions && <div className="mt-4 flex justify-end">{actions}</div>}
           </div>
           <div className="mx-auto w-full max-w-5xl">{children}</div>
         </div>

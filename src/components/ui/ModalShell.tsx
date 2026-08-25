@@ -9,6 +9,7 @@ interface ModalShellProps {
   isOpen: boolean;
   onClose: (silent?: boolean) => void;
   children: React.ReactNode;
+  title?: string;
   maxWidthClassName?: string;
   className?: string;
   backdropClassName?: string;
@@ -32,6 +33,7 @@ const ModalShell: React.FC<ModalShellProps> = ({
   isOpen,
   onClose,
   children,
+  title,
   maxWidthClassName = "max-w-2xl",
   className,
   backdropClassName,
@@ -39,7 +41,7 @@ const ModalShell: React.FC<ModalShellProps> = ({
   zIndexClassName = "z-[100]",
   reducedEffects = false,
   gamepadPriority = 100,
-  ariaLabel = "Janela de diálogo",
+  ariaLabel,
 }) => {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = React.useRef<HTMLElement | null>(null);
@@ -171,7 +173,7 @@ const ModalShell: React.FC<ModalShellProps> = ({
             ref={contentRef}
             role="dialog"
             aria-modal="true"
-            aria-label={ariaLabel}
+            aria-label={ariaLabel || title || "Janela de diálogo"}
             tabIndex={-1}
             initial={shouldReduceEffects ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
             animate={shouldReduceEffects ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
