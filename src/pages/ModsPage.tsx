@@ -1,27 +1,16 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  PackageOpen,
   Search,
   ChevronDown,
   LayoutGrid,
   ListFilter,
-  CheckCircle2,
   Download,
-  FolderSync,
-  Activity,
   Layers,
   Sparkles,
   MoreVertical,
-  ShieldCheck,
-  RefreshCw,
   FolderOpen,
   ArrowUpRight,
-  Power,
-  Trash2,
-  Settings,
-  Check,
-  AlertCircle,
   ExternalLink,
 } from "lucide-react";
 import type { Game } from "../types/domain";
@@ -66,13 +55,6 @@ const normalizeInstalledMods = (
     ]),
   );
 
-type ModSubTab =
-  | "BIBLIOTECA"
-  | "MEUS_MODS"
-  | "INSTALADOS"
-  | "ATUALIZACOES"
-  | "CONFIGURACOES";
-
 export const getGameArtwork = (game: Game): string => {
   if (game.cardImage) return game.cardImage;
   if (game.image && (game.image.startsWith("http") || game.image.startsWith("data:"))) return game.image;
@@ -91,7 +73,6 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     notificationVolume / 100,
   );
 
-  const [activeTab, setActiveTab] = useState<ModSubTab>("BIBLIOTECA");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -238,17 +219,6 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     return list;
   }, [games, searchTerm, statusFilter, sortOrder, installedByGame]);
 
-  const allInstalledModsList = useMemo(() => {
-    const list: { game: Game; mod: InstalledModEntry }[] = [];
-    games.forEach((game) => {
-      const mods = installedByGame[game.id] || [];
-      mods.forEach((mod) => {
-        list.push({ game, mod });
-      });
-    });
-    return list;
-  }, [games, installedByGame]);
-
   const configuredGames = games.filter((game) => Boolean(gameFolders[game.id])).length;
   const totalInstalledMods = Object.values(installedByGame).flat().length;
   const activeInstalledMods = Object.values(installedByGame)
@@ -330,50 +300,8 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
           </div>
         </section>
 
-        {/* Sub-Tabs Bar */}
-        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/[0.08] bg-[#090A0D]/90 backdrop-blur-xl p-1.5 shadow-lg">
-          {[
-            { id: "BIBLIOTECA" as const, label: "Biblioteca", icon: <Layers className="w-3.5 h-3.5" /> },
-            { id: "MEUS_MODS" as const, label: "Meus Mods", icon: <PackageOpen className="w-3.5 h-3.5" /> },
-            { id: "INSTALADOS" as const, label: "Instalados", icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-            { id: "ATUALIZACOES" as const, label: "Atualizações", badge: 6, icon: <RefreshCw className="w-3.5 h-3.5" /> },
-            { id: "CONFIGURACOES" as const, label: "Configurações", icon: <ShieldCheck className="w-3.5 h-3.5" /> },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onMouseEnter={() => playSound?.("hover")}
-                onClick={() => {
-                  playSound?.("select");
-                  setActiveTab(tab.id);
-                }}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.2)]"
-                    : "text-white/60 hover:bg-white/[0.06] hover:text-white"
-                }`}
-              >
-                {tab.icon}
-                <span className="font-body">{tab.label}</span>
-                {typeof tab.badge === "number" && (
-                  <span
-                    className={`ml-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9.5px] font-bold ${
-                      isActive ? "bg-black text-white" : "bg-white/20 text-white"
-                    }`}
-                  >
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Dynamic Tab Views */}
-        {activeTab === "BIBLIOTECA" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Main Games Grid & Discovery */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left Main Column: Games Grid & Discovery (8 Cols) */}
             <div className="lg:col-span-8 flex flex-col gap-6">
               {/* Search, Filter & Controls Bar */}
@@ -577,222 +505,9 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                   </div>
                 </div>
               </div>
-
-              {/* Panel 2: Perfil de Mods */}
-              <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-5 shadow-xl backdrop-blur-2xl">
-                <span className="text-[10.5px] font-body font-bold uppercase tracking-[0.2em] text-white/50 block mb-4">
-                  PERFIL DE MODS
-                </span>
-
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-body font-semibold mb-1.5">
-                      <span className="text-white/60">Performance</span>
-                      <span className="text-white">Equilibrado</span>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5, 6].map((bar) => (
-                        <div
-                          key={bar}
-                          className={`h-1.5 flex-1 rounded-full ${
-                            bar <= 4 ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)]" : "bg-white/[0.08]"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-body font-semibold mb-1.5">
-                      <span className="text-white/60">Estabilidade</span>
-                      <span className="text-white">Alto</span>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5, 6].map((bar) => (
-                        <div
-                          key={bar}
-                          className={`h-1.5 flex-1 rounded-full ${
-                            bar <= 5 ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)]" : "bg-white/[0.08]"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between text-xs font-body font-semibold mb-1.5">
-                      <span className="text-white/60">Qualidade Visual</span>
-                      <span className="text-white">Máximo</span>
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3, 4, 5, 6].map((bar) => (
-                        <div
-                          key={bar}
-                          className={`h-1.5 flex-1 rounded-full ${
-                            bar <= 6 ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)]" : "bg-white/[0.08]"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
-        )}
-
-        {/* Tab: MEUS MODS & INSTALADOS */}
-        {(activeTab === "MEUS_MODS" || activeTab === "INSTALADOS") && (
-          <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-              <div>
-                <h2 className="text-lg font-display font-bold text-white">
-                  {activeTab === "INSTALADOS" ? "Mods Ativos & Instalados" : "Todos os Meus Mods"}
-                </h2>
-                <p className="text-xs font-body text-white/50">
-                  Gerencie e ative mods instalados em todos os seus jogos cadastrados.
-                </p>
-              </div>
-              <span className="px-3 py-1 rounded-xl bg-white/10 text-xs font-bold text-white">
-                {allInstalledModsList.length} mods
-              </span>
-            </div>
-
-            {allInstalledModsList.length === 0 ? (
-              <div className="py-16 text-center text-white/40 space-y-2">
-                <PackageOpen className="w-10 h-10 mx-auto opacity-40 mb-2" />
-                <p className="text-sm font-semibold text-white/60">Nenhum mod instalado ainda</p>
-                <p className="text-xs">Selecione um jogo na Biblioteca para gerenciar e instalar modificações.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {allInstalledModsList.map(({ game, mod }) => (
-                  <div
-                    key={`${game.id}-${mod.id}`}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/20 transition-all"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
-                        {mod.pictureUrl ? (
-                          <img src={mod.pictureUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white/40 font-bold text-xs">
-                            MOD
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{mod.name}</p>
-                        <p className="text-[11px] font-body text-white/40 truncate">
-                          {game.title} · v{mod.version || "1.0"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => toggleInstalledMod(game, mod.id, !mod.enabled)}
-                        className={`p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                          mod.enabled
-                            ? "bg-white text-black border-white"
-                            : "bg-white/[0.04] text-white/50 border-white/[0.08] hover:text-white"
-                        }`}
-                        title={mod.enabled ? "Desativar Mod" : "Ativar Mod"}
-                      >
-                        <Power className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeInstalledMod(game, mod.id)}
-                        className="p-2 rounded-xl bg-white/[0.04] hover:bg-rose-500/20 text-white/40 hover:text-rose-400 border border-white/[0.08] hover:border-rose-500/30 transition-all cursor-pointer"
-                        title="Desinstalar Mod"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Tab: ATUALIZAÇÕES */}
-        {activeTab === "ATUALIZACOES" && (
-          <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
-              <div>
-                <h2 className="text-lg font-display font-bold text-white">Atualizações Disponíveis</h2>
-                <p className="text-xs font-body text-white/50">
-                  Verifique novas versões publicadas pelos criadores no Nexus Mods.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-white text-black text-xs font-bold hover:bg-white/90 transition cursor-pointer"
-              >
-                Atualizar Todos
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                { name: "Cyber Engine Tweaks", game: "Cyberpunk 2077", current: "v1.28", next: "v1.29", size: "12 MB" },
-                { name: "HD Reworked Project NextGen", game: "The Witcher 3", current: "v11.0", next: "v12.0", size: "4.2 GB" },
-                { name: "SkyUI 5.2 SE", game: "Skyrim Special Edition", current: "v5.1", next: "v5.2", size: "45 MB" },
-              ].map((update, i) => (
-                <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
-                  <div>
-                    <h4 className="text-xs font-bold text-white">{update.name}</h4>
-                    <p className="text-[11px] text-white/40 mt-0.5">
-                      {update.game} · {update.current} &rarr; <span className="text-white font-semibold">{update.next}</span> ({update.size})
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="px-4 py-1.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition cursor-pointer"
-                  >
-                    Atualizar
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Tab: CONFIGURAÇÕES */}
-        {activeTab === "CONFIGURACOES" && (
-          <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-2xl space-y-6">
-            <div className="border-b border-white/[0.06] pb-4">
-              <h2 className="text-lg font-display font-bold text-white">Configurações do Nexus & Diretórios</h2>
-              <p className="text-xs font-body text-white/50">
-                Ajuste os caminhos de instalação local e sincronização da API do Nexus Mods.
-              </p>
-            </div>
-
-            <div className="space-y-4 max-w-2xl">
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
-                <label className="text-xs font-bold text-white block">Nexus Mods API Key</label>
-                <input
-                  type="password"
-                  placeholder="nexus_api_key_..."
-                  defaultValue="••••••••••••••••••••••••"
-                  className="w-full h-10 px-4 rounded-xl bg-white/[0.04] border border-white/[0.08] text-xs font-mono text-white focus:outline-none focus:border-white/30"
-                />
-                <p className="text-[10.5px] text-white/40">Usado para baixar e verificar atualizações de mods automaticamente.</p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-white">Instalação Automática de Dependências</h4>
-                  <p className="text-[10.5px] text-white/40">Baixar frameworks e pré-requisitos ao adicionar mods.</p>
-                </div>
-                <input type="checkbox" defaultChecked className="accent-white h-4 w-4 cursor-pointer" />
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         {/* Selected Game Mod Detail Panel Modal */}
         {selectedGame && (
