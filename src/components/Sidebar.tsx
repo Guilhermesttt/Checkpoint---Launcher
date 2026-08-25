@@ -576,7 +576,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelect = (id: string) => {
     onCategory(id);
-    playSound("navigate");
+    playSound("showModal");
   };
 
   return (

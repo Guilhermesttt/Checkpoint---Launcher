@@ -112,7 +112,7 @@ const soundThemes = {
     select: phelieriumSelectSound,
     back: phelieriumCloseDetailSound,
     edit: phelieriumEditSound,
-    modalClose: phelieriumAlertSound,
+    modalClose: phelieriumCloseDetailSound,
     favoriteOn: phelieriumClickSound,
     favoriteOff: phelieriumClickSound,
     delete: phelieriumAlertSound,
@@ -126,7 +126,7 @@ const soundThemes = {
     switchOn: phelieriumClickSound,
     switchOff: phelieriumClickSound,
     screenshot: phelieriumUiAchievementSound,
-    showModal: phelieriumSelectSound,
+    showModal: phelieriumDeepSelectSound,
     overlayAchievement: phelieriumAchievementSound,
   },
   ps5: {
