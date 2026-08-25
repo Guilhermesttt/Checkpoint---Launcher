@@ -42,15 +42,16 @@ import {
   Track as LiveKitTrack,
   type LocalTrackPublication,
 } from "../services/livekitVoice";
-import sfxJoin from "../sounds/Stoat_SFX/user_join_voice-DbrgaLbl.ogg";
-import sfxLeave from "../sounds/Stoat_SFX/user_leave_voice-CBZjEE14.ogg";
+import sfxJoin from "../sounds/Phelierium Default/ui_call_enter.mp3";
+import sfxLeave from "../sounds/Phelierium Default/ui_leave_call.mp3";
+import sfxIncomingCall from "../sounds/Phelierium Default/Magnetophonique_-_29_03_2017_-_La_Plante_Montreal_KLICKAUD.mp3";
+import sfxRingingOut from "../sounds/Phelierium Default/ui_ringing.mp3";
 import sfxMute from "../sounds/Stoat_SFX/mute-CuCJ24EB.ogg";
 import sfxUnmute from "../sounds/Stoat_SFX/unmute-CxrIl-lz.ogg";
 import sfxDeafen from "../sounds/Stoat_SFX/deafen-CCoO7jJ3.ogg";
 import sfxUndeafen from "../sounds/Stoat_SFX/undeafen-HBVfWE8u.ogg";
 import sfxStreamStart from "../sounds/Stoat_SFX/stream_start-C5XqRk1f.ogg";
 import sfxStreamEnd from "../sounds/Stoat_SFX/stream_end-CBLpDPZy.ogg";
-import sfxIncomingCall from "../sounds/Stoat_SFX/incoming_call.ogg";
 import sfxFullMute from "../sounds/Stoat_SFX/full_mute.ogg";
 
 const playSfx = (src: string, volume = 1.0) => {
@@ -1322,8 +1323,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         activeRingtoneAudioRef.current = audio;
         void audio.play().catch(() => { });
       } else if (type === "ringout") {
-        const audio = new Audio(sfxJoin);
-        audio.volume = 0.5;
+        const audio = new Audio(sfxRingingOut);
+        audio.loop = true;
+        audio.volume = 0.85;
         activeRingtoneAudioRef.current = audio;
         void audio.play().catch(() => { });
       } else if (type === "connect") {
