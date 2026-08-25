@@ -135,7 +135,12 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
   );
 
   const [activeTab, setActiveTab] = React.useState<PanelTab>("discover");
-  const [domainDraft, setDomainDraft] = React.useState(gameDomain);
+  const [domainDraft, setDomainDraft] = React.useState(gameDomain || "");
+
+  React.useEffect(() => {
+    setDomainDraft(gameDomain || "");
+  }, [gameDomain, isOpen]);
+
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortMode, setSortMode] = React.useState<CatalogSort>("featured");
   const [visibleCount, setVisibleCount] = React.useState(CATALOG_PAGE_SIZE);

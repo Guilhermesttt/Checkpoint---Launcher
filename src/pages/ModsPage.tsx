@@ -516,16 +516,16 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             game={selectedGame}
             isOpen={Boolean(selectedGame)}
             onClose={() => setSelectedGame(null)}
-            gameFolder={gameFolders[selectedGame.id]}
-            onSelectGameFolder={() => void chooseGameFolder(selectedGame)}
+            gameFolder={gameFolders[selectedGame.id] || ""}
+            onChooseFolder={() => void chooseGameFolder(selectedGame)}
+            gameDomain={gameDomains[selectedGame.id] || ""}
+            onSaveDomain={(domain) => saveGameDomain(selectedGame, domain)}
             installedMods={installedByGame[selectedGame.id] || []}
             onToggleMod={(modId, enabled) =>
               toggleInstalledMod(selectedGame, modId, enabled)
             }
             onRemoveMod={(modId) => removeInstalledMod(selectedGame, modId)}
-            nexusDomain={gameDomains[selectedGame.id]}
-            onSaveNexusDomain={(domain) => saveGameDomain(selectedGame, domain)}
-            onDownloadRecorded={handleDownloadRecorded}
+            onDownloadRecorded={(mod) => recordDownloadedMod(selectedGame, mod)}
           />
         )}
       </div>
