@@ -1287,7 +1287,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } }}
           className="fixed inset-0 z-100 flex"
           style={{ background: "var(--background)" }}
         >
@@ -1302,7 +1302,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           <motion.div
             initial={{ scale: 1.05, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 1.05, opacity: 0 }}
+            exit={{ scale: 1.1, opacity: 0, filter: "blur(16px)", transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } }}
             transition={{ duration: 1.5, ease: "easeOut" }}
             className="absolute inset-0 origin-center"
             style={{
@@ -1323,12 +1323,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
           <div className="relative z-10 grid w-full h-full grid-cols-[minmax(560px,720px)_1fr] gap-8">
             <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -40 }}
+              initial={{ opacity: 0, x: -50, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{
+                opacity: 0,
+                x: -70,
+                scale: 0.95,
+                filter: "blur(10px)",
+                transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
+              }}
               transition={{
                 duration: 0.6,
-                delay: 0.2,
+                delay: 0.15,
                 ease: [0.16, 1, 0.3, 1],
               }}
               className="m-8 mr-0 rounded-[32px] border border-white/10 bg-black/35 backdrop-blur-3xl shadow-2xl p-8 flex flex-col justify-center h-[calc(100dvh-4rem)]"
@@ -1894,10 +1900,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             </motion.div>
 
             <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 40 }}
-              transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              initial={{ opacity: 0, x: 50, scale: 0.97 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{
+                opacity: 0,
+                x: 70,
+                scale: 0.95,
+                filter: "blur(10px)",
+                transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
+              }}
+              transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col justify-end items-end p-8 pl-0"
             >
               <div className="w-[260px] rounded-3xl overflow-hidden border border-white/10 bg-black/35 backdrop-blur-2xl shadow-2xl mb-5">
@@ -1949,13 +1961,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             </motion.div>
           </div>
 
-          <button
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
             onClick={onClose}
             aria-label={copy.close}
-            className="absolute top-8 right-8 z-20 p-4 premium-glass rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90"
+            className="absolute top-8 right-8 z-20 p-4 premium-glass rounded-full hover:bg-white/10 transition-all hover:rotate-90 active:scale-90 cursor-pointer"
           >
             <X className="w-5 h-5 text-white" />
-          </button>
+          </motion.button>
 
           <ModalShell
             isOpen={Boolean(
