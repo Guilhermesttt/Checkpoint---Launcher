@@ -12,6 +12,8 @@ import {
   FolderOpen,
   ArrowUpRight,
   ExternalLink,
+  PackageOpen,
+  CheckCircle2,
 } from "lucide-react";
 import type { Game } from "../types/domain";
 import { usePreferences } from "../context/PreferencesContext";
@@ -507,7 +509,6 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
               </div>
             </div>
           </div>
-        </div>
 
         {/* Selected Game Mod Detail Panel Modal */}
         {selectedGame && (
