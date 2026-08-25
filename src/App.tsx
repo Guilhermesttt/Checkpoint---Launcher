@@ -21,6 +21,8 @@ import { usePrefersReducedMotion } from "./hooks/usePrefersReducedMotion";
 import type { SoundTheme } from "./context/PreferencesContext";
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
+  default: () =>
+    import("./sounds/Phelierium Default/background_music.mp3").then((module) => module.default),
   ps5: () =>
     import("./sounds/PS5_Plus/003. Home Menu.mp3").then((module) => module.default),
   ps4: () => import("./sounds/PS4/01 Main.mp3").then((module) => module.default),
@@ -39,6 +41,7 @@ const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
 // These source tracks were mastered much quieter than the other theme music.
 // The gain values bring their peaks close to -2 dB without changing the user's volume setting.
 const menuMusicGain: Record<SoundTheme, number> = {
+  default: 1,
   ps5: 0.7,
   ps4: 25,
   psp: 1,
