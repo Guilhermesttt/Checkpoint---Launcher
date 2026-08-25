@@ -112,10 +112,6 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     ),
   );
 
-  const [activeModProfile, setActiveModProfile] = useState<string>(() =>
-    localStorage.getItem(storageKeys.activeProfile(uid)) || "Equilibrado",
-  );
-
   useEffect(() => {
     localStorage.setItem(
       storageKeys.installed(uid),
