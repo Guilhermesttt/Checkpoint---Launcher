@@ -4,7 +4,7 @@ import "@fontsource/archivo-black/400.css";
 import "@fontsource/stix-two-text/400.css";
 import "@fontsource/stix-two-text/700.css";
 import "./index.css";
-import { Navigate, createBrowserRouter, RouterProvider } from "react-router-dom";
+import { Navigate, createBrowserRouter, createHashRouter, RouterProvider } from "react-router-dom";
 
 import LoadingState from "./components/ui/loading-state";
 
@@ -108,7 +108,7 @@ const webRoutes = [
   },
 ];
 
-const router = createBrowserRouter(isDesktopRuntime ? desktopRoutes : webRoutes);
+const router = isDesktopRuntime ? createHashRouter(desktopRoutes) : createBrowserRouter(webRoutes);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

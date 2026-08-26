@@ -1009,24 +1009,43 @@ const waitForServer = async () => {
 };
 
 
-const loadMainWindow = async () => {
-  const preferredUrl = process.env.ELECTRON_START_URL || APP_URL;
-  const fallbackUrl = process.env.ELECTRON_START_URL ? APP_URL : null;
-  const targets = fallbackUrl && fallbackUrl !== preferredUrl ? [preferredUrl, fallbackUrl] : [preferredUrl];
+const getLocalDistIndexPath = () => {
+  const possiblePaths = [
+    path.join(__dirname, "..", "dist", "index.html"),
+    path.join(app.getAppPath(), "dist", "index.html"),
+  ];
+  return possiblePaths.find((p) => fs.existsSync(p)) || null;
+};
 
-  let lastError = null;
-  for (const target of targets) {
+const loadMainWindow = async () => {
+  if (process.env.ELECTRON_START_URL) {
     try {
-      await mainWindow.loadURL(target);
+      await mainWindow.loadURL(process.env.ELECTRON_START_URL);
       return;
     } catch (error) {
-      lastError = error;
-      appendStartupLog(`Failed to load window URL: ${target}`, error);
-      await sleep(700);
+      appendStartupLog(`Failed to load dev server: ${process.env.ELECTRON_START_URL}`, error);
     }
   }
 
-  throw lastError ?? new Error("Falha ao carregar a janela principal.");
+  const localDistPath = getLocalDistIndexPath();
+  if (localDistPath) {
+    try {
+      await mainWindow.loadFile(localDistPath);
+      return;
+    } catch (error) {
+      appendStartupLog(`Failed to load local dist index.html: ${localDistPath}`, error);
+    }
+  }
+
+  const preferredUrl = APP_URL;
+  try {
+    await mainWindow.loadURL(preferredUrl);
+    return;
+  } catch (error) {
+    appendStartupLog(`Failed to load window URL: ${preferredUrl}`, error);
+  }
+
+  throw new Error("Falha ao carregar a janela principal (arquivos locais ou backend indisponíveis).");
 };
 
 const showFatalStartupError = (error) => {
@@ -1046,7 +1065,8 @@ const showFatalStartupError = (error) => {
 };
 
 const createWindow = async () => {
-  if (!process.env.ELECTRON_START_URL) {
+  const hasLocalDist = Boolean(getLocalDistIndexPath());
+  if (!process.env.ELECTRON_START_URL && !hasLocalDist) {
     await waitForServer();
   }
 

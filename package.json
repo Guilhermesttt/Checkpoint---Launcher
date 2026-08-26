@@ -69,7 +69,10 @@
       "assets/manifest.json",
       "package.json",
       "src/assets/hedrabionics_pindown.io.mp4",
-      "src/assets/Overlay_Background.mp4"
+      "src/assets/Overlay_Background.mp4",
+      "src/sounds/**/*",
+      "src/assets/**/*",
+      "node_modules/@fontsource-variable/**/*"
     ],
     "asar": true,
     "asarUnpack": [
