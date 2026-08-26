@@ -224,7 +224,6 @@ const normalizeCaptureShortcut = (value) => {
 const pendingOverlayEvents = [];
 let achievementBridge;
 let startupErrorShown = false;
-let isQuitting = false;
 let tray = null;
 let localGameLibrary = null;
 let pendingAccountAuthCallback = null;
@@ -232,26 +231,6 @@ let nexusCredentialStore = null;
 let pendingNexusDownload = null;
 let nexusDownloadState = null;
 let nexusDownloadInProgress = false;
-
-const windowBehaviorController = createWindowBehaviorController({
-  hideWindow: () => {
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
-  },
-  showWindow: () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-  },
-  requestConfirmation: () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    mainWindow.webContents.send("system:exit-confirmation-requested");
-  },
-  quitApp: () => {
-    isQuitting = true;
-    app.quit();
-  },
-});
 
 const overlayIconUrl = () =>
   `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
