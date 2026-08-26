@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage, nativeImage } = require("electron");
 
 const crypto = require("node:crypto");
 const { z } = require("zod");
@@ -340,6 +340,9 @@ const deliverAccountAuthCallback = (payload) => {
 const isLocalAppUrl = (rawUrl) => {
   try {
     const url = new URL(rawUrl);
+    if (url.protocol === "file:") {
+      return true;
+    }
     const origin = `${url.protocol}//${url.host}`;
     // Aceita tanto a origem do backend de produção quanto do Vite em modo dev
     const backendOk = origin === APP_ORIGIN;
@@ -3985,10 +3988,34 @@ app.whenReady().then(async () => {
       },
     };
 
-    const iconPath = path.join(app.getAppPath(), "assets", "icon.png");
     try {
-      if (fs.existsSync(iconPath)) {
-        tray = new Tray(iconPath);
+      const getTrayIcon = () => {
+        const candidatePaths = [
+          path.join(__dirname, "..", "assets", "icon.ico"),
+          path.join(app.getAppPath(), "assets", "icon.ico"),
+          path.join(process.resourcesPath, "assets", "icon.ico"),
+          path.join(__dirname, "..", "assets", "icon.png"),
+          path.join(app.getAppPath(), "assets", "icon.png"),
+          path.join(process.resourcesPath, "assets", "icon.png"),
+        ];
+        for (const p of candidatePaths) {
+          try {
+            if (fs.existsSync(p)) {
+              const img = nativeImage.createFromPath(p);
+              if (!img.isEmpty()) {
+                return img.resize({ width: 16, height: 16 });
+              }
+            }
+          } catch {
+            // Continua procurando nos outros caminhos
+          }
+        }
+        return null;
+      };
+
+      const trayIcon = getTrayIcon();
+      if (trayIcon && !trayIcon.isEmpty()) {
+        tray = new Tray(trayIcon);
         const contextMenu = Menu.buildFromTemplate([
           { label: "Abrir Phelierium", click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
           { label: "Sair", click: () => { windowBehaviorController.requestAppQuit(); } }
@@ -4004,6 +4031,8 @@ app.whenReady().then(async () => {
         };
         tray.on("click", openMainWindow);
         tray.on("double-click", openMainWindow);
+      } else {
+        console.warn("[SystemTray] Nenhum icone valido encontrado para a bandeja.");
       }
     } catch (e) {
       console.warn("Não foi possível inicializar a System Tray:", e);

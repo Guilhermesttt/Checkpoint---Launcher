@@ -18,6 +18,7 @@ const formItemVariants = {
     transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] as const },
   },
 };
+import pherieliumLogo from "../assets/Pherielium_logo.png";
 import { useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { NotificationProvider } from "../components/NotificationCenter";
@@ -278,7 +279,7 @@ const SuccessOverlay = ({ message }: { message: string }) => {
             className="absolute inset-0 rounded-full bg-white blur-[60px]"
           />
           <img
-            src="/Pherielium_logo.png"
+            src={pherieliumLogo}
             alt="Pherielium"
             className="relative w-28 h-28 md:w-36 md:h-36 object-contain drop-shadow-[0_0_50px_rgba(255,255,255,0.85)]"
             draggable={false}
@@ -395,7 +396,7 @@ const AnimatedPherieliumLogo = () => {
         className="relative z-10 cursor-pointer"
       >
         <img
-          src="/Pherielium_logo.png"
+          src={pherieliumLogo}
           alt="Pherielium"
           className="w-52 h-52 md:w-72 md:h-72 object-contain drop-shadow-[0_0_60px_rgba(255,255,255,0.65)] transition-transform duration-500 hover:scale-105"
           draggable={false}
