@@ -1,3 +1,5 @@
+import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
+
 const updatedAt = "July 3, 2026";
 
 export default function PrivacyPolicy() {
@@ -5,7 +7,7 @@ export default function PrivacyPolicy() {
     <main className="min-h-screen bg-[#050507] text-white">
       <section className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-6 py-16 sm:px-8 lg:px-10">
         <div className="flex items-center gap-3">
-          <img src="/Pherielium_logo.png" alt="Pherielium" className="h-10 w-10 object-contain" />
+          <img src={PHERIELIUM_LOGO_PATH} alt="Pherielium" className="h-10 w-10 object-contain" />
           <span className="text-lg font-heading font-bold tracking-[0.18em] text-white/90">
             PHERIELIUM
           </span>

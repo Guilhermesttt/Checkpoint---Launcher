@@ -65,8 +65,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "assets/icon.ico",
-      "assets/manifest.json",
+      "assets/**/*",
+      "public/**/*",
       "package.json",
       "src/assets/hedrabionics_pindown.io.mp4",
       "src/assets/Overlay_Background.mp4",

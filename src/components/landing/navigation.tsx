@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
+import { PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 
 const navLinks = [
   { name: "Recursos",     href: "#features"      },
@@ -38,7 +39,7 @@ export function Navigation() {
         >
           <a href="#" className="flex items-center gap-2.5 group">
             <img
-              src="/Pherielium_logo.png"
+              src={PHERIELIUM_LOGO_PATH}
               alt="Phelierium"
               className={`transition-all duration-500 object-contain ${isScrolled ? "w-6 h-6" : "w-7 h-7"}`}
             />

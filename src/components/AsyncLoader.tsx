@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import LoadingState from "./ui/loading-state";
+import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 
 const loadingMsgs = [
   "Iniciando sistemas...",
@@ -46,7 +47,7 @@ const AsyncLoader: React.FC = () => {
           <div className="absolute -inset-4 rounded-full bg-white/[0.03] blur-xl animate-pulse" />
           <div className="relative w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/[0.12] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.1)] backdrop-blur-xl">
             <img
-              src="/Pherielium_logo.png"
+              src={PHERIELIUM_LOGO_PATH}
               alt="Pherielium"
               className="w-8 h-8 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]"
             />

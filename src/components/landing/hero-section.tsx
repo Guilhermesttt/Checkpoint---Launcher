@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
-import { EPIC_GAMES_ICON_PATH } from "../../constants/assets";
+import { EPIC_GAMES_ICON_PATH, PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 
 const words = ["organizar", "lançar", "descobrir", "jogar"];
 
@@ -120,7 +120,7 @@ export function HeroSection() {
         <div className="lg:max-w-[60%]">
           <div className={`mb-8 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
             <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
-              <img src="/Pherielium_logo.png" alt="Phelierium" className="h-4 w-4 object-contain opacity-80" />
+              <img src={PHERIELIUM_LOGO_PATH} alt="Phelierium" className="h-4 w-4 object-contain opacity-80" />
               O launcher definitivo para sua biblioteca de jogos
             </span>
           </div>

@@ -232,8 +232,24 @@ let pendingNexusDownload = null;
 let nexusDownloadState = null;
 let nexusDownloadInProgress = false;
 
-const overlayIconUrl = () =>
-  `file:///${path.join(app.getAppPath(), "assets", "icon.png").replace(/\\/g, "/")}`;
+const getOverlayIconDataUri = () => {
+  const candidatePaths = [
+    path.join(__dirname, "..", "assets", "icon.png"),
+    path.join(app.getAppPath(), "assets", "icon.png"),
+    path.join(process.resourcesPath, "assets", "icon.png"),
+  ];
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        const buf = fs.readFileSync(p);
+        return `data:image/png;base64,${buf.toString("base64")}`;
+      }
+    } catch {}
+  }
+  return "";
+};
+
+const overlayIconUrl = () => getOverlayIconDataUri();
 
 const profileArg = process.argv.find((arg) => arg.startsWith("--profile="))?.split("=")[1] || process.env.CHECKPOINT_PROFILE;
 if (profileArg) {

@@ -18,6 +18,7 @@ import {
 import type { Game } from "../types/domain";
 import { usePreferences } from "../context/PreferencesContext";
 import { useSoundEffects } from "../hooks/useSoundEffects";
+import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import ModGameDetailPanel, {
   type InstalledModEntry,
 } from "../components/mods/ModGameDetailPanel";
@@ -262,7 +263,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
               <div className="absolute inset-3 rounded-full border border-white/20 rotate-45 animate-spin" style={{ animationDuration: "10s" }} />
               <div className="w-14 h-14 rounded-full bg-white/[0.08] border border-white/30 shadow-[0_0_30px_rgba(255,255,255,0.25)] flex items-center justify-center p-2.5">
                 <img
-                  src="/Pherielium_logo.png"
+                  src={PHERIELIUM_LOGO_PATH}
                   alt="Pherielium Hub"
                   className="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(255,255,255,0.6)]"
                 />

@@ -1,6 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneOff, Video, Signal, ShieldCheck, Activity } from "lucide-react";
+import { PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 import type { CallInvitePayload } from "../../services/voiceCall";
 
 interface IncomingCallModalProps {
@@ -45,7 +46,7 @@ export const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 opacity-50">
-                <img src="/Pherielium_logo.png" alt="" className="h-3.5 w-3.5 object-contain" />
+                <img src={PHERIELIUM_LOGO_PATH} alt="" className="h-3.5 w-3.5 object-contain" />
                 <span className="text-[10px] font-display font-bold text-white tracking-widest uppercase">
                   PHERIELIUM
                 </span>

@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import { supabase } from "../services/supabase";
 
 const GoogleIcon = () => (
@@ -49,7 +50,7 @@ const DesktopAuth: React.FC = () => {
           ) : status === "error" ? (
             <AlertCircle className="w-7 h-7 text-red-400" />
           ) : (
-            <img src="/Pherielium_logo.png" className="w-8 h-8 object-contain" alt="Pherielium" />
+            <img src={PHERIELIUM_LOGO_PATH} className="w-8 h-8 object-contain" alt="Pherielium" />
           )}
         </div>
         

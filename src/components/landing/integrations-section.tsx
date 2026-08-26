@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSteam } from "@fortawesome/free-brands-svg-icons";
-import { EPIC_GAMES_ICON_PATH } from "../../constants/assets";
+import { faSteam, faDiscord, faSpotify, faXbox } from "@fortawesome/free-brands-svg-icons";
+import { PHERIELIUM_LOGO_PATH, EPIC_GAMES_ICON_PATH } from "../../constants/assets";
 
 const integrations = [
   {
@@ -112,7 +112,7 @@ export function IntegrationsSection() {
                       className="h-15 w-15 object-contain invert"
                     />
                   ) : (
-                    <img src="/Pherielium_logo.png" alt="Phelierium" className="h-16 w-16 object-contain opacity-80" />
+                    <img src={PHERIELIUM_LOGO_PATH} alt="Phelierium" className="h-16 w-16 object-contain opacity-80" />
                   )}
                 </div>
                 <h3 className="text-2xl font-display mb-2">

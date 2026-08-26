@@ -20,6 +20,7 @@ import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import LoadingState from "../components/ui/loading-state";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
+import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import {
   AddFriendModal,
   ChatModal,
@@ -2405,7 +2406,7 @@ const Home: React.FC = () => {
                   className="absolute inset-0 rounded-full bg-white blur-2xl"
                 />
                 <img
-                  src="/Pherielium_logo.png"
+                  src={PHERIELIUM_LOGO_PATH}
                   alt="Pherielium"
                   className="relative w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-[0_0_35px_rgba(255,255,255,0.6)]"
                   draggable={false}

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, Check, Plus, Link2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
+import { PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 
 export interface EmptyStateProps {
   searchTerm: string;
@@ -20,7 +21,7 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(
     >
       <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)]">
         <img
-          src="/Pherielium_logo.png"
+          src={PHERIELIUM_LOGO_PATH}
           alt="Pherielium"
           className="w-8 h-8 object-contain opacity-70"
           draggable={false}

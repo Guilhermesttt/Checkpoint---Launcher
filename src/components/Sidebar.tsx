@@ -31,6 +31,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam, faDiscord, faSpotify, faXbox } from "@fortawesome/free-brands-svg-icons";
 import {
+  PHERIELIUM_LOGO_PATH,
   EPIC_GAMES_ICON_PATH,
   EA_GAMES_ICON_PATH,
   UBISOFT_ICON_PATH,
@@ -610,7 +611,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <div className="relative w-10 h-10 rounded-2xl flex items-center justify-center bg-white/[0.05] border border-white/[0.08] group-hover:border-white/20 transition-all duration-200 group-hover:scale-105 shadow-md shrink-0">
-            <img src="/Pherielium_logo.png" alt="Pherielium" className="h-6 w-6 object-contain" />
+            <img src={PHERIELIUM_LOGO_PATH} alt="Pherielium" className="h-6 w-6 object-contain" />
           </div>
           {isExpanded && (
             <div className="flex flex-1 items-center justify-between min-w-0 pr-1">
