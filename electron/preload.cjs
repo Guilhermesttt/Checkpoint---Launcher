@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   isExecutableRunning: (executablePath) => ipcRenderer.invoke("launcher:is-executable-running", executablePath),
   detectRunningGames: (executablePaths) => ipcRenderer.invoke("launcher:detect-running-games", executablePaths),
   startGoogleBrowserAuth: () => ipcRenderer.invoke("auth:start-google-browser"),
+  pollGoogleBrowserAuth: (state) => ipcRenderer.invoke("auth:poll-google-status", state),
   onAccountAuthCallback: (callback) => {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on("auth:account-callback", handler);

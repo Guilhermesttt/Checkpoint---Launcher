@@ -3545,6 +3545,22 @@ registerSecureIpcHandler("auth:start-google-browser", async () => {
   return { state };
 });
 
+registerSecureIpcHandler("auth:poll-google-status", async (_event, state) => {
+  if (!state || typeof state !== "string") {
+    return { status: "error", error: "State invalido." };
+  }
+  try {
+    const statusUrl = new URL(`/auth/desktop/google/status?state=${encodeURIComponent(state)}`, APP_URL);
+    const response = await fetch(statusUrl.toString());
+    if (!response.ok) {
+      return { status: "pending" };
+    }
+    return await response.json();
+  } catch (error) {
+    return { status: "pending" };
+  }
+});
+
 registerSecureIpcHandler("shell:open-external", async (_event, url) => {
   const rawUrl = String(url || "").trim();
   if (!isSafeOpenExternalUrl(rawUrl)) {

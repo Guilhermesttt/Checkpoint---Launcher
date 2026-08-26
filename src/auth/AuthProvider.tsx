@@ -174,14 +174,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const deadline = Date.now() + 120_000;
       while (Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        const statusRes = await fetch(apiUrl(`/auth/desktop/google/status?state=${encodeURIComponent(state)}`));
-        if (statusRes.ok) {
-          const data = await statusRes.json();
-          if (data.status === "error") {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+          let data: any = null;
+          if (typeof (window.electronAPI as any).pollGoogleBrowserAuth === "function") {
+            data = await (window.electronAPI as any).pollGoogleBrowserAuth(state);
+          } else {
+            const statusRes = await fetch(apiUrl(`/auth/desktop/google/status?state=${encodeURIComponent(state)}`));
+            if (statusRes.ok) {
+              data = await statusRes.json();
+            }
+          }
+
+          if (data?.status === "error") {
             throw new Error(data.error || "Falha na autenticação do Google.");
           }
-          if (data.status === "complete" && data.email && data.emailOtp) {
+          if (data?.status === "complete" && data.email && data.emailOtp) {
             const { error } = await supabase.auth.verifyOtp({
               email: data.email,
               token: data.emailOtp,
@@ -190,9 +198,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (error) throw error;
             return;
           }
+        } catch (pollErr: any) {
+          if (pollErr?.message && !pollErr.message.includes("Failed to fetch") && !pollErr.message.includes("NetworkError")) {
+            throw pollErr;
+          }
         }
       }
-      throw new Error("Tempo limite excedido aguardando login do Google.");
+      throw new Error("Tempo limite excedido aguardando login do Google. Tente novamente.");
     } else {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
