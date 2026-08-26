@@ -19,13 +19,10 @@ describe("superficies compartilhadas do Spotify", () => {
     expect(page).toContain("const copy = SPOTIFY_COPY[language]");
   });
 
-  it("inclui controles Spotify e seek no overlay in-game", () => {
+  it("nao expoe controles Spotify no overlay in-game para manter a experiencia gamer focada", () => {
     const overlay = source("electron/overlay.html");
-    expect(overlay).toContain('data-panel-tab="spotify"');
-    expect(overlay).toContain('data-panel-view="spotify"');
-    expect(overlay).toContain('id="spotify-overlay-seek"');
-    expect(overlay).toContain('kind: "spotify-seek"');
-    expect(overlay).toContain('kind: direction < 0 ? "spotify-previous" : "spotify-next"');
+    expect(overlay).not.toContain('data-panel-tab="spotify"');
+    expect(overlay).not.toContain('data-panel-view="spotify"');
   });
 
   it("protege o tema do launcher durante toda reproducao Spotify", () => {

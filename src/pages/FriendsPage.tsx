@@ -176,10 +176,10 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           {/* Left Column: User Profile Identity & Recent Social Activity (4 Cols) */}
           <div className="lg:col-span-4 flex flex-col gap-5">
             {/* User Identity Card */}
-            <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-5 shadow-xl backdrop-blur-2xl">
+            <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#14161f] border border-white/20 shadow-md">
+                  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/15 shadow-md">
                     {userProfile?.photoURL || user?.photoURL || discordAvatar ? (
                       <img
                         src={userProfile?.photoURL || user?.photoURL || discordAvatar}
@@ -192,7 +192,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                       </div>
                     )}
                   </div>
-                  <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-white border-2 border-[#090A0D] shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+                  <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full bg-white border-2 border-black/80 shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             </div>
 
             {/* Recent Social Activity (3 Blocks Max, strictly within last 7h) */}
-            <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-5 shadow-xl backdrop-blur-2xl">
+            <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10.5px] font-body font-bold uppercase tracking-[0.2em] text-white/50 flex items-center gap-1.5">
                   <Activity className="w-3.5 h-3.5 text-white/60" /> ATIVIDADE RECENTE (ÚLTIMAS 7H)
@@ -308,7 +308,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           {/* Right Column: Friends Search, Filter & Grid (8 Cols) */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             {/* Search & Control Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#090A0D]/90 border border-white/[0.08] p-2.5 backdrop-blur-xl shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] border border-white/[0.08] p-2.5 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
@@ -364,7 +364,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
               </div>
 
               {onlineFriends.length === 0 ? (
-                <div className="rounded-[24px] bg-[#090A0D]/60 border border-white/[0.06] p-8 text-center">
+                <div className="rounded-[24px] bg-white/[0.02] border border-white/[0.06] p-8 text-center backdrop-blur-xl">
                   <Users className="w-8 h-8 text-white/20 mx-auto mb-2" />
                   <p className="text-sm font-body font-semibold text-white/60">Nenhum amigo online no momento</p>
                 </div>
@@ -377,7 +377,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     return (
                       <div
                         key={friend.id}
-                        className="group relative rounded-[24px] bg-[#090A0D]/90 border border-white/[0.08] hover:border-white/20 p-4 transition-all duration-200 hover:-translate-y-1 shadow-lg flex flex-col justify-between"
+                        className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-4 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between"
                       >
                         <div>
                           {/* Avatar & Header */}
@@ -392,7 +392,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                                   </div>
                                 )}
                               </div>
-                              <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white border-2 border-[#090A0D] shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+                              <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white border-2 border-black/80 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
                             </div>
 
                             <div className="min-w-0 flex-1">
@@ -504,7 +504,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                     <div
                       key={friend.id}
                       onClick={() => onViewFriendProfile(friend)}
-                      className="shrink-0 flex items-center gap-3 p-3 rounded-2xl bg-[#090A0D]/70 border border-white/[0.06] hover:border-white/15 cursor-pointer transition-all hover:scale-102"
+                      className="shrink-0 flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/15 cursor-pointer transition-all hover:scale-102 backdrop-blur-xl shadow-md"
                       style={{ minWidth: 190 }}
                     >
                       <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/[0.04] border border-white/10 grayscale opacity-60">
@@ -531,7 +531,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
       {/* SubTab: CHATS */}
       {activeSubTab === "CHAT" && (
-        <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-2xl">
+        <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
           <div className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-4">
             <div>
               <h2 className="text-lg font-display font-bold text-white">Conversas Recentes</h2>
@@ -549,7 +549,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   <div
                     key={friend.id}
                     onClick={() => onOpenChat(friend)}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-white/20 cursor-pointer transition-all"
+                    className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/20 cursor-pointer transition-all backdrop-blur-xl shadow-md"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
@@ -627,7 +627,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
 
       {/* SubTab: SOLICITAÇÕES */}
       {activeSubTab === "SOLICITAÇÕES" && (
-        <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-6 shadow-xl backdrop-blur-2xl">
+        <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
           <div className="mb-6 flex items-center justify-between border-b border-white/[0.06] pb-4">
             <div>
               <h2 className="text-lg font-display font-bold text-white">Solicitações de Amizade</h2>
@@ -794,7 +794,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
                 value={query}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 placeholder={t("addFriendSearchPlaceholder") || "Digite o nome ou email do usuário..."}
-                className="w-full h-12 pl-11 pr-11 rounded-2xl bg-[#090A0D]/90 border border-white/[0.1] text-xs font-body text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 shadow-inner transition-all"
+                className="w-full h-12 pl-11 pr-11 rounded-2xl bg-white/[0.04] border border-white/[0.1] text-xs font-body text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 shadow-inner transition-all backdrop-blur-xl"
                 autoFocus
               />
               {query && (
@@ -866,7 +866,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
             return (
               <div
                 key={user.uid}
-                className="flex items-center justify-between p-4 rounded-2xl bg-[#090A0D]/95 border border-white/[0.08] hover:border-white/20 transition-all shadow-md"
+                className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 transition-all shadow-md backdrop-blur-xl"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/10 flex items-center justify-center shrink-0">

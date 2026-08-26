@@ -661,6 +661,7 @@ const Home: React.FC = () => {
       const title = detail?.title?.trim();
       if (!title) return;
 
+      playSound("play");
       lastOverlayWelcomeGameRef.current = title;
       markCurrentPresence(title, detail?.executablePath || null);
       void window.electronAPI?.showGameStartOverlay({ gameTitle: title });
@@ -668,7 +669,7 @@ const Home: React.FC = () => {
 
     window.addEventListener("checkpoint:game-launch", handleGameLaunch);
     return () => window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
-  }, [markCurrentPresence]);
+  }, [markCurrentPresence, playSound]);
 
   useEffect(() => {
     if (!currentPresenceGame) {
@@ -1872,7 +1873,7 @@ const Home: React.FC = () => {
                 playSound("select");
               }}
               onPreviewSound={() => playSound("select")}
-              onTestNotificationSound={() => playSound("friendRequest")}
+              onTestNotificationSound={() => playSound("notification")}
               t={t}
               steamConnected={Boolean(resolvedSteamId)}
               discordConnected={Boolean(resolvedDiscordId)}

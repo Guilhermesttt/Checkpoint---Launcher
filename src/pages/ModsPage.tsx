@@ -238,7 +238,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
         </div>
 
         {/* Hero Banner Card */}
-        <section className="relative overflow-hidden rounded-[32px] border border-white/[0.08] bg-[#090A0D]/95 p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+        <section className="relative overflow-hidden rounded-[32px] border border-white/[0.08] bg-white/[0.03] p-6 md:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
           {/* Subtle Cosmic Ambient Atmosphere */}
           <div className="pointer-events-none absolute right-1/4 top-1/2 -translate-y-1/2 h-64 w-64 rounded-full bg-white/[0.04] blur-[100px]" />
 
@@ -307,7 +307,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             {/* Left Main Column: Games Grid & Discovery (8 Cols) */}
             <div className="lg:col-span-8 flex flex-col gap-6">
               {/* Search, Filter & Controls Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#090A0D]/90 border border-white/[0.08] p-2.5 backdrop-blur-xl shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/[0.03] border border-white/[0.08] p-2.5 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
                 <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                   <input
@@ -385,11 +385,11 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                   return (
                     <div
                       key={game.id}
-                      className="group relative rounded-[24px] bg-[#090A0D]/90 border border-white/[0.08] hover:border-white/25 p-3.5 transition-all duration-200 hover:-translate-y-1 shadow-lg flex flex-col justify-between"
+                      className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-3.5 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between"
                     >
                       <div>
                         {/* Game Artwork Thumbnail */}
-                        <div className="relative h-28 w-full rounded-2xl overflow-hidden bg-[#12131a] mb-3 border border-white/10">
+                        <div className="relative h-28 w-full rounded-2xl overflow-hidden bg-white/[0.05] mb-3 border border-white/10">
                           {artwork ? (
                             <img
                               src={artwork}
@@ -442,7 +442,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
               </div>
 
               {/* Bottom Discovery Banner */}
-              <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-5 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-xl shadow-xl">
+              <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-5 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-xl shadow-xl">
                 <div className="flex items-center gap-3.5">
                   <div className="h-10 w-10 rounded-2xl bg-white/[0.08] border border-white/20 flex items-center justify-center text-white shrink-0">
                     <Sparkles className="w-5 h-5 animate-pulse" />
@@ -473,7 +473,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             {/* Right Sidebar: Status do Sistema & Atividade & Perfil (4 Cols) */}
             <div className="lg:col-span-4 flex flex-col gap-5">
               {/* Panel 1: Status do Sistema (Sem sincronização) */}
-              <div className="rounded-[28px] bg-[#090A0D]/90 border border-white/[0.08] p-5 shadow-xl backdrop-blur-2xl">
+              <div className="rounded-[28px] bg-white/[0.03] border border-white/[0.08] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.4)] backdrop-blur-2xl">
                 <span className="text-[10.5px] font-body font-bold uppercase tracking-[0.2em] text-white/50 block mb-4">
                   STATUS DO SISTEMA
                 </span>
@@ -517,7 +517,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
             isOpen={Boolean(selectedGame)}
             onClose={() => setSelectedGame(null)}
             gameFolder={gameFolders[selectedGame.id] || ""}
-            onChooseFolder={() => void chooseGameFolder(selectedGame)}
+            onChooseFolder={() => chooseGameFolder(selectedGame)}
             gameDomain={gameDomains[selectedGame.id] || ""}
             onSaveDomain={(domain) => saveGameDomain(selectedGame, domain)}
             installedMods={installedByGame[selectedGame.id] || []}

@@ -687,4 +687,10 @@ body.low-performance::before {
     background-position: -200% 0;
   }
 }
+
+img,
+video {
+  -webkit-user-drag: none;
+}
+
 

@@ -213,7 +213,12 @@ const GameCard: React.FC<GameCardProps> = ({
       }}
     >
       <motion.div
-        style={{ rotateX, rotateY }}
+        style={{
+          width: CARD_WIDTH,
+          height: CARD_HEIGHT,
+          rotateX,
+          rotateY,
+        }}
         animate={{
           scale: visuallyActive ? 1.05 : 0.95,
           y: visuallyActive ? -8 : 0,
@@ -223,15 +228,11 @@ const GameCard: React.FC<GameCardProps> = ({
           stiffness: 220,
           damping: 20,
         }}
-        className={`relative overflow-hidden rounded-[28px] bg-[#090A0D] border transition-all duration-300 backdrop-blur-2xl flex flex-col justify-between ${
+        className={`relative overflow-hidden rounded-[28px] bg-[#090A0D] border transition-all duration-200 flex flex-col justify-between ${
           visuallyActive
             ? "border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
             : "border-white/[0.08] hover:border-white/25 shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
         }`}
-        style={{
-          width: CARD_WIDTH,
-          height: CARD_HEIGHT,
-        }}
       >
         {/* Full-Bleed Cover Image Artwork */}
         {hasAllFailed ? (

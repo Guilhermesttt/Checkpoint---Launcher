@@ -4,10 +4,16 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; font-src 'self'; script-src 'self' 'unsafe-inline';" />
+    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Phelierium Overlay</title>
+
   <style>
+    /* ==========================================================================
+       PHELIERIUM OVERLAY — DESIGN SYSTEM (MONO SPACE & CONSTELLATION)
+       Identidade visual unificada: Space Grotesk + Inter + Unbounded, preto sideral e luz pura.
+       ========================================================================== */
+
     @font-face {
       font-family: "Inter";
       src: url("../node_modules/@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
@@ -24,31 +30,37 @@
       font-display: swap;
     }
 
+    @font-face {
+      font-family: "Space Grotesk";
+      src: local("Space Grotesk"), local("SpaceGrotesk");
+      font-style: normal;
+      font-weight: 300 800;
+      font-display: swap;
+    }
+
     :root {
       color-scheme: dark;
-      --overlay-font-display: "Unbounded", "Segoe UI", sans-serif;
-      --overlay-font-body: "Inter", "Segoe UI", sans-serif;
+      --overlay-font-display: "Unbounded", "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --overlay-font-body: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       --overlay-width: min(392px, calc(100vw - 32px));
 
-      /* Context Colors */
-      --color-achievement: 255 255 255;
-      --color-friend-request: 236 72 153;
-      --color-friend-accepted: 14 165 233;
-      --color-friend-playing: 16 185 129;
-      --color-friend-message: 255 255 255;
-      --color-controller: 148 163 184;
-      --color-game-start: 255 255 255;
-      --color-overlay-hint: 255 255 255;
-      --color-capture: 34 211 238;
-
-      /* UI Concept Palette */
+      /* Mono & Sideral Palette (Translucent Glassmorphism) */
+      --ctx-color: 255, 255, 255;
       --panel-accent: 255, 255, 255;
-      --panel-bg: #050507;
-      --panel-surface: #101014;
-      --panel-surface-hover: #17171c;
+      --panel-bg: rgba(6, 7, 10, 0.7);
+      --panel-surface: rgba(255, 255, 255, 0.04);
+      --panel-surface-elevated: rgba(255, 255, 255, 0.075);
+      --panel-surface-hover: rgba(255, 255, 255, 0.095);
       --panel-border: rgba(255, 255, 255, 0.09);
-      --text-muted: rgba(255, 255, 255, 0.48);
+      --panel-border-strong: rgba(255, 255, 255, 0.18);
+      --text-primary: #FFFFFF;
+      --text-secondary: rgba(255, 255, 255, 0.72);
+      --text-muted: rgba(255, 255, 255, 0.44);
       --card-duration: 4200ms;
+    }
+
+    h1, h2, h3, .panel-logo, .achievement-summary strong, .social-badge, .achievement-eyebrow {
+      font-family: var(--overlay-font-display);
     }
 
     html,
@@ -63,6 +75,9 @@
     body {
       pointer-events: none;
       font-family: var(--overlay-font-body);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     *,
@@ -79,9 +94,9 @@
     }
 
     body.gamepad-navigation .is-gamepad-focused {
-      outline: 2px solid rgba(255, 255, 255, 0.92) !important;
+      outline: 2px solid rgba(255, 255, 255, 0.95) !important;
       outline-offset: 3px;
-      box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.08), 0 0 24px rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.08), 0 0 24px rgba(255, 255, 255, 0.18) !important;
     }
 
     .panel-logo,
@@ -101,11 +116,25 @@
     .settings-card h3,
     .profile-identity h2 {
       font-family: var(--overlay-font-display);
+      letter-spacing: -0.02em;
     }
 
-    /* =========================================================
-       TOASTS (Notificações Flutuantes)
-       ========================================================= */
+    .ui-icon {
+      width: 20px;
+      height: 20px;
+      display: block;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    /* ==========================================================================
+       TOASTS (Notificações Flutuantes - Vidro Cósmico Mono)
+       ========================================================================== */
+
     #achievement-stack,
     #social-stack {
       position: fixed;
@@ -173,17 +202,17 @@
       min-height: 0;
       flex: 0 0 auto;
       opacity: 0;
-      --ctx-color: var(--color-game-start);
+      --ctx-color: 255, 255, 255;
       --entry-x: -18px;
     }
 
     .overlay-card.is-entering {
-      animation: overlay-in 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: overlay-in 440ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
       animation-delay: var(--stagger, 0ms);
     }
 
     .overlay-card.is-leaving {
-      animation: overlay-out 280ms cubic-bezier(0.4, 0, 1, 1) forwards;
+      animation: overlay-out 260ms cubic-bezier(0.4, 0, 1, 1) forwards;
     }
 
     .overlay-card.is-clickable {
@@ -192,53 +221,20 @@
     }
 
     .overlay-card.is-clickable:hover .overlay-shell {
-      border-color: rgba(var(--ctx-color), 0.55);
+      border-color: rgba(255, 255, 255, 0.35);
       box-shadow:
-        0 22px 54px rgba(0, 0, 0, 0.55),
-        0 0 28px rgba(var(--ctx-color), 0.3),
-        inset 0 1px rgba(255, 255, 255, 0.16);
-      transform: translateY(-2px) scale(1.015);
+        0 24px 60px rgba(0, 0, 0, 0.65),
+        0 0 32px rgba(255, 255, 255, 0.12),
+        inset 0 1px rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px) scale(1.012);
     }
 
     .overlay-card.is-clickable:active .overlay-shell {
-      transform: translateY(0) scale(0.985);
+      transform: translateY(0) scale(0.99);
     }
 
     .achievement-card {
-      --ctx-color: var(--color-achievement);
       --entry-x: 18px;
-    }
-
-    .social-card.kind-friend-request {
-      --ctx-color: var(--color-friend-request);
-    }
-
-    .social-card.kind-friend-accepted {
-      --ctx-color: var(--color-friend-accepted);
-    }
-
-    .social-card.kind-friend-playing {
-      --ctx-color: var(--color-friend-playing);
-    }
-
-    .social-card.kind-friend-message {
-      --ctx-color: var(--color-friend-message);
-    }
-
-    .social-card.kind-controller-connected {
-      --ctx-color: var(--color-controller);
-    }
-
-    .social-card.kind-game-start {
-      --ctx-color: var(--color-game-start);
-    }
-
-    .social-card.kind-overlay-hint {
-      --ctx-color: var(--color-overlay-hint);
-    }
-
-    .social-card.kind-capture-saved {
-      --ctx-color: var(--color-capture);
     }
 
     .overlay-shell {
@@ -246,21 +242,22 @@
       inset: 0;
       display: flex;
       align-items: stretch;
-      gap: 4cqw;
-      padding: 6.2cqw;
+      gap: 4.5cqw;
+      padding: 6cqw;
       border-radius: 20px;
       background:
-        radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.08), transparent 36%),
-        linear-gradient(145deg, rgba(16, 16, 22, 0.55), rgba(6, 6, 9, 0.72));
-      -webkit-backdrop-filter: blur(24px) saturate(160%);
-      backdrop-filter: blur(24px) saturate(160%);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+        radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.09), transparent 38%),
+        linear-gradient(145deg, rgba(14, 15, 20, 0.82), rgba(4, 4, 6, 0.92));
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       box-shadow:
-        0 18px 48px rgba(0, 0, 0, 0.45),
-        inset 0 1px rgba(255, 255, 255, 0.08);
+        0 20px 52px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
       overflow: hidden;
     }
 
+    /* Linha luminosa de acento mono */
     .overlay-shell::before {
       content: "";
       position: absolute;
@@ -269,20 +266,21 @@
       left: 0;
       width: 2px;
       border-radius: 0 99px 99px 0;
-      background: rgba(var(--ctx-color), 0.82);
-      box-shadow: 0 0 18px rgba(var(--ctx-color), 0.28);
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
       pointer-events: none;
       z-index: 3;
     }
 
+    /* Sweep de brilho estelar */
     .overlay-shell::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.14) 50%, transparent 58%);
+      background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.05) 48%, rgba(255, 255, 255, 0.12) 50%, transparent 58%);
       transform: translateX(-120%);
-      animation: shine-sweep 900ms cubic-bezier(0.16, 1, 0.3, 1) 1;
-      animation-delay: calc(var(--stagger, 0ms) + 150ms);
+      animation: shine-sweep 950ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+      animation-delay: calc(var(--stagger, 0ms) + 120ms);
       pointer-events: none;
       z-index: 4;
     }
@@ -316,7 +314,7 @@
       inset: 0;
       background:
         radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.03), transparent 38%),
-        linear-gradient(145deg, rgba(16, 16, 22, 0.22), rgba(6, 6, 9, 0.38));
+        linear-gradient(145deg, rgba(8, 9, 12, 0.3), rgba(3, 4, 6, 0.5));
     }
 
     .overlay-shell > :not(.overlay-video-layer) {
@@ -338,10 +336,11 @@
       isolation: isolate;
     }
 
+    /* Anel de Órbita Celeste */
     .icon-ring {
       position: absolute;
-      inset: -6px;
-      color: rgba(var(--ctx-color), 0.2);
+      inset: -7px;
+      color: rgba(255, 255, 255, 0.28);
       pointer-events: none;
     }
 
@@ -360,8 +359,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(var(--ctx-color), 0.42);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.25);
       z-index: 1;
     }
 
@@ -372,9 +371,10 @@
     }
 
     .icon-avatar.is-logo {
-      padding: 12px;
+      padding: 10px;
       border-radius: 14px;
-      background: #0b0b0e;
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.18);
     }
 
     .icon-avatar.is-logo img {
@@ -408,7 +408,7 @@
     .icon-avatar svg {
       width: 50%;
       height: 50%;
-      color: rgba(var(--ctx-color), 1);
+      color: #fff;
     }
 
     .animate-icon {
@@ -418,97 +418,48 @@
     .animate-icon-trophy {
       transform-box: fill-box;
       transform-origin: center;
-      animation: animate-icon-trophy-loop 1.8s cubic-bezier(0.22, 0.9, 0.32, 1) infinite;
+      animation: animate-icon-trophy-loop 2s cubic-bezier(0.22, 0.9, 0.32, 1) infinite;
     }
 
     .animate-icon-controller .controller-shell {
       transform-box: fill-box;
       transform-origin: center;
-      animation: animate-icon-controller-shell 1.5s ease-in-out infinite;
+      animation: animate-icon-controller-shell 1.6s ease-in-out infinite;
     }
 
     .animate-icon-controller .controller-controls {
       transform-box: fill-box;
       transform-origin: center;
-      animation: animate-icon-controller-controls 1.5s ease-in-out infinite;
+      animation: animate-icon-controller-controls 1.6s ease-in-out infinite;
     }
 
     .animate-icon-camera .camera-lens {
       transform-box: fill-box;
       transform-origin: center;
-      animation: animate-icon-camera-lens 1.35s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+      animation: animate-icon-camera-lens 1.4s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
     }
 
     @keyframes animate-icon-trophy-loop {
-
-      0%,
-      45%,
-      100% {
-        transform: translateY(0) scale(1) rotate(0deg);
-      }
-
-      60% {
-        transform: translateY(-1px) scale(1.08) rotate(-3deg);
-      }
-
-      75% {
-        transform: translateY(0) scale(0.98) rotate(2deg);
-      }
+      0%, 45%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
+      60% { transform: translateY(-1px) scale(1.06) rotate(-3deg); }
+      75% { transform: translateY(0) scale(0.98) rotate(2deg); }
     }
 
     @keyframes animate-icon-controller-shell {
-
-      0%,
-      42%,
-      100% {
-        transform: scale(1);
-      }
-
-      58% {
-        transform: scale(0.95);
-      }
+      0%, 42%, 100% { transform: scale(1); }
+      58% { transform: scale(0.95); }
     }
 
     @keyframes animate-icon-controller-controls {
-
-      0%,
-      42%,
-      100% {
-        transform: scale(1) rotate(0deg);
-      }
-
-      56% {
-        transform: scale(0.85) rotate(20deg);
-      }
-
-      70% {
-        transform: scale(1) rotate(-20deg);
-      }
+      0%, 42%, 100% { transform: scale(1) rotate(0deg); }
+      56% { transform: scale(0.85) rotate(18deg); }
+      70% { transform: scale(1) rotate(-18deg); }
     }
 
     @keyframes animate-icon-camera-lens {
-
-      0%,
-      38%,
-      100% {
-        transform: scale(1);
-      }
-
-      50% {
-        transform: scale(0.45);
-      }
-
-      68% {
-        transform: scale(1.15);
-      }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-
-      .animate-icon,
-      .animate-icon * {
-        animation: none !important;
-      }
+      0%, 38%, 100% { transform: scale(1); }
+      50% { transform: scale(0.45); }
+      68% { transform: scale(1.12); }
     }
 
     .overlay-content {
@@ -532,15 +483,15 @@
     .social-badge {
       width: max-content;
       max-width: 100%;
-      padding: 3px 6px;
-      border: 1px solid rgba(var(--ctx-color), 0.16);
+      padding: 3px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 999px;
-      background: rgba(var(--ctx-color), 0.055);
+      background: rgba(255, 255, 255, 0.06);
       font-size: 8px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: rgba(var(--ctx-color), 1);
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.95);
       margin-bottom: 5px;
     }
 
@@ -548,9 +499,9 @@
     .social-title {
       margin: 0;
       color: #fff;
-      font-size: clamp(15px, 4.5cqw, 18px);
-      font-weight: 800;
-      line-height: 1.08;
+      font-size: clamp(14px, 4.3cqw, 17px);
+      font-weight: 700;
+      line-height: 1.12;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
@@ -561,10 +512,11 @@
     .achievement-description,
     .social-description {
       margin: 4px 0 0;
-      color: rgba(255, 255, 255, 0.6);
+      color: var(--text-secondary);
       font-size: clamp(10px, 2.6cqw, 12px);
-      line-height: 1.3;
+      line-height: 1.35;
       overflow: hidden;
+      text-overflow: ellipsis;
       display: -webkit-box;
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
@@ -574,9 +526,9 @@
       position: absolute;
       bottom: 0;
       left: 0;
-      height: 3px;
+      height: 2px;
       width: 100%;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .overlay-progress::after {
@@ -585,62 +537,105 @@
       height: 100%;
       width: 100%;
       transform-origin: left;
-      background: rgba(var(--ctx-color), 1);
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.4), #ffffff);
       animation: progress-drain linear forwards;
       animation-duration: var(--card-duration);
     }
 
-    /* =========================================================
-       COMMAND PANEL — CHECKPOINT CONCEPT UI (EXACT MATCH)
-       ========================================================= */
+    /* ==========================================================================
+       COMMAND PANEL — VIDRO SIDERAL TRANSLÚCIDO & SUPERFÍCIES MONO
+       ========================================================================== */
+
+    body.panel-open {
+      background: rgba(0, 0, 0, 0.38);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
+      backdrop-filter: blur(10px) saturate(130%);
+    }
+
+    body.panel-open #achievement-stack,
+    body.panel-open #social-stack {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .panel-game-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.08;
+      background-size: cover;
+      background-position: center;
+      filter: blur(28px);
+    }
 
     #command-panel {
       position: fixed;
-      inset: 5vh 5vw;
+      inset: 4vh 4vw;
       display: none;
       pointer-events: auto;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 28px;
-      background: radial-gradient(ellipse at top, #1c1d28 0%, #0d0e12 50%, #050507 100%);
-      box-shadow: 0 40px 120px rgba(0, 0, 0, 0.95), 0 0 80px rgba(0, 0, 0, 0.8);
+      background:
+        radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.06) 0%, rgba(8, 9, 12, 0.65) 45%, rgba(3, 4, 6, 0.74) 100%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      backdrop-filter: blur(28px) saturate(180%);
+      box-shadow:
+        0 36px 100px rgba(0, 0, 0, 0.7),
+        0 0 40px rgba(255, 255, 255, 0.02),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
       overflow: hidden;
       color: white;
       transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1), transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
       transform: scale(0.96) translateY(14px);
       opacity: 0;
+      z-index: 1000;
     }
 
     #command-panel.is-open {
       display: grid;
-      grid-template-columns: 88px 1fr 340px;
+      grid-template-columns: 80px minmax(0, 1fr);
       animation: panel-pop-in 340ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     /* ---- Sidebar Esquerda ---- */
     .panel-sidebar {
-      background: rgba(8, 8, 11, 0.95);
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      z-index: 2;
+      width: 80px;
+      min-width: 80px;
+      max-width: 80px;
+      height: 100%;
+      background: rgba(5, 6, 8, 0.58);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--panel-border);
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 24px 12px;
-      z-index: 10;
+      padding: 24px 8px;
+      box-sizing: border-box;
+      flex-shrink: 0;
     }
 
     .panel-logo {
       width: 44px;
       height: 44px;
-      background: rgba(255, 255, 255, 0.07);
-      color: white;
-      font-size: 20px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 32px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.08);
+      padding: 7px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      display: grid;
+      place-items: center;
+      margin-bottom: 24px;
+      flex-shrink: 0;
+    }
+
+    .panel-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
     }
 
     .panel-brand,
@@ -652,30 +647,57 @@
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
     }
 
     .panel-tab {
-      width: 100%;
+      width: 64px;
+      height: 52px;
       border: none;
       border-radius: 12px;
-      padding: 12px 4px;
+      padding: 6px 0;
       background: transparent;
       color: var(--text-muted);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      gap: 3px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 180ms ease;
       position: relative;
     }
 
     .panel-tab .nav-icon {
-      font-size: 22px;
-      font-weight: normal;
+      width: 34px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      transition: background 180ms ease, transform 180ms ease;
+    }
+
+    .panel-tab:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .panel-tab:hover .nav-icon {
+      background: rgba(255, 255, 255, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .panel-tab.is-active {
+      color: #fff;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0%, transparent 100%);
+    }
+
+    .panel-tab.is-active .nav-icon {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
     }
 
     .panel-tab::before {
@@ -684,42 +706,38 @@
       left: -12px;
       top: 50%;
       transform: translateY(-50%);
-      width: 4px;
+      width: 3px;
       height: 0;
-      background: rgb(var(--panel-accent));
+      background: #fff;
       border-radius: 0 4px 4px 0;
-      transition: height 0.2s ease;
-    }
-
-    .panel-tab:hover {
-      color: white;
-      background: rgba(255, 255, 255, 0.03);
-    }
-
-    .panel-tab.is-active {
-      color: white;
-      background: linear-gradient(90deg, rgba(var(--panel-accent), 0.15) 0%, transparent 100%);
+      transition: height 200ms ease;
     }
 
     .panel-tab.is-active::before {
-      height: 24px;
-      box-shadow: 0 0 10px rgba(var(--panel-accent), 0.8);
+      height: 22px;
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
     }
 
     .nav-notification {
       position: absolute;
       top: 6px;
       right: 12px;
-      background: #ec4899;
-      color: white;
+      background: #fff;
+      color: #030405;
       font-size: 10px;
-      font-weight: bold;
-      width: 18px;
+      font-weight: 800;
+      min-width: 18px;
       height: 18px;
-      border-radius: 50%;
+      padding: 0 4px;
+      border-radius: 999px;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .nav-notification[hidden] {
+      display: none !important;
     }
 
     .sidebar-spacer {
@@ -736,15 +754,12 @@
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+      transition: color 180ms ease;
     }
 
     .panel-action:hover {
-      color: #f87171;
-    }
-
-    .panel-action .nav-icon {
-      font-size: 22px;
+      color: #fff;
     }
 
     .sidebar-profile {
@@ -763,18 +778,29 @@
       height: 40px;
       border-radius: 12px;
       object-fit: cover;
-      border: 2px solid rgba(var(--panel-accent), 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .sidebar-profile i {
       position: absolute;
-      bottom: 16px;
+      bottom: 18px;
       right: -2px;
-      width: 12px;
-      height: 12px;
-      background: #10b981;
+    }
+
+    /* ---- Status Dots Mono ---- */
+    .status-dot {
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      border: 2px solid var(--panel-bg);
+      display: inline-block;
+      margin-right: 8px;
+      background: rgba(255, 255, 255, 0.28);
+    }
+
+    .status-dot.online {
+      background: #ffffff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
+      animation: pulse-online-glow 2.8s infinite ease-in-out;
     }
 
     /* ---- Área Central (Workspace) ---- */
@@ -784,24 +810,27 @@
       min-width: 0;
       min-height: 0;
       overflow: hidden;
+      background: rgba(3, 4, 5, 0.4);
     }
 
     .panel-topbar {
       flex: 0 0 auto;
-      padding: 32px 40px 16px;
+      padding: 32px 40px 18px;
       display: grid;
       grid-template-columns: 1fr auto auto auto;
-      gap: 24px;
+      gap: 20px;
       align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
     .welcome-copy h1 {
       margin: 0;
       font-size: 24px;
-      font-weight: 800;
+      font-weight: 700;
       display: flex;
       align-items: center;
       gap: 8px;
+      color: #fff;
     }
 
     .welcome-copy p {
@@ -811,10 +840,10 @@
       font-weight: 500;
     }
 
-    .wave {
-      animation: wave-hand 2.4s ease-in-out infinite;
-      transform-origin: 70% 70%;
-      display: inline-block;
+    .welcome-mark {
+      width: 20px;
+      height: 20px;
+      color: rgba(255, 255, 255, 0.7);
     }
 
     .friend-search {
@@ -822,22 +851,24 @@
       border: 1px solid var(--panel-border);
       border-radius: 9999px;
       padding: 0 18px;
-      height: 44px;
+      height: 42px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       width: 260px;
-      transition: all 0.2s;
+      transition: all 180ms ease;
     }
 
     .friend-search:focus-within {
-      border-color: rgba(var(--panel-accent), 0.5);
-      background: var(--panel-surface-hover);
+      border-color: rgba(255, 255, 255, 0.28);
+      background: var(--panel-surface-elevated);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
     }
 
-    .friend-search span {
+    .friend-search .ui-icon {
       color: var(--text-muted);
-      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
     .friend-search input {
@@ -852,12 +883,19 @@
     .top-profile {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       background: var(--panel-surface);
       border: 1px solid var(--panel-border);
-      padding: 6px 16px 6px 6px;
+      padding: 5px 14px 5px 5px;
       border-radius: 30px;
       cursor: pointer;
+      color: #fff;
+      transition: all 180ms ease;
+    }
+
+    .top-profile:hover {
+      background: var(--panel-surface-hover);
+      border-color: var(--panel-border-strong);
     }
 
     .top-profile img {
@@ -872,75 +910,71 @@
       font-weight: 600;
     }
 
-    .top-profile b {
+    .top-profile .ui-icon {
+      width: 14px;
+      height: 14px;
       color: var(--text-muted);
-      font-size: 10px;
-      margin-left: 4px;
     }
 
     .top-close {
-      background: transparent;
-      border: none;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      background: var(--panel-surface);
+      border: 1px solid var(--panel-border);
+      border-radius: 50%;
       color: var(--text-muted);
-      font-size: 28px;
       cursor: pointer;
-      padding: 0;
-      line-height: 1;
-      transition: color 0.2s;
+      transition: all 180ms ease;
     }
 
     .top-close:hover {
       color: white;
+      background: var(--panel-surface-hover);
+      border-color: var(--panel-border-strong);
+    }
+
+    .top-close .ui-icon {
+      width: 18px;
+      height: 18px;
     }
 
     .panel-layout {
       flex: 1;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
       min-height: 0;
+      height: 100%;
+      overflow: hidden;
     }
 
     .panel-content {
-      flex: 1;
       min-height: 0;
-      padding: 24px 40px;
+      height: 100%;
+      padding: 28px 36px;
       overflow-y: auto;
     }
 
     .panel-content::-webkit-scrollbar {
-      width: 6px;
+      width: 5px;
     }
 
     .panel-content::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
       border-radius: 6px;
     }
 
     .panel-view {
       display: none;
-      animation: fade-in 300ms ease forwards;
+      animation: fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
-
-    .spotify-overlay-page { display:grid; grid-template-columns:220px minmax(0,1fr); gap:34px; align-items:center; min-height:100%; padding:30px; }
-    .spotify-overlay-cover { width:220px; aspect-ratio:1; border-radius:28px; object-fit:cover; background:rgba(255,255,255,.06); box-shadow:0 24px 70px rgba(0,0,0,.55); }
-    .spotify-overlay-copy { min-width:0; }
-    .spotify-overlay-kicker { color:#1ed760; font-size:10px; font-weight:900; letter-spacing:.24em; text-transform:uppercase; }
-    .spotify-overlay-copy h2 { margin:10px 0 4px; overflow:hidden; color:#fff; font-size:30px; text-overflow:ellipsis; white-space:nowrap; }
-    .spotify-overlay-copy p { margin:0; overflow:hidden; color:rgba(255,255,255,.42); font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
-    .spotify-overlay-range { width:100%; margin-top:30px; accent-color:#1ed760; cursor:pointer; }
-    .spotify-overlay-time { display:flex; justify-content:space-between; margin-top:5px; color:rgba(255,255,255,.3); font-size:10px; font-variant-numeric:tabular-nums; }
-    .spotify-overlay-controls { display:flex; align-items:center; justify-content:center; gap:28px; margin-top:18px; }
-    .spotify-overlay-controls button { display:grid; width:42px; height:42px; place-items:center; border:0; border-radius:50%; background:transparent; color:rgba(255,255,255,.55); cursor:pointer; }
-    .spotify-overlay-controls button:hover { color:#fff; background:rgba(255,255,255,.08); }
-    .spotify-overlay-controls .spotify-overlay-toggle { width:54px; height:54px; background:#fff; color:#050505; }
-    .spotify-overlay-volume { display:flex; align-items:center; gap:12px; margin-top:24px; color:rgba(255,255,255,.35); }
-    .spotify-overlay-volume input { flex:1; accent-color:#1ed760; }
-    .spotify-overlay-empty { display:grid; grid-column:1/-1; place-items:center; min-height:360px; color:rgba(255,255,255,.4); text-align:center; }
 
     .panel-view.is-active {
       display: block;
     }
 
-    /* ---- Friends Grid & List ---- */
+    /* ---- Friends Grid & List (60fps Optimized) ---- */
     .section-heading {
       display: flex;
       align-items: center;
@@ -950,10 +984,11 @@
 
     .section-heading h2 {
       margin: 0;
-      font-size: 15px;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 700;
       display: flex;
       align-items: center;
+      color: #fff;
     }
 
     .section-heading button {
@@ -963,164 +998,195 @@
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
+      transition: color 120ms ease;
     }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 8px;
-      background: #64748b;
+    .section-heading button:hover {
+      color: #fff;
     }
 
-    .status-dot.online {
-      background: #10b981;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
-      animation: pulse-online-glow 2.5s infinite ease-in-out;
-    }
-
-    /* Online Grid - Cards Verticais */
+    /* Online Grid - Cards Leves & Fluídos */
     .online-friends-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 40px;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+      contain: content;
     }
 
-    .online-friends-grid .friend-card {
+    .friend-card {
       background: var(--panel-surface);
       border: 1px solid var(--panel-border);
-      border-radius: 16px;
-      padding: 20px;
+      border-radius: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       gap: 12px;
-      transition: all 0.2s ease;
+      transform: translateZ(0);
+      will-change: transform;
+      transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), background-color 140ms ease, border-color 140ms ease;
       position: relative;
     }
 
-    .online-friends-grid .friend-card:hover {
-      border-color: rgb(var(--panel-accent));
-      background: var(--panel-surface-hover);
-      transform: translateY(-2px);
+    .friend-card:hover {
+      border-color: var(--panel-border-strong);
+      background: var(--panel-surface-elevated);
+      transform: translateY(-2px) translateZ(0);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
     }
 
-    .online-friends-grid .friend-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
+    .friend-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
       object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transform: translateZ(0);
     }
 
-    .online-friends-grid .friend-copy {
+    .friend-copy {
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
 
-    .online-friends-grid .friend-name {
-      font-size: 15px;
+    .friend-name {
+      font-size: 13px;
       font-weight: 700;
-      color: white;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
     }
 
-    .online-friends-grid .friend-status {
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.62);
+    .friend-status {
+      font-size: 11px;
+      color: var(--text-secondary);
       font-weight: 500;
       display: flex;
       align-items: center;
     }
 
-    .online-friends-grid .friend-status::before {
+    .friend-status::before {
       content: "";
       display: inline-block;
       width: 6px;
       height: 6px;
-      background: #10b981;
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
       border-radius: 50%;
       margin-right: 6px;
+      flex-shrink: 0;
     }
 
-    .online-friends-grid .chat-button {
+    .status-offline .friend-status::before {
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: none;
+    }
+
+    .chat-button {
       width: 100%;
       margin-top: auto;
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 9999px;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      color: white;
-      transition: all 0.2s;
+      color: #fff;
+      transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
+      transform: translateZ(0);
     }
 
-    .online-friends-grid .friend-card:hover .chat-button {
+    .chat-button:hover {
       background: #fff;
-      color: #08080a;
+      color: #030405;
       border-color: #fff;
+    }
+
+    .chat-button:active {
+      transform: scale(0.97) translateZ(0);
+    }
+
+    .chat-button.call-button {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    .chat-button.call-button:hover {
+      background: #ffffff;
+      color: #030405;
+      border-color: #ffffff;
     }
 
     /* Offline List - Linhas Horizontais */
     .offline-friends-list {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
+      contain: content;
     }
 
     .offline-friends-list .friend-card {
       display: flex;
+      flex-direction: row;
       align-items: center;
-      gap: 16px;
-      padding: 12px 16px;
+      gap: 14px;
+      padding: 10px 16px;
       border-radius: 12px;
-      background: transparent;
+      background: rgba(255, 255, 255, 0.02);
       border: 1px solid transparent;
-      transition: background 0.2s;
+      transform: none;
+      box-shadow: none;
     }
 
     .offline-friends-list .friend-card:hover {
       background: var(--panel-surface);
+      border-color: var(--panel-border);
+      transform: none;
+      box-shadow: none;
     }
 
     .offline-friends-list .friend-avatar {
       width: 36px;
       height: 36px;
-      border-radius: 50%;
+      border-radius: 10px;
       opacity: 0.6;
     }
 
     .offline-friends-list .friend-copy {
       flex: 1;
-      display: flex;
-      flex-direction: column;
     }
 
     .offline-friends-list .friend-name {
-      font-size: 14px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.8);
+      font-size: 13px;
+      color: var(--text-secondary);
     }
 
     .offline-friends-list .friend-status {
-      font-size: 12px;
       color: var(--text-muted);
+      font-size: 11px;
     }
 
     .offline-friends-list .chat-button {
+      width: auto;
+      margin-top: 0;
+      padding: 6px 14px;
+      font-size: 11px;
       background: transparent;
-      border: none;
-      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
       color: var(--text-muted);
-      cursor: pointer;
     }
 
     .offline-friends-list .chat-button:hover {
-      color: white;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
     }
 
     /* ---- Context Panel (Painel Direito) ---- */
@@ -1129,20 +1195,25 @@
       padding: 32px 24px;
       display: flex;
       flex-direction: column;
-      background: rgba(8, 8, 11, 0.95);
+      background: rgba(5, 6, 8, 0.52);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
     }
 
     .context-game-card {
       background: var(--panel-surface);
       border: 1px solid var(--panel-border);
-      border-radius: 20px;
+      border-radius: 14px;
       overflow: hidden;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
+      transform: translateZ(0);
     }
 
     .context-game-art {
-      height: 140px;
-      background: linear-gradient(180deg, #1f1f2e 0%, #151520 100%);
+      height: 110px;
+      background: linear-gradient(145deg, #16171d, #090a0d);
+      background-size: cover;
+      background-position: center;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1150,97 +1221,112 @@
     }
 
     .context-game-icon {
-      font-size: 48px;
-      color: rgb(var(--panel-accent));
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: rgba(255, 255, 255, 0.75);
+    }
+
+    .context-game-icon .ui-icon {
+      width: 36px;
+      height: 36px;
+      stroke-width: 1.4;
     }
 
     .context-game-copy {
-      padding: 20px;
+      padding: 16px;
       text-align: center;
     }
 
     .context-game-copy h2 {
-      margin: 0 0 8px;
-      font-size: 16px;
+      margin: 0 0 4px;
+      font-size: 13px;
       font-weight: 700;
+      color: #fff;
     }
 
     .context-game-copy p {
-      margin: 0 0 16px;
-      font-size: 12px;
+      margin: 0 0 12px;
+      font-size: 11px;
       color: var(--text-muted);
       line-height: 1.4;
     }
 
     .context-primary {
       width: 100%;
-      padding: 12px 20px;
+      padding: 9px 16px;
       border: none;
       border-radius: 9999px;
       font-weight: 800;
-      font-size: 13px;
+      font-size: 11px;
+      letter-spacing: 0.02em;
       background: #fff;
-      color: #08080a;
+      color: #030405;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transform: translateZ(0);
+      transition: transform 120ms ease, background-color 120ms ease;
     }
 
     .context-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      transform: translateY(-1px) translateZ(0);
+      background: #f0f0f2;
+    }
+
+    .context-primary:active {
+      transform: scale(0.97) translateZ(0);
     }
 
     .quick-access h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin: 0 0 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin: 0 0 10px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
 
     .quick-access button {
       width: 100%;
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 12px;
-      margin-bottom: 8px;
+      gap: 10px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
       background: var(--panel-surface);
-      border: 1px solid transparent;
+      border: 1px solid var(--panel-border);
       border-radius: 12px;
       color: white;
       text-align: left;
       cursor: pointer;
-      transition: all 0.2s;
+      transform: translateZ(0);
+      will-change: transform;
+      transition: transform 120ms ease, background-color 120ms ease, border-color 120ms ease;
     }
 
     .quick-access button:hover {
       background: var(--panel-surface-hover);
-      border-color: rgba(var(--panel-accent), 0.3);
+      border-color: var(--panel-border-strong);
+      transform: translateX(3px) translateZ(0);
     }
 
     .quick-icon {
       width: 36px;
       height: 36px;
-      border-radius: 8px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.85);
     }
 
-    .quick-icon.purple {
-      background: rgba(255, 255, 255, 0.065);
-      color: rgba(255, 255, 255, 0.78);
-    }
-
-    .quick-icon.blue {
-      background: rgba(59, 130, 246, 0.1);
-      color: #60a5fa;
-    }
-
+    .quick-icon.purple,
+    .quick-icon.blue,
     .quick-icon.pink {
-      background: rgba(236, 72, 153, 0.1);
-      color: #f472b6;
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.85);
     }
 
     .quick-access span:nth-child(2) {
@@ -1283,303 +1369,7 @@
       font-weight: 600;
     }
 
-    .context-panel footer .notif i {
-      font-style: normal;
-    }
-
-    /* ---- Animations ---- */
-    @keyframes panel-pop-in {
-      0% {
-        opacity: 0;
-        transform: scale(0.95) translateY(14px);
-        filter: blur(6px);
-      }
-      100% {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-        filter: blur(0);
-      }
-    }
-
-    @keyframes overlay-in {
-      0% {
-        opacity: 0;
-        transform: translateX(var(--entry-x)) scale(0.93);
-        filter: blur(4px);
-      }
-
-      65% {
-        opacity: 1;
-        transform: translateX(calc(var(--entry-x) * -0.06)) scale(1.015);
-        filter: blur(0);
-      }
-
-      100% {
-        opacity: 1;
-        transform: translateX(0) scale(1);
-        filter: blur(0);
-      }
-    }
-
-    @keyframes overlay-out {
-      from {
-        opacity: 1;
-        transform: translateX(0) scale(1);
-        filter: blur(0);
-      }
-
-      to {
-        opacity: 0;
-        transform: translateX(var(--entry-x)) scale(0.95);
-        filter: blur(4px);
-      }
-    }
-
-    @keyframes progress-drain {
-      from {
-        transform: scaleX(1);
-      }
-
-      to {
-        transform: scaleX(0);
-      }
-    }
-
-    @keyframes shine-sweep {
-      0% {
-        transform: translateX(-120%) skewX(-15deg);
-      }
-
-      100% {
-        transform: translateX(150%) skewX(-15deg);
-      }
-    }
-
-    @keyframes fade-in {
-      from {
-        opacity: 0;
-        transform: translateY(12px) scale(0.985);
-        filter: blur(4px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-        filter: blur(0);
-      }
-    }
-
-    @keyframes pulse-online-glow {
-      0%, 100% {
-        box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
-      }
-      50% {
-        box-shadow: 0 0 14px rgba(16, 185, 129, 0.9), 0 0 22px rgba(16, 185, 129, 0.4);
-      }
-    }
-
-    @keyframes wave-hand {
-      0%,
-      55%,
-      100% {
-        transform: rotate(0)
-      }
-
-      65% {
-        transform: rotate(16deg)
-      }
-
-      75% {
-        transform: rotate(-10deg)
-      }
-
-      85% {
-        transform: rotate(12deg)
-      }
-    }
-
-    /* Utilitarios para manter compatibilidade JS Oculta */
-    .sr-only {
-      position: absolute !important;
-      width: 1px !important;
-      height: 1px !important;
-      padding: 0 !important;
-      margin: -1px !important;
-      overflow: hidden !important;
-      clip: rect(0, 0, 0, 0) !important;
-      white-space: nowrap !important;
-      border: 0 !important;
-    }
-
-    .panel-game-backdrop {
-      display: none;
-    }
-
-    .unread-badge {
-      display: none !important;
-    }
-
-    body.panel-open {
-      background: rgba(0, 0, 0, 0.75);
-      -webkit-backdrop-filter: blur(28px) saturate(140%);
-      backdrop-filter: blur(28px) saturate(140%);
-    }
-
-    body.panel-open #achievement-stack,
-    body.panel-open #social-stack {
-      opacity: 0;
-      visibility: hidden;
-    }
-
-    /* Tema nativo do launcher e acabamento de interacao */
-    .ui-icon {
-      width: 20px;
-      height: 20px;
-      display: block;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.8;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      pointer-events: none;
-    }
-
-    #command-panel {
-      background: radial-gradient(ellipse at top, #1c1d28 0%, #0d0e12 50%, #050507 100%);
-      -webkit-backdrop-filter: blur(48px) saturate(180%);
-      backdrop-filter: blur(48px) saturate(180%);
-      box-shadow: 0 42px 120px rgba(0, 0, 0, 0.95), inset 0 1px rgba(255, 255, 255, 0.08);
-    }
-
-    .panel-sidebar {
-      background: rgba(8, 8, 11, 0.95);
-      backdrop-filter: blur(24px);
-    }
-
-    .panel-logo {
-      padding: 8px;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      clip-path: none;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), inset 0 1px rgba(255, 255, 255, 0.08);
-    }
-
-    .panel-logo img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    .panel-tab .nav-icon,
-    .panel-action .nav-icon {
-      width: 34px;
-      height: 30px;
-      display: grid;
-      place-items: center;
-      border-radius: 9px;
-      transition: background 180ms ease, transform 180ms ease;
-    }
-
-    .panel-tab:hover .nav-icon,
-    .panel-tab.is-active .nav-icon {
-      background: rgba(255, 255, 255, 0.09);
-      transform: translateY(-1px);
-    }
-
-    .panel-tab.is-active {
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
-    }
-
-    .panel-action:hover {
-      color: #fff;
-    }
-
-    .panel-tab::before {
-      background: #fff;
-      box-shadow: 0 0 14px rgba(255, 255, 255, 0.35);
-    }
-
-    .nav-notification {
-      background: #fff;
-      color: #050507;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-    }
-
-    .nav-notification[hidden] {
-      display: none !important;
-    }
-
-    .friend-search:focus-within {
-      border-color: rgba(255, 255, 255, 0.32);
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.045);
-    }
-
-    .welcome-mark {
-      width: 22px;
-      height: 22px;
-      color: rgba(255, 255, 255, 0.64);
-    }
-
-    .online-friends-grid .friend-card:hover {
-      border-color: rgba(255, 255, 255, 0.28);
-      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.3);
-    }
-
-    .online-friends-grid .friend-status {
-      color: rgba(255, 255, 255, 0.62);
-    }
-
-    .context-panel {
-      background: rgba(5, 5, 7, 0.52);
-      backdrop-filter: blur(22px);
-    }
-
-    .context-game-art {
-      background: linear-gradient(145deg, #18181d, #0b0b0e);
-    }
-
-    .context-game-icon {
-      width: 58px;
-      height: 58px;
-      display: grid;
-      place-items: center;
-      color: rgba(255, 255, 255, 0.78);
-    }
-
-    .context-game-icon .ui-icon {
-      width: 46px;
-      height: 46px;
-      stroke-width: 1.35;
-    }
-
-    .context-primary {
-      background: #fff;
-      color: #08080a;
-      box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
-    }
-
-    .context-primary:hover {
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42), 0 0 0 3px rgba(255, 255, 255, 0.08);
-    }
-
-    .quick-icon.purple,
-    .quick-icon.blue,
-    .quick-icon.pink {
-      background: rgba(255, 255, 255, 0.065);
-      color: rgba(255, 255, 255, 0.78);
-    }
-
-    .quick-access button:hover {
-      border-color: rgba(255, 255, 255, 0.14);
-      transform: translateX(2px);
-    }
-
-    .context-panel footer .notif {
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    /* Chat ocupa a area de trabalho e preserva o contexto do jogo. */
+    /* ---- Chat Layout ---- */
     #panel-chat-view,
     .chat-layout {
       height: 100%;
@@ -1592,11 +1382,6 @@
       overflow: hidden;
     }
 
-    .panel-view[data-panel-view="chats"] #panel-chat-view:not([hidden]) {
-      height: 100%;
-      min-height: 0;
-    }
-
     .chat-layout {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
@@ -1604,54 +1389,55 @@
       overflow: hidden;
       border: 1px solid var(--panel-border);
       border-radius: 18px;
-      background: rgba(9, 9, 12, 0.78);
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+      background: rgba(6, 7, 10, 0.88);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
     }
 
     .chat-header {
-      min-height: 74px;
-      padding: 12px 18px;
+      min-height: 70px;
+      padding: 12px 20px;
       display: grid;
       grid-template-columns: auto auto 1fr;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       border-bottom: 1px solid var(--panel-border);
-      background: rgba(255, 255, 255, 0.025);
+      background: rgba(255, 255, 255, 0.02);
     }
 
     .chat-back {
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       display: grid;
       place-items: center;
-      padding: 0;
       border: 1px solid var(--panel-border);
-      border-radius: 11px;
-      background: rgba(255, 255, 255, 0.035);
-      color: rgba(255, 255, 255, 0.72);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.75);
       cursor: pointer;
+      transition: all 160ms ease;
     }
 
     .chat-back:hover {
       color: #fff;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.09);
+      border-color: var(--panel-border-strong);
     }
 
     .chat-header .friend-avatar {
-      width: 42px;
-      height: 42px;
-      border-radius: 13px;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
       object-fit: cover;
       border: 1px solid rgba(255, 255, 255, 0.12);
     }
 
     .chat-header .friend-name {
       font-size: 14px;
-      font-weight: 750;
+      font-weight: 700;
     }
 
     .chat-header .friend-status {
-      margin-top: 3px;
+      margin-top: 2px;
       font-size: 11px;
       color: var(--text-muted);
     }
@@ -1664,17 +1450,17 @@
       flex-direction: column;
       gap: 10px;
       scrollbar-width: thin;
-      scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+      scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
     }
 
     .chat-message {
       align-self: flex-start;
       max-width: min(72%, 520px);
-      padding: 11px 14px 8px;
+      padding: 11px 15px 9px;
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 5px 16px 16px 16px;
-      background: #17171c;
-      color: rgba(255, 255, 255, 0.88);
+      border-radius: 4px 16px 16px 16px;
+      background: #101116;
+      color: rgba(255, 255, 255, 0.9);
       font-size: 13px;
       line-height: 1.48;
       overflow-wrap: anywhere;
@@ -1682,14 +1468,15 @@
 
     .chat-message.is-mine {
       align-self: flex-end;
-      border-color: rgba(255, 255, 255, 0.16);
-      border-radius: 16px 5px 16px 16px;
-      background: #f1f1f3;
-      color: #0a0a0c;
+      border-color: rgba(255, 255, 255, 0.18);
+      border-radius: 16px 4px 16px 16px;
+      background: #f4f4f6;
+      color: #030405;
+      font-weight: 500;
     }
 
     .chat-message.is-pending {
-      opacity: 0.56;
+      opacity: 0.5;
     }
 
     .chat-message-image {
@@ -1707,7 +1494,7 @@
       margin-top: 5px;
       font-size: 9px;
       text-align: right;
-      opacity: 0.48;
+      opacity: 0.45;
     }
 
     .chat-day-separator {
@@ -1716,7 +1503,7 @@
       align-items: center;
       gap: 10px;
       margin: 6px 0;
-      color: rgba(255, 255, 255, 0.34);
+      color: rgba(255, 255, 255, 0.3);
       font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.16em;
@@ -1740,7 +1527,7 @@
 
     .chat-composer {
       padding: 0 18px 18px;
-      background: linear-gradient(180deg, transparent, rgba(5, 5, 7, 0.86) 24%);
+      background: linear-gradient(180deg, transparent, rgba(3, 4, 6, 0.9) 24%);
     }
 
     .chat-typing {
@@ -1753,9 +1540,9 @@
     .chat-error {
       min-height: 0;
       padding: 0 4px;
-      color: #ff9d9d;
+      color: #fff;
+      opacity: 0.85;
       font-size: 10px;
-      line-height: 1.4;
     }
 
     .chat-error:not(:empty) {
@@ -1764,13 +1551,13 @@
 
     .chat-form {
       display: grid;
-      grid-template-columns: 42px minmax(0, 1fr) 42px;
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
       gap: 8px;
       padding: 5px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.035);
-      transition: border-color 180ms ease, box-shadow 180ms ease;
+      transition: all 180ms ease;
     }
 
     .chat-form:focus-within {
@@ -1790,14 +1577,14 @@
     }
 
     .chat-send {
-      width: 42px;
+      width: 40px;
       height: 38px;
       display: grid;
       place-items: center;
       border: 0;
       border-radius: 10px;
       background: #fff;
-      color: #08080a;
+      color: #030405;
       cursor: pointer;
       transition: transform 160ms ease, opacity 160ms ease;
     }
@@ -1807,20 +1594,21 @@
     }
 
     .chat-send:disabled {
-      opacity: 0.42;
+      opacity: 0.4;
       cursor: wait;
     }
 
     .chat-attach {
-      width: 42px;
+      width: 40px;
       height: 38px;
       display: grid;
       place-items: center;
       border: 0;
       border-radius: 10px;
-      background: rgba(255, 255, 255, 0.07);
-      color: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.06);
+      color: rgba(255, 255, 255, 0.75);
       cursor: pointer;
+      transition: all 160ms ease;
     }
 
     .chat-attach:hover {
@@ -1828,61 +1616,58 @@
       color: #fff;
     }
 
-    .chat-attach:disabled {
-      opacity: 0.42;
-      cursor: wait;
-    }
-
     #chat-image-input {
       display: none;
     }
 
-    .achievement-list {
-      display: grid;
-      gap: 10px;
-    }
-
+    /* ---- Game Page / Session Monitor (60fps Optimized) ---- */
     .game-page,
-    .media-page {
+    .media-page,
+    .conversation-page,
+    .settings-page,
+    .profile-page {
       min-height: 100%;
-      animation: fade-in 240ms ease both;
+      animation: fade-in 180ms ease both;
+      contain: content;
     }
 
     .game-session-card {
-      min-height: 280px;
+      min-height: 240px;
       display: grid;
-      grid-template-columns: minmax(240px, 42%) 1fr;
+      grid-template-columns: minmax(200px, 38%) 1fr;
       overflow: hidden;
       border: 1px solid var(--panel-border);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.025);
+      border-radius: 16px;
+      background: var(--panel-surface);
+      transform: translateZ(0);
     }
 
     .game-session-art {
-      min-height: 280px;
+      min-height: 240px;
       display: grid;
       place-items: center;
-      background-color: #101014;
+      background-color: #0c0d11;
       background-position: center;
       background-size: cover;
       position: relative;
       color: rgba(255, 255, 255, 0.35);
+      transform: translateZ(0);
     }
 
     .game-session-art::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(90deg, transparent 55%, rgba(7, 7, 9, 0.9));
+      background: linear-gradient(90deg, transparent 50%, rgba(8, 9, 12, 0.95));
     }
 
     .game-session-art .ui-icon {
-      width: 58px;
-      height: 58px;
+      width: 48px;
+      height: 48px;
     }
 
     .game-session-copy {
-      padding: 32px;
+      padding: 24px 28px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -1890,176 +1675,193 @@
     }
 
     .game-session-copy h2 {
-      margin: 10px 0 8px;
-      font-size: 25px;
+      margin: 8px 0 4px;
+      font-size: 20px;
+      color: #fff;
     }
 
     .game-session-copy p {
       margin: 0;
       color: var(--text-muted);
-      font-size: 12px;
-      line-height: 1.5;
+      font-size: 11px;
+      line-height: 1.45;
     }
 
     .game-session-copy button {
-      margin-top: 24px;
-      padding: 11px 15px;
+      margin-top: 18px;
+      padding: 9px 16px;
       border: 0;
-      border-radius: 10px;
+      border-radius: 9999px;
       background: #fff;
-      color: #08080a;
-      font-weight: 750;
+      color: #030405;
+      font-weight: 700;
+      font-size: 11px;
       cursor: pointer;
+      transform: translateZ(0);
+      transition: transform 120ms ease, background-color 120ms ease;
     }
 
+    .game-session-copy button:hover {
+      transform: translateY(-1px) translateZ(0);
+      background: #f0f0f2;
+    }
+
+    .game-session-copy button:active {
+      transform: scale(0.97) translateZ(0);
+    }
+
+    /* Indicador Live Mono */
     .game-live {
       display: flex;
       align-items: center;
-      gap: 7px;
-      color: rgba(255, 255, 255, 0.58);
+      gap: 6px;
+      color: rgba(255, 255, 255, 0.7);
       font-size: 9px;
       font-weight: 800;
       letter-spacing: .12em;
     }
 
     .game-live i {
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 9px rgba(16, 185, 129, .5);
-    }
-
-    .game-live b {
-      font: inherit;
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+      flex-shrink: 0;
     }
 
     .game-live.is-idle i {
-      background: #64748b;
+      background: rgba(255, 255, 255, 0.25);
       box-shadow: none;
     }
 
     .game-live.is-unverified i {
-      background: #f59e0b;
-      box-shadow: 0 0 9px rgba(245, 158, 11, .45);
+      background: #ffffff;
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
     }
 
     .panel-view[data-panel-view="game"].is-active,
     .panel-view[data-panel-view="media"].is-active {
       height: clamp(480px, calc(90vh - 160px), 780px);
       overflow-y: auto;
-      padding-right: 7px;
+      padding-right: 6px;
     }
 
     .game-metrics {
       margin-top: 12px;
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 9px;
+      gap: 10px;
+      contain: content;
     }
 
     .game-metrics article {
       min-width: 0;
-      padding: 14px;
+      padding: 12px 14px;
       display: grid;
       grid-template-columns: auto 1fr;
       align-items: center;
-      gap: 3px 9px;
+      gap: 2px 8px;
       border: 1px solid var(--panel-border);
-      border-radius: 13px;
-      background: rgba(255, 255, 255, .025);
+      border-radius: 12px;
+      background: var(--panel-surface);
+      transform: translateZ(0);
     }
 
     .game-metrics .ui-icon {
       grid-row: 1 / 3;
-      width: 19px;
-      height: 19px;
-      color: rgba(255, 255, 255, .5);
+      width: 18px;
+      height: 18px;
+      color: rgba(255, 255, 255, 0.6);
     }
 
     .game-metrics span {
       color: var(--text-muted);
-      font-size: 9px;
+      font-size: 8.5px;
       text-transform: uppercase;
-      letter-spacing: .06em;
+      letter-spacing: .08em;
+      font-weight: 700;
     }
 
     .game-metrics strong {
       overflow: hidden;
-      font-size: 14px;
+      font-size: 13px;
       text-overflow: ellipsis;
       white-space: nowrap;
+      color: #fff;
     }
 
     .game-details-card {
       margin-top: 12px;
-      padding: 4px 16px;
+      padding: 2px 14px;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       border: 1px solid var(--panel-border);
-      border-radius: 14px;
-      background: rgba(255, 255, 255, .02);
+      border-radius: 12px;
+      background: var(--panel-surface);
+      contain: content;
     }
 
     .game-details-card div {
       min-width: 0;
-      padding: 13px 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, .05);
+      padding: 10px 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
     .game-details-card div:nth-last-child(-n+3) {
       border-bottom: 0;
     }
 
-    .game-details-card span,
+    .game-details-card span {
+      color: var(--text-muted);
+      font-size: 8.5px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+      display: block;
+    }
+
     .game-details-card strong {
+      margin-top: 3px;
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 11px;
       display: block;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .game-details-card span {
-      color: var(--text-muted);
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: .07em;
-    }
-
-    .game-details-card strong {
-      margin-top: 5px;
-      color: rgba(255, 255, 255, .82);
-      font-size: 11px;
-    }
-
+    /* ---- Achievements View (60fps Optimized) ---- */
     .achievement-summary {
-      margin-bottom: 18px;
-      padding: 16px 18px;
+      margin-bottom: 14px;
+      padding: 14px 18px;
       display: grid;
       grid-template-columns: auto 1fr;
       align-items: baseline;
-      gap: 4px 9px;
+      gap: 3px 8px;
       border: 1px solid var(--panel-border);
       border-radius: 14px;
-      background: rgba(255, 255, 255, .025);
+      background: var(--panel-surface);
+      transform: translateZ(0);
     }
 
     .achievement-summary strong {
       font-size: 20px;
+      color: #fff;
     }
 
-    .achievement-summary>span {
+    .achievement-summary > span {
       color: var(--text-muted);
       font-size: 11px;
     }
 
     .achievement-progress-track {
       grid-column: 1 / -1;
-      height: 4px;
-      margin-top: 9px;
+      height: 3px;
+      margin-top: 8px;
       overflow: hidden;
       border-radius: 999px;
-      background: rgba(255, 255, 255, .07);
+      background: rgba(255, 255, 255, 0.08);
     }
 
     #panel-achievement-progress {
@@ -2067,32 +1869,44 @@
       width: 0;
       height: 100%;
       border-radius: inherit;
-      background: #fff;
-      transition: width 300ms ease;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.6), #ffffff);
+      transition: width 240ms ease;
     }
 
     .achievement-item {
-      min-height: 68px;
-      padding: 10px 13px;
+      min-height: 60px;
+      padding: 10px 14px;
       display: grid;
       grid-template-columns: auto 1fr;
       align-items: center;
-      gap: 13px;
-      border: 1px solid rgba(255, 255, 255, .07);
-      border-radius: 13px;
-      background: rgba(255, 255, 255, .025);
+      gap: 12px;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      background: var(--panel-surface);
+      transform: translateZ(0);
+      will-change: transform;
+      transition: transform 120ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .achievement-item:hover {
+      border-color: var(--panel-border-strong);
+      background: var(--panel-surface-elevated);
+      transform: translateY(-2px) translateZ(0);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     }
 
     .achievement-item.is-locked {
-      opacity: .46;
+      opacity: 0.4;
       filter: grayscale(1);
     }
 
     .achievement-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 10px;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
       object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transform: translateZ(0);
     }
 
     .achievement-copy {
@@ -2101,12 +1915,12 @@
 
     .achievement-name {
       color: #fff;
-      font-size: 13px;
-      font-weight: 750;
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .achievement-description-small {
-      margin-top: 3px;
+      margin-top: 2px;
       overflow: hidden;
       color: var(--text-muted);
       font-size: 10px;
@@ -2115,11 +1929,12 @@
     }
 
     .achievement-state {
-      margin-top: 5px;
-      color: rgba(255, 255, 255, .65);
-      font-size: 9px;
+      margin-top: 3px;
+      color: rgba(255, 255, 255, 0.65);
+      font-size: 8.5px;
       text-transform: uppercase;
-      letter-spacing: .07em;
+      letter-spacing: .08em;
+      font-weight: 700;
     }
 
     .panel-view[data-panel-view="achievements"].is-active {
@@ -2134,175 +1949,94 @@
       min-height: 0;
       flex: 1 1 auto;
       overflow-y: auto;
-      padding-right: 8px;
-      align-content: start;
-    }
-
-    .panel-view[data-panel-view="achievements"] .achievement-list::-webkit-scrollbar,
-    .capture-gallery::-webkit-scrollbar,
-    .panel-view[data-panel-view="game"].is-active::-webkit-scrollbar,
-    .panel-view[data-panel-view="media"].is-active::-webkit-scrollbar {
-      width: 5px;
-    }
-
-    .panel-view[data-panel-view="achievements"] .achievement-list::-webkit-scrollbar-thumb,
-    .capture-gallery::-webkit-scrollbar-thumb,
-    .panel-view[data-panel-view="game"].is-active::-webkit-scrollbar-thumb,
-    .panel-view[data-panel-view="media"].is-active::-webkit-scrollbar-thumb {
-      border-radius: 999px;
-      background: rgba(255, 255, 255, .16);
-    }
-
-    .media-player-card {
-      padding: 28px;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 20px;
-      border: 1px solid var(--panel-border);
-      border-radius: 18px;
-      background: radial-gradient(circle at 0 0, rgba(255, 255, 255, .07), transparent 35%), rgba(255, 255, 255, .025);
-    }
-
-    .media-cover {
-      width: 92px;
-      height: 92px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(255, 255, 255, .09);
-      border-radius: 18px;
-      background: #151519;
-      color: rgba(255, 255, 255, .45);
-    }
-
-    .media-cover .ui-icon {
-      width: 34px;
-      height: 34px;
-    }
-
-    .media-copy span {
-      color: var(--text-muted);
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: .11em;
-    }
-
-    .media-copy h2 {
-      margin: 8px 0 5px;
-      font-size: 19px;
-    }
-
-    .media-copy p {
-      margin: 0;
-      color: var(--text-muted);
-      font-size: 11px;
-    }
-
-    .media-controls {
+      padding-right: 6px;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      gap: 6px;
+      contain: content;
     }
 
-    .media-controls button {
-      width: 40px;
-      height: 40px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(255, 255, 255, .1);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, .04);
-      color: #fff;
-      cursor: pointer;
-    }
-
-    .media-controls button:hover {
-      background: rgba(255, 255, 255, .09);
-    }
-
-    .media-controls .media-play {
-      width: 48px;
-      height: 48px;
-      background: #fff;
-      color: #08080a;
-    }
-
+    /* ---- Capturas de Tela / Galeria (60fps Optimized) ---- */
     .capture-hero {
-      padding: 22px;
+      padding: 18px 20px;
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
-      gap: 17px;
+      gap: 16px;
       border: 1px solid var(--panel-border);
-      border-radius: 17px;
-      background: radial-gradient(circle at 0 0, rgba(255, 255, 255, .08), transparent 42%), rgba(255, 255, 255, .025);
+      border-radius: 14px;
+      background: var(--panel-surface);
+      transform: translateZ(0);
     }
 
     .capture-hero-icon {
-      width: 58px;
-      height: 58px;
+      width: 46px;
+      height: 46px;
       display: grid;
       place-items: center;
-      border: 1px solid rgba(255, 255, 255, .1);
-      border-radius: 15px;
-      background: rgba(255, 255, 255, .055);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.85);
     }
 
     .capture-hero-icon .ui-icon {
-      width: 27px;
-      height: 27px;
+      width: 22px;
+      height: 22px;
     }
 
-    .capture-hero>div>span {
+    .capture-hero > div > span {
       color: var(--text-muted);
-      font-size: 9px;
+      font-size: 8.5px;
       font-weight: 800;
-      letter-spacing: .11em;
+      letter-spacing: .12em;
+      text-transform: uppercase;
     }
 
     .capture-hero h2 {
-      margin: 7px 0 4px;
-      font-size: 18px;
+      margin: 4px 0 2px;
+      font-size: 16px;
+      color: #fff;
     }
 
     .capture-hero p {
       margin: 0;
       color: var(--text-muted);
-      font-size: 10px;
+      font-size: 10.5px;
     }
 
-    .capture-hero>button {
-      min-height: 42px;
-      padding: 0 20px;
+    .capture-hero > button {
+      min-height: 38px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       border: 0;
       border-radius: 9999px;
       background: #fff;
-      color: #08080a;
+      color: #030405;
       font-weight: 800;
+      font-size: 11px;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-      transition: transform 0.2s, box-shadow 0.2s;
+      transform: translateZ(0);
+      transition: transform 120ms ease, background-color 120ms ease;
     }
 
-    .capture-hero>button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    .capture-hero > button:hover {
+      transform: translateY(-1px) translateZ(0);
+      background: #f0f0f2;
     }
 
-    .capture-hero>button .ui-icon {
-      width: 17px;
-      height: 17px;
+    .capture-hero > button:active {
+      transform: scale(0.97) translateZ(0);
     }
 
     .capture-hero kbd {
-      padding: 4px 6px;
-      border-radius: 5px;
-      background: rgba(0, 0, 0, .1);
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.12);
       font: inherit;
-      font-size: 9px;
+      font-size: 8.5px;
     }
 
     .capture-heading {
@@ -2315,336 +2049,107 @@
     .capture-heading h3 {
       margin: 0;
       font-size: 13px;
+      font-weight: 700;
+      color: #fff;
     }
 
     .capture-heading button {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       border: 0;
       background: transparent;
       color: var(--text-muted);
-      font-size: 10px;
+      font-size: 10.5px;
+      font-weight: 600;
       cursor: pointer;
+      transition: color 120ms ease;
     }
 
     .capture-heading button:hover {
       color: #fff;
     }
 
-    .capture-heading .ui-icon {
-      width: 15px;
-      height: 15px;
-    }
-
-    .capture-feedback {
-      min-height: 15px;
-      margin: 7px 0 0;
-      color: var(--text-muted);
-      font-size: 9px;
-    }
-
     .capture-gallery {
       max-height: 390px;
       overflow-y: auto;
-      padding-right: 7px;
+      padding-right: 6px;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 9px;
+      gap: 10px;
+      contain: content;
     }
 
     .capture-card {
       position: relative;
       aspect-ratio: 16 / 9;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, .08);
-      border-radius: 11px;
-      background: #101014;
-      transition: opacity 180ms ease, border-color 180ms ease;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      background: #0d0e12;
+      cursor: pointer;
+      transform: translateZ(0);
+      will-change: transform;
+      transition: transform 140ms ease, border-color 140ms ease;
     }
 
-    .capture-card.is-deleting {
-      opacity: .46;
-      pointer-events: none;
+    .capture-card:hover {
+      border-color: var(--panel-border-strong);
+      transform: scale(1.02) translateZ(0);
     }
 
     .capture-card img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transition: transform 220ms ease;
-    }
-
-    .capture-card:hover img {
-      transform: scale(1.035);
+      transform: translateZ(0);
     }
 
     .capture-card .capture-date {
       position: absolute;
-      right: 7px;
-      bottom: 7px;
-      padding: 4px 6px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, .68);
-      color: rgba(255, 255, 255, .75);
-      font-size: 8px;
-      backdrop-filter: blur(8px);
+      right: 6px;
+      bottom: 6px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.75);
+      color: rgba(255, 255, 255, 0.85);
+      font-size: 8.5px;
     }
 
     .capture-delete {
       position: absolute;
-      top: 7px;
-      right: 7px;
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 5px;
-      border: 1px solid rgba(255, 255, 255, .12);
-      border-radius: 8px;
-      background: rgba(5, 5, 7, .76);
-      color: rgba(255, 255, 255, .72);
-      opacity: 0;
-      transform: translateY(-3px);
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.65);
+      color: rgba(255, 255, 255, 0.7);
       cursor: pointer;
-      backdrop-filter: blur(10px);
-      transition: width 160ms ease, opacity 160ms ease, transform 160ms ease, color 160ms ease, background 160ms ease, border-color 160ms ease;
-    }
-
-    .capture-card:hover .capture-delete,
-    .capture-delete:focus-visible,
-    .capture-delete.is-confirming {
-      opacity: 1;
-      transform: translateY(0);
+      transition: background-color 120ms ease, color 120ms ease;
     }
 
     .capture-delete:hover {
       color: #fff;
-      background: rgba(18, 18, 22, .92);
+      background: rgba(255, 255, 255, 0.25);
     }
 
-    .capture-delete.is-confirming {
-      width: 72px;
-      border-color: rgba(248, 113, 113, .6);
-      background: rgba(127, 29, 29, .88);
-      color: #fff;
-    }
-
-    .capture-delete.is-confirming::after {
-      content: "Excluir?";
-      font-size: 8px;
-      font-weight: 800;
-    }
-
-    .capture-delete .ui-icon {
-      width: 14px;
-      height: 14px;
-    }
-
-    .capture-empty {
-      grid-column: 1 / -1;
-      padding: 38px 16px;
-      border: 1px dashed rgba(255, 255, 255, .1);
-      border-radius: 13px;
-      color: var(--text-muted);
-      text-align: center;
-      font-size: 11px;
-    }
-
-    .capture-card {
-      cursor: zoom-in;
-    }
-
-    .capture-card:focus-visible {
-      outline: 2px solid rgba(255, 255, 255, .86);
-      outline-offset: 2px;
-      border-color: rgba(255, 255, 255, .54);
-    }
-
-    .capture-viewer {
-      position: fixed;
-      inset: 0;
-      z-index: 20000;
-      display: none;
-      place-items: center;
-      padding: 3vh 3vw;
-      pointer-events: auto;
-      background: rgba(0, 0, 0, .86);
-      backdrop-filter: blur(18px);
-    }
-
-    .capture-viewer.is-open {
-      display: grid;
-      animation: fade-in 170ms ease both;
-    }
-
-    .capture-viewer-shell {
-      width: min(1500px, 94vw);
-      height: min(900px, 90vh);
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, .13);
-      border-radius: 18px;
-      background: #08080a;
-      box-shadow: 0 36px 110px rgba(0, 0, 0, .72);
-    }
-
-    .capture-viewer-header,
-    .capture-viewer-footer {
-      min-height: 58px;
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      background: rgba(255, 255, 255, .025);
-    }
-
-    .capture-viewer-header {
-      border-bottom: 1px solid rgba(255, 255, 255, .08);
-    }
-
-    .capture-viewer-footer {
-      justify-content: space-between;
-      border-top: 1px solid rgba(255, 255, 255, .08);
-    }
-
-    .capture-viewer-title {
-      min-width: 0;
-      flex: 1;
-    }
-
-    .capture-viewer-title strong,
-    .capture-viewer-title span {
-      display: block;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .capture-viewer-title strong {
-      font-size: 13px;
-    }
-
-    .capture-viewer-title span,
-    .capture-viewer-footer {
-      color: var(--text-muted);
-      font-size: 10px;
-    }
-
-    .capture-viewer-close,
-    .capture-viewer-nav {
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(255, 255, 255, .12);
-      background: rgba(255, 255, 255, .055);
-      color: #fff;
-      cursor: pointer;
-    }
-
-    .capture-viewer-close {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-    }
-
-    .capture-viewer-stage {
-      min-height: 0;
-      position: relative;
-      display: grid;
-      place-items: center;
-      padding: 18px 66px;
-      overflow: hidden;
-      background: #030304;
-    }
-
-    .capture-viewer-image {
-      max-width: 100%;
-      max-height: 100%;
-      object-fit: contain;
-      filter: drop-shadow(0 20px 36px rgba(0, 0, 0, .45));
-    }
-
-    .capture-viewer-nav {
-      position: absolute;
-      top: 50%;
-      width: 42px;
-      height: 58px;
-      border-radius: 12px;
-      transform: translateY(-50%);
-      background: rgba(12, 12, 15, .82);
-      backdrop-filter: blur(12px);
-    }
-
-    .capture-viewer-nav:hover,
-    .capture-viewer-close:hover {
-      background: rgba(255, 255, 255, .12);
-    }
-
-    .capture-viewer-nav:disabled {
-      opacity: .25;
-      cursor: default;
-    }
-
-    .capture-viewer-nav.previous {
-      left: 14px;
-    }
-
-    .capture-viewer-nav.next {
-      right: 14px;
-    }
-
-    .capture-viewer-nav.next .ui-icon {
-      transform: rotate(180deg);
-    }
-
-    .capture-viewer-shortcuts {
-      display: flex;
-      gap: 12px;
-    }
-
-    .capture-viewer-shortcuts kbd {
-      font: inherit;
-      color: rgba(255, 255, 255, .7);
-    }
-
-    .top-profile {
-      color: #fff;
-      font: inherit;
-    }
-
-    .top-profile:hover {
-      background: var(--panel-surface-hover);
-      border-color: rgba(255, 255, 255, 0.16);
-    }
-
-    .top-profile .ui-icon {
-      width: 15px;
-      height: 15px;
-      color: var(--text-muted);
-    }
-
-    .conversation-page,
-    .settings-page,
-    .profile-page {
-      min-height: 100%;
-      animation: fade-in 240ms ease both;
-    }
-
+    /* ---- Conversations / Settings / Profile Views (60fps Optimized) ---- */
     .view-title {
-      margin-bottom: 22px;
+      margin-bottom: 18px;
     }
 
     .view-title h2 {
       margin: 0;
-      font-size: 24px;
-      letter-spacing: -0.025em;
+      font-size: 20px;
+      color: #fff;
     }
 
     .view-title p {
-      margin: 6px 0 0;
+      margin: 4px 0 0;
       color: var(--text-muted);
       font-size: 12px;
     }
@@ -2652,7 +2157,8 @@
     .conversation-list {
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 6px;
+      contain: content;
     }
 
     .conversation-row {
@@ -2660,76 +2166,74 @@
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       align-items: center;
-      gap: 14px;
-      padding: 12px 14px;
-      border: 1px solid transparent;
-      border-radius: 14px;
-      background: rgba(255, 255, 255, 0.025);
+      gap: 12px;
+      padding: 10px 14px;
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      background: var(--panel-surface);
       color: #fff;
       text-align: left;
       cursor: pointer;
-      transition: background 170ms ease, border-color 170ms ease, transform 170ms ease;
+      transform: translateZ(0);
+      will-change: transform;
+      transition: transform 120ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
     }
 
     .conversation-row:hover {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.1);
-      transform: translateX(2px);
+      background: var(--panel-surface-elevated);
+      border-color: var(--panel-border-strong);
+      transform: translateX(3px) translateZ(0);
     }
 
     .conversation-row img {
-      width: 46px;
-      height: 46px;
-      border-radius: 14px;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
       object-fit: cover;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      transform: translateZ(0);
     }
 
     .conversation-copy {
       min-width: 0;
     }
 
-    .conversation-copy strong,
+    .conversation-copy strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
     .conversation-copy span {
       display: block;
+      margin-top: 2px;
+      color: var(--text-muted);
+      font-size: 10px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .conversation-copy strong {
-      font-size: 14px;
-    }
-
-    .conversation-copy span {
-      margin-top: 4px;
-      color: var(--text-muted);
-      font-size: 11px;
-    }
-
-    .conversation-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
     .conversation-unread {
-      min-width: 22px;
-      height: 22px;
-      padding: 0 7px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
       display: grid;
       place-items: center;
       border-radius: 999px;
       background: #fff;
-      color: #050507;
-      font-size: 10px;
+      color: #030405;
+      font-size: 9.5px;
       font-weight: 800;
     }
 
-    .conversation-empty {
-      padding: 48px 18px;
+    .conversation-empty,
+    .capture-empty {
+      padding: 36px 16px;
       border: 1px dashed rgba(255, 255, 255, 0.1);
-      border-radius: 16px;
+      border-radius: 14px;
       color: var(--text-muted);
       text-align: center;
       font-size: 12px;
@@ -2739,33 +2243,37 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
+      contain: content;
     }
 
     .settings-card,
     .profile-card {
       border: 1px solid var(--panel-border);
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.025);
+      border-radius: 14px;
+      background: var(--panel-surface);
       overflow: hidden;
+      transform: translateZ(0);
     }
 
     .settings-card h3 {
       margin: 0;
-      padding: 16px 18px 12px;
-      font-size: 13px;
+      padding: 14px 16px 10px;
+      font-size: 12px;
+      color: #fff;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
     .setting-row {
-      min-height: 58px;
+      min-height: 48px;
       padding: 10px 16px;
       display: flex;
       align-items: center;
       gap: 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.055);
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
     }
 
-    .setting-row .quick-icon {
-      flex: 0 0 auto;
+    .setting-row:first-of-type {
+      border-top: none;
     }
 
     .setting-copy {
@@ -2775,248 +2283,224 @@
 
     .setting-copy b {
       display: block;
-      font-size: 12px;
+      font-size: 11.5px;
+      color: #fff;
     }
 
     .setting-copy small {
       display: block;
-      margin-top: 3px;
+      margin-top: 2px;
       color: var(--text-muted);
-      font-size: 10px;
+      font-size: 9.5px;
     }
 
     .setting-switch {
-      width: 38px;
-      height: 22px;
+      width: 36px;
+      height: 20px;
       position: relative;
       appearance: none;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.18);
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.08);
       cursor: pointer;
-      transition: background 160ms ease;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .setting-switch:checked {
+      background: #ffffff;
+      border-color: #ffffff;
     }
 
     .setting-switch::after {
       content: "";
       position: absolute;
-      top: 3px;
-      left: 3px;
+      top: 2px;
+      left: 2px;
       width: 14px;
       height: 14px;
       border-radius: 50%;
-      background: rgba(255, 255, 255, 0.5);
-      transition: transform 160ms ease, background 160ms ease;
-    }
-
-    .setting-switch:checked {
-      background: #fff;
+      background: #ffffff;
+      transition: transform 120ms cubic-bezier(0.2, 0, 0, 1);
     }
 
     .setting-switch:checked::after {
       transform: translateX(16px);
-      background: #08080a;
+      background: #030405;
     }
 
-    .shortcut-key {
-      padding: 6px 9px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-bottom-color: rgba(255, 255, 255, 0.25);
-      border-radius: 7px;
-      background: rgba(255, 255, 255, 0.055);
-      color: rgba(255, 255, 255, 0.74);
-      font-size: 10px;
-      white-space: nowrap;
-    }
-
-    .shortcut-recorder {
-      min-width: 148px;
-      padding: 6px 7px 6px 10px;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 9px;
-      border: 1px solid rgba(255, 255, 255, .12);
-      border-radius: 9px;
-      background: #151519;
-      color: rgba(255, 255, 255, .68);
-      font: inherit;
-      font-size: 9px;
-      cursor: pointer;
-      transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
-    }
-
-    .shortcut-recorder:hover {
-      border-color: rgba(255, 255, 255, .24);
-      background: #1a1a1f;
-      color: #fff;
-    }
-
-    .shortcut-recorder.is-recording {
-      border-color: rgba(255, 255, 255, .48);
-      background: rgba(255, 255, 255, .09);
-      color: #fff;
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, .045);
-    }
-
-    .shortcut-recorder kbd {
-      padding: 5px 7px;
-      border: 1px solid rgba(255, 255, 255, .14);
-      border-bottom-color: rgba(255, 255, 255, .32);
-      border-radius: 6px;
-      background: rgba(255, 255, 255, .055);
-      color: #fff;
-      font: inherit;
-      font-size: 9px;
-      white-space: nowrap;
-    }
-
-    .settings-card-wide {
-      grid-column: 1 / -1;
-    }
-
-    .setting-feedback {
-      min-height: 15px;
-      margin: 0;
-      padding: 0 17px 10px;
-      color: var(--text-muted);
-      font-size: 9px;
-    }
-
-    .profile-hero {
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      background: radial-gradient(circle at 12% 0, rgba(255, 255, 255, 0.08), transparent 42%);
-    }
-
-    .profile-hero img {
-      width: 82px;
-      height: 82px;
-      border-radius: 22px;
-      object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.16);
-      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
-    }
-
-    .profile-identity h2 {
-      margin: 0;
-      font-size: 22px;
-    }
-
-    .profile-identity p {
-      margin: 6px 0 0;
-      color: var(--text-muted);
-      font-size: 12px;
-    }
-
+    /* Discord Pill Mono */
     .discord-pill {
-      width: fit-content;
-      margin-top: 10px;
-      padding: 6px 9px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 7px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.045);
-      color: rgba(255, 255, 255, 0.72);
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
       font-size: 10px;
-    }
-
-    .discord-pill[hidden] {
-      display: none !important;
+      font-weight: 600;
     }
 
     .discord-pill i {
-      width: 7px;
-      height: 7px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+      background: #fff;
+      box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
     }
 
-    .profile-stats {
+    /* ---- Animações Globais ---- */
+    @keyframes panel-pop-in {
+      0% {
+        opacity: 0;
+        transform: scale(0.96) translateY(14px);
+        filter: blur(6px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes overlay-in {
+      0% {
+        opacity: 0;
+        transform: translateX(var(--entry-x)) scale(0.94);
+        filter: blur(4px);
+      }
+      65% {
+        opacity: 1;
+        transform: translateX(calc(var(--entry-x) * -0.05)) scale(1.012);
+        filter: blur(0);
+      }
+      100% {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes overlay-out {
+      from {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+        filter: blur(0);
+      }
+      to {
+        opacity: 0;
+        transform: translateX(var(--entry-x)) scale(0.95);
+        filter: blur(4px);
+      }
+    }
+
+    @keyframes progress-drain {
+      from { transform: scaleX(1); }
+      to { transform: scaleX(0); }
+    }
+
+    @keyframes shine-sweep {
+      0% { transform: translateX(-120%) skewX(-15deg); }
+      100% { transform: translateX(150%) skewX(-15deg); }
+    }
+
+    @keyframes fade-in {
+      from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.99);
+        filter: blur(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+      }
+    }
+
+    @keyframes pulse-online-glow {
+      0%, 100% {
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+      }
+      50% {
+        box-shadow: 0 0 14px rgba(255, 255, 255, 1), 0 0 22px rgba(255, 255, 255, 0.4);
+      }
+    }
+
+    /* Modal / Viewer de Capturas */
+    .capture-viewer {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0, 0, 0, 0.9);
+      backdrop-filter: blur(32px);
+      display: none;
+      place-items: center;
+      padding: 40px;
+    }
+
+    .capture-viewer.is-open {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-top: 1px solid var(--panel-border);
     }
 
-    .profile-stat {
-      padding: 18px;
-      text-align: center;
-      border-right: 1px solid var(--panel-border);
+    .capture-viewer-content {
+      position: relative;
+      max-width: 90vw;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    .profile-stat:last-child {
-      border-right: 0;
+    .capture-viewer-content img {
+      max-width: 100%;
+      max-height: calc(85vh - 60px);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+      object-fit: contain;
     }
 
-    .profile-stat strong {
-      display: block;
-      font-size: 20px;
+    .capture-viewer-bar {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      color: #fff;
+      font-size: 13px;
     }
 
-    .profile-stat span {
-      display: block;
-      margin-top: 4px;
-      color: var(--text-muted);
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    .capture-viewer-shortcuts kbd {
+      padding: 3px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      font: inherit;
+      color: rgba(255, 255, 255, 0.8);
     }
 
-    body.overlay-reduced-motion *,
-    body.overlay-reduced-motion *::before,
-    body.overlay-reduced-motion *::after {
-      animation-duration: 0.01ms !important;
-      transition-duration: 0.01ms !important;
-    }
-
-    @media (max-width: 1180px) {
-      #command-panel.is-open {
-        grid-template-columns: 76px minmax(0, 1fr) 300px;
-      }
-
-      .panel-topbar {
-        padding-inline: 24px;
-      }
-
-      .panel-content {
-        padding-inline: 24px;
-      }
-
-      .friend-search {
-        width: 210px;
-      }
-
-      .settings-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .settings-card-wide {
-        grid-column: auto;
-      }
-
-      .game-metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      .capture-hero {
-        grid-template-columns: auto 1fr;
-      }
-
-      .capture-hero>button {
-        grid-column: 1 / -1;
-        justify-content: center;
+    /* Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      .animate-icon,
+      .animate-icon *,
+      .status-dot.online,
+      .overlay-card,
+      #command-panel {
+        animation: none !important;
+        transition: none !important;
       }
     }
 
-    @media (max-height: 700px) {
-      .panel-view[data-panel-view="chats"].is-active {
-        min-height: 0;
-      }
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
     }
   </style>
 </head>
@@ -3117,39 +2601,45 @@
       </symbol>
     </defs>
   </svg>
+
   <div id="achievement-stack"></div>
   <div id="social-stack"></div>
+
   <section id="command-panel" aria-hidden="true">
     <div class="panel-game-backdrop" id="panel-game-backdrop"></div>
     <aside class="panel-sidebar">
       <div class="panel-logo" aria-label="Phelierium"><img src="../assets/icon.png" alt="" /></div>
       <nav class="panel-navigation" aria-label="Navegação do overlay">
-        <button class="panel-tab is-active" data-panel-tab="friends"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-home" />
-            </svg></span><span>Início</span></button>
-        <button class="panel-tab" data-panel-tab="chats"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-chat" />
-            </svg></span><span>Chat</span><b class="nav-notification" id="nav-unread" hidden></b></button>
-        <button class="panel-tab" data-panel-tab="game"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-gamepad" />
-            </svg></span><span>Jogo</span></button>
-        <button class="panel-tab" data-panel-tab="media"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-image" />
-            </svg></span><span>Mídia</span></button>
-        <button class="panel-tab" data-panel-tab="achievements"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-trophy" />
-            </svg></span><span>Conquistas</span></button>
-        <button class="panel-tab" data-panel-tab="spotify"><span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-music" />
-            </svg></span><span>Spotify</span></button>
+        <button class="panel-tab is-active" data-panel-tab="friends">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-home" /></svg></span>
+          <span>Início</span>
+        </button>
+        <button class="panel-tab" data-panel-tab="chats">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-chat" /></svg></span>
+          <span>Chat</span>
+          <b class="nav-notification" id="nav-unread" hidden></b>
+        </button>
+        <button class="panel-tab" data-panel-tab="game">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span>
+          <span>Jogo</span>
+        </button>
+        <button class="panel-tab" data-panel-tab="media">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-image" /></svg></span>
+          <span>Mídia</span>
+        </button>
+        <button class="panel-tab" data-panel-tab="achievements">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span>
+          <span>Conquistas</span>
+        </button>
       </nav>
       <div class="sidebar-spacer"></div>
-      <button class="panel-action panel-tab" data-panel-tab="settings"><span class="nav-icon"><svg class="ui-icon">
-            <use href="#icon-settings" />
-          </svg></span><span>Config.</span></button>
+      <button class="panel-action panel-tab" data-panel-tab="settings">
+        <span class="nav-icon"><svg class="ui-icon"><use href="#icon-settings" /></svg></span>
+        <span>Config.</span>
+      </button>
       <div class="sidebar-profile">
         <img id="sidebar-profile-avatar" alt="" />
-        <span id="sidebar-profile-name">Guilherme</span>
+        <span id="sidebar-profile-name">Jogador</span>
         <i class="status-dot online"></i>
       </div>
     </aside>
@@ -3157,26 +2647,21 @@
     <div class="panel-workspace">
       <header class="panel-topbar">
         <div class="welcome-copy">
-          <h1>Olá, <span id="panel-profile-name">Guilherme</span> <svg class="ui-icon welcome-mark">
-              <use href="#icon-sparkles" />
-            </svg></h1>
-          <p><span id="panel-friend-count">6 amigos</span> &bull; <span id="panel-online-count">2 online</span></p>
+          <h1>Olá, <span id="panel-profile-name">Jogador</span> <svg class="ui-icon welcome-mark"><use href="#icon-sparkles" /></svg></h1>
+          <p><span id="panel-friend-count">0 amigos</span> &bull; <span id="panel-online-count">0 online</span></p>
         </div>
         <label class="friend-search">
-          <svg class="ui-icon">
-            <use href="#icon-search" />
-          </svg>
+          <svg class="ui-icon"><use href="#icon-search" /></svg>
           <input id="friend-search" type="search" placeholder="Buscar amigos..." autocomplete="off" />
         </label>
         <button class="top-profile" data-panel-tab="profile" type="button">
           <img id="panel-profile-avatar" alt="" />
-          <span>Meu perfil</span><svg class="ui-icon" aria-hidden="true">
-            <use href="#icon-chevron-down" />
-          </svg>
+          <span>Meu perfil</span>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
         </button>
-        <button class="top-close" id="panel-close-top" aria-label="Fechar overlay"><svg class="ui-icon">
-            <use href="#icon-close" />
-          </svg></button>
+        <button class="top-close" id="panel-close-top" aria-label="Fechar overlay">
+          <svg class="ui-icon"><use href="#icon-close" /></svg>
+        </button>
       </header>
 
       <div class="panel-layout">
@@ -3185,7 +2670,7 @@
             <div id="panel-friends-view">
               <section class="friend-section">
                 <div class="section-heading">
-                  <h2><i class="status-dot online"></i> Amigos online <span id="online-heading-count">(3)</span></h2>
+                  <h2><i class="status-dot online"></i> Amigos online <span id="online-heading-count">(0)</span></h2>
                   <button id="show-all-friends">Ver todos ›</button>
                 </div>
                 <div class="online-friends-grid" id="panel-friends-online"></div>
@@ -3193,333 +2678,334 @@
 
               <section class="friend-section offline-section">
                 <div class="section-heading">
-                  <h2><i class="status-dot"></i> Amigos offline <span id="offline-heading-count">(12)</span></h2>
+                  <h2><i class="status-dot"></i> Amigos offline <span id="offline-heading-count">(0)</span></h2>
                 </div>
                 <div class="offline-friends-list" id="panel-friends-offline"></div>
               </section>
               <p class="sr-only" id="panel-game">Nenhum jogo detectado.</p>
             </div>
           </div>
+
           <div class="panel-view" data-panel-view="chats">
-            <div class="conversation-page" id="panel-chat-list">
+            <div id="panel-chat-list">
               <div class="view-title">
                 <h2>Conversas</h2>
                 <p>Continue suas conversas sem sair do jogo.</p>
               </div>
               <div class="conversation-list" id="conversation-list"></div>
             </div>
-            <div id="panel-chat-view" hidden>
-              <div class="chat-layout">
-                <header class="chat-header">
-                  <button class="chat-back" id="chat-back" aria-label="Voltar para amigos"><svg class="ui-icon">
-                      <use href="#icon-back" />
-                    </svg></button>
-                  <img class="friend-avatar" id="chat-avatar" alt="" />
-                  <div class="friend-copy">
-                    <div class="friend-name" id="chat-name">Amigo</div>
-                    <div class="friend-status" id="chat-status">Conversa</div>
-                  </div>
-                </header>
-                <div class="chat-messages" id="chat-messages"></div>
-                <div class="chat-composer">
-                  <div class="chat-typing" id="chat-typing"></div>
-                  <div class="chat-error" id="chat-error" role="status" aria-live="polite"></div>
-                  <input id="chat-image-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
-                  <form class="chat-form" id="chat-form"><button class="chat-attach" id="chat-attach" type="button"
-                      aria-label="Enviar imagem"><svg class="ui-icon">
-                        <use href="#icon-image" />
-                      </svg></button><input class="chat-input" id="chat-input" autocomplete="off"
-                      placeholder="Escreva uma mensagem..." aria-label="Mensagem" /><button class="chat-send"
-                      id="chat-send" type="submit" aria-label="Enviar mensagem"><svg class="ui-icon">
-                        <use href="#icon-send" />
-                      </svg></button></form>
+            <div class="chat-layout" id="panel-chat-view" hidden>
+              <header class="chat-header">
+                <button class="chat-back" id="chat-back" aria-label="Voltar para a lista">
+                  <svg class="ui-icon"><use href="#icon-back" /></svg>
+                </button>
+                <img class="friend-avatar" id="chat-avatar" alt="" />
+                <div>
+                  <div class="friend-name" id="chat-name">Amigo</div>
+                  <div class="friend-status" id="chat-status">Conversa Phelierium</div>
                 </div>
+              </header>
+              <div class="chat-messages" id="chat-messages"></div>
+              <div class="chat-composer">
+                <div class="chat-typing" id="chat-typing"></div>
+                <div class="chat-error" id="chat-error"></div>
+                <form class="chat-form" id="chat-form">
+                  <button class="chat-attach" id="chat-attach" type="button" aria-label="Anexar imagem">
+                    <svg class="ui-icon"><use href="#icon-image" /></svg>
+                  </button>
+                  <input class="chat-input" id="chat-input" type="text" placeholder="Escreva uma mensagem..." autocomplete="off" />
+                  <button class="chat-send" id="chat-send" type="submit" aria-label="Enviar mensagem">
+                    <svg class="ui-icon"><use href="#icon-send" /></svg>
+                  </button>
+                </form>
+                <input id="chat-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
               </div>
             </div>
           </div>
+
           <div class="panel-view" data-panel-view="game">
             <div class="game-page">
-              <div class="view-title">
-                <h2>Jogo em execução</h2>
-                <p>Informações da sua sessão atual.</p>
-              </div>
-              <section class="game-session-card">
-                <div class="game-session-art" id="game-page-art"><svg class="ui-icon">
-                    <use href="#icon-gamepad" />
-                  </svg></div>
-                <div class="game-session-copy"><span class="game-live" id="game-live-status"><i></i><b
-                      id="game-live-label">AGUARDANDO JOGO</b></span>
-                  <h2 id="game-page-title">Nenhum jogo detectado</h2>
-                  <p id="game-page-message">Abra um jogo pela biblioteca para acompanhar sua sessão.</p><button
-                    type="button" data-context-tab="achievements">Ver conquistas</button>
+              <div class="game-session-card">
+                <div class="game-session-art" id="game-page-art">
+                  <svg class="ui-icon"><use href="#icon-gamepad" /></svg>
                 </div>
-              </section>
-              <div class="game-metrics">
-                <article><svg class="ui-icon">
-                    <use href="#icon-clock" />
-                  </svg><span>Sessão atual</span><strong id="game-session-duration">00:00:00</strong></article>
-                <article><svg class="ui-icon">
-                    <use href="#icon-gamepad" />
-                  </svg><span>Tempo total</span><strong id="game-total-playtime">0h</strong></article>
-                <article><svg class="ui-icon">
-                    <use href="#icon-trophy" />
-                  </svg><span>Conquistas</span><strong id="game-achievement-ratio">0/0</strong></article>
-                <article><svg class="ui-icon">
-                    <use href="#icon-users" />
-                  </svg><span>Amigos jogando</span><strong id="game-friends-playing">0</strong></article>
+                <div class="game-session-copy">
+                  <div class="game-live" id="game-live-status">
+                    <i></i><span id="game-live-label">AGUARDANDO JOGO</span>
+                  </div>
+                  <h2 id="game-page-title">Nenhum jogo em execução</h2>
+                  <p id="game-page-message">Abra um jogo pela biblioteca para acompanhar sua sessão.</p>
+                </div>
               </div>
-              <section class="game-details-card">
+
+              <div class="game-metrics">
+                <article>
+                  <svg class="ui-icon"><use href="#icon-clock" /></svg>
+                  <span>Sessão atual</span>
+                  <strong id="game-session-duration">00:00:00</strong>
+                </article>
+                <article>
+                  <svg class="ui-icon"><use href="#icon-chart" /></svg>
+                  <span>Tempo total</span>
+                  <strong id="game-total-playtime">0h</strong>
+                </article>
+                <article>
+                  <svg class="ui-icon"><use href="#icon-trophy" /></svg>
+                  <span>Conquistas</span>
+                  <strong id="game-achievement-ratio">0/0</strong>
+                </article>
+                <article>
+                  <svg class="ui-icon"><use href="#icon-users" /></svg>
+                  <span>Amigos jogando</span>
+                  <strong id="game-friends-playing">0</strong>
+                </article>
+              </div>
+
+              <div class="game-details-card">
                 <div><span>Plataforma</span><strong id="game-platform">—</strong></div>
                 <div><span>Executável</span><strong id="game-executable">—</strong></div>
                 <div><span>Desenvolvedor</span><strong id="game-developer">—</strong></div>
                 <div><span>Lançamento</span><strong id="game-release-date">—</strong></div>
-                <div><span>Modo de janela</span><strong id="game-window-mode">Padrão do jogo</strong></div>
+                <div><span>Modo de janela</span><strong id="game-window-mode">Padrão</strong></div>
                 <div><span>Resolução</span><strong id="game-resolution">Automática</strong></div>
-              </section>
+              </div>
             </div>
           </div>
-          <div class="panel-view" data-panel-view="achievements">
-            <div class="view-title">
-              <h2>Conquistas</h2>
-              <p id="achievement-game-label">Inicie um jogo para acompanhar o progresso.</p>
+
+          <div class="panel-view" data-panel-view="media">
+            <div class="media-page">
+              <div class="capture-hero">
+                <div class="capture-hero-icon">
+                  <svg class="ui-icon"><use href="#icon-camera" /></svg>
+                </div>
+                <div>
+                  <span>Capturas de Tela</span>
+                  <h2>Registre seus melhores momentos</h2>
+                  <p>Capture a tela do jogo a qualquer momento usando o botão ou o atalho rápido.</p>
+                  <div class="capture-feedback" id="capture-setting-feedback"></div>
+                </div>
+                <button id="capture-now" type="button">
+                  <svg class="ui-icon"><use href="#icon-camera" /></svg>
+                  <span>Capturar agora</span>
+                  <kbd id="capture-shortcut-label">F8</kbd>
+                </button>
+              </div>
+
+              <div class="capture-heading">
+                <h3>Capturas recentes</h3>
+                <button id="open-captures-folder" type="button">
+                  <svg class="ui-icon"><use href="#icon-folder" /></svg>
+                  <span>Abrir pasta</span>
+                </button>
+              </div>
+
+              <div class="capture-gallery" id="capture-gallery"></div>
+              <div class="capture-feedback" id="capture-gallery-feedback"></div>
             </div>
-            <div class="achievement-summary"><strong><span id="panel-unlocked">0</span>/<span
-                  id="panel-available">0</span></strong><span>desbloqueadas</span>
-              <div class="achievement-progress-track"><i id="panel-achievement-progress"></i></div>
+          </div>
+
+          <div class="panel-view" data-panel-view="achievements">
+            <div class="achievement-summary">
+              <strong><span id="panel-unlocked">0</span>/<span id="panel-available">0</span></strong>
+              <span id="achievement-game-label">Conquistas registradas</span>
+              <div class="achievement-progress-track">
+                <span id="panel-achievement-progress"></span>
+              </div>
             </div>
             <div class="achievement-list" id="panel-achievements"></div>
           </div>
-          <div class="panel-view" data-panel-view="media">
-            <div class="media-page">
-              <div class="view-title">
-                <h2>Capturas</h2>
-                <p>Registre seus melhores momentos sem sair da partida.</p>
-              </div>
-              <section class="capture-hero">
-                <span class="capture-hero-icon"><svg class="ui-icon">
-                    <use href="#icon-camera" />
-                  </svg></span>
-                <div><span>CAPTURA DE TELA</span>
-                  <h2>Capture o monitor do jogo</h2>
-                  <p>Os arquivos são salvos automaticamente em Imagens/Phelierium Captures.</p>
-                </div>
-                <button type="button" id="capture-now"><svg class="ui-icon">
-                    <use href="#icon-camera" />
-                  </svg>Capturar agora <kbd id="capture-shortcut-label">F8</kbd></button>
-              </section>
-              <div class="capture-heading">
-                <h3>Capturas recentes</h3><button type="button" id="open-captures-folder"><svg class="ui-icon">
-                    <use href="#icon-folder" />
-                  </svg>Abrir pasta</button>
-              </div>
-              <div class="capture-gallery" id="capture-gallery"></div>
-              <p class="capture-feedback" id="capture-gallery-feedback" aria-live="polite"></p>
-            </div>
-          </div>
-          <div class="panel-view" data-panel-view="spotify">
-            <div class="spotify-overlay-page">
-              <div class="spotify-overlay-empty" id="spotify-overlay-empty"><div><svg class="ui-icon" style="width:42px;height:42px"><use href="#icon-music" /></svg><h2>Spotify</h2><p>Conecte e escolha uma música no launcher.</p></div></div>
-              <img class="spotify-overlay-cover" id="spotify-overlay-cover" alt="" hidden />
-              <div class="spotify-overlay-copy" id="spotify-overlay-player" hidden>
-                <span class="spotify-overlay-kicker">Tocando agora</span>
-                <h2 id="spotify-overlay-title">Spotify</h2>
-                <p id="spotify-overlay-artist">Phelierium Player</p>
-                <input class="spotify-overlay-range" id="spotify-overlay-seek" type="range" min="0" max="1" value="0" aria-label="Posição da música" />
-                <div class="spotify-overlay-time"><span id="spotify-overlay-current">0:00</span><span id="spotify-overlay-duration">0:00</span></div>
-                <div class="spotify-overlay-controls">
-                  <button type="button" id="spotify-overlay-previous" aria-label="Faixa anterior"><svg class="ui-icon"><use href="#icon-skip-back" /></svg></button>
-                  <button type="button" class="spotify-overlay-toggle" id="spotify-overlay-toggle" aria-label="Reproduzir ou pausar"><svg class="ui-icon"><use id="spotify-overlay-toggle-icon" href="#icon-play" /></svg></button>
-                  <button type="button" id="spotify-overlay-next" aria-label="Próxima faixa"><svg class="ui-icon"><use href="#icon-skip-forward" /></svg></button>
-                </div>
-                <label class="spotify-overlay-volume"><svg class="ui-icon"><use href="#icon-volume" /></svg><input id="spotify-overlay-volume" type="range" min="0" max="100" value="55" aria-label="Volume Spotify" /></label>
-              </div>
-            </div>
-          </div>
+
           <div class="panel-view" data-panel-view="settings">
             <div class="settings-page">
               <div class="view-title">
-                <h2>Configurações do overlay</h2>
-                <p>Personalize o comportamento durante suas partidas.</p>
+                <h2>Configurações do Overlay</h2>
+                <p>Personalize o comportamento e a aparência durante suas partidas.</p>
               </div>
               <div class="settings-grid">
-                <section class="settings-card">
+                <div class="settings-card">
                   <h3>Notificações</h3>
-                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-bell" />
-                      </svg></span><span class="setting-copy"><b>Atividade social</b><small>Mensagens e atividades dos
-                        amigos</small></span><input class="setting-switch" id="setting-social" type="checkbox"
-                      checked /></label>
-                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-trophy" />
-                      </svg></span><span class="setting-copy"><b>Conquistas</b><small>Mostrar conquistas
-                        desbloqueadas</small></span><input class="setting-switch" id="setting-achievements"
-                      type="checkbox" checked /></label>
-                </section>
-                <section class="settings-card">
-                  <h3>Experiência</h3>
-                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-sparkles" />
-                      </svg></span><span class="setting-copy"><b>Animações</b><small>Transições e movimentos da
-                        interface</small></span><input class="setting-switch" id="setting-animations" type="checkbox"
-                      checked /></label>
-                  <label class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-settings" />
-                      </svg></span><span class="setting-copy"><b>Abrir overlay</b><small>Atalho global durante o
-                        jogo</small></span><kbd class="shortcut-key">Ctrl + Shift + O</kbd></label>
-                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-gamepad" />
-                      </svg></span><span class="setting-copy"><b>Atalho no controle</b><small>Xbox Guide, PS/Home ou o
-                        fallback View + Menu</small></span><kbd class="shortcut-key">Botão central</kbd></div>
-                </section>
-                <section class="settings-card settings-card-wide">
-                  <h3>Captura de tela</h3>
-                  <div class="setting-row"><span class="quick-icon"><svg class="ui-icon">
-                        <use href="#icon-camera" />
-                      </svg></span><span class="setting-copy"><b>Atalho de captura</b><small>F1–F24, Print Screen ou
-                        combinação com Ctrl, Alt e Shift</small></span><button class="shortcut-recorder"
-                      id="record-capture-shortcut" type="button" aria-pressed="false"><span
-                        id="record-shortcut-label">Alterar</span><kbd id="capture-shortcut-value">F8</kbd></button>
+                  <div class="setting-row">
+                    <div class="setting-copy">
+                      <b>Conquistas</b>
+                      <small>Exibir pop-up ao desbloquear conquistas.</small>
+                    </div>
+                    <input class="setting-switch" id="setting-achievements" type="checkbox" />
                   </div>
-                  <p class="setting-feedback" id="capture-setting-feedback"></p>
-                </section>
+                  <div class="setting-row">
+                    <div class="setting-copy">
+                      <b>Atividades Sociais</b>
+                      <small>Notificar mensagens, chamadas e amigos jogando.</small>
+                    </div>
+                    <input class="setting-switch" id="setting-social" type="checkbox" />
+                  </div>
+                </div>
+
+                <div class="settings-card">
+                  <h3>Experiência & Atalhos</h3>
+                  <div class="setting-row">
+                    <div class="setting-copy">
+                      <b>Animações Fluídas</b>
+                      <small>Efeitos visuais e transições dinâmicas a 60fps.</small>
+                    </div>
+                    <input class="setting-switch" id="setting-animations" type="checkbox" />
+                  </div>
+                  <div class="setting-row">
+                    <div class="setting-copy">
+                      <b>Atalho de Captura</b>
+                      <small id="capture-shortcut-value">F8</small>
+                    </div>
+                    <button class="chat-button" id="record-capture-shortcut" style="width:auto;padding:6px 14px;font-size:11px;">
+                      <span id="record-shortcut-label">Alterar</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
           <div class="panel-view" data-panel-view="profile">
             <div class="profile-page">
-              <div class="view-title">
-                <h2>Meu perfil</h2>
-                <p>Sua identidade e atividade no Phelierium.</p>
+              <div class="settings-card profile-card" style="padding:28px;">
+                <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
+                  <img id="profile-page-avatar" alt="" style="width:64px;height:64px;border-radius:18px;object-fit:cover;border:1px solid rgba(255,255,255,0.2);" />
+                  <div>
+                    <h2 class="profile-identity" id="profile-page-name" style="margin:0 0 6px;font-size:22px;color:#fff;">Jogador</h2>
+                    <div class="discord-pill" id="profile-discord" hidden>
+                      <i></i><span id="profile-discord-name">Discord Conectado</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="game-metrics" style="margin-top:0;">
+                  <article>
+                    <svg class="ui-icon"><use href="#icon-users" /></svg>
+                    <span>Total de amigos</span>
+                    <strong id="profile-friends-total">0</strong>
+                  </article>
+                  <article>
+                    <svg class="ui-icon"><use href="#icon-users" /></svg>
+                    <span>Amigos online</span>
+                    <strong id="profile-online-total">0</strong>
+                  </article>
+                  <article>
+                    <svg class="ui-icon"><use href="#icon-trophy" /></svg>
+                    <span>Conquistas</span>
+                    <strong id="profile-achievements-total">0</strong>
+                  </article>
+                </div>
               </div>
-              <section class="profile-card">
-                <div class="profile-hero">
-                  <img id="profile-page-avatar" alt="" />
-                  <div class="profile-identity">
-                    <h2 id="profile-page-name">Jogador</h2>
-                    <p id="profile-page-status">Online no Phelierium</p>
-                    <div class="discord-pill" id="profile-discord"><i></i><span id="profile-discord-name">Discord
-                        conectado</span></div>
-                  </div>
-                </div>
-                <div class="profile-stats">
-                  <div class="profile-stat"><strong id="profile-friends-total">0</strong><span>Amigos</span></div>
-                  <div class="profile-stat"><strong id="profile-online-total">0</strong><span>Online</span></div>
-                  <div class="profile-stat"><strong id="profile-achievements-total">0</strong><span>Conquistas</span>
-                  </div>
-                </div>
-              </section>
             </div>
           </div>
         </main>
+
+        <aside class="context-panel">
+          <div class="context-game-card">
+            <div class="context-game-art" id="context-game-art">
+              <div class="context-game-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></div>
+            </div>
+            <div class="context-game-copy">
+              <h2 id="context-game-title">Nenhum jogo</h2>
+              <p id="context-game-message">Abra um jogo pela biblioteca para acompanhar estatísticas e conquistas.</p>
+              <button class="context-primary" data-context-tab="game">Acessar Sessão</button>
+            </div>
+          </div>
+
+          <div class="quick-access">
+            <h3>Acesso Rápido</h3>
+            <button data-context-tab="media">
+              <div class="quick-icon"><svg class="ui-icon"><use href="#icon-camera" /></svg></div>
+              <span><b>Galeria de Capturas</b><small>Fotos recentes e atalhos</small></span>
+              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)"><use href="#icon-chevron" /></svg>
+            </button>
+            <button data-context-tab="achievements">
+              <div class="quick-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></div>
+              <span><b>Conquistas</b><small>Ver metas desbloqueadas</small></span>
+              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)"><use href="#icon-chevron" /></svg>
+            </button>
+          </div>
+
+          <footer>
+            <span>Phelierium Overlay</span>
+            <div class="notif"><i class="status-dot online"></i> Ativo</div>
+          </footer>
+        </aside>
       </div>
     </div>
-
-    <aside class="context-panel">
-      <div class="context-game-card">
-        <div class="context-game-art" id="context-game-art">
-          <div class="context-game-icon"><svg class="ui-icon">
-              <use href="#icon-gamepad" />
-            </svg></div>
-        </div>
-        <div class="context-game-copy">
-          <h2 id="context-game-title">Nenhum jogo detectado</h2>
-          <p id="context-game-message">Inicie um jogo para acessar capturas, conquistas e ferramentas do overlay
-            mais.</p>
-          <button class="context-primary" data-context-tab="achievements">Ver biblioteca</button>
-        </div>
-      </div>
-
-      <div class="quick-access">
-        <h3>Acesso rápido</h3>
-        <button data-context-tab="media">
-          <span class="quick-icon purple"><svg class="ui-icon">
-              <use href="#icon-image" />
-            </svg></span>
-          <span><b>Capturas de tela</b><small>Ver suas imagens</small></span><i><svg class="ui-icon">
-              <use href="#icon-chevron" />
-            </svg></i>
-        </button>
-        <button data-context-tab="achievements">
-          <span class="quick-icon pink"><svg class="ui-icon">
-              <use href="#icon-trophy" />
-            </svg></span>
-          <span><b>Conquistas</b><small>Ver progresso e conquistas</small></span><i><svg class="ui-icon">
-              <use href="#icon-chevron" />
-            </svg></i>
-        </button>
-      </div>
-    </aside>
   </section>
 
+  <!-- Visualizador de Capturas em Tela Cheia -->
   <div class="capture-viewer" id="capture-viewer" aria-hidden="true">
-    <section class="capture-viewer-shell" role="dialog" aria-modal="true" aria-labelledby="capture-viewer-name">
-      <header class="capture-viewer-header">
-        <div class="capture-viewer-title">
-          <strong id="capture-viewer-name">Captura de tela</strong>
-          <span id="capture-viewer-date"></span>
+    <div class="capture-viewer-content">
+      <img id="capture-viewer-image" alt="Captura de tela" />
+      <div class="capture-viewer-bar">
+        <div>
+          <strong id="capture-viewer-name">Captura</strong>
+          <span id="capture-viewer-date" style="margin-left:8px;color:var(--text-muted);"></span>
         </div>
-        <button class="capture-viewer-close" id="capture-viewer-close" type="button" aria-label="Fechar visualização">
-          <svg class="ui-icon">
-            <use href="#icon-close" />
-          </svg>
-        </button>
-      </header>
-      <div class="capture-viewer-stage">
-        <button class="capture-viewer-nav previous" id="capture-viewer-previous" type="button"
-          aria-label="Captura anterior">
-          <svg class="ui-icon">
-            <use href="#icon-back" />
-          </svg>
-        </button>
-        <img class="capture-viewer-image" id="capture-viewer-image" alt="" />
-        <button class="capture-viewer-nav next" id="capture-viewer-next" type="button" aria-label="Próxima captura">
-          <svg class="ui-icon">
-            <use href="#icon-back" />
-          </svg>
-        </button>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <span id="capture-viewer-counter" style="color:var(--text-muted);font-size:12px;"></span>
+          <button class="chat-back" id="capture-viewer-previous" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-back" /></svg></button>
+          <button class="chat-back" id="capture-viewer-next" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-chevron" /></svg></button>
+          <button class="chat-back" id="capture-viewer-close" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-close" /></svg></button>
+        </div>
       </div>
-      <footer class="capture-viewer-footer">
-        <span id="capture-viewer-counter">1 de 1</span>
-        <span class="capture-viewer-shortcuts"><kbd>← →</kbd> navegar <kbd>Esc</kbd> fechar</span>
-      </footer>
-    </section>
+      <div class="capture-viewer-shortcuts" style="margin-top:12px;">
+        <kbd>Esc</kbd> <span>Fechar</span> &bull; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> <span>Navegar</span>
+      </div>
+    </div>
   </div>
 
-  <script src="./overlay-video.js"></script>
   <script src="./overlay-gamepad.js"></script>
   <script>
     const achievementStack = document.getElementById("achievement-stack");
     const socialStack = document.getElementById("social-stack");
     const commandPanel = document.getElementById("command-panel");
-    const appendToastVideo = (shell, kind) => {
-      try {
-        return window.CheckpointOverlayVideo?.appendOverlayVideoLayer(shell, kind) || null;
-      } catch (error) {
-        console.warn("[overlay] Falha ao preparar o fundo em vídeo:", error);
-        return null;
-      }
-    };
+
     const checkpointIconUrl = new URL("../assets/icon.png", window.location.href).toString();
-    const overlayAnimationPreferenceVersion = "3";
-    if (
-      localStorage.getItem("checkpoint-overlay-animation-version")
-      !== overlayAnimationPreferenceVersion
-    ) {
+
+    if (localStorage.getItem("checkpoint-overlay-animations") === null) {
       localStorage.setItem("checkpoint-overlay-animations", "true");
-      localStorage.setItem(
-        "checkpoint-overlay-animation-version",
-        overlayAnimationPreferenceVersion,
-      );
     }
+
     const overlayPreferences = {
       social: localStorage.getItem("checkpoint-overlay-social") !== "false",
       animations: localStorage.getItem("checkpoint-overlay-animations") !== "false",
     };
-    const achievementPositions = new Set(["top-left", "top-right", "bottom-left", "bottom-right"]);
-    const applyAchievementPosition = (position) => {
-      achievementStack.dataset.position = achievementPositions.has(position) ? position : "top-right";
+
+    const applyAchievementPosition = (position = "top-right") => {
+      const allowed = ["top-right", "top-left", "bottom-right", "bottom-left"];
+      achievementStack.dataset.position = allowed.includes(position) ? position : "top-right";
     };
-    applyAchievementPosition("top-right");
+
+    const appendToastVideo = (shell, type) => {
+      const isAchievement = type === "achievement";
+      const prefersReduction = document.body.classList.contains("overlay-reduced-motion")
+        || window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      if (prefersReduction) return;
+
+      const layer = document.createElement("div");
+      layer.className = "overlay-video-layer";
+
+      const video = document.createElement("video");
+      video.className = "overlay-video is-rotated";
+      video.src = new URL("../src/assets/video/ui_banner_animation.webm", window.location.href).toString();
+      video.autoplay = true;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.setAttribute("aria-hidden", "true");
+
+      const scrim = document.createElement("div");
+      scrim.className = "overlay-video-scrim";
+
+      layer.appendChild(video);
+      layer.appendChild(scrim);
+      shell.appendChild(layer);
+
+      const playPromise = video.play?.();
+      playPromise?.catch(() => {});
+    };
+
+    // Traduções de Interface
     const overlayTranslations = {
       "pt-BR": {
         home: "Início", game: "Jogo", media: "Mídia", achievements: "Conquistas", settings: "Config.",
@@ -3537,7 +3023,7 @@
         player: "Jogador", unavailable: "Indisponível", playing: "Jogando", noDescription: "Sem descrição.",
         locked: "Bloqueada", achievementUnlocked: "Desbloqueada", achievementUpdated: "CONQUISTA ATUALIZADA",
         achievementNew: "CONQUISTA DESBLOQUEADA", loadingAchievements: "Carregando conquistas do jogo...",
-        discordConnected: "Discord conectado", typing: "digitando...", chatConversation: "Conversa pelo Phelierium",
+        discordConnected: "Discord conectado", typing: "digitando...", chatConversation: "Conversa Phelierium",
         startConversation: "Comece a conversa por aqui.", noInfo: "Não informado", automatic: "Automática",
         overlayAvailable: "Overlay disponível", controllerConnected: "Controle conectado", friendRequest: "Pedido de amizade", requestAccepted: "Pedido aceito", friendPlayingBadge: "Amigo jogando", newMessage: "Nova mensagem", newImage: "Nova imagem", nowPlaying: "Tocando agora", gameStarted: "Jogo iniciado",
       },
@@ -3545,103 +3031,24 @@
         home: "Home", game: "Game", media: "Media", achievements: "Achievements", settings: "Settings",
         hello: "Hello,", searchFriends: "Search friends...", myProfile: "My profile", onlineFriends: "Online friends",
         offlineFriends: "Offline friends", viewAll: "View all ›", showLess: "Show less", noGame: "No game detected",
-        conversations: "Conversations", conversationsHint: "Keep chatting without leaving the game.",
-        typeMessage: "Write a message...", runningGame: "Game running", sessionInfo: "Information about your current session.",
+        conversations: "Conversations", conversationsHint: "Keep chatting without leaving your game.",
+        typeMessage: "Type a message...", runningGame: "Running game", sessionInfo: "Information about your current session.",
         currentSession: "Current session", totalTime: "Total time", friendsPlaying: "Friends playing",
         platform: "Platform", executable: "Executable", developer: "Developer", release: "Release",
         windowMode: "Window mode", resolution: "Resolution", unlocked: "unlocked", captures: "Captures",
         captureHint: "Save your best moments without leaving the match.", captureNow: "Capture now",
         recentCaptures: "Recent captures", openFolder: "Open folder", overlaySettings: "Overlay settings",
-        personalize: "Customize behavior while you play.", notifications: "Notifications",
+        personalize: "Personalize overlay behavior during matches.", notifications: "Notifications",
         experience: "Experience", screenshot: "Screenshot", friends: "Friends", online: "Online", offline: "Offline",
         player: "Player", unavailable: "Unavailable", playing: "Playing", noDescription: "No description.",
         locked: "Locked", achievementUnlocked: "Unlocked", achievementUpdated: "ACHIEVEMENT UPDATED",
         achievementNew: "ACHIEVEMENT UNLOCKED", loadingAchievements: "Loading game achievements...",
-        discordConnected: "Discord connected", typing: "typing...", chatConversation: "Phelierium conversation",
+        discordConnected: "Discord connected", typing: "typing...", chatConversation: "Phelierium chat",
         startConversation: "Start the conversation here.", noInfo: "Not provided", automatic: "Automatic",
         overlayAvailable: "Overlay available", controllerConnected: "Controller connected", friendRequest: "Friend request", requestAccepted: "Request accepted", friendPlayingBadge: "Friend playing", newMessage: "New message", newImage: "New image", nowPlaying: "Now playing", gameStarted: "Game started",
       },
-      "es-ES": {
-        home: "Inicio", game: "Juego", media: "Multimedia", achievements: "Logros", settings: "Ajustes",
-        hello: "Hola,", searchFriends: "Buscar amigos...", myProfile: "Mi perfil", onlineFriends: "Amigos en línea",
-        offlineFriends: "Amigos desconectados", viewAll: "Ver todos ›", showLess: "Mostrar menos", noGame: "Ningún juego detectado",
-        conversations: "Conversaciones", conversationsHint: "Sigue conversando sin salir del juego.",
-        typeMessage: "Escribe un mensaje...", runningGame: "Juego en ejecución", sessionInfo: "Información de tu sesión actual.",
-        currentSession: "Sesión actual", totalTime: "Tiempo total", friendsPlaying: "Amigos jugando",
-        platform: "Plataforma", executable: "Ejecutable", developer: "Desarrollador", release: "Lanzamiento",
-        windowMode: "Modo de ventana", resolution: "Resolución", unlocked: "desbloqueados", captures: "Capturas",
-        captureHint: "Guarda tus mejores momentos sin salir de la partida.", captureNow: "Capturar ahora",
-        recentCaptures: "Capturas recientes", openFolder: "Abrir carpeta", overlaySettings: "Configuración del overlay",
-        personalize: "Personaliza el comportamiento durante tus partidas.", notifications: "Notificaciones",
-        experience: "Experiencia", screenshot: "Captura de pantalla", friends: "Amigos", online: "En línea", offline: "Desconectado",
-        player: "Jugador", unavailable: "No disponible", playing: "Jugando", noDescription: "Sin descripción.",
-        locked: "Bloqueado", achievementUnlocked: "Desbloqueado", achievementUpdated: "LOGRO ACTUALIZADO",
-        achievementNew: "LOGRO DESBLOQUEADO", loadingAchievements: "Cargando logros del juego...",
-        discordConnected: "Discord conectado", typing: "escribiendo...", chatConversation: "Conversación de Phelierium",
-        startConversation: "Comienza la conversación aquí.", noInfo: "No informado", automatic: "Automática",
-        overlayAvailable: "Overlay disponible", controllerConnected: "Mando conectado", friendRequest: "Solicitud de amistad", requestAccepted: "Solicitud aceptada", friendPlayingBadge: "Amigo jugando", newMessage: "Nuevo mensaje", newImage: "Nueva imagen", nowPlaying: "Reproduciendo ahora", gameStarted: "Juego iniciado",
-      },
-      "fr-FR": {
-        home: "Accueil", game: "Jeu", media: "Médias", achievements: "Succès", settings: "Paramètres",
-        hello: "Bonjour,", searchFriends: "Rechercher des amis...", myProfile: "Mon profil", onlineFriends: "Amis en ligne",
-        offlineFriends: "Amis hors ligne", viewAll: "Voir tous ›", showLess: "Afficher moins", noGame: "Aucun jeu détecté",
-        conversations: "Conversations", conversationsHint: "Continuez à discuter sans quitter le jeu.",
-        typeMessage: "Écrivez un message...", runningGame: "Jeu en cours", sessionInfo: "Informations sur votre session actuelle.",
-        currentSession: "Session actuelle", totalTime: "Temps total", friendsPlaying: "Amis en jeu",
-        platform: "Plateforme", executable: "Exécutable", developer: "Développeur", release: "Sortie",
-        windowMode: "Mode fenêtre", resolution: "Résolution", unlocked: "débloqués", captures: "Captures",
-        captureHint: "Enregistrez vos meilleurs moments sans quitter la partie.", captureNow: "Capturer",
-        recentCaptures: "Captures récentes", openFolder: "Ouvrir le dossier", overlaySettings: "Paramètres de l’overlay",
-        personalize: "Personnalisez le comportement pendant vos parties.", notifications: "Notifications",
-        experience: "Expérience", screenshot: "Capture d’écran", friends: "Amis", online: "En ligne", offline: "Hors ligne",
-        player: "Joueur", unavailable: "Indisponible", playing: "Joue à", noDescription: "Aucune description.",
-        locked: "Verrouillé", achievementUnlocked: "Débloqué", achievementUpdated: "SUCCÈS MIS À JOUR",
-        achievementNew: "SUCCÈS DÉBLOQUÉ", loadingAchievements: "Chargement des succès du jeu...",
-        discordConnected: "Discord connecté", typing: "écrit...", chatConversation: "Conversation Phelierium",
-        startConversation: "Commencez la conversation ici.", noInfo: "Non renseigné", automatic: "Automatique",
-        overlayAvailable: "Overlay disponible", controllerConnected: "Manette connectée", friendRequest: "Demande d’ami", requestAccepted: "Demande acceptée", friendPlayingBadge: "Ami en jeu", newMessage: "Nouveau message", newImage: "Nouvelle image", nowPlaying: "Lecture en cours", gameStarted: "Jeu lancé",
-      },
-      "de-DE": {
-        home: "Start", game: "Spiel", media: "Medien", achievements: "Erfolge", settings: "Einstellungen",
-        hello: "Hallo,", searchFriends: "Freunde suchen...", myProfile: "Mein Profil", onlineFriends: "Freunde online",
-        offlineFriends: "Freunde offline", viewAll: "Alle anzeigen ›", showLess: "Weniger anzeigen", noGame: "Kein Spiel erkannt",
-        conversations: "Unterhaltungen", conversationsHint: "Chatte weiter, ohne das Spiel zu verlassen.",
-        typeMessage: "Nachricht schreiben...", runningGame: "Laufendes Spiel", sessionInfo: "Informationen zur aktuellen Sitzung.",
-        currentSession: "Aktuelle Sitzung", totalTime: "Gesamtzeit", friendsPlaying: "Spielende Freunde",
-        platform: "Plattform", executable: "Programmdatei", developer: "Entwickler", release: "Veröffentlichung",
-        windowMode: "Fenstermodus", resolution: "Auflösung", unlocked: "freigeschaltet", captures: "Aufnahmen",
-        captureHint: "Halte deine besten Momente fest, ohne das Spiel zu verlassen.", captureNow: "Jetzt aufnehmen",
-        recentCaptures: "Letzte Aufnahmen", openFolder: "Ordner öffnen", overlaySettings: "Overlay-Einstellungen",
-        personalize: "Passe das Verhalten während des Spielens an.", notifications: "Benachrichtigungen",
-        experience: "Erlebnis", screenshot: "Screenshot", friends: "Freunde", online: "Online", offline: "Offline",
-        player: "Spieler", unavailable: "Nicht verfügbar", playing: "Spielt", noDescription: "Keine Beschreibung.",
-        locked: "Gesperrt", achievementUnlocked: "Freigeschaltet", achievementUpdated: "ERFOLG AKTUALISIERT",
-        achievementNew: "ERFOLG FREIGESCHALTET", loadingAchievements: "Spielerfolge werden geladen...",
-        discordConnected: "Discord verbunden", typing: "tippt...", chatConversation: "Phelierium-Unterhaltung",
-        startConversation: "Beginne die Unterhaltung hier.", noInfo: "Nicht angegeben", automatic: "Automatisch",
-        overlayAvailable: "Overlay verfügbar", controllerConnected: "Controller verbunden", friendRequest: "Freundschaftsanfrage", requestAccepted: "Anfrage angenommen", friendPlayingBadge: "Freund spielt", newMessage: "Neue Nachricht", newImage: "Neues Bild", nowPlaying: "Läuft gerade", gameStarted: "Spiel gestartet",
-      },
-      "it-IT": {
-        home: "Home", game: "Gioco", media: "Media", achievements: "Obiettivi", settings: "Impostazioni",
-        hello: "Ciao,", searchFriends: "Cerca amici...", myProfile: "Il mio profilo", onlineFriends: "Amici online",
-        offlineFriends: "Amici offline", viewAll: "Vedi tutti ›", showLess: "Mostra meno", noGame: "Nessun gioco rilevato",
-        conversations: "Conversazioni", conversationsHint: "Continua a chattare senza uscire dal gioco.",
-        typeMessage: "Scrivi un messaggio...", runningGame: "Gioco in esecuzione", sessionInfo: "Informazioni sulla sessione attuale.",
-        currentSession: "Sessione attuale", totalTime: "Tempo totale", friendsPlaying: "Amici in gioco",
-        platform: "Piattaforma", executable: "Eseguibile", developer: "Sviluppatore", release: "Uscita",
-        windowMode: "Modalità finestra", resolution: "Risoluzione", unlocked: "sbloccati", captures: "Catture",
-        captureHint: "Salva i tuoi momenti migliori senza uscire dalla partita.", captureNow: "Cattura ora",
-        recentCaptures: "Catture recenti", openFolder: "Apri cartella", overlaySettings: "Impostazioni overlay",
-        personalize: "Personalizza il comportamento durante le partite.", notifications: "Notifiche",
-        experience: "Esperienza", screenshot: "Cattura schermo", friends: "Amici", online: "Online", offline: "Offline",
-        player: "Giocatore", unavailable: "Non disponibile", playing: "Gioca a", noDescription: "Nessuna descrizione.",
-        locked: "Bloccato", achievementUnlocked: "Sbloccato", achievementUpdated: "OBIETTIVO AGGIORNATO",
-        achievementNew: "OBIETTIVO SBLOCCATO", loadingAchievements: "Caricamento obiettivi del gioco...",
-        discordConnected: "Discord collegato", typing: "sta scrivendo...", chatConversation: "Conversazione Phelierium",
-        startConversation: "Inizia la conversazione qui.", noInfo: "Non specificato", automatic: "Automatica",
-        overlayAvailable: "Overlay disponibile", controllerConnected: "Controller collegato", friendRequest: "Richiesta di amicizia", requestAccepted: "Richiesta accettata", friendPlayingBadge: "Amico in gioco", newMessage: "Nuovo messaggio", newImage: "Nuova immagine", nowPlaying: "In riproduzione", gameStarted: "Gioco avviato",
-      },
     };
+
     let overlayLanguage = "pt-BR";
     const overlayTextOrigins = new WeakMap();
     const overlayStaticKeys = new Map([
@@ -3656,7 +3063,9 @@
       ["Configurações do overlay", "overlaySettings"], ["Personalize o comportamento durante suas partidas.", "personalize"],
       ["Notificações", "notifications"], ["Experiência", "experience"], ["Captura de tela", "screenshot"], ["Amigos", "friends"],
     ]);
+
     const overlayT = (key) => overlayTranslations[overlayLanguage]?.[key] || overlayTranslations["pt-BR"][key] || key;
+
     const applyOverlayLanguage = (language) => {
       overlayLanguage = overlayTranslations[language] ? language : "pt-BR";
       document.documentElement.lang = overlayLanguage;
@@ -3674,8 +3083,11 @@
       const chatInput = document.getElementById("chat-input");
       if (chatInput) chatInput.placeholder = overlayT("typeMessage");
     };
+
     const overlaySoundMap = {
       "achievement-unlock": {
+        default: new URL("../src/sounds/Phelierium Default/Achievment_Unlock.mp3", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/Achievment_Unlock.mp3", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_achievement_toast.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/21. Src27 Se Msg Trophy.mp3", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
@@ -3685,6 +3097,8 @@
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav", window.location.href).toString(),
       },
       "screenshot": {
+        default: new URL("../src/sounds/Phelierium Default/ui_achievment.mp3", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/ui_achievment.mp3", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_toast.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/deck_ui_toast.wav", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/deck_ui_toast.wav", window.location.href).toString(),
@@ -3695,6 +3109,8 @@
       },
       "screenshot-trigger": new URL("../src/sounds/PS5_Plus/37. Take Screenshot Psfx Take Screen.mp3", window.location.href).toString(),
       "ui-hover": {
+        default: new URL("../src/sounds/Phelierium Default/ui_select.wav", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/ui_select.wav", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_slider_down.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/deck_ui_navigation.wav", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/deck_ui_slider_down.wav", window.location.href).toString(),
@@ -3704,6 +3120,8 @@
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_slider_down.wav", window.location.href).toString(),
       },
       "ui-click": {
+        default: new URL("../src/sounds/Phelierium Default/ui_click.wav", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/ui_click.wav", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_default_activation.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/deck_ui_show_modal.wav", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/confirmation_positive.wav", window.location.href).toString(),
@@ -3713,6 +3131,8 @@
         cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_default_activation.wav", window.location.href).toString(),
       },
       "ui-back": {
+        default: new URL("../src/sounds/Phelierium Default/ui_close_game_detail.mp3", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/ui_close_game_detail.mp3", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/deck_ui_out_of_game_detail.wav", window.location.href).toString(),
@@ -3732,7 +3152,7 @@
           });
         }
         node.classList.add("is-leaving");
-        setTimeout(() => node.remove(), 350);
+        setTimeout(() => node.remove(), 320);
       }, duration);
     };
 
@@ -3742,7 +3162,7 @@
       const sourceEntry = overlaySoundMap[sound];
       const src = typeof sourceEntry === "string"
         ? sourceEntry
-        : sourceEntry?.[requestedTheme] || sourceEntry?.ps5;
+        : sourceEntry?.[requestedTheme] || sourceEntry?.default;
       if (!src) return;
       const audio = new Audio(src);
       const isUiSound = sound === "ui-hover" || sound === "ui-click" || sound === "ui-back";
@@ -3784,49 +3204,53 @@
       const cards = Array.from(stack.querySelectorAll(".overlay-card:not(.is-leaving)"));
       cards.slice(0, Math.max(0, cards.length - maxCards)).forEach((card) => {
         card.classList.add("is-leaving");
-        setTimeout(() => card.remove(), 300);
+        setTimeout(() => card.remove(), 280);
       });
     };
 
+    // Motivo de Órbita Celeste & Nós Estelares (Substituindo o antigo reticle de mira tática)
     const reticleSvg = () => `
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="50" cy="50" r="42" stroke="currentColor" stroke-width="2.5" opacity="0.82" />
-          <circle cx="50" cy="50" r="34" stroke="currentColor" stroke-width="1.4" opacity="0.4" />
-          <line x1="50" y1="2" x2="50" y2="12" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-          <line x1="50" y1="88" x2="50" y2="98" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-          <line x1="2" y1="50" x2="12" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-          <line x1="88" y1="50" x2="98" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-        </svg>
-      `;
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Órbita externa com nós concêntricos -->
+        <circle cx="50" cy="50" r="45" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 4" opacity="0.6" />
+        <circle cx="50" cy="50" r="38" stroke="currentColor" stroke-width="1.5" opacity="0.8" />
+        <circle cx="50" cy="50" r="32" stroke="currentColor" stroke-width="0.8" opacity="0.35" />
+        <!-- Micro nós estelares nas órbitas -->
+        <circle cx="50" cy="5" r="2" fill="currentColor" opacity="0.9" />
+        <circle cx="95" cy="50" r="2" fill="currentColor" opacity="0.9" />
+        <circle cx="50" cy="95" r="2" fill="currentColor" opacity="0.9" />
+        <circle cx="5" cy="50" r="2" fill="currentColor" opacity="0.9" />
+      </svg>
+    `;
 
     const trophySvg = () => `
-        <svg class="animate-icon animate-icon-trophy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
-          <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
-          <path d="M4 22h16"></path>
-          <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path>
-          <path d="M12 2a5 5 0 0 0-5 5v4c0 .32.03.63.08.94h9.84c.05-.31.08-.62.08-.94V7a5 5 0 0 0-5-5z"></path>
-        </svg>
-      `;
+      <svg class="animate-icon animate-icon-trophy" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+        <path d="M4 22h16"></path>
+        <path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"></path>
+        <path d="M12 2a5 5 0 0 0-5 5v4c0 .32.03.63.08.94h9.84c.05-.31.08-.62.08-.94V7a5 5 0 0 0-5-5z"></path>
+      </svg>
+    `;
 
     const controllerSvg = () => `
-        <svg class="animate-icon animate-icon-controller" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path class="controller-shell" d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5Z"></path>
-          <g class="controller-controls">
-            <path d="M6 11h4"></path>
-            <path d="M8 9v4"></path>
-            <path d="M15 12h.01"></path>
-            <path d="M18 10h.01"></path>
-          </g>
-        </svg>
-      `;
+      <svg class="animate-icon animate-icon-controller" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path class="controller-shell" d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5Z"></path>
+        <g class="controller-controls">
+          <path d="M6 11h4"></path>
+          <path d="M8 9v4"></path>
+          <path d="M15 12h.01"></path>
+          <path d="M18 10h.01"></path>
+        </g>
+      </svg>
+    `;
 
     const cameraSvg = () => `
-        <svg class="animate-icon animate-icon-camera" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4Z"></path>
-          <circle class="camera-lens" cx="12" cy="13" r="3"></circle>
-        </svg>
-      `;
+      <svg class="animate-icon animate-icon-camera" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4Z"></path>
+        <circle class="camera-lens" cx="12" cy="13" r="3"></circle>
+      </svg>
+    `;
 
     const safeImageUrl = (value) => {
       if (typeof value !== "string" || !value.trim()) return "";
@@ -3846,7 +3270,7 @@
         .map((part) => Array.from(part)[0] || "")
         .join("")
         .toUpperCase() || "J";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#17171c"/><text x="64" y="69" text-anchor="middle" dominant-baseline="middle" fill="#f5f5f5" font-family="Segoe UI,Arial,sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#121318"/><text x="64" y="69" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Space Grotesk, Inter, Segoe UI, sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
       return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
     };
 
@@ -4103,6 +3527,7 @@
       content.appendChild(createProgressBar());
       shell.appendChild(content);
       card.appendChild(shell);
+
       if (payload.kind === "friend-message" || payload.kind === "friend-request" || payload.kind === "incoming-call" || payload.kind === "call") {
         card.classList.add("is-clickable");
         card.setAttribute(
@@ -4165,6 +3590,7 @@
       captureViewer?.classList.remove("is-open");
       captureViewer?.setAttribute("aria-hidden", "true");
     };
+
     const renderCaptureViewer = () => {
       const captures = Array.isArray(latestPanelState.captures) ? latestPanelState.captures : [];
       if (captureViewerIndex < 0 || captures.length === 0) {
@@ -4194,6 +3620,7 @@
       if (previous) previous.disabled = captureViewerIndex === 0;
       if (next) next.disabled = captureViewerIndex === captures.length - 1;
     };
+
     const openCaptureViewer = (index) => {
       captureViewerIndex = index;
       renderCaptureViewer();
@@ -4201,6 +3628,7 @@
       captureViewer?.setAttribute("aria-hidden", "false");
       document.getElementById("capture-viewer-close")?.focus();
     };
+
     const moveCaptureViewer = (direction) => {
       if (captureViewerIndex < 0) return;
       const captures = Array.isArray(latestPanelState.captures) ? latestPanelState.captures : [];
@@ -4208,31 +3636,7 @@
       renderCaptureViewer();
     };
 
-    const formatSpotifyTime = (milliseconds) => {
-      const seconds = Math.max(0, Math.floor((Number(milliseconds) || 0) / 1000));
-      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-    };
-    const renderSpotifyState = (spotify = {}) => {
-      const track = spotify.track || null;
-      const empty = document.getElementById("spotify-overlay-empty");
-      const player = document.getElementById("spotify-overlay-player");
-      const cover = document.getElementById("spotify-overlay-cover");
-      if (empty) empty.hidden = Boolean(track);
-      if (player) player.hidden = !track;
-      if (cover) {
-        cover.hidden = !track;
-        cover.src = track ? (safeImageUrl(track.coverUrl) || checkpointIconUrl) : "";
-      }
-      if (!track) return;
-      document.getElementById("spotify-overlay-title").textContent = track.title || "Spotify";
-      document.getElementById("spotify-overlay-artist").textContent = track.artist || "Phelierium Player";
-      const seek = document.getElementById("spotify-overlay-seek");
-      seek.max = String(Math.max(1, Number(spotify.durationMs) || 0));
-      if (!seek.matches(":active")) seek.value = String(Math.max(0, Number(spotify.positionMs) || 0));
-      document.getElementById("spotify-overlay-current").textContent = formatSpotifyTime(seek.value);
-      document.getElementById("spotify-overlay-duration").textContent = formatSpotifyTime(spotify.durationMs);
-      document.getElementById("spotify-overlay-toggle-icon").setAttribute("href", spotify.paused ? "#icon-play" : "#icon-pause");
-    };
+    const renderSpotifyState = () => {};
 
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
@@ -4288,9 +3692,10 @@
       navUnread.hidden = totalUnread === 0;
       navUnread.textContent = String(Math.min(99, totalUnread));
 
+      // Cards de amigos com estilo mono elegante
       const createFriendCard = (friend) => {
         const card = document.createElement("article");
-        card.className = `panel-card friend-card status-${friend.status || "offline"}`;
+        card.className = `friend-card status-${friend.status || "offline"}`;
         const avatar = document.createElement("img");
         avatar.className = "friend-avatar";
         setAvatarSource(avatar, friend.avatar, friend.name);
@@ -4305,16 +3710,11 @@
         status.textContent = friend.playing ? `${overlayT("playing")} ${friend.playing}` : friend.status === "online" ? overlayT("online") : overlayT("offline");
         copy.append(name, status);
         card.append(avatar, copy);
-        if (friend.unread > 0) {
-          const unread = document.createElement("span");
-          unread.className = "unread-badge";
-          unread.textContent = String(Math.min(99, friend.unread));
-          card.appendChild(unread);
-        }
+
         if (friend.canChat) {
           const callBtn = document.createElement("button");
-          callBtn.className = "chat-button";
-          callBtn.style.cssText = "margin-right: 6px; background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.35);";
+          callBtn.className = "chat-button call-button";
+          callBtn.style.marginRight = "6px";
           callBtn.textContent = "Ligar";
           callBtn.addEventListener("click", () => {
             window.achievementOverlay.panelAction({
@@ -4326,6 +3726,7 @@
           });
           card.appendChild(callBtn);
         }
+
         const chat = document.createElement("button");
         chat.className = "chat-button";
         chat.textContent = friend.canChat ? "Chat" : overlayT("unavailable");
@@ -4344,14 +3745,14 @@
       const visibleOnline = showAllOnlineFriends ? onlineFriends : onlineFriends.slice(0, 3);
       if (visibleOnline.length === 0) {
         const empty = document.createElement("div");
-        empty.className = "panel-card";
+        empty.className = "conversation-empty";
         empty.textContent = searchTerm ? "Nenhum amigo online corresponde à busca." : "Nenhum amigo online agora.";
         onlineRoot.appendChild(empty);
       }
       visibleOnline.forEach((friend) => onlineRoot.appendChild(createFriendCard(friend)));
       if (offlineFriends.length === 0) {
         const empty = document.createElement("div");
-        empty.className = "panel-card";
+        empty.className = "conversation-empty";
         empty.textContent = searchTerm ? "Nenhum amigo offline corresponde à busca." : "Nenhum amigo offline.";
         offlineRoot.appendChild(empty);
       }
@@ -4440,17 +3841,17 @@
       const achievementItems = Array.isArray(achievements.items) ? achievements.items : [];
       if (achievements.loading) {
         const loading = document.createElement("div");
-        loading.className = "panel-card";
+        loading.className = "conversation-empty";
         loading.textContent = overlayT("loadingAchievements");
         achievementsRoot.appendChild(loading);
       } else if (!currentGame) {
         const empty = document.createElement("div");
-        empty.className = "panel-card";
+        empty.className = "conversation-empty";
         empty.textContent = "Inicie um jogo para ver suas conquistas aqui.";
         achievementsRoot.appendChild(empty);
       } else if (achievementItems.length === 0) {
         const empty = document.createElement("div");
-        empty.className = "panel-card";
+        empty.className = "conversation-empty";
         empty.textContent = "Este jogo não possui uma lista detalhada de conquistas disponível.";
         achievementsRoot.appendChild(empty);
       } else {
@@ -4639,18 +4040,20 @@
       document.querySelectorAll("[data-panel-tab]").forEach((item) => item.classList.toggle("is-active", item === activeButton));
       document.querySelectorAll("[data-panel-view]").forEach((view) => view.classList.toggle("is-active", view.dataset.panelView === tab));
     };
+
     document.querySelectorAll("[data-panel-tab]").forEach((button) => button.addEventListener("click", () => {
       activatePanelTab(button.dataset.panelTab, button);
       if (button.dataset.panelTab !== "chats" && latestPanelState.chat) {
         window.achievementOverlay.panelAction({ kind: "close-chat" });
       }
-
     }));
+
     document.querySelectorAll("[data-context-tab]").forEach((button) => button.addEventListener("click", () => {
       const tab = button.dataset.contextTab;
       const navButton = document.querySelector(`[data-panel-tab="${tab}"]`);
       activatePanelTab(tab, navButton);
     }));
+
     const overlayInteractiveSelector = [
       "button",
       "[role='button']",
@@ -4659,8 +4062,10 @@
       "input[type='range']",
       ".capture-card",
     ].join(",");
+
     let gamepadFocusedElement = null;
-    const panelTabOrder = ["friends", "chats", "game", "media", "achievements", "spotify", "settings", "profile"];
+    const panelTabOrder = ["friends", "chats", "game", "media", "achievements", "settings", "profile"];
+
     const isGamepadFocusable = (element) => {
       if (!(element instanceof HTMLElement)) return false;
       if (element.hidden || element.closest("[hidden]")) return false;
@@ -4668,15 +4073,18 @@
       const panelView = element.closest("[data-panel-view]");
       return !panelView || panelView.classList.contains("is-active");
     };
+
     const gamepadFocusableElements = () => Array.from(
       commandPanel?.querySelectorAll(overlayInteractiveSelector) || [],
     ).filter(isGamepadFocusable);
+
     const setGamepadFocus = (element) => {
       gamepadFocusedElement?.classList.remove("is-gamepad-focused");
       gamepadFocusedElement = isGamepadFocusable(element) ? element : null;
       gamepadFocusedElement?.classList.add("is-gamepad-focused");
       gamepadFocusedElement?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
     };
+
     const resetGamepadFocus = () => {
       const activeView = commandPanel?.querySelector("[data-panel-view].is-active");
       setGamepadFocus(
@@ -4686,6 +4094,7 @@
         || null,
       );
     };
+
     const moveGamepadFocus = (direction) => {
       const elements = gamepadFocusableElements();
       if (!elements.length) return;
@@ -4718,6 +4127,7 @@
       const step = direction === "left" || direction === "up" ? -1 : 1;
       setGamepadFocus(elements[(currentIndex + step + elements.length) % elements.length]);
     };
+
     const switchGamepadTab = (direction) => {
       const activeTab = document.querySelector("[data-panel-tab].is-active")?.dataset.panelTab || panelTabOrder[0];
       const activeIndex = Math.max(0, panelTabOrder.indexOf(activeTab));
@@ -4725,21 +4135,24 @@
       document.querySelector(`[data-panel-tab="${nextTab}"]`)?.click();
       resetGamepadFocus();
     };
+
     const clearGamepadNavigation = () => {
       document.body.classList.remove("gamepad-navigation");
       gamepadFocusedElement?.classList.remove("is-gamepad-focused");
       gamepadFocusedElement = null;
     };
+
     ["pointerdown", "mousemove", "wheel", "keydown"].forEach((eventName) => {
       window.addEventListener(eventName, clearGamepadNavigation, { passive: true });
     });
+
     const overlayGamepad = window.createOverlayGamepadController?.({
       getGamepads: () => navigator.getGamepads?.() || [],
       requestFrame: (callback) => requestAnimationFrame(callback),
       cancelFrame: (handle) => cancelAnimationFrame(handle),
       now: () => performance.now(),
       isPanelOpen: () => commandPanel?.classList.contains("is-open"),
-      isSpotifyActive: () => document.querySelector('[data-panel-view="spotify"]')?.classList.contains("is-active"),
+      isSpotifyActive: () => false,
       actions: {
         togglePanel: () => window.achievementOverlay.panelAction({ kind: "toggle", source: "gamepad" }),
         moveFocus: moveGamepadFocus,
@@ -4753,9 +4166,7 @@
           else window.achievementOverlay.panelAction({ kind: "close" });
         },
         switchTab: switchGamepadTab,
-        spotifyTrack: (direction) => window.achievementOverlay.panelAction({
-          kind: direction < 0 ? "spotify-previous" : "spotify-next",
-        }),
+        spotifyTrack: () => {},
         onGamepadInput: () => {
           document.body.classList.add("gamepad-navigation");
           if (commandPanel?.classList.contains("is-open") && !isGamepadFocusable(gamepadFocusedElement)) {
@@ -4765,6 +4176,7 @@
       },
     });
     overlayGamepad?.start();
+
     document.addEventListener("pointerover", (event) => {
       if (!document.body.classList.contains("panel-open")) return;
       const target = event.target instanceof Element
@@ -4774,6 +4186,7 @@
       if (event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return;
       playOverlayUiSound("ui-hover");
     });
+
     document.addEventListener("click", (event) => {
       if (!document.body.classList.contains("panel-open")) return;
       const target = event.target instanceof Element
@@ -4785,6 +4198,7 @@
         || /fechar|voltar|cancelar/.test(label);
       playOverlayUiSound(isBackAction ? "ui-back" : "ui-click");
     });
+
     document.getElementById("panel-close-top")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close" }));
     document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
     document.getElementById("show-all-friends")?.addEventListener("click", (event) => {
@@ -4793,18 +4207,7 @@
       renderPanelState(latestPanelState);
     });
     document.getElementById("chat-back")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close-chat" }));
-    document.getElementById("spotify-overlay-toggle")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-toggle" }));
-    document.getElementById("spotify-overlay-next")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-next" }));
-    document.getElementById("spotify-overlay-previous")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "spotify-previous" }));
-    document.getElementById("spotify-overlay-seek")?.addEventListener("input", (event) => {
-      document.getElementById("spotify-overlay-current").textContent = formatSpotifyTime(event.currentTarget.value);
-    });
-    document.getElementById("spotify-overlay-seek")?.addEventListener("change", (event) => {
-      window.achievementOverlay.panelAction({ kind: "spotify-seek", positionMs: Number(event.currentTarget.value) || 0 });
-    });
-    document.getElementById("spotify-overlay-volume")?.addEventListener("input", (event) => {
-      window.achievementOverlay.panelAction({ kind: "spotify-volume", volume: (Number(event.currentTarget.value) || 0) / 100 });
-    });
+
     const syncOverlayPreferences = () => {
       overlayPreferences.social = document.getElementById("setting-social").checked;
       overlayPreferences.animations = document.getElementById("setting-animations").checked;
@@ -4812,6 +4215,7 @@
       localStorage.setItem("checkpoint-overlay-animations", String(overlayPreferences.animations));
       document.body.classList.toggle("overlay-reduced-motion", !overlayPreferences.animations);
     };
+
     document.getElementById("setting-social").checked = overlayPreferences.social;
     document.getElementById("setting-achievements").checked =
       latestPanelState.settings?.achievementNotificationsEnabled !== false;
@@ -4827,6 +4231,7 @@
     document.querySelectorAll(".setting-switch:not(#setting-achievements)")
       .forEach((input) => input.addEventListener("change", syncOverlayPreferences));
     syncOverlayPreferences();
+
     document.getElementById("capture-now")?.addEventListener("click", async (event) => {
       const button = event.currentTarget;
       button.disabled = true;
@@ -4835,15 +4240,18 @@
       setCaptureFeedback(result?.ok ? "Captura salva em Imagens/Phelierium Captures." : result?.error || "Não foi possível capturar a tela.");
       button.disabled = false;
     });
+
     document.getElementById("open-captures-folder")?.addEventListener("click", () => {
       window.achievementOverlay.panelAction({ kind: "open-captures-folder" });
     });
+
     document.getElementById("capture-viewer-close")?.addEventListener("click", closeCaptureViewer);
     document.getElementById("capture-viewer-previous")?.addEventListener("click", () => moveCaptureViewer(-1));
     document.getElementById("capture-viewer-next")?.addEventListener("click", () => moveCaptureViewer(1));
     captureViewer?.addEventListener("click", (event) => {
       if (event.target === captureViewer) closeCaptureViewer();
     });
+
     const captureShortcutRecorder = document.getElementById("record-capture-shortcut");
     const stopCaptureShortcutRecording = () => {
       captureShortcutRecording = false;
@@ -4855,6 +4263,7 @@
       const value = document.getElementById("capture-shortcut-value");
       if (value) value.textContent = formatShortcut(shortcut);
     };
+
     captureShortcutRecorder?.addEventListener("click", () => {
       if (captureShortcutRecording) {
         stopCaptureShortcutRecording();
@@ -4869,6 +4278,7 @@
       setCaptureFeedback("Pressione F1–F24, Print Screen ou uma combinação com Ctrl, Alt ou Shift. Esc cancela.");
       captureShortcutRecorder.focus();
     });
+
     let chatTypingIdleTimer = 0;
     let chatTypingLastRefresh = 0;
     document.getElementById("chat-input")?.addEventListener("input", (event) => {
@@ -4889,6 +4299,7 @@
         window.achievementOverlay.panelAction({ kind: "set-typing", typing: false });
       }, 2500);
     });
+
     document.getElementById("chat-form")?.addEventListener("submit", (event) => {
       event.preventDefault();
       const input = document.getElementById("chat-input");
@@ -4900,15 +4311,17 @@
       chatTypingLastRefresh = 0;
       window.achievementOverlay.panelAction({ kind: "set-typing", typing: false });
     });
+
     document.getElementById("chat-attach")?.addEventListener("click", () => {
       document.getElementById("chat-image-input")?.click();
     });
+
     document.getElementById("chat-image-input")?.addEventListener("change", async (event) => {
       const file = event.currentTarget.files?.[0];
       event.currentTarget.value = "";
       if (!file) return;
       if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 8 * 1024 * 1024) {
-        document.getElementById("chat-error").textContent = "Use uma imagem JPG, PNG, WEBP ou GIF de ate 8 MB.";
+        document.getElementById("chat-error").textContent = "Use uma imagem JPG, PNG, WEBP ou GIF de até 8 MB.";
         return;
       }
       const result = await window.achievementOverlay.panelAction({
@@ -4918,11 +4331,13 @@
         data: new Uint8Array(await file.arrayBuffer()),
       });
       if (result?.ok === false) {
-        document.getElementById("chat-error").textContent = result.error || "Nao foi possivel enviar a imagem.";
+        document.getElementById("chat-error").textContent = result.error || "Não foi possível enviar a imagem.";
       }
     });
+
     document.querySelectorAll("[data-media]").forEach((button) => button.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: button.dataset.media })));
     window.setInterval(updateSessionDuration, 1000);
+
     window.addEventListener("keydown", async (event) => {
       if (
         event.key === "Escape"
@@ -4986,7 +4401,7 @@
       else window.achievementOverlay.panelAction({ kind: "close" });
     }, true);
 
-    // Mock API Binding (Mantenha sem alterações)
+    // Mock API Binding
     if (window.achievementOverlay) {
       window.achievementOverlay.onUnlock(enqueueAchievement);
       window.achievementOverlay.onWelcome(enqueueSocial);

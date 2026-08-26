@@ -28,10 +28,11 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
           animate={{ opacity: noFx ? 0.3 : 0.45 }}
           exit={{ opacity: 0 }}
           transition={{
-            duration: noFx ? 0.1 : 0.8,
+            duration: noFx ? 0.1 : 0.65,
             ease: "easeOut"
           }}
-          className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${noFx ? "" : "blur-[80px] scale-[1.2]"}`}
+          style={{ transform: "translate3d(0,0,0)" }}
+          className={`absolute inset-0 w-full h-full object-cover will-change-[opacity,transform] ${noFx ? "" : "blur-[80px] scale-[1.2]"}`}
         />
       </AnimatePresence>
 

@@ -151,7 +151,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
   return (
     <div className="space-y-6 select-none">
       {/* Header with Stats & Actions */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-3xl border border-white/10 bg-black/40 p-5 md:p-6 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 md:p-6 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white border border-white/15 shadow-inner">
             <Radio className="h-6 w-6 text-white" />
@@ -246,7 +246,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
             placeholder="Pesquisar canais de voz por nome..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-xl bg-black/40 border border-white/10 text-xs font-semibold text-white placeholder-white/40 focus:outline-none focus:border-white/30 focus:bg-white/5 transition"
+            className="w-full h-10 pl-10 pr-4 rounded-xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-xl text-xs font-semibold text-white placeholder-white/40 focus:outline-none focus:border-white/30 focus:bg-white/8 transition"
           />
         </div>
 
@@ -300,10 +300,10 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
               return (
                 <div
                   key={room.id}
-                  className={`group relative flex flex-col justify-between p-4.5 rounded-2xl border transition-all duration-200 ${
+                  className={`group relative flex flex-col justify-between p-4.5 rounded-2xl border transition-all duration-200 backdrop-blur-xl ${
                     isCurrent
                       ? "bg-white/[0.08] border-white/40 shadow-xl"
-                      : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 hover:border-white/20"
+                      : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] hover:border-white/20 shadow-[0_15px_35px_rgba(0,0,0,0.3)]"
                   }`}
                 >
                   <div className="space-y-2.5">
@@ -432,12 +432,12 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
             return (
               <div
                 key={room.id}
-                className={`flex flex-col justify-between p-4.5 rounded-2xl border transition-all duration-200 ${
+                className={`flex flex-col justify-between p-4.5 rounded-2xl border transition-all duration-200 backdrop-blur-xl ${
                   isCurrent
                     ? "bg-white/[0.08] border-white/40 shadow-xl"
                     : isFull
                     ? "bg-white/[0.01] border-white/5 opacity-70"
-                    : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10 hover:border-white/20"
+                    : "bg-white/[0.03] hover:bg-white/[0.06] border-white/[0.08] hover:border-white/20 shadow-[0_15px_35px_rgba(0,0,0,0.3)]"
                 }`}
               >
                 <div className="space-y-2.5">

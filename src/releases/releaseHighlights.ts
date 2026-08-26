@@ -13,31 +13,32 @@ export interface ReleaseHighlights {
 }
 
 export const LATEST_RELEASE: ReleaseHighlights = {
-  version: "3.2.1",
-  title: "Overlay Refinado, Correção de Dependências & Sons GameCube",
-  description: "Correção de dependências no app.asar, ícone oficial no overlay Divirta-se, suporte a efeitos sonoros do GameCube e refinamentos de vídeo de fundo.",
-  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.2.1",
+  version: "3.2.2",
+  title: "Overlay Cósmico Glassmorphism & Performance 60 FPS",
+  description: "Redesenho completo do overlay em vidro translúcido monocromático, otimizações de 60 FPS estilo console e novo pacote de efeitos sonoros Phelierium.",
+  releaseUrl: "https://github.com/Guilhermesttt/Checkpoint---Launcher/releases/tag/v3.2.2",
   highlights: [
     {
       id: "stability",
-      title: "Overlay & Identidade Visual",
-      description: "Logo oficial Phelierium nos cards sociais de overlay e transparência aprimorada para vídeos de fundo.",
+      title: "Overlay Cósmico em Vidro Translúcido",
+      description: "Design mono espacial com tipografia Space Grotesk + Inter, backdrop-filter de alta definição e visibilidade total do jogo.",
     },
     {
       id: "controller",
-      title: "Mapeamento de Áudio GameCube",
-      description: "Integração do efeito sonoro fly-out nas interações do tema GameCube e navegação fluida.",
+      title: "Fluidez 60 FPS Console-Grade",
+      description: "Aceleração total por hardware (GPU) e isolamento de layout CSS Containment em todos os cards e listas da interface.",
     },
     {
       id: "voice",
-      title: "Estabilidade & Pacote app.asar",
-      description: "Inclusão do Zod nas dependências de produção para execução sem erros no bundle distribuído.",
+      title: "Áudio & Efeitos Sonoros Phelierium",
+      description: "Sons nativos de inicialização de jogo, mensagens no chat e desbloqueio de conquistas perfeitamente integrados.",
     },
   ],
 };
 
 const releasesByVersion = new Map([
   [LATEST_RELEASE.version, LATEST_RELEASE],
+  ["3.2.1", LATEST_RELEASE],
   ["3.2.0", LATEST_RELEASE],
 ]);
 

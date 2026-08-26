@@ -57,7 +57,7 @@ const GameCardSlot = React.memo(
             isSteam={game.source === "steam" || game.launcherType === "steam"}
             isEpic={game.source === "epic" || game.launcherType === "epic"}
             launcherType={game.launcherType}
-            steamAppId={game.steamAppId}
+            steamAppId={typeof game.steamAppId === "number" ? game.steamAppId : Number(game.steamAppId) || undefined}
             isFavorite={game.isFavorite}
             onClick={handleClick}
           />

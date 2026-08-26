@@ -2,9 +2,12 @@ const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tra
 
 const crypto = require("node:crypto");
 const { z } = require("zod");
-app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization,WebRtcHWEncoding,WebRtcHWDecoding");
+// ── Hardware Video Decode & WebRTC Acceleration ──────────────────────────────
 app.commandLine.appendSwitch("enable-accelerated-video-decode");
 app.commandLine.appendSwitch("enable-accelerated-mjpeg-decode");
+app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,WebRtcHWEncoding,WebRtcHWDecoding");
+app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enabled/");
+
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -68,15 +71,6 @@ const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
 const AUTO_START_ARG = "--checkpoint-autostart";
 const IS_AUTO_START = process.argv.includes(AUTO_START_ARG);
 const ENABLE_EMULATOR_FILE_INJECTION = process.env.CHECKPOINT_ENABLE_EMULATOR_INJECTION === "1";
-
-// ── Otimizações de Memória & GPU para Electron em PCs Fracos ────────────────
-app.commandLine.appendSwitch("js-flags", "--max-old-space-size=256");
-app.commandLine.appendSwitch("renderer-process-limit", "2");
-app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
-
-// ── Hardware WebRTC Encoding (H.264 via NVENC/QuickSync/VideoToolbox) ────────
-// Reduz uso de CPU durante screen share com jogo rodando em paralelo
-app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enabled/");
 
 // ─── Registro de watchers ativos por jogo (gameId → FSWatcher) ───────────────
 // Garante que nunca tenhamos dois watchers para o mesmo jogo.
@@ -3582,8 +3576,8 @@ registerSecureIpcHandler("overlay:set-achievement-volume", async (_event, reques
 });
 
 registerSecureIpcHandler("overlay:set-achievement-sound-theme", async (_event, requestedTheme) => {
-  const supportedThemes = new Set(["ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"]);
-  achievementSoundTheme = supportedThemes.has(requestedTheme) ? requestedTheme : "ps5";
+  const supportedThemes = new Set(["default", "ps5", "ps4", "psp", "ps2", "gamecube", "xbox360", "cyberpunk"]);
+  achievementSoundTheme = supportedThemes.has(requestedTheme) ? requestedTheme : "default";
   overlayPanelState = {
     ...overlayPanelState,
     settings: { ...overlayPanelState.settings, achievementSoundTheme },

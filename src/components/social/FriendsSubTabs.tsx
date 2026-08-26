@@ -33,7 +33,7 @@ export const FriendsSubTabs: React.FC<FriendsSubTabsProps> = ({
   ];
 
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-[#090A0D]/90 backdrop-blur-xl p-1.5 shadow-lg">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-2xl p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
       <div className="flex items-center gap-1.5 flex-wrap">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

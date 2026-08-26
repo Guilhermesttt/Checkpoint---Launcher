@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { SoundTheme } from "../context/PreferencesContext";
 
-import phelieriumSelectSound from "../sounds/Phelierium Default/ui_select.mp3";
-import phelieriumClickSound from "../sounds/Phelierium Default/ui_click.mp3";
+import phelieriumSelectSound from "../sounds/Phelierium Default/ui_select.wav";
+import phelieriumClickSound from "../sounds/Phelierium Default/ui_click.wav";
 import phelieriumAlertSound from "../sounds/Phelierium Default/ui_alert.mp3";
 import phelieriumNotificationSound from "../sounds/Phelierium Default/ui_notification.mp3";
 import phelieriumFriendshipSound from "../sounds/Phelierium Default/ui_friendshipsent.mp3";
@@ -13,6 +13,8 @@ import phelieriumDeepSelectSound from "../sounds/Phelierium Default/ui_deep_sele
 import phelieriumAchievementSound from "../sounds/Phelierium Default/Achievment_Unlock.mp3";
 import phelieriumUiAchievementSound from "../sounds/Phelierium Default/ui_achievment.mp3";
 import phelieriumCallEnterSound from "../sounds/Phelierium Default/ui_call_enter.mp3";
+import phelieriumGameStartSound from "../sounds/Phelierium Default/ui_game_start.mp3";
+import phelieriumNewChatMessageSound from "../sounds/Phelierium Default/ui_new_chat_message.mp3";
 
 import ps5PlusNavigateSound from "../sounds/PS5_Plus/deck_ui_navigation.wav";
 import ps5PlusHoverSound from "../sounds/PS5_Plus/deck_ui_slider_down.wav";
@@ -105,7 +107,7 @@ import gcClosePhotosSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_out
 import gcLaunchGameSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav";
 import gcShowModalSound from "../sounds/Nintendo GameCube Menu SFX/deck_ui_show_modal.wav";
 
-const soundThemes = {
+export const soundThemes = {
   default: {
     navigate: phelieriumClickSound,
     hover: phelieriumSelectSound,
@@ -116,13 +118,15 @@ const soundThemes = {
     favoriteOn: phelieriumClickSound,
     favoriteOff: phelieriumClickSound,
     delete: phelieriumAlertSound,
-    play: phelieriumUiAchievementSound,
-    boot: phelieriumUiAchievementSound,
+    play: phelieriumGameStartSound,
+    boot: phelieriumGameStartSound,
     search: phelieriumSelectSound,
     detailOpen: phelieriumOpenDetailSound,
     friendRequest: phelieriumFriendshipSound,
     chatSent: phelieriumSelectSound,
-    chatReceived: phelieriumNotificationSound,
+    chatReceived: phelieriumNewChatMessageSound,
+    notification: phelieriumNotificationSound,
+    callEnter: phelieriumCallEnterSound,
     switchOn: phelieriumClickSound,
     switchOff: phelieriumClickSound,
     screenshot: phelieriumUiAchievementSound,
@@ -146,6 +150,8 @@ const soundThemes = {
     friendRequest: ps5PlusMessageToastSound,
     chatSent: ps5PlusActivationSound,
     chatReceived: ps5PlusMessageToastSound,
+    notification: ps5PlusMessageToastSound,
+    callEnter: ps5PlusShowModalSound,
     switchOn: ps5PlusSwitchOnSound,
     switchOff: ps5PlusSwitchOffSound,
     screenshot: ps5PlusToastSound,
@@ -169,6 +175,8 @@ const soundThemes = {
     friendRequest: ps4FriendRequestSound,
     chatSent: ps4ShowModalSound,
     chatReceived: ps4ToastSound,
+    notification: ps4ToastSound,
+    callEnter: ps4ShowModalSound,
     switchOn: ps4FlyInSound,
     switchOff: ps4ReturnSound,
     screenshot: ps4ToastSound,
@@ -192,6 +200,8 @@ const soundThemes = {
     friendRequest: pspToastSound,
     chatSent: pspPositiveSound,
     chatReceived: pspToastSound,
+    notification: pspToastSound,
+    callEnter: pspPositiveSound,
     switchOn: pspSwitchOnSound,
     switchOff: pspSwitchOffSound,
     screenshot: pspToastSound,
@@ -215,6 +225,8 @@ const soundThemes = {
     friendRequest: xbFriendJoinSound,
     chatSent: xbActivationSound,
     chatReceived: xbChatReceivedSound,
+    notification: xbToastSound,
+    callEnter: xbFriendJoinSound,
     switchOn: xbFavoriteOnSound,
     switchOff: xbFavoriteOffSound,
     screenshot: xbToastSound,
@@ -238,6 +250,8 @@ const soundThemes = {
     friendRequest: cyberpunkToastSound,
     chatSent: cyberpunkActivationSound,
     chatReceived: cyberpunkToastSound,
+    notification: cyberpunkToastSound,
+    callEnter: cyberpunkShowModalSound,
     switchOn: cyberpunkSwitchOnSound,
     switchOff: cyberpunkSwitchOffSound,
     screenshot: cyberpunkToastSound,
@@ -261,6 +275,8 @@ const soundThemes = {
     friendRequest: ps2ToastSound,
     chatSent: ps2ActivationSound,
     chatReceived: ps2ToastSound,
+    notification: ps2ToastSound,
+    callEnter: ps2DetailOpenSound,
     switchOn: ps2FavoriteOnSound,
     switchOff: ps2FavoriteOffSound,
     screenshot: ps2ToastSound,
@@ -271,56 +287,116 @@ const soundThemes = {
     navigate: gcNavigateSound,
     hover: gcHoverSound,
     select: gcActivationSound,
-    // Fechar painel de detalhes
     back: gcFlyOutSound,
     edit: gcEditModalSound,
-    // Fechar painel de detalhes
     modalClose: gcFlyOutSound,
-    // Favoritar / desfavoritar
     favoriteOn: gcFavoriteSound,
     favoriteOff: gcFavoriteSound,
     delete: gcClosePhotosSound,
     play: gcLaunchGameSound,
     boot: gcLaunchGameSound,
     search: gcShowModalSound,
-    // Abrir painel de detalhes
     detailOpen: gcDetailOpenSound,
-    // Mensagens, pedidos de amizade, notificacoes
     friendRequest: gcShowModalSound,
     chatSent: gcFavoriteSound,
     chatReceived: gcShowModalSound,
-    // Abrir fotos
+    notification: gcShowModalSound,
+    callEnter: gcDetailOpenSound,
     switchOn: gcOpenPhotosSound,
-    // Fechar fotos
     switchOff: gcClosePhotosSound,
     screenshot: gcShowModalSound,
     showModal: gcShowModalSound,
-    // Conquistas
     overlayAchievement: gcEditModalSound,
   },
 };
 
 export type SoundEffectType = keyof (typeof soundThemes)["ps5"];
 
-const audioCache = new Map<string, HTMLAudioElement>();
+// ─── Tipos de som que são notificações ─────────────────────────────────────────
 const notificationSoundTypes = new Set<SoundEffectType>([
   "friendRequest",
   "chatReceived",
   "chatSent",
+  "notification",
+  "callEnter",
 ]);
 
 const isNotificationSoundType = (type: SoundEffectType) =>
   notificationSoundTypes.has(type);
 
-const preloadAudio = (path: string) => {
-  if (audioCache.has(path)) return audioCache.get(path);
-  const audio = new Audio(path);
-  audio.preload = "auto";
-  audio.load();
-  audioCache.set(path, audio);
+// ─── Motor de Áudio Web Audio API (Latência Zero & Zero Bugs de Promise) ──────
+let globalAudioCtx: AudioContext | null = null;
+
+const getAudioContext = (): AudioContext | null => {
+  if (typeof window === "undefined") return null;
+  if (!globalAudioCtx) {
+    const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtxClass) {
+      globalAudioCtx = new AudioCtxClass();
+    }
+  }
+  if (globalAudioCtx && globalAudioCtx.state === "suspended") {
+    void globalAudioCtx.resume().catch(() => {});
+  }
+  return globalAudioCtx;
+};
+
+// Cache de buffers decodificados em memória
+const audioBufferCache = new Map<string, AudioBuffer>();
+const pendingFetches = new Map<string, Promise<AudioBuffer | null>>();
+
+const loadAudioBuffer = async (url: string): Promise<AudioBuffer | null> => {
+  if (audioBufferCache.has(url)) return audioBufferCache.get(url)!;
+  if (pendingFetches.has(url)) return pendingFetches.get(url)!;
+
+  const fetchPromise = (async () => {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return null;
+      const res = await fetch(url);
+      const arrayBuffer = await res.arrayBuffer();
+      const decoded = await ctx.decodeAudioData(arrayBuffer);
+      audioBufferCache.set(url, decoded);
+      return decoded;
+    } catch {
+      return null;
+    } finally {
+      pendingFetches.delete(url);
+    }
+  })();
+
+  pendingFetches.set(url, fetchPromise);
+  return fetchPromise;
+};
+
+// Fallback HTML5 Audio Pool (caso WebAudio falhe)
+const htmlAudioPool = new Map<string, HTMLAudioElement[]>();
+const getHtmlAudio = (path: string, volume: number): HTMLAudioElement => {
+  const pool = htmlAudioPool.get(path) ?? [];
+  let audio = pool.find((a) => a.paused || a.ended);
+  if (!audio) {
+    audio = new Audio(path);
+    audio.preload = "auto";
+    if (pool.length < 5) pool.push(audio);
+    htmlAudioPool.set(path, pool);
+  }
+  audio.volume = Math.max(0, Math.min(1, volume));
+  audio.currentTime = 0;
   return audio;
 };
 
+// Desbloqueia o AudioContext no primeiro gesto do usuário
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    if (globalAudioCtx && globalAudioCtx.state === "suspended") {
+      void globalAudioCtx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener("pointerdown", unlockAudio, { capture: true, once: true });
+  window.addEventListener("keydown", unlockAudio, { capture: true, once: true });
+}
+
+// ─── Hook principal ───────────────────────────────────────────────────────────
 export const useSoundEffects = (
   volume = 0.35,
   theme: SoundTheme = "default",
@@ -328,77 +404,111 @@ export const useSoundEffects = (
 ) => {
   const lastNavigateAtRef = useRef(0);
   const lastHoverAtRef = useRef(0);
-  const activeAudiosRef = useRef(new Set<HTMLAudioElement>());
-  const activeNotificationAudiosRef = useRef(new Set<HTMLAudioElement>());
-  const sounds = soundThemes[theme] ?? soundThemes.default ?? soundThemes.ps5;
+  const activeAudiosRef = useRef<Set<HTMLAudioElement>>(new Set());
+
+  const sounds = soundThemes[theme] ?? soundThemes.default;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
+  // Pré-carrega buffers de áudio na memória
   useEffect(() => {
-    Array.from(new Set(Object.values(soundPaths))).forEach(preloadAudio);
+    const paths = Array.from(new Set(Object.values(soundPaths)));
+    paths.forEach((url) => {
+      void loadAudioBuffer(url);
+    });
   }, [soundPaths]);
 
-  const stopActiveSounds = useCallback((includeNotifications = false) => {
-    activeAudiosRef.current.forEach((audio) => {
-      if (!includeNotifications && activeNotificationAudiosRef.current.has(audio)) return;
-      audio.pause();
-      audio.currentTime = 0;
-      activeAudiosRef.current.delete(audio);
-      activeNotificationAudiosRef.current.delete(audio);
-    });
-  }, []);
-
+  // Silencia efeitos sonoros ativos quando a janela perde o foco
   useEffect(() => {
-    const stopInterfaceSounds = () => stopActiveSounds();
-    const stopWhenInactive = () => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) {
-        stopInterfaceSounds();
-      }
+    if (typeof window === "undefined") return;
+    const handleBlur = () => {
+      activeAudiosRef.current.forEach((audio) => {
+        try {
+          audio.pause();
+        } catch {}
+      });
+      activeAudiosRef.current.clear();
     };
-
-    window.addEventListener("blur", stopInterfaceSounds);
-    document.addEventListener("visibilitychange", stopWhenInactive);
+    window.addEventListener("blur", handleBlur);
     return () => {
-      window.removeEventListener("blur", stopInterfaceSounds);
-      document.removeEventListener("visibilitychange", stopWhenInactive);
-      stopActiveSounds(true);
+      window.removeEventListener("blur", handleBlur);
     };
-  }, [stopActiveSounds]);
+  }, []);
 
   const playSound = useCallback(
     (type: SoundEffectType) => {
-      const isNotificationSound = isNotificationSoundType(type);
-      if (
-        !isNotificationSound
-        && (document.visibilityState !== "visible" || !document.hasFocus())
-      ) return;
+      const path = soundPaths[type];
+      if (!path) return;
 
+      const isNotification = isNotificationSoundType(type);
+      if (
+        typeof document !== "undefined" &&
+        !isNotification &&
+        !document.hasFocus()
+      ) {
+        return;
+      }
+
+      const targetVolume = Math.max(0, Math.min(1, isNotification ? notificationVolume : volume));
+      if (targetVolume <= 0) return;
+
+      // Rate-limit para navegações ultra-rápidas
       const now = performance.now();
       if (type === "navigate") {
-        if (lastNavigateAtRef.current > 0 && now - lastNavigateAtRef.current < 85) return;
+        if (lastNavigateAtRef.current > 0 && now - lastNavigateAtRef.current < 45) return;
         lastNavigateAtRef.current = now;
       }
       if (type === "hover") {
-        if (lastHoverAtRef.current > 0 && now - lastHoverAtRef.current < 70) return;
+        if (lastHoverAtRef.current > 0 && now - lastHoverAtRef.current < 40) return;
         lastHoverAtRef.current = now;
       }
 
-      const path = soundPaths[type];
-      if (!path) return;
-      const cachedAudio = preloadAudio(path);
-      const audio = cachedAudio?.cloneNode(true) as HTMLAudioElement | undefined;
-      if (!audio) return;
+      const ctx = getAudioContext();
+      const cachedBuffer = audioBufferCache.get(path);
 
-      audio.volume = isNotificationSound ? notificationVolume : volume;
-      activeAudiosRef.current.add(audio);
-      if (isNotificationSound) activeNotificationAudiosRef.current.add(audio);
-      audio.addEventListener("ended", () => {
-        activeAudiosRef.current.delete(audio);
-        activeNotificationAudiosRef.current.delete(audio);
-      }, { once: true });
-      audio.play().catch(() => {
-        activeAudiosRef.current.delete(audio);
-        activeNotificationAudiosRef.current.delete(audio);
-      });
+      if (ctx && cachedBuffer) {
+        try {
+          if (ctx.state === "suspended") {
+            void ctx.resume();
+          }
+          const source = ctx.createBufferSource();
+          source.buffer = cachedBuffer;
+
+          const gainNode = ctx.createGain();
+          gainNode.gain.setValueAtTime(targetVolume, ctx.currentTime);
+
+          source.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          source.start(0);
+          return;
+        } catch {
+          // fallback abaixo
+        }
+      }
+
+      // Se não estava no cache ou WebAudio falhou, usa HTMLAudio fallback
+      try {
+        const audio = getHtmlAudio(path, targetVolume);
+        if (!isNotification) {
+          activeAudiosRef.current.add(audio);
+        }
+        const onEnded = () => {
+          activeAudiosRef.current.delete(audio);
+        };
+        audio.addEventListener("ended", onEnded, { once: true });
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            activeAudiosRef.current.delete(audio);
+          });
+        }
+      } catch {
+        // silencioso
+      }
+
+      // Se ainda não estava em cache, tenta decodificar para o próximo toque
+      if (!cachedBuffer) {
+        void loadAudioBuffer(path);
+      }
     },
     [notificationVolume, soundPaths, volume],
   );

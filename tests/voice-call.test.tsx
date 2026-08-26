@@ -115,7 +115,7 @@ describe("Voice & Screen Share Call System", () => {
 
     expect(screen.getAllByText("Matheus").length).toBeGreaterThan(0);
     expect(screen.getByText("Guilherme")).toBeInTheDocument();
-    expect(screen.getByText("00:45")).toBeInTheDocument();
+    expect(screen.getAllByText("00:45").length).toBeGreaterThan(0);
     expect(screen.getByText("Desconectar")).toBeInTheDocument();
   });
 

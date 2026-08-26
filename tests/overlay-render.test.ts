@@ -610,7 +610,7 @@ describe("overlay de conquistas", () => {
     expect(document.querySelector('[data-panel-tab="friends"]')).toHaveClass("is-active");
   });
 
-  it("confirma, volta e controla faixas do Spotify pelo controle", () => {
+  it("confirma e volta pelo controle no overlay", () => {
     const friendAction = document.getElementById("friend-action");
     const friendClick = vi.fn();
     friendAction?.addEventListener("click", friendClick);
@@ -622,11 +622,5 @@ describe("overlay de conquistas", () => {
     panelAction.mockClear();
     pressGamepadButton(1);
     expect(panelAction).toHaveBeenCalledWith({ kind: "close" });
-
-    document.querySelector<HTMLButtonElement>('[data-panel-tab="spotify"]')?.click();
-    pressGamepadButton(7);
-    pressGamepadButton(6);
-    expect(panelAction).toHaveBeenCalledWith({ kind: "spotify-next" });
-    expect(panelAction).toHaveBeenCalledWith({ kind: "spotify-previous" });
   });
 });

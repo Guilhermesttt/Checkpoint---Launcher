@@ -52,7 +52,7 @@ export interface LanguageOption {
 }
 
 export interface AppThemeOption {
-  id: "default" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
+  id: "default" | "ps5" | "playstation" | "ps4" | "psp" | "gamecube" | "xbox360" | "cyberpunk";
   label: string;
   hint: string;
   swatch: string;

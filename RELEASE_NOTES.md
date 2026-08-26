@@ -1,5 +1,27 @@
 # Release Notes — Phelierium Game Hub
 
+## Phelierium Game Hub — v3.2.2
+
+Atualização com redesenho cósmico do Overlay in-game, otimizações de performance estilo console 60 FPS e refinamentos sonoros do tema Phelierium.
+
+### Destaques da versão 3.2.2
+
+#### 🌌 Overlay Cósmico Glassmorphism
+- **Design Sideral Monocromático:** Reformulação visual completa com tipografia Space Grotesk (display) e Inter (corpo), paleta mono pura preto e branco e nós estelares orbitais.
+- **Vidro Translúcido com Backdrop-Filter:** Painel de comando em vidro translúcido de alta definição que preserva a visibilidade clara da gameplay em segundo plano.
+- **Foco e Limpeza:** Remoção do módulo legado do Spotify, deixando o Command Panel mais limpo, ágil e focado na experiência gamer.
+
+#### ⚡ Performance 60 FPS Console-Grade
+- **Aceleração por Hardware GPU (`translateZ(0)` & `will-change`):** Todos os cards de amigos, conquistas, métricas de sessão e conversas agora operam em camadas compostas na GPU.
+- **Isolamento de Renderização com CSS Containment:** Grids e listas com `contain: content`, eliminando engasgos (stuttering) e reflows durante o scroll e interações rápidas.
+- **Micro-interações Ágeis:** Transições encurtadas para 120ms com curvas rápidas de aceleração `cubic-bezier`.
+
+#### 🔊 Efeitos Sonoros Phelierium Default
+- **Sons Nativos Integrados:** Áudio de início de jogo (`ui_game_start`), nova mensagem no chat (`ui_new_chat_message`), chamadas e notificações mapeadas para o tema padrão.
+- **Correção de Áudio Fantasma:** Eliminação de gatilhos indevidos de áudio ao minimizar o hub ou alternar janelas.
+
+---
+
 ## Phelierium Game Hub — v3.2.1
 
 Atualização de estabilidade, acessibilidade e refinamentos de qualidade de vida do overlay e navegação.

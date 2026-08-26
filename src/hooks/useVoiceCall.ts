@@ -1313,6 +1313,9 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   }, []);
 
   // SFX sounds
+  // NOTE: Não usar loop=true para ringout — o setInterval já repetem o som.
+  // loop=true faz o browser retomar automaticamente quando a janela volta ao foco (autoplay resume),
+  // causando o toque inesperado ao minimizar/restaurar.
   const playRingtone = useCallback((type: "call" | "ringout" | "connect" | "disconnect") => {
     stopRingtone();
     try {
@@ -1323,8 +1326,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         activeRingtoneAudioRef.current = audio;
         void audio.play().catch(() => { });
       } else if (type === "ringout") {
+        // Sem loop: o interval de 3s em startCall repete o som manualmente.
+        // Isso evita que o browser retome o áudio automaticamente ao restaurar a janela.
         const audio = new Audio(sfxRingingOut);
-        audio.loop = true;
+        audio.loop = false;
         audio.volume = 0.85;
         activeRingtoneAudioRef.current = audio;
         void audio.play().catch(() => { });
@@ -1335,6 +1340,31 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       }
     } catch { }
   }, [stopRingtone]);
+
+  // Pausa o ringout quando a janela perde foco ou é minimizada.
+  // O loop=false + interval garante que o som só toque quando a janela está em foco.
+  // Sem isso, o browser retome o áudio com loop=true automaticamente ao restaurar a janela.
+  useEffect(() => {
+    const pauseRingout = () => {
+      const audio = activeRingtoneAudioRef.current;
+      if (!audio) return;
+      // Só pausa o ringout de saída; chamadas entrantes podem continuar
+      if (audio.loop) return; // loop=true = incoming call — não interromper
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch { }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") pauseRingout();
+    };
+    window.addEventListener("blur", pauseRingout);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("blur", pauseRingout);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // Complete Cleanup Helper (Full Mesh P2P, AudioPipelines, Timers, Media Streams)
   const cleanUpCall = useCallback(() => {

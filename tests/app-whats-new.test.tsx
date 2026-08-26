@@ -53,18 +53,18 @@ describe("novidades no fluxo inicial do app", () => {
     });
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { getVersion: vi.fn().mockResolvedValue("3.2.1") },
+      value: { getVersion: vi.fn().mockResolvedValue("3.2.2") },
     });
   });
 
   it("abre o modal somente depois que a introducao termina", async () => {
     render(<App />);
 
-    expect(screen.queryByText("Overlay & Identidade Visual")).not.toBeInTheDocument();
+    expect(screen.queryByText("Overlay Cósmico em Vidro Translúcido")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Finalizar introdução" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Overlay & Identidade Visual")).toBeInTheDocument();
+      expect(screen.getByText("Overlay Cósmico em Vidro Translúcido")).toBeInTheDocument();
     });
     expect(screen.getByText("Home pronta")).toBeInTheDocument();
   });

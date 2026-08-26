@@ -51,6 +51,7 @@ import { ParticipantContextMenu } from "./ParticipantContextMenu";
 import { ChannelInviteModal } from "./ChannelInviteModal";
 import { CallPrivacyPanel } from "./CallPrivacyPanel";
 import { CreateChannelModal } from "./CreateChannelModal";
+import { CallTelemetryLeft, CallTelemetryRight } from "./CallTelemetryOverlay";
 import spaceBgVideo from "../../assets/Space-BG.mp4";
 import friendCallingVideo from "../../assets/BG-Video-Calling.mp4";
 import friendConnectedVideo from "../../assets/BG-Video-Friend.mp4";
@@ -1691,9 +1692,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                 )}
                               </div>
 
-                              {/* Discord-style Bottom-Left Name & Status Pill */}
+                              {/* Discord-style Top-Left Name & Status Pill */}
                               {feed.isConnecting ? (
-                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)] pointer-events-none max-w-[calc(100%-28px)]">
+                                <div className="absolute top-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)] pointer-events-none max-w-[calc(100%-110px)] z-10">
                                   <Loader2 className="h-3.5 w-3.5 text-sky-400 animate-spin shrink-0" />
                                   <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
                                     {feed.title}
@@ -1703,7 +1704,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                   </span>
                                 </div>
                               ) : feed.isRinging ? (
-                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.2)] pointer-events-none max-w-[calc(100%-28px)]">
+                                <div className="absolute top-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.2)] pointer-events-none max-w-[calc(100%-110px)] z-10">
                                   <Phone className="h-3.5 w-3.5 text-amber-300 animate-bounce shrink-0" />
                                   <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
                                     {feed.title}
@@ -1713,7 +1714,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                   </span>
                                 </div>
                               ) : (
-                                <div className="absolute bottom-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-28px)]">
+                                <div className="absolute top-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-110px)] z-10">
                                   {isSpeaking && (
                                     <span className="h-2 w-2 rounded-full bg-[#23a55a] animate-pulse shrink-0" />
                                   )}
@@ -1731,6 +1732,38 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                                   ) : null}
                                 </div>
                               )}
+
+                              {/* Telemetry HUD Cards at the Bottom */}
+                              <div className="absolute bottom-3.5 inset-x-3.5 flex items-center justify-center z-10 pointer-events-none">
+                                {activeFeeds.length === 1 && feed.isLocal ? (
+                                  <div className="flex flex-wrap items-center justify-center gap-3 w-full">
+                                    <CallTelemetryLeft
+                                      duration={duration}
+                                      stream={localStream}
+                                      isSpeaking={isSpeakingLocal}
+                                      className="pointer-events-auto"
+                                    />
+                                    <CallTelemetryRight
+                                      stream={localStream}
+                                      isSpeaking={isSpeakingLocal}
+                                      className="pointer-events-auto"
+                                    />
+                                  </div>
+                                ) : feed.isLocal ? (
+                                  <CallTelemetryLeft
+                                    duration={duration}
+                                    stream={localStream}
+                                    isSpeaking={isSpeakingLocal}
+                                    className="pointer-events-auto"
+                                  />
+                                ) : (
+                                  <CallTelemetryRight
+                                    stream={feed.stream || remoteStream}
+                                    isSpeaking={feed.isSpeaking || isSpeakingRemote}
+                                    className="pointer-events-auto"
+                                  />
+                                )}
+                              </div>
 
                               {/* PTT Indicator (Top Right) */}
                               {feed.isLocal && inputMode === "push-to-talk" && (
