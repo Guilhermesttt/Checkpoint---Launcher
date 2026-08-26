@@ -119,7 +119,33 @@ const STARTUP_LOG_FILE = "desktop-startup.log";
 const HEALTH_CHECK_MAX_ATTEMPTS = 120; // 120 * 500ms = ~60s de tolerância
 const HEALTH_CHECK_INTERVAL_MS = 500;
 
+let isQuitting = false;
 let mainWindow;
+
+const windowBehaviorController = createWindowBehaviorController({
+  hideWindow: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.hide();
+    }
+  },
+  showWindow: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  },
+  requestConfirmation: () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("overlay:panel-action", { kind: "request-exit-confirmation" });
+    }
+  },
+  quitApp: () => {
+    isQuitting = true;
+    app.quit();
+  },
+});
+
 let spotifyAuthManager;
 let overlayWindow;
 let overlayReady = false;

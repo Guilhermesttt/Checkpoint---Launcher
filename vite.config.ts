@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
+  base: "./",
   assetsInclude: ["**/*.glb"],
   plugins: [react(), tailwindcss()],
   resolve: {
