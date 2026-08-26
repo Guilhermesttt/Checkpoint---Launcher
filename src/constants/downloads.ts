@@ -1,6 +1,6 @@
 // ─── Configuração de Download e Links de Releases ────────────────
 
-export const CURRENT_LAUNCHER_VERSION = "3.1.5";
+export const CURRENT_LAUNCHER_VERSION = "3.2.2";
 
 export const GITHUB_REPO_URL =
   "https://github.com/Guilhermesttt/Checkpoint---Launcher";

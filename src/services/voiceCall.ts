@@ -502,3 +502,13 @@ export const sendCallPrivacyUpdate = async (
     payload: privacyPayload,
   });
 };
+
+export const cleanupAllChannels = () => {
+  for (const [name, channel] of activeChannels) {
+    try {
+      supabase.removeChannel(channel);
+    } catch {}
+    activeChannels.delete(name);
+  }
+  channelPromises.clear();
+};

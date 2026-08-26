@@ -1,11 +1,11 @@
 import pherieliumLogo from "../assets/Pherielium_logo.png";
-import epicGamesIcon from "../../public/brands/epic-games.png";
-import eaGamesIcon from "../../public/brands/ea.png";
-import ubisoftIcon from "../../public/brands/ubisoft.png";
-import gogIcon from "../../public/brands/gog.png";
-import riotGamesIcon from "../../public/brands/riot.png";
-import battlenetIcon from "../../public/brands/battle-net.png";
-import rockstarIcon from "../../public/brands/rockstar.png";
+import epicGamesIcon from "../assets/brands/epic-games.png";
+import eaGamesIcon from "../assets/brands/ea.png";
+import ubisoftIcon from "../assets/brands/ubisoft.png";
+import gogIcon from "../assets/brands/gog.png";
+import riotGamesIcon from "../assets/brands/riot.png";
+import battlenetIcon from "../assets/brands/battle-net.png";
+import rockstarIcon from "../assets/brands/rockstar.png";
 
 export const PHERIELIUM_LOGO_PATH = pherieliumLogo;
 export const EPIC_GAMES_ICON_PATH = epicGamesIcon;

@@ -1,6 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CornerDownLeft, Mouse, MouseRight, Plus, Settings, UserPlus } from "lucide-react";
+import DOMPurify from "dompurify";
 import { useGamepad, type GamepadButtonName } from "../../context/GamepadContext";
 
 import psCross from "../../assets/PlayStation Series/Vector/playstation_button_cross.svg?raw";
@@ -71,7 +72,7 @@ const GamepadIcon: React.FC<{ svg: string; label: string; className?: string }> 
       role="img"
       aria-label={label}
       className={`inline-flex shrink-0 items-center justify-center text-white opacity-85 ${className}`}
-      dangerouslySetInnerHTML={{ __html: markup }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markup, { USE_PROFILES: { svg: true } }) }}
     />
   );
 };

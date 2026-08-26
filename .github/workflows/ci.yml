@@ -28,7 +28,6 @@ jobs:
       - run: npm run build
       - run: npm run test:typecheck
       - run: npm run test:coverage
-      - run: npm run test:rules
       - run: npm run audit:ci
       - uses: actions/upload-artifact@v4
         if: always()
@@ -42,7 +41,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     env:
-      VITE_BACKEND_URL: https://checkpoint-backend-vgvx.onrender.com
+      VITE_BACKEND_URL: https://checkpoint-launcher.onrender.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

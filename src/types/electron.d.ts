@@ -306,17 +306,6 @@ declare global {
       onAccountAuthCallback: (
         callback: (payload: { steamStatus?: string; discordStatus?: string }) => void,
       ) => () => void;
-      getSpotifyStatus: () => Promise<{
-        connected: boolean;
-        requiresReauthorization: boolean;
-        account: { id: string; displayName: string; imageUrl: string; product: string } | null;
-      }>;
-      connectSpotify: (clientId: string) => Promise<{
-        connected: true;
-        account: { id: string; displayName: string; imageUrl: string; product: string };
-      }>;
-      disconnectSpotify: () => Promise<{ connected: false; account: null }>;
-      getSpotifyAccessToken: (clientId: string) => Promise<{ accessToken: string }>;
       openExternalUrl: (url: string) => Promise<void>;
       copyToClipboard: (value: string) => Promise<{ ok: boolean }>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
@@ -527,11 +516,6 @@ declare global {
         friendId?: string;
         contentKind?: "text" | "image";
       }) => Promise<void>;
-      showSpotifyTrackOverlay: (payload: {
-        title: string;
-        artist: string;
-        coverUrl?: string;
-      }) => Promise<{ shown: boolean }>;
       updateOverlayPanel: (payload: {
         language?: import("../context/PreferencesContext").LauncherLanguage;
         friends: Array<{ id: string; name: string; status: string; playing?: string; avatar?: string; unread?: number; canChat?: boolean }>;
@@ -580,14 +564,6 @@ declare global {
           discordUsername?: string;
           achievements?: number;
         };
-        spotify?: {
-          status: "loading" | "unconfigured" | "unsupported" | "disconnected" | "connecting" | "ready" | "error";
-          remoteMode: boolean;
-          paused: boolean;
-          positionMs: number;
-          durationMs: number;
-          track: import("../services/spotify").SpotifyTrack | null;
-        };
       }) => Promise<void>;
       onOverlayPanelAction: (callback: (payload:
         | { kind: "select-chat"; friendId: string }
@@ -597,11 +573,6 @@ declare global {
         | { kind: "set-typing"; typing: boolean }
         | { kind: "open-launcher-chat"; friendId: string }
         | { kind: "open-launcher-friends" }
-        | { kind: "spotify-toggle" }
-        | { kind: "spotify-next" }
-        | { kind: "spotify-previous" }
-        | { kind: "spotify-seek"; positionMs: number }
-        | { kind: "spotify-volume"; volume: number }
         | { kind: "voice-call"; friendId?: string; friendUid?: string; friendName?: string; friendAvatar?: string }
         | { kind: "voice-accept" }
         | { kind: "voice-reject" }

@@ -1,5 +1,5 @@
 export interface ReleaseHighlight {
-  id: "spotify" | "controller" | "stability" | "platforms" | "search" | "mods" | "voice";
+  id: "controller" | "stability" | "platforms" | "search" | "mods" | "voice";
   title: string;
   description: string;
 }

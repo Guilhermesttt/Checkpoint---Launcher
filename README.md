@@ -11,7 +11,7 @@ Um hub de jogos unificado, construído para trazer a experiência de console def
 [![Landing Page](https://img.shields.io/badge/site-pherielium.netlify.app-000000?style=for-the-badge)](https://pherielium.netlify.app)
 [![GitHub](https://img.shields.io/badge/GitHub-repo-black?style=for-the-badge&logo=github)](https://github.com/Guilhermesttt/Checkpoint---Launcher)
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-blueviolet?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-3.1.4-informational?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-3.2.2-informational?style=for-the-badge)
 
 </div>
 
@@ -44,7 +44,7 @@ Construído com **Electron + React + TypeScript**, o Pherielium recentemente pas
 | Camada | Tecnologias |
 |---|---|
 | Desktop App | Electron, React, TypeScript |
-| Landing Page | Next.js / React, Three.js (shaders), Vengeance UI |
+| Landing Page | Next.js / React, Vengeance UI |
 | Backend | Node.js (hospedado no Render.com) |
 | Comunicação em tempo real | WebRTC (voz, screen share) |
 | Integrações | Steam API, RetroAchievements, Nexus Mods, Discord/Google OAuth, Epic Games (manifest local) |

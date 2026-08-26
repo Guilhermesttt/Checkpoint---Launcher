@@ -6,5 +6,5 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src", "tests", "vitest.config.ts", "vitest.rules.config.ts"]
+  "include": ["src", "tests", "vitest.config.ts"]
 }

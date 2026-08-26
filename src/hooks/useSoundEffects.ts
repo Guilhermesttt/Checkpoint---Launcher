@@ -343,7 +343,9 @@ const getAudioContext = (): AudioContext | null => {
 
 // Cache de buffers decodificados em memória
 const audioBufferCache = new Map<string, AudioBuffer>();
+const AUDIO_BUFFER_CACHE_MAX = 50;
 const pendingFetches = new Map<string, Promise<AudioBuffer | null>>();
+const preloadedUrls = new Set<string>();
 
 const loadAudioBuffer = async (url: string): Promise<AudioBuffer | null> => {
   if (audioBufferCache.has(url)) return audioBufferCache.get(url)!;
@@ -357,6 +359,10 @@ const loadAudioBuffer = async (url: string): Promise<AudioBuffer | null> => {
       const arrayBuffer = await res.arrayBuffer();
       const decoded = await ctx.decodeAudioData(arrayBuffer);
       audioBufferCache.set(url, decoded);
+      if (audioBufferCache.size > AUDIO_BUFFER_CACHE_MAX) {
+        const oldestKey = audioBufferCache.keys().next().value;
+        if (oldestKey !== undefined) audioBufferCache.delete(oldestKey);
+      }
       return decoded;
     } catch {
       return null;
@@ -409,11 +415,14 @@ export const useSoundEffects = (
   const sounds = soundThemes[theme] ?? soundThemes.default;
   const soundPaths = useMemo(() => sounds, [sounds]);
 
-  // Pré-carrega buffers de áudio na memória
+  // Pré-carrega buffers de áudio na memória (once per URL across all hook instances)
   useEffect(() => {
     const paths = Array.from(new Set(Object.values(soundPaths)));
     paths.forEach((url) => {
-      void loadAudioBuffer(url);
+      if (!preloadedUrls.has(url)) {
+        preloadedUrls.add(url);
+        void loadAudioBuffer(url);
+      }
     });
   }, [soundPaths]);
 

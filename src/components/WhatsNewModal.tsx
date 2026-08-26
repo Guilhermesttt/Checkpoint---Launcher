@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, ExternalLink, Gamepad2, Music2, Sparkles, X, Search, Layers, Wrench, Mic } from "lucide-react";
+import { ArrowRight, ExternalLink, Gamepad2, Sparkles, X, Search, Layers, Wrench, Mic } from "lucide-react";
 import ModalShell from "./ui/ModalShell";
 import type { ReleaseHighlight, ReleaseHighlights } from "../releases/releaseHighlights";
 
@@ -9,7 +9,6 @@ interface WhatsNewModalProps {
 }
 
 const highlightIcons: Record<ReleaseHighlight["id"], React.ComponentType<{ className?: string }>> = {
-  spotify: Music2,
   controller: Gamepad2,
   stability: Sparkles,
   platforms: Layers,

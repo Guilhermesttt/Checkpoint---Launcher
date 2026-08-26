@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { FastAverageColor } from 'fast-average-color';
 
 const fac = new FastAverageColor();
+const colorCache = new Map<string, { hex: string; isDark: boolean }>();
+const COLOR_CACHE_MAX = 200;
 
 /** Clamps luminance for extracted cover color so bright/pastel artwork doesn't wash out contrast */
 function clampColorLuminance(r: number, g: number, b: number): string {
@@ -26,6 +28,9 @@ export const useGameColor = (imageUrl?: string) => {
       return;
     }
 
+    const cached = colorCache.get(imageUrl);
+    if (cached) { setColor(cached); return; }
+
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     img.src = imageUrl;
@@ -38,7 +43,13 @@ export const useGameColor = (imageUrl?: string) => {
           extracted.value[1],
           extracted.value[2],
         );
-        setColor({ hex: clampedHex, isDark: extracted.isDark });
+        const result = { hex: clampedHex, isDark: extracted.isDark };
+        colorCache.set(imageUrl, result);
+        if (colorCache.size > COLOR_CACHE_MAX) {
+          const oldestKey = colorCache.keys().next().value;
+          if (oldestKey !== undefined) colorCache.delete(oldestKey);
+        }
+        setColor(result);
       } catch {
         setColor({ hex: '#ffffff', isDark: false });
       }

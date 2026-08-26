@@ -38,7 +38,6 @@ const { createWindowBehaviorController } = require("./window-behavior.cjs");
 const { createRetroArtworkImporter } = require("./retro-artwork-importer.cjs");
 const { createTheGamesDbClient } = require("./thegamesdb.cjs");
 const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
-const { createSpotifyAuthManager } = require("./spotify-auth-manager.cjs");
 const {
   getNexusDownloadLinks,
   getNexusModCatalog,
@@ -66,7 +65,17 @@ const {
 // Backend de produção (Render). Pode ser sobrescrito via env BACKEND_PUBLIC_URL
 // se um dia você quiser apontar pra outro ambiente sem mexer no código.
 const PROD_BACKEND_URL = "https://checkpoint-launcher.onrender.com";
-const APP_URL = (process.env.VITE_BACKEND_URL || process.env.BACKEND_PUBLIC_URL || PROD_BACKEND_URL).replace(/\/$/, "");
+const resolveAppUrl = () => {
+  const envUrl = (process.env.VITE_BACKEND_URL || process.env.BACKEND_PUBLIC_URL || "").replace(/\/$/, "");
+  if (app.isPackaged) {
+    if (envUrl && !envUrl.includes("localhost") && !envUrl.includes("127.0.0.1") && !envUrl.includes("0.0.0.0")) {
+      return envUrl;
+    }
+    return PROD_BACKEND_URL;
+  }
+  return envUrl || PROD_BACKEND_URL;
+};
+const APP_URL = resolveAppUrl();
 const IS_SMOKE_TEST = process.argv.includes("--smoke-test");
 const AUTO_START_ARG = "--checkpoint-autostart";
 const IS_AUTO_START = process.argv.includes(AUTO_START_ARG);
@@ -146,7 +155,6 @@ const windowBehaviorController = createWindowBehaviorController({
   },
 });
 
-let spotifyAuthManager;
 let overlayWindow;
 let overlayReady = false;
 let overlayDisplayId = null;
@@ -169,7 +177,6 @@ let overlayPanelState = {
     achievementNotificationPosition: "top-right",
   },
   chat: null,
-  spotify: { status: "disconnected", remoteMode: false, paused: true, positionMs: 0, durationMs: 0, track: null },
   profile: { name: "Jogador", avatar: "", discordConnected: false, discordUsername: "", achievements: 0 },
 };
 const overlayEventCopy = {
@@ -393,42 +400,6 @@ const getNexusApiKey = async () => {
     throw new Error("Conecte uma chave pessoal Nexus antes de continuar.");
   }
   return apiKey;
-};
-
-const getSpotifyAuthManager = () => {
-  if (spotifyAuthManager) return spotifyAuthManager;
-  const tokenPath = path.join(app.getPath("userData"), "spotify-session.bin");
-  // Cache em memória para evitar leituras repetidas de disco
-  let _cachedToken = undefined;
-  const credentialStore = {
-    read: async () => {
-      if (_cachedToken !== undefined) return _cachedToken;
-      try {
-        if (!safeStorage.isEncryptionAvailable()) return (_cachedToken = null);
-        const buf = await fs.promises.readFile(tokenPath).catch(() => null);
-        if (!buf) return (_cachedToken = null);
-        _cachedToken = JSON.parse(safeStorage.decryptString(buf));
-        return _cachedToken;
-      } catch {
-        return (_cachedToken = null);
-      }
-    },
-    write: async (value) => {
-      if (!safeStorage.isEncryptionAvailable()) return;
-      _cachedToken = value;
-      await fs.promises.mkdir(path.dirname(tokenPath), { recursive: true });
-      const encrypted = safeStorage.encryptString(JSON.stringify(value));
-      const tmpPath = `${tokenPath}.tmp`;
-      await fs.promises.writeFile(tmpPath, encrypted);
-      await fs.promises.rename(tmpPath, tokenPath);
-    },
-    clear: async () => {
-      _cachedToken = null;
-      try { await fs.promises.rm(tokenPath, { force: true }); } catch { /* ignore */ }
-    },
-  };
-  spotifyAuthManager = createSpotifyAuthManager({ BrowserWindow, credentialStore });
-  return spotifyAuthManager;
 };
 
 const getNexusDownloadRoot = () =>
@@ -1352,9 +1323,8 @@ const createOverlayWindow = () => {
       preload: path.join(__dirname, "overlay-preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       backgroundThrottling: false,
-      webSecurity: false,
     },
   });
 
@@ -1818,21 +1788,6 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       error: String(payload.chat.error || "").slice(0, 300),
       messages,
     } : null,
-    spotify: {
-      status: ["loading", "unconfigured", "unsupported", "disconnected", "connecting", "ready", "error"].includes(payload?.spotify?.status)
-        ? payload.spotify.status
-        : "disconnected",
-      remoteMode: Boolean(payload?.spotify?.remoteMode),
-      paused: payload?.spotify?.paused !== false,
-      positionMs: Math.max(0, Number(payload?.spotify?.positionMs) || 0),
-      durationMs: Math.max(0, Number(payload?.spotify?.durationMs) || 0),
-      track: payload?.spotify?.track ? {
-        id: String(payload.spotify.track.id || "").slice(0, 128),
-        title: String(payload.spotify.track.title || "").slice(0, 180),
-        artist: String(payload.spotify.track.artist || "").slice(0, 180),
-        coverUrl: sanitizeOverlayImageSource(payload.spotify.track.coverUrl),
-      } : null,
-    },
     profile: {
       name: String(payload?.profile?.name || "Jogador").slice(0, 80),
       avatar: sanitizeOverlayImageSource(payload?.profile?.avatar),
@@ -1957,15 +1912,6 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       `$shell = New-Object -ComObject WScript.Shell; $shell.SendKeys([char]${keyCode})`,
     ], { windowsHide: true }, () => undefined);
     return;
-  }
-  if (["spotify-toggle", "spotify-next", "spotify-previous", "spotify-seek", "spotify-volume"].includes(kind)) {
-    const payload = { kind };
-    if (kind === "spotify-seek") payload.positionMs = Math.max(0, Number(action?.positionMs) || 0);
-    if (kind === "spotify-volume") payload.volume = Math.max(0, Math.min(1, Number(action?.volume) || 0));
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("overlay:panel-action", payload);
-    }
-    return { ok: true };
   }
   if (["select-chat", "close-chat", "send-message", "send-image", "set-typing"].includes(kind)) {
     const payload = { kind };
@@ -3777,33 +3723,6 @@ registerSecureIpcHandler("overlay:show-friend-request", async (_event, payload) 
     friendId,
     contentKind,
   });
-});
-
-registerSecureIpcHandler("spotify:get-status", async () =>
-  getSpotifyAuthManager().getStatus());
-
-registerSecureIpcHandler("spotify:connect", async (_event, clientId) =>
-  getSpotifyAuthManager().connect(String(clientId || "").slice(0, 128)));
-
-registerSecureIpcHandler("spotify:disconnect", async () =>
-  getSpotifyAuthManager().disconnect());
-
-registerSecureIpcHandler("spotify:get-access-token", async (_event, clientId) => ({
-  accessToken: await getSpotifyAuthManager().getAccessToken(String(clientId || "").slice(0, 128)),
-}));
-
-registerSecureIpcHandler("overlay:show-spotify-track", async (_event, payload) => {
-  if (!inGameOverlayActive) return { shown: false };
-  const title = String(payload?.title || "").trim().slice(0, 180);
-  const artist = String(payload?.artist || "").trim().slice(0, 180);
-  if (!title) return { shown: false };
-  sendOverlayEvent("overlay:social", {
-    kind: "spotify-track",
-    title,
-    description: artist || "Spotify",
-    avatarUrl: sanitizeOverlayImageSource(payload?.coverUrl) || overlayIconUrl(),
-  });
-  return { shown: true };
 });
 
 registerSecureIpcHandler("mods:detect-conflicts", async (_event, manifestRoot) => {

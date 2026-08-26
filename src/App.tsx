@@ -69,7 +69,6 @@ const AppContent: React.FC = () => {
   const musicVolumeRef = React.useRef(musicVolume);
   const musicTransitionRef = React.useRef(0);
   const completedIntroUserRef = React.useRef<string | null>(null);
-  const spotifyPlayingRef = React.useRef(false);
   const {
     release: whatsNewRelease,
     dismiss: dismissWhatsNew,
@@ -167,7 +166,6 @@ const AppContent: React.FC = () => {
   }, [resolveActiveMusic]);
 
   const startBackgroundMusic = React.useCallback(async () => {
-    if (spotifyPlayingRef.current) return;
     if (lowPerformanceMode) return;
     if (document.hidden || !document.hasFocus()) {
       pendingMusicStartRef.current = true;
@@ -175,12 +173,10 @@ const AppContent: React.FC = () => {
     }
     const audio = await ensureMusicSource();
     if (!audio) return;
-    if (spotifyPlayingRef.current) return;
 
     if (musicAudioContextRef.current?.state === "suspended") {
       await musicAudioContextRef.current.resume().catch(() => {});
     }
-    if (spotifyPlayingRef.current) return;
 
     if (!audio.paused) return;
     audio.volume = 0;
@@ -245,26 +241,6 @@ const AppContent: React.FC = () => {
       audio.currentTime = 0;
     });
   }, [fadeMusicTo]);
-
-  const pauseBackgroundMusicForSpotify = React.useCallback(() => {
-    clearMusicFade();
-    pendingMusicStartRef.current = false;
-    musicRef.current?.pause();
-  }, [clearMusicFade]);
-
-  React.useEffect(() => {
-    const handleSpotifyPlayback = (event: Event) => {
-      const playing = Boolean((event as CustomEvent<{ playing?: boolean }>).detail?.playing);
-      spotifyPlayingRef.current = playing;
-      if (playing) {
-        pauseBackgroundMusicForSpotify();
-      } else if (user?.uid && isIntroVisible === false) {
-        void startBackgroundMusic();
-      }
-    };
-    window.addEventListener("checkpoint:spotify-playback", handleSpotifyPlayback);
-    return () => window.removeEventListener("checkpoint:spotify-playback", handleSpotifyPlayback);
-  }, [isIntroVisible, pauseBackgroundMusicForSpotify, startBackgroundMusic, user?.uid]);
 
   React.useEffect(() => {
     if (lowPerformanceMode) {

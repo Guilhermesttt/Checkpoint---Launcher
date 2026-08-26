@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isBackendHealthy } from "../services/api";
 import {
   disconnectSteamAccount,
@@ -40,6 +40,32 @@ export function useAccountConnections({
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
   const [steamSyncing, setSteamSyncing] = useState(false);
+
+  const steamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const steamFocusRef = useRef<(() => void) | null>(null);
+  const discordIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const discordFocusRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (steamIntervalRef.current) {
+        clearInterval(steamIntervalRef.current);
+        steamIntervalRef.current = null;
+      }
+      if (steamFocusRef.current) {
+        window.removeEventListener("focus", steamFocusRef.current);
+        steamFocusRef.current = null;
+      }
+      if (discordIntervalRef.current) {
+        clearInterval(discordIntervalRef.current);
+        discordIntervalRef.current = null;
+      }
+      if (discordFocusRef.current) {
+        window.removeEventListener("focus", discordFocusRef.current);
+        discordFocusRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSyncSteam = async () => {
     if (!userUid || !resolvedSteamId) {
@@ -100,8 +126,10 @@ export function useAccountConnections({
             attempts++;
             const prof = await refreshProfile();
             if (prof?.steamId || attempts >= maxAttempts) {
-              clearInterval(intervalId);
-              window.removeEventListener("focus", onFocus);
+              if (steamIntervalRef.current) clearInterval(steamIntervalRef.current);
+              steamIntervalRef.current = null;
+              if (steamFocusRef.current) window.removeEventListener("focus", steamFocusRef.current);
+              steamFocusRef.current = null;
               setSteamConnecting(false);
             }
           };
@@ -110,10 +138,11 @@ export function useAccountConnections({
             void checkSteam();
           };
 
-          const intervalId = setInterval(checkSteam, 1500);
+          steamIntervalRef.current = setInterval(checkSteam, 1500);
+          steamFocusRef.current = onFocus;
           window.addEventListener("focus", onFocus);
         } else {
-          window.location.href = url;
+          window.open(url, "_blank");
         }
       } catch (e) {
         notify(e instanceof Error ? e.message : "Não foi possível conectar com a Steam.", "error");
@@ -147,8 +176,10 @@ export function useAccountConnections({
             attempts++;
             const prof = await refreshProfile();
             if (prof?.discordId || attempts >= maxAttempts) {
-              clearInterval(intervalId);
-              window.removeEventListener("focus", onFocus);
+              if (discordIntervalRef.current) clearInterval(discordIntervalRef.current);
+              discordIntervalRef.current = null;
+              if (discordFocusRef.current) window.removeEventListener("focus", discordFocusRef.current);
+              discordFocusRef.current = null;
               setDiscordConnecting(false);
             }
           };
@@ -157,10 +188,11 @@ export function useAccountConnections({
             void checkDiscord();
           };
 
-          const intervalId = setInterval(checkDiscord, 1500);
+          discordIntervalRef.current = setInterval(checkDiscord, 1500);
+          discordFocusRef.current = onFocus;
           window.addEventListener("focus", onFocus);
         } else {
-          window.location.href = url;
+          window.open(url, "_blank");
         }
       } catch (e) {
         notify(e instanceof Error ? e.message : "Não foi possível conectar com o Discord.", "error");

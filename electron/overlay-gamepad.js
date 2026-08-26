@@ -30,7 +30,6 @@
     cancelFrame,
     now,
     isPanelOpen,
-    isSpotifyActive,
     actions,
   }) => {
     const previous = new Map();
@@ -51,8 +50,6 @@
       else if (name === "B") actions.goBack();
       else if (name === "L1") actions.switchTab(-1);
       else if (name === "R1") actions.switchTab(1);
-      else if (name === "L2" && isSpotifyActive()) actions.spotifyTrack(-1);
-      else if (name === "R2" && isSpotifyActive()) actions.spotifyTrack(1);
     };
 
     const updateEdge = (key, pressed, action) => {

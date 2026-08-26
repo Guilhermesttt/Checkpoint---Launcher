@@ -75,7 +75,7 @@ export function useGameLibraryView({
 
   const continuePlayingGames = useMemo(
     () =>
-      [...games]
+      games
         .filter((game) => Boolean(game.lastPlayedAt || game.steamLastPlayedAt || game.hoursPlayed))
         .sort((a, b) => {
           const aPlayed = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
@@ -89,7 +89,7 @@ export function useGameLibraryView({
 
   const favoriteShowcaseGames = useMemo(
     () =>
-      [...games]
+      games
         .filter((game) => game.isFavorite)
         .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a))
         .slice(0, 4),

@@ -29,7 +29,7 @@ import {
 } from "./animated/SidebarIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSteam, faDiscord, faSpotify, faXbox } from "@fortawesome/free-brands-svg-icons";
+import { faSteam, faDiscord, faXbox } from "@fortawesome/free-brands-svg-icons";
 import {
   PHERIELIUM_LOGO_PATH,
   EPIC_GAMES_ICON_PATH,
@@ -41,7 +41,7 @@ import {
   ROCKSTAR_ICON_PATH,
 } from "../constants/assets";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
-import { usePreferences, type LauncherLanguage } from "../context/PreferencesContext";
+import { type LauncherLanguage } from "../context/PreferencesContext";
 import {
   SIDEBAR_NAVIGATION_GROUPS,
   SIDEBAR_NAVIGATION_ORDER,
@@ -53,17 +53,6 @@ export const SteamBrandIcon: React.FC<{ className?: string; style?: React.CSSPro
 }) => (
   <FontAwesomeIcon
     icon={faSteam}
-    className={className}
-    style={style as React.ComponentProps<typeof FontAwesomeIcon>["style"]}
-  />
-);
-
-export const SpotifyBrandIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
-  className,
-  style,
-}) => (
-  <FontAwesomeIcon
-    icon={faSpotify}
     className={className}
     style={style as React.ComponentProps<typeof FontAwesomeIcon>["style"]}
   />
@@ -559,7 +548,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     FAVORITES: { "pt-BR": "Favoritos", "en-US": "Favorites", "es-ES": "Favoritos", "fr-FR": "Favoris", "de-DE": "Favoriten", "it-IT": "Preferiti" }[language],
     FRIENDS: { "pt-BR": "Amigos", "en-US": "Friends", "es-ES": "Amigos", "fr-FR": "Amis", "de-DE": "Freunde", "it-IT": "Amici" }[language],
     FEED: { "pt-BR": "Radar Gamer", "en-US": "Gaming Radar", "es-ES": "Radar Gamer", "fr-FR": "Radar Gamer", "de-DE": "Gaming Radar", "it-IT": "Radar Gamer" }[language],
-    SPOTIFY: "Spotify",
     MODS: "Gerenciador de Mods",
     STEAM: "Steam",
     EPIC: "Epic Games",
@@ -571,7 +559,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     filters: { "pt-BR": "MENU", "en-US": "MENU", "es-ES": "MENÚ", "fr-FR": "MENU", "de-DE": "MENÜ", "it-IT": "MENU" }[language],
     platforms: { "pt-BR": "PLATAFORMAS", "en-US": "PLATFORMS", "es-ES": "PLATAFORMAS", "fr-FR": "PLATEFORMES", "de-DE": "PLATTFORMEN", "it-IT": "PIATTAFORME" }[language],
     community: { "pt-BR": "SOCIAL", "en-US": "SOCIAL", "es-ES": "SOCIAL", "fr-FR": "SOCIAL", "de-DE": "SOZIAL", "it-IT": "SOCIAL" }[language],
-    music: { "pt-BR": "MÚSICA", "en-US": "MUSIC", "es-ES": "MÚSICA", "fr-FR": "MUSIQUE", "de-DE": "MUSIK", "it-IT": "MUSICA" }[language],
     mods: { "pt-BR": "FERRAMENTAS", "en-US": "TOOLS", "es-ES": "HERRAMIENTAS", "fr-FR": "OUTILS", "de-DE": "WERKZEUGE", "it-IT": "STRUMENTI" }[language],
   };
 

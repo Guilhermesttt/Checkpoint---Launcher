@@ -3335,7 +3335,6 @@
       if (kind === "friend-accepted") return overlayT("requestAccepted");
       if (kind === "friend-playing") return overlayT("friendPlayingBadge");
       if (kind === "friend-message" || kind === "message") return overlayT(contentKind === "image" ? "newImage" : "newMessage");
-      if (kind === "spotify-track") return overlayT("nowPlaying");
       return "PHELIERIUM";
     };
 
@@ -3636,11 +3635,8 @@
       renderCaptureViewer();
     };
 
-    const renderSpotifyState = () => {};
-
     const renderPanelState = (state = {}) => {
       latestPanelState = state;
-      renderSpotifyState(state.spotify);
       applyAchievementPosition(state.settings?.achievementNotificationPosition);
       const achievementSetting = document.getElementById("setting-achievements");
       if (achievementSetting) {
@@ -4152,7 +4148,6 @@
       cancelFrame: (handle) => cancelAnimationFrame(handle),
       now: () => performance.now(),
       isPanelOpen: () => commandPanel?.classList.contains("is-open"),
-      isSpotifyActive: () => false,
       actions: {
         togglePanel: () => window.achievementOverlay.panelAction({ kind: "toggle", source: "gamepad" }),
         moveFocus: moveGamepadFocus,
@@ -4166,7 +4161,6 @@
           else window.achievementOverlay.panelAction({ kind: "close" });
         },
         switchTab: switchGamepadTab,
-        spotifyTrack: () => {},
         onGamepadInput: () => {
           document.body.classList.add("gamepad-navigation");
           if (commandPanel?.classList.contains("is-open") && !isGamepadFocusable(gamepadFocusedElement)) {

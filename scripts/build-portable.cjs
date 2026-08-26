@@ -84,7 +84,14 @@ const buildPortable = () => {
     console.warn("[build-portable] AVISO: Não foi possível carregar o arquivo .env:", e.message);
   }
 
-  process.env.VITE_BACKEND_URL = process.env.VITE_BACKEND_URL || "https://checkpoint-launcher.onrender.com";
+  if (
+    !process.env.VITE_BACKEND_URL ||
+    process.env.VITE_BACKEND_URL.includes("localhost") ||
+    process.env.VITE_BACKEND_URL.includes("127.0.0.1") ||
+    process.env.VITE_BACKEND_URL.includes("0.0.0.0")
+  ) {
+    process.env.VITE_BACKEND_URL = "https://checkpoint-launcher.onrender.com";
+  }
   run(process.execPath, [path.join(projectRoot, "node_modules", "vite", "bin", "vite.js"), "build"]);
   cleanReleaseDirectories();
 

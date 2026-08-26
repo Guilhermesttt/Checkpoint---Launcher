@@ -638,38 +638,6 @@ body.low-performance::before {
   display: none !important;
 }
 
-/* Scroll discreto usado nas superfícies do Spotify. */
-.spotify-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(30, 215, 96, 0.45) rgba(255, 255, 255, 0.04);
-}
-
-.spotify-scrollbar::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-.spotify-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 999px;
-}
-
-.spotify-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(30, 215, 96, 0.45);
-  border-radius: 999px;
-}
-
-.spotify-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(30, 215, 96, 0.7);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .spotify-cover-card {
-    transform: none !important;
-    transition: none !important;
-  }
-}
-
 @keyframes pixel-on {
   0%, 100% {
     opacity: 0.12;

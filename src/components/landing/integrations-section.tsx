@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSteam, faDiscord, faSpotify, faXbox } from "@fortawesome/free-brands-svg-icons";
+import { faSteam } from "@fortawesome/free-brands-svg-icons";
 import { PHERIELIUM_LOGO_PATH, EPIC_GAMES_ICON_PATH } from "../../constants/assets";
 
 const integrations = [

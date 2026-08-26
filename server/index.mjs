@@ -179,7 +179,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://sdk.scdn.co"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
@@ -191,7 +191,6 @@ app.use(
           "https://*.livekit.cloud",
           "wss://*.livekit.cloud",
           "https://api.nexusmods.com",
-          "https://api.spotify.com",
           "https://steamcommunity.com",
           "https://checkpoint-launcher.onrender.com",
           "http://localhost:*",
@@ -199,7 +198,7 @@ app.use(
           "http://127.0.0.1:*",
           "ws://127.0.0.1:*",
         ],
-        frameSrc: ["'self'", "https://sdk.scdn.co"],
+        frameSrc: ["'self'"],
         objectSrc: ["'none'"],
       },
     },
@@ -1577,14 +1576,14 @@ app.get("/api/voice/turn-credentials", steamPrivateLimiter, requireFirebaseUser,
   }
 });
 
-app.post("/api/voice/livekit-token", steamPrivateLimiter, async (req, res) => {
+app.post("/api/voice/livekit-token", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
   try {
-    const { roomName, identity, name, metadata } = req.body || {};
-    const effectiveIdentity = String(identity || "").trim();
+    const { roomName, name, metadata } = req.body || {};
     const effectiveRoom = String(roomName || "").trim();
+    const uid = req.firebaseUser.uid;
 
-    if (!effectiveRoom || !effectiveIdentity) {
-      return res.status(400).json({ error: "roomName e identity são obrigatórios." });
+    if (!effectiveRoom) {
+      return res.status(400).json({ error: "roomName é obrigatório." });
     }
 
     const apiKey = (process.env.LIVEKIT_API_KEY || "").trim();
@@ -1596,8 +1595,8 @@ app.post("/api/voice/livekit-token", steamPrivateLimiter, async (req, res) => {
     }
 
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: effectiveIdentity,
-      name: String(name || effectiveIdentity),
+      identity: uid,
+      name: String(name || req.firebaseUser.name || uid),
       metadata: typeof metadata === "string" ? metadata : JSON.stringify(metadata || {}),
       ttl: "24h",
     });
@@ -1614,7 +1613,7 @@ app.post("/api/voice/livekit-token", steamPrivateLimiter, async (req, res) => {
     return res.json({ token, serverUrl: livekitUrl });
   } catch (err) {
     console.error("[LiveKit Token Endpoint Error]", err);
-    return res.status(500).json({ error: err?.message || "Falha ao gerar token LiveKit." });
+    return res.status(500).json({ error: "Falha ao gerar token LiveKit." });
   }
 });
 
@@ -2207,11 +2206,23 @@ app.get("/api/proxy/image", steamPublicLimiter, async (req, res) => {
     if (!upstream.ok) return res.status(502).end();
     const ct = upstream.headers.get("content-type") || "image/jpeg";
     if (!ct.startsWith("image/")) return res.status(502).end();
+    const contentLength = Number(upstream.headers.get("content-length") || 0);
+    if (contentLength > 10 * 1024 * 1024) return res.status(413).end();
     res.set("Content-Type", ct);
     res.set("Cache-Control", "public, max-age=86400");
     res.set("Access-Control-Allow-Origin", "*");
-    const buf = await upstream.arrayBuffer();
-    return res.send(Buffer.from(buf));
+    const MAX_PROXY_BYTES = 10 * 1024 * 1024;
+    const chunks = [];
+    let totalBytes = 0;
+    const reader = upstream.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.length;
+      if (totalBytes > MAX_PROXY_BYTES) { reader.cancel(); return res.status(413).end(); }
+      chunks.push(value);
+    }
+    return res.send(Buffer.concat(chunks.map((c) => Buffer.from(c))));
   } catch {
     return res.status(502).end();
   }

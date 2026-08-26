@@ -2277,7 +2277,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         lastProcessedInviteKeyRef.current = inviteKey;
         lastInviteTimestampRef.current = now;
 
-        if (callState === "idle") {
+        if (callStateRef.current === "idle") {
           setIncomingInvite(invite);
           setCallState("ringing-in");
           playRingtone("call");
@@ -2309,7 +2309,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
       },
       onEnd: () => {
-        if (callState !== "idle") {
+        if (callStateRef.current !== "idle") {
           notify("Chamada finalizada.", "info");
           playRingtone("disconnect");
           cleanUpCall();
@@ -2320,7 +2320,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     return () => {
       unsubscribe();
     };
-  }, [callState, cleanUpCall, notify, playRingtone, stopRingtone, user?.uid]);
+  }, [cleanUpCall, notify, playRingtone, stopRingtone, user?.uid]);
 
   // INITIATE CALL (1:1 Friend Call) - LiveKit SFU Primary
   const startCall = useCallback(
@@ -2350,7 +2350,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
             chatId,
             friendUid,
             friendName: friend.name,
-            friendAvatar: friend.avatar,
             hasVideo: withVideo,
             timestamp: Date.now(),
           }));
@@ -2483,6 +2482,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   // ANSWER CALL (Callee 1:1) - LiveKit SFU Primary
   const answerCall = useCallback(async () => {
     stopRingtone();
+    if (callDurationTimerRef.current) {
+      window.clearInterval(callDurationTimerRef.current);
+      callDurationTimerRef.current = null;
+    }
     const invite = incomingInvite || incomingInviteRef.current;
     const currentState = callStateRef.current || callState;
     if (!user?.uid || !invite) {
@@ -2521,7 +2524,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           chatId,
           friendUid: callerId,
           friendName: callerName,
-          friendAvatar: callerAvatar || undefined,
           hasVideo: Boolean(hasVideo),
           timestamp: Date.now(),
         }));
@@ -2842,7 +2844,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     const fakeFriend: SocialFriend = {
       id: `cp-friend:${targetSession.friendUid}`,
       name: targetSession.friendName,
-      avatar: targetSession.friendAvatar || "",
+      avatar: "",
       status: "online",
       source: "checkpoint",
     };
@@ -2875,7 +2877,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         });
       }
     }
-  }, [isDeafened, session?.chatId, user?.uid]);
+  }, [isDeafened, session?.chatId, user?.uid, playSfx, sfxMute, sfxUnmute, sendCallState]);
 
   // DEAFEN / UNDEAFEN (MUTE ALL / SOM & MIC)
   const toggleDeafen = useCallback(() => {
@@ -2895,13 +2897,13 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           senderId: user.uid,
           chatId: session.chatId,
           isDeafened: nextDeafened,
-          isMuted: nextDeafened ? true : isMuted,
+          isMuted: nextDeafened ? true : isMutedRef.current,
         });
       }
 
       return nextDeafened;
     });
-  }, [isMuted, session?.chatId, user?.uid]);
+  }, [session?.chatId, user?.uid]);
 
   // TOGGLE CAMERA
   const toggleCamera = useCallback(async () => {

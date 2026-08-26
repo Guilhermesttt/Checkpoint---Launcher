@@ -1610,7 +1610,6 @@ const Home: React.FC = () => {
     if (!silent) playSound("back");
     setIsAddModalOpen(false);
     setEditingGame(null);
-    setGames((p) => p);
   };
 
   // Correção 4: Adição das listas de IDs calculadas para o AddFriendModal
@@ -1629,6 +1628,10 @@ const Home: React.FC = () => {
       (request) => request.uid,
     );
   }, [userProfile?.checkpointFriendRequestsOutgoing]);
+
+  const friendIdSet = useMemo(() => new Set(checkpointFriendIds), [checkpointFriendIds]);
+  const outgoingRequestIdSet = useMemo(() => new Set(outgoingFriendRequestIds), [outgoingFriendRequestIds]);
+  const incomingRequestIdSet = useMemo(() => new Set(incomingFriendRequestIds), [incomingFriendRequestIds]);
 
   return (
     <div
@@ -2203,9 +2206,9 @@ const Home: React.FC = () => {
         onAddFriend={handleAddCheckpointFriend}
         onViewProfile={(profile) => void handleViewSearchedProfile(profile)}
         currentUserUid={user?.uid ?? ""}
-        friendIds={new Set(checkpointFriendIds)}
-        outgoingRequestIds={new Set(outgoingFriendRequestIds)}
-        incomingRequestIds={new Set(incomingFriendRequestIds)}
+        friendIds={friendIdSet}
+        outgoingRequestIds={outgoingRequestIdSet}
+        incomingRequestIds={incomingRequestIdSet}
         playSound={playSound}
         t={t}
       />
