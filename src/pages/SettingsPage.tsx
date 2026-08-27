@@ -1284,14 +1284,14 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                   <motion.div
                     animate={hapticsEnabled ? { x: [0, -1.2, 1.2, -1.2, 0], rotate: [0, -1, 1, -1, 0] } : { x: 0, rotate: 0 }}
                     transition={hapticsEnabled ? { duration: 0.45, repeat: Infinity, repeatDelay: 2.2, ease: "easeInOut" } : { duration: 0.2 }}
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border will-change-transform transform-gpu ${hapticsEnabled ? "bg-emerald-500/15 border-emerald-400/25 text-emerald-300" : "bg-white/[0.04] border-white/10 text-white/30"}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border will-change-transform transform-gpu ${hapticsEnabled ? "bg-white/10 border-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]" : "bg-white/[0.04] border-white/10 text-white/30"}`}
                   >
                     <Gamepad2 className="h-4.5 w-4.5" />
                   </motion.div>
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white whitespace-nowrap flex items-center gap-2">
                       {t("hapticsEnabled")}
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider border ${hapticsEnabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/20" : "bg-white/[0.04] text-white/35 border-white/10"}`}>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider border ${hapticsEnabled ? "bg-white/10 text-white/90 border-white/20" : "bg-white/[0.04] text-white/35 border-white/10"}`}>
                         {hapticsEnabled ? "Ligada" : "Desligada"}
                       </span>
                     </p>
