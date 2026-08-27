@@ -1,6 +1,6 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 
 interface ShinyButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode
@@ -45,11 +45,11 @@ export function ShinyButton({
         }
 
         .shiny-cta {
-          --shiny-cta-bg: #08090C;
-          --shiny-cta-bg-subtle: rgba(255, 255, 255, 0.12);
+          --shiny-cta-bg: #000000;
+          --shiny-cta-bg-subtle: #1a1818;
           --shiny-cta-fg: #ffffff;
-          --shiny-cta-highlight: var(--game-color, rgba(255, 255, 255, 0.85));
-          --shiny-cta-highlight-subtle: var(--game-color, rgba(255, 255, 255, 0.4));
+          --shiny-cta-highlight: var(--game-color, blue);
+          --shiny-cta-highlight-subtle: var(--game-color, #8484ff);
           --animation: gradient-angle linear infinite;
           --duration: 3s;
           --shadow-size: 2px;
@@ -60,9 +60,9 @@ export function ShinyButton({
           overflow: hidden;
           cursor: pointer;
           outline-offset: 4px;
-          padding: 0.85rem 2rem;
+          padding: 1.25rem 2.5rem;
           font-family: inherit;
-          font-size: 0.85rem;
+          font-size: 1.125rem;
           line-height: 1.2;
           font-weight: 800;
           letter-spacing: 0.08em;
@@ -79,9 +79,9 @@ export function ShinyButton({
               var(--shiny-cta-highlight) calc(var(--gradient-percent) * 3),
               transparent calc(var(--gradient-percent) * 4)
             ) border-box;
-          box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle), 0 10px 30px rgba(0, 0, 0, 0.7);
+          box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle);
           transition: var(--transition);
-          transition-property: --gradient-angle-offset, --gradient-percent, --gradient-shine, transform, box-shadow;
+          transition-property: --gradient-angle-offset, --gradient-percent, --gradient-shine;
         }
 
         .shiny-cta::before,
@@ -177,8 +177,6 @@ export function ShinyButton({
           --gradient-percent: 20%;
           --gradient-angle-offset: 95deg;
           --gradient-shine: var(--shiny-cta-highlight-subtle);
-          box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle), 0 0 35px var(--shiny-cta-highlight), 0 14px 36px rgba(0, 0, 0, 0.8);
-          transform: scale(1.03);
         }
 
         .shiny-cta:is(:hover, :focus-visible),

@@ -382,8 +382,8 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
   };
 
   const iconStyle = {
-    color: active ? "#ffffff" : "rgba(255,255,255,0.45)",
-    filter: active ? "drop-shadow(0 0 6px rgba(255,255,255,0.6))" : "none",
+    color: active ? "rgb(var(--launcher-accent))" : "rgba(255,255,255,0.45)",
+    filter: active ? "drop-shadow(0 0 6px rgb(var(--launcher-accent) / 0.55))" : "none",
   };
 
   const buttonContent = (
@@ -399,9 +399,9 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
         ${isExpanded ? "w-full h-11 px-3.5 gap-3.5 rounded-2xl text-left" : "h-12 w-12 justify-center rounded-2xl"}
         ${!active ? "hover:bg-white/[0.05]" : ""}`}
       style={{
-        background: active ? "rgba(255, 255, 255, 0.08)" : "transparent",
+        background: active ? "rgb(var(--launcher-accent) / 0.13)" : "transparent",
         boxShadow: active
-          ? "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.15)"
+          ? "0 4px 20px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgb(var(--launcher-accent) / 0.22)"
           : "none",
       }}
     >
@@ -409,7 +409,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
       {active && (
         <motion.div
           layoutId="sb-active"
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-5 rounded-r-full shadow-[0_0_10px_rgba(255,255,255,0.85)] bg-white"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-5 rounded-r-full bg-[rgb(var(--launcher-accent))] shadow-[0_0_10px_rgb(var(--launcher-accent)/0.7)]"
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         />
       )}
@@ -442,7 +442,7 @@ const SidebarButton: React.FC<SidebarButtonProps> = ({
         <div className="flex flex-1 items-center justify-between min-w-0">
           <span
             className={`truncate text-[13px] font-body transition-colors duration-200 ${
-              active ? "text-white font-semibold" : "text-white/60 group-hover:text-white"
+              active ? "text-[rgb(var(--launcher-accent))] font-semibold" : "text-white/60 group-hover:text-white"
             }`}
           >
             {label}
@@ -569,19 +569,19 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <motion.aside
-      initial={{ x: -80, opacity: 0 }}
+      initial={{ x: -48, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed left-3.5 top-3.5 bottom-3.5 z-50 flex flex-col pointer-events-none transition-all duration-300 ease-out"
+      transition={{ duration: 0.48, ease: [0.32, 0.72, 0, 1] }}
+      className="fixed left-3.5 top-3.5 bottom-3.5 z-50 flex flex-col pointer-events-none hub-60fps transition-[width] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform transform-gpu"
       style={{ width: isExpanded ? 240 : 80 }}
     >
       <div
-        className="pointer-events-auto flex-1 flex flex-col py-4 px-2.5 min-h-0 rounded-[32px] border border-white/[0.06]"
+        className="pointer-events-auto flex-1 flex flex-col py-4 px-2.5 min-h-0 rounded-[32px] border border-white/[0.08]"
         style={{
-          background: "rgba(10, 11, 15, 0.45)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
-          backdropFilter: "blur(32px)",
-          WebkitBackdropFilter: "blur(32px)",
+          background: "rgba(12, 14, 20, 0.26)",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
         }}
       >
         {/* Cabeçalho Topo - Clicar no Logo abre/fecha a sidebar */}

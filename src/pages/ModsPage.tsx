@@ -18,6 +18,7 @@ import {
 import type { Game } from "../types/domain";
 import { usePreferences } from "../context/PreferencesContext";
 import { useSoundEffects } from "../hooks/useSoundEffects";
+import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import ModGameDetailPanel, {
   type InstalledModEntry,
@@ -81,6 +82,13 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [sortOrder, setSortOrder] = useState<"AZ" | "ZA" | "MODS">("AZ");
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  useGamepadNavigation({
+    scrollRef: scrollRef as React.RefObject<HTMLElement>,
+    enabled: !selectedGame,
+    disableX: true,
+    disableO: true,
+  });
 
   const [gameFolders, setGameFolders] = useState<Record<string, string>>(() =>
     readRecord<string>(storageKeys.folders(uid)),
@@ -229,7 +237,11 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
     .filter((m) => m.enabled).length;
 
   return (
-    <div className="flex flex-col min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-4 font-sans select-none thin-scrollbar">
+    <div
+      ref={scrollRef}
+      data-system-page
+      className="flex flex-col min-h-0 flex-1 overflow-y-auto px-8 pb-16 pt-4 font-sans select-none thin-scrollbar hub-scroll"
+    >
       <div className="mx-auto w-full max-w-7xl space-y-6">
         {/* Top Header Breadcrumb */}
         <div className="flex items-center gap-2 text-xs font-body font-semibold tracking-widest text-white/40 uppercase">
@@ -313,6 +325,8 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                   <input
                     type="text"
+                    data-gamepad-id="mods-search"
+                    data-gamepad-nav-down="mods-category"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Buscar jogos..."
@@ -323,6 +337,9 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <select
+                      data-gamepad-id="mods-category"
+                      data-gamepad-nav-up="mods-search"
+                      data-gamepad-nav-down="mods-status"
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
                       className="h-10 px-4 pr-8 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs font-body font-semibold text-white/80 focus:outline-none focus:border-white/25 cursor-pointer appearance-none"
@@ -334,6 +351,9 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
 
                   <div className="relative">
                     <select
+                      data-gamepad-id="mods-status"
+                      data-gamepad-nav-up="mods-category"
+                      data-gamepad-nav-down="mods-sort"
                       value={statusFilter}
                       onChange={(e) => setStatusFilter(e.target.value)}
                       className="h-10 px-4 pr-8 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs font-body font-semibold text-white/80 focus:outline-none focus:border-white/25 cursor-pointer appearance-none"
@@ -346,6 +366,9 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
 
                   <div className="relative">
                     <select
+                      data-gamepad-id="mods-sort"
+                      data-gamepad-nav-up="mods-status"
+                      data-gamepad-nav-down="mods-card-0"
                       value={sortOrder}
                       onChange={(e) => setSortOrder(e.target.value as any)}
                       className="h-10 px-4 pr-8 rounded-xl bg-white/[0.04] border border-white/[0.06] text-xs font-body font-semibold text-white/80 focus:outline-none focus:border-white/25 cursor-pointer appearance-none"
@@ -378,7 +401,7 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
 
               {/* Games Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                {filteredGames.map((game) => {
+                {filteredGames.map((game, index) => {
                   const gameMods = installedByGame[game.id] || [];
                   const activeMods = gameMods.filter((m) => m.enabled).length;
                   const artwork = getGameArtwork(game);
@@ -386,7 +409,15 @@ export const ModsPage: React.FC<ModsPageProps> = ({ uid, games }) => {
                   return (
                     <div
                       key={game.id}
-                      className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-3.5 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between"
+                      data-gamepad-id={`mods-card-${index}`}
+                      data-gamepad-nav-up={index < 4 ? "mods-sort" : `mods-card-${index - 4}`}
+                      data-gamepad-nav-down={index + 4 < filteredGames.length ? `mods-card-${index + 4}` : undefined}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Gerenciar mods de ${game.title}`}
+                      onClick={() => { playSound?.("select"); setSelectedGame(game); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); playSound?.("select"); setSelectedGame(game); } }}
+                      className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-3.5 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-white/60 data-[gamepad-focused=true]:border-white/30 cursor-pointer"
                     >
                       <div>
                         {/* Game Artwork Thumbnail */}

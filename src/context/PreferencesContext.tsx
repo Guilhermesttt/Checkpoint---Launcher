@@ -49,6 +49,8 @@ interface PreferencesContextValue {
   setRestoreLastScreen: (value: boolean) => void;
   confirmBeforeExit: boolean;
   setConfirmBeforeExit: (value: boolean) => void;
+  hapticsEnabled: boolean;
+  setHapticsEnabled: (value: boolean) => void;
   preferencesHydrated: boolean;
   t: (key: TranslationKey) => string;
 }
@@ -94,7 +96,9 @@ const translations = {
     confirmBeforeExit: "Confirmar antes de sair",
     confirmBeforeExitHint: "Pede confirmação antes de encerrar o aplicativo.",
     lowPerformanceMode: "Desativar Animações",
-    lowPerformanceModeHint: "Desativa animações e efeitos pesados para poupar CPU/GPU.",
+    lowPerformanceModeHint: "Desativa animações pesadas para poupar CPU/GPU.",
+    hapticsEnabled: "Vibração do controle",
+    hapticsEnabledHint: "Ativa o feedback háptico ao navegar e interagir com o controle. Desative se a luz ficar bugada.",
     openAtLogin: "Iniciar com o Windows",
     openAtLoginHint: "Inicia o launcher silenciosamente em segundo plano ao ligar o PC.",
     closeOnLaunch: "Ocultar ao Jogar",
@@ -236,6 +240,8 @@ const translations = {
     confirmBeforeExitHint: "Asks for confirmation before quitting the application.",
     lowPerformanceMode: "Disable Animations",
     lowPerformanceModeHint: "Disables heavy animations and effects to save CPU/GPU.",
+    hapticsEnabled: "Controller vibration",
+    hapticsEnabledHint: "Enables haptic feedback when navigating with the controller. Turn off if the lightbar glitches.",
     openAtLogin: "Start with Windows",
     openAtLoginHint: "Starts the launcher silently in the background on PC startup.",
     closeOnLaunch: "Hide on Launch",
@@ -377,6 +383,8 @@ const translations = {
     confirmBeforeExitHint: "Pide confirmación antes de cerrar la aplicación.",
     lowPerformanceMode: "Desactivar Animaciones",
     lowPerformanceModeHint: "Desactiva animaciones pesadas para ahorrar CPU/GPU.",
+    hapticsEnabled: "Vibración del mando",
+    hapticsEnabledHint: "Activa la respuesta háptica al navegar con el mando. Desactívala si la luz parpadea.",
     openAtLogin: "Iniciar con Windows",
     openAtLoginHint: "Inicia el launcher silenciosamente en segundo plano.",
     closeOnLaunch: "Ocultar al Jugar",
@@ -867,6 +875,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
   const [minimizeToTrayOnClose, setMinimizeToTrayOnClose] = useState(true);
   const [restoreLastScreen, setRestoreLastScreen] = useState(false);
   const [confirmBeforeExit, setConfirmBeforeExit] = useState(true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [hydratedPreferencesUid, setHydratedPreferencesUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -899,6 +908,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     const savedAchievementNotifications = readPreference(user.uid, "achievement_notifications");
     const savedCustomAchievementNotifications = readPreference(user.uid, "custom_achievement_notifications");
     const savedAchievementNotificationPosition = readPreference(user.uid, "achievement_notification_position");
+    const savedHapticsEnabled = readPreference(user.uid, "haptics_enabled");
 
     if (savedOpenAtLogin !== null) {
       const shouldOpenAtLogin = savedOpenAtLogin === "true";
@@ -926,6 +936,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     if (savedMinimizeToTray !== null) setMinimizeToTrayOnClose(savedMinimizeToTray === "true");
     if (savedRestoreLastScreen !== null) setRestoreLastScreen(savedRestoreLastScreen === "true");
     if (savedConfirmBeforeExit !== null) setConfirmBeforeExit(savedConfirmBeforeExit === "true");
+    if (savedHapticsEnabled !== null) setHapticsEnabled(savedHapticsEnabled === "true");
     if (savedAchievementNotifications !== null) {
       setAchievementNotificationsEnabled(savedAchievementNotifications === "true");
     }
@@ -1006,10 +1017,11 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
     writePreference(user.uid, "minimize_to_tray", String(minimizeToTrayOnClose));
     writePreference(user.uid, "restore_last_screen", String(restoreLastScreen));
     writePreference(user.uid, "confirm_before_exit", String(confirmBeforeExit));
+    writePreference(user.uid, "haptics_enabled", String(hapticsEnabled));
     writePreference(user.uid, "achievement_notifications", String(achievementNotificationsEnabled));
     writePreference(user.uid, "custom_achievement_notifications", String(customAchievementNotifications));
     writePreference(user.uid, "achievement_notification_position", achievementNotificationPosition);
-  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme]);
+  }, [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hapticsEnabled, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -1023,6 +1035,10 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       document.body.classList.remove("low-performance");
     }
   }, [visualTheme, lowPerformanceMode]);
+
+  useEffect(() => {
+    try { localStorage.setItem("checkpoint_haptics_enabled_global", String(hapticsEnabled)); } catch {}
+  }, [hapticsEnabled]);
 
   useEffect(() => {
     if (!user?.uid || hydratedPreferencesUid !== user.uid) return;
@@ -1088,6 +1104,8 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
       setRestoreLastScreen,
       confirmBeforeExit,
       setConfirmBeforeExit,
+      hapticsEnabled,
+      setHapticsEnabled,
       preferencesHydrated: hydratedPreferencesUid === user?.uid,
       t: (key) => {
         if (language === "pt-BR" || language === "en-US" || language === "es-ES") {
@@ -1100,7 +1118,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         );
       },
     }),
-    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme],
+    [achievementNotificationPosition, achievementNotificationsEnabled, achievementVolume, closeOnLaunch, confirmBeforeExit, customAchievementNotifications, effectsVolume, hapticsEnabled, hydratedPreferencesUid, language, lowPerformanceMode, minimizeToTrayOnClose, musicVolume, notificationVolume, openAtLogin, restoreLastScreen, soundTheme, user?.uid, visualTheme],
   );
 
   return (

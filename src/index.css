@@ -111,6 +111,12 @@ html[data-launcher-theme="sunset"] {
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --radius-card: 28px;
+  --radius-panel: 32px;
+  --radius-pill: 9999px;
+  --radius-control: 16px;
+  --sidebar-collapsed: 96px;
+  --sidebar-expanded: 272px;
 }
 
 .font-display,
@@ -189,6 +195,8 @@ html[data-launcher-theme="sunset"] {
   html {
     scroll-behavior: smooth;
     overflow-x: hidden;
+    scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -197,6 +205,9 @@ html[data-launcher-theme="sunset"] {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    overscroll-behavior: none;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -529,6 +540,23 @@ html[data-launcher-theme="sunset"] {
       0 16px 40px rgba(0, 0, 0, 0.5);
   }
 
+  /* ── Unified radius + elevation system ── */
+  .radius-card { border-radius: var(--radius-card); }
+  .radius-panel { border-radius: var(--radius-panel); }
+  .text-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  .text-meta {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+  }
+
   .shimmer {
     background: linear-gradient(90deg,
         rgba(255, 255, 255, 0) 0%,
@@ -540,6 +568,26 @@ html[data-launcher-theme="sunset"] {
 
   .will-change-transform {
     will-change: transform;
+  }
+
+  /* ── 60fps Console Hub ── */
+  .hub-60fps {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    contain: layout style;
+  }
+
+  .hub-scroll {
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+  }
+
+  .hub-card {
+    contain: layout paint style;
+    transform: translateZ(0);
+    backface-visibility: hidden;
   }
 
   .mod-list-item {

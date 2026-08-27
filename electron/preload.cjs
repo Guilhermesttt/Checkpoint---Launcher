@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   searchTheGamesDb: (request) => ipcRenderer.invoke("retro:search-thegamesdb", request),
   getTheGamesDbScreenshots: (request) => ipcRenderer.invoke("retro:thegamesdb-screenshots", request),
   getScreenSources: () => ipcRenderer.invoke("media:get-screen-sources"),
+  getLocalGameScreenshots: (request) => ipcRenderer.invoke("media:get-local-game-screenshots", request),
   selectModGameDirectory: (gameTitle) =>
     ipcRenderer.invoke("mods:select-game-directory", gameTitle),
   getNexusStatus: () => ipcRenderer.invoke("nexus:get-status"),
@@ -74,6 +75,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("system:exit-confirmation-requested", handler);
   },
   openExternalUrl: (url) => ipcRenderer.invoke("shell:open-external", url),
+  openPath: (path) => ipcRenderer.invoke("shell:open-path", path),
   copyToClipboard: (value) => ipcRenderer.invoke("system:copy-to-clipboard", value),
   scanLocalGames: () => ipcRenderer.invoke("game:scan-local"),
   listLocalGames: (uid) => ipcRenderer.invoke("library:list", uid),
@@ -115,6 +117,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on("overlay:panel-action", handler);
     return () => ipcRenderer.removeListener("overlay:panel-action", handler);
+  },
+  onOverlayHubInputLock: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("overlay:hub-input-lock", handler);
+    return () => ipcRenderer.removeListener("overlay:hub-input-lock", handler);
   },
   // ─ Auto-Updater APIs ────────────────────────────────────────────────────────
   getVersion: () => ipcRenderer.invoke("app:get-version"),

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Clock, Wifi, Scan } from "lucide-react";
+import { Clock } from "lucide-react";
 
 interface CallTelemetryLeftProps {
   duration: number;
@@ -166,37 +166,26 @@ export const CallTelemetryLeft: React.FC<CallTelemetryLeftProps> = ({
   isSpeaking,
   className = "",
 }) => {
-  const [latency, setLatency] = useState(18);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Natural subtle latency jitter between 16ms and 22ms
-      const nextLatency = 16 + Math.floor(Math.random() * 6);
-      setLatency(nextLatency);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
+  // Latência/codec hidden behind settings per audit — simplified to duration + quality only
   return (
     <div className={`flex flex-col gap-2.5 w-full max-w-[340px] select-none ${className}`}>
-      {/* Top Card: Qualidade da chamada */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-2xl px-4 py-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+      {/* Simplified Card: Excelente with green dot + waveform + duration — rounded-2xl p-3 bg-black/40 border border-white/10 */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl p-3 bg-black/40 border border-white/10 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
-            {/* 4 Signal bars */}
-            <div className="flex items-end gap-[2px] h-3.5">
-              <span className="w-[2.5px] h-1.5 rounded-full bg-emerald-400" />
-              <span className="w-[2.5px] h-2.2 rounded-full bg-emerald-400" />
-              <span className="w-[2.5px] h-3 rounded-full bg-emerald-400" />
-              <span className="w-[2.5px] h-3.5 rounded-full bg-emerald-400" />
-            </div>
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
           </div>
           <div className="flex flex-col leading-tight">
-            <span className="text-[9.5px] font-bold uppercase tracking-wider text-white/45 font-mono">
-              QUALIDADE DA CHAMADA
+            <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
+              Qualidade
             </span>
-            <span className="text-xs font-black tracking-wide text-emerald-400 font-sans mt-0.5">
-              EXCELENTE
+            <span className="text-xs font-bold tracking-wide text-emerald-400 flex items-center gap-1.5 mt-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Excelente
+            </span>
+            <span className="text-[10px] font-medium text-white/60 font-mono mt-1 tabular-nums flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-white/40" />
+              {formatDuration(duration)}
             </span>
           </div>
         </div>
@@ -204,48 +193,6 @@ export const CallTelemetryLeft: React.FC<CallTelemetryLeftProps> = ({
         {/* Live Audio Waveform */}
         <div className="w-24 sm:w-28 h-7 flex items-center justify-end overflow-hidden">
           <CallWaveformVisualizer stream={stream} isSpeaking={isSpeaking} />
-        </div>
-      </div>
-
-      {/* Bottom Card: Duração, Latência, Codec */}
-      <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-2xl px-4 py-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-        {/* Duração */}
-        <div className="flex items-center gap-2.5">
-          <Clock className="h-4.5 w-4.5 text-white/35 shrink-0" />
-          <div className="flex flex-col leading-tight">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/40 font-mono">
-              DURAÇÃO
-            </span>
-            <span className="text-xs font-bold text-white font-mono mt-0.5 tabular-nums">
-              {formatDuration(duration)}
-            </span>
-          </div>
-        </div>
-
-        {/* Latência */}
-        <div className="flex items-center gap-2.5">
-          <Wifi className="h-4.5 w-4.5 text-white/35 shrink-0" />
-          <div className="flex flex-col leading-tight">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/40 font-mono">
-              LATÊNCIA
-            </span>
-            <span className="text-xs font-bold text-white font-mono mt-0.5 tabular-nums">
-              {latency}ms
-            </span>
-          </div>
-        </div>
-
-        {/* Codec */}
-        <div className="flex items-center gap-2.5">
-          <Scan className="h-4.5 w-4.5 text-white/35 shrink-0" />
-          <div className="flex flex-col leading-tight">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/40 font-mono">
-              CODEC
-            </span>
-            <span className="text-xs font-bold text-white font-mono mt-0.5 tracking-wide">
-              OPUS
-            </span>
-          </div>
         </div>
       </div>
     </div>
@@ -337,29 +284,22 @@ export const CallTelemetryRight: React.FC<CallTelemetryRightProps> = ({
     };
   }, [stream, isSpeaking]);
 
+  const levelPct = Math.min(100, Math.max(0, ((voiceLevelPills || (isSpeaking ? 5 : 0)) / 8) * 100));
+
   return (
     <div className={`flex flex-col gap-2.5 w-full max-w-[340px] select-none ${className}`}>
-      {/* Top Card: Nível de Voz */}
-      <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-2xl px-4 py-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-white/50 font-mono">
-          NÍVEL DE VOZ
+      {/* Simplified: Nível de voz — horizontal bar h-1 bg-white/15 rounded-full with fill per audit */}
+      <div className="flex items-center justify-between gap-4 rounded-2xl p-3 bg-black/40 border border-white/10 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
+          Nível de voz
         </span>
 
-        {/* 8 LED capsules/pills */}
-        <div className="flex items-center gap-1.5">
-          {Array.from({ length: 8 }).map((_, i) => {
-            const isLit = i < (voiceLevelPills || (isSpeaking ? 5 : 0));
-            return (
-              <div
-                key={i}
-                className={`h-2.5 w-3 rounded-full transition-all duration-100 ${
-                  isLit
-                    ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)] scale-105"
-                    : "bg-white/[0.08]"
-                }`}
-              />
-            );
-          })}
+        {/* Horizontal bar replacing •••••••• dots */}
+        <div className="flex-1 max-w-[120px] h-1 bg-white/15 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-emerald-400 rounded-full transition-all duration-100"
+            style={{ width: `${levelPct}%` }}
+          />
         </div>
       </div>
     </div>

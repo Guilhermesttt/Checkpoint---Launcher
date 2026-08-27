@@ -36,6 +36,7 @@
     let frameHandle = 0;
     let running = false;
     let lastAxisMoveAt = 0;
+    let overlayHasFocus = false;
 
     const dispatch = (name) => {
       if (name === "GUIDE") {
@@ -45,6 +46,10 @@
       }
       if (!isPanelOpen()) return;
       actions.onGamepadInput?.();
+      
+      // Se overlay não tem foco, não processa navegação (exceto botões de sistema)
+      if (!overlayHasFocus && !["GUIDE", "L1", "R1", "B"].includes(name)) return;
+      
       if (DIRECTION_BY_BUTTON[name]) actions.moveFocus(DIRECTION_BY_BUTTON[name]);
       else if (name === "A") actions.activateFocus();
       else if (name === "B") actions.goBack();
@@ -105,6 +110,13 @@
         if (frameHandle) cancelFrame(frameHandle);
         frameHandle = 0;
         previous.clear();
+      },
+      setOverlayFocus(hasFocus) {
+        if (hasFocus) {
+          window.dispatchEvent(new CustomEvent("checkpoint:overlay-focus-changed", { detail: { hasFocus: true } }));
+        } else {
+          window.dispatchEvent(new CustomEvent("checkpoint:overlay-focus-changed", { detail: { hasFocus: false } }));
+        }
       },
     };
   };

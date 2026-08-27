@@ -18,6 +18,7 @@ import WhatsNewModal from "./components/WhatsNewModal";
 import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
 import { isBackendHealthy } from "./services/api";
 import { usePrefersReducedMotion } from "./hooks/usePrefersReducedMotion";
+import { setLauncherInputLocked } from "./utils/launcherInputLock";
 import type { SoundTheme } from "./context/PreferencesContext";
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
@@ -285,6 +286,15 @@ const AppContent: React.FC = () => {
     return () =>
       window.removeEventListener("checkpoint:game-launch", stopBackgroundMusic);
   }, [stopBackgroundMusic]);
+
+  // Bloqueia inputs do controle no hub enquanto o overlay in-game estiver aberto.
+  React.useEffect(() => {
+    if (!window.electronAPI?.onOverlayHubInputLock) return;
+    const unsub = window.electronAPI.onOverlayHubInputLock(({ locked }: { locked: boolean }) => {
+      setLauncherInputLocked(locked);
+    });
+    return () => { unsub?.(); };
+  }, []);
 
   React.useEffect(() => {
     if (!user?.uid) return;

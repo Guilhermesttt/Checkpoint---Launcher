@@ -1017,13 +1017,30 @@ const Home: React.FC = () => {
   });
 
   useGamepadButton("DPAD_UP", () => {
-    if (isAnyModalOpen || searchOpen || !isSystemCategory) return;
-    moveSystemFocus("up");
+    if (isAnyModalOpen || searchOpen) return;
+    if (isSystemCategory) {
+      moveSystemFocus("up");
+      return;
+    }
+    // No hub (biblioteca): DPAD_UP foca a pesquisa se existir
+    if (!["SETTINGS", "FRIENDS", "MODS", "RADAR", "PROFILE"].includes(activeCategory)) {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+      playSound("search");
+    }
   });
 
   useGamepadButton("DPAD_DOWN", () => {
-    if (isAnyModalOpen || searchOpen || !isSystemCategory) return;
-    moveSystemFocus("down");
+    if (isAnyModalOpen || searchOpen) return;
+    if (isSystemCategory) {
+      moveSystemFocus("down");
+      return;
+    }
+    // Se a pesquisa estiver focada, DPAD_DOWN volta ao carrossel
+    if (document.activeElement === searchInputRef.current) {
+      searchInputRef.current?.blur();
+      playSound("navigate");
+    }
   });
 
   useGamepadButton("SQUARE", async () => {
@@ -1700,14 +1717,14 @@ const Home: React.FC = () => {
       />
 
       <div
-        className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden transition-[margin-left] duration-300 ease-out"
+        className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden hub-60fps transition-[margin-left] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{ marginLeft: isSidebarExpanded ? 272 : 96 }}
       >
         <motion.div
-          initial={{ opacity: 0, y: -12 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="shrink-0 flex items-center justify-between px-10 pt-7 relative"
+          transition={{ duration: 0.42, delay: 0.06, ease: [0.32, 0.72, 0, 1] }}
+          className="shrink-0 flex items-center justify-between px-10 pt-7 relative transform-gpu will-change-transform"
         >
           <div className="flex items-center gap-6">
             <InteractiveBreadcrumb
@@ -1732,7 +1749,7 @@ const Home: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={t("searchPlaceholder") || "Pesquisar jogo... (S)"}
-                    className="h-9 w-44 md:w-56 rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.09] border border-white/[0.08] focus:border-white/20 pl-9 pr-8 text-xs text-white placeholder:text-white/30 outline-none transition-all duration-200"
+                    className="h-9 w-44 md:w-56 rounded-full bg-white/[0.04] hover:bg-white/[0.07] focus:bg-white/[0.09] border border-white/[0.08] focus:border-white/20 pl-9 pr-8 text-xs text-white placeholder:text-white/30 outline-none transition-all duration-200 transform-gpu will-change-transform focus:scale-[1.015] hover:scale-[1.01] focus:shadow-[0_0_16px_rgba(255,255,255,0.06)]"
                   />
                   {searchTerm && (
                     <button
@@ -1843,7 +1860,7 @@ const Home: React.FC = () => {
           </div>
         </motion.div>
 
-        <div className="flex-1 flex flex-col justify-end min-h-0">
+        <div className="flex-1 flex flex-col justify-end min-h-0 hub-60fps will-change-transform">
           {activeCategory === "SETTINGS" ? (
             <SettingsPageV2
               language={launcherLanguage}
@@ -2014,35 +2031,33 @@ const Home: React.FC = () => {
           ) : (
             <>
               <motion.div
-                className="px-10 pb-4 shrink-0"
+                className="px-10 pb-4 shrink-0 transform-gpu will-change-transform"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
+                transition={{ duration: 0.35, delay: 0.08, ease: [0.32, 0.72, 0, 1] }}
               >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`hero-${currentGame?.id}`}
-                    initial={{ opacity: 0, y: 18, filter: "blur(8px)" }}
+                    initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
-                    transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex items-end justify-between gap-8"
+                    exit={{ opacity: 0, y: -6, filter: "blur(4px)" }}
+                    transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
+                    className="flex items-end justify-between gap-8 transform-gpu"
                   >
                     <div className="min-w-0 flex-1">
-                      <p
-                        className="mb-1 text-[11px] font-body font-medium tracking-wider text-white/40 uppercase"
-                      >
+                      <p className="mb-1.5 text-[10px] font-body font-bold tracking-[0.16em] text-white/50 uppercase">
                         {currentGame?.category ?? "Jogo"} · {canonicalIndex + 1} de {displayGames.length}
                       </p>
                       <h1
-                        className="tracking-tight font-display font-semibold text-3xl md:text-5xl text-white leading-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.75)] line-clamp-1"
+                        className="tracking-tight font-display font-bold text-3xl md:text-[40px] text-white leading-[0.95] drop-shadow-[0_4px_24px_rgba(0,0,0,0.75)] line-clamp-1"
                         style={{
-                          maxWidth: "70vw",
+                          maxWidth: "64vw",
                         }}
                       >
                         {currentGame?.title}
                       </h1>
-                      <div className="mt-3 flex items-center gap-2.5 flex-wrap font-body">
+                      <div className="mt-2.5 flex items-center gap-2 flex-wrap font-body">
                         {(currentGame?.launcherType === "steam" || currentGame?.source === "steam") ? (
                           <span className="flex items-center gap-1.5 rounded-full bg-[#16171c]/90 border border-white/[0.12] px-3 py-1 text-xs font-semibold text-white/90 shadow-sm backdrop-blur-md">
                             <SteamBrandIcon className="w-3.5 h-3.5 text-white" /> Steam
@@ -2103,7 +2118,7 @@ const Home: React.FC = () => {
                       <ShinyButton
                         onClick={() => currentGame && openDetails(currentGame)}
                         onMouseEnter={() => playSound("hover")}
-                        className="relative shrink-0 flex items-center gap-2.5 h-12 px-7 rounded-full bg-white text-black font-body font-semibold text-xs tracking-wider"
+                        className="!shrink-0 !flex !items-center shadow-[0_4px_20px_rgba(255,255,255,0.12)]"
                       >
                         <svg
                           viewBox="0 0 24 24"
@@ -2118,15 +2133,15 @@ const Home: React.FC = () => {
                 </AnimatePresence>
               </motion.div>
 
-              <div className="shrink-0 pb-14">
+              <div className="shrink-0 pb-8 hub-scroll will-change-transform transform-gpu">
 
-                <AnimatePresence mode="popLayout" initial={false}>
+                <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={activeCategory}
-                    initial={{ opacity: 0, y: 28 }}
+                    initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 14 }}
-                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.26, ease: [0.32, 0.72, 0, 1] }}
                   >
                     <GameRow
                       games={displayGames}
@@ -2152,8 +2167,8 @@ const Home: React.FC = () => {
           }}
         >
           <p
-            className="text-[9px] font-semibold uppercase tracking-[0.28em] font-body"
-            style={{ color: "rgba(255,255,255,0.16)" }}
+            className="text-[10px] font-semibold uppercase tracking-[0.2em] font-body"
+            style={{ color: "rgba(255,255,255,0.45)" }}
           >
             {displayGames.length} {displayGames.length === 1 ? "jogo" : "jogos"}
           </p>

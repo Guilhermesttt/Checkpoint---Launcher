@@ -17,16 +17,20 @@ export const EmptyState: React.FC<EmptyStateProps> = React.memo(
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-md rounded-[32px] p-10 text-center bg-[#08090C]/90 border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
+      className="w-full max-w-md rounded-[32px] p-10 text-center bg-[rgba(14,16,24,0.34)] border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
     >
-      <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)]">
+      <motion.div
+        animate={{ y: [0, -4, 0] }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)] will-change-transform transform-gpu"
+      >
         <img
           src={PHERIELIUM_LOGO_PATH}
           alt="Pherielium"
           className="w-8 h-8 object-contain opacity-70"
           draggable={false}
         />
-      </div>
+      </motion.div>
 
       <h3 className="mb-2 text-2xl font-display font-semibold tracking-tight text-white">
         {searchTerm ? "Nenhum jogo encontrado" : "Biblioteca vazia"}
@@ -99,7 +103,7 @@ export const EmptyLibraryOnboarding: React.FC<EmptyLibraryOnboardingProps> = Rea
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-xl rounded-[32px] p-8 md:p-10 bg-[#08090C]/90 border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.85)] backdrop-blur-2xl font-sans"
+        className="w-full max-w-xl rounded-[32px] p-8 md:p-10 bg-[rgba(14,16,24,0.34)] border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl font-sans"
       >
         <div className="flex items-center justify-between mb-8">
           <p className="text-[11px] font-body tracking-wider uppercase text-white/35">

@@ -1,4 +1,5 @@
 import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   Bell,
@@ -20,6 +21,12 @@ import {
   User,
   Volume2,
   Zap,
+  Battery,
+  BatteryLow,
+  BatteryCharging,
+  Usb,
+  Bluetooth,
+  Vibrate,
 } from "lucide-react";
 import { SystemPageShell } from "../components/ui/SystemPageShell";
 import { Switch } from "../components/ui/switch";
@@ -27,7 +34,7 @@ import { AppUpdateSection, SettingsHeader } from "../components/settings/AppUpda
 import { usePreferences, type LauncherLanguage, type SoundTheme, type VisualTheme } from "../context/PreferencesContext";
 import { useVoiceCallContext } from "../context/VoiceCallContext";
 import { useSoundEffects } from "../hooks/useSoundEffects";
-import { useGamepad } from "../context/GamepadContext";
+import { useGamepad, playHapticPattern } from "../context/GamepadContext";
 import { useControllerLedStatus } from "../hooks/useControllerLed";
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../services/supabase";
@@ -389,6 +396,8 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
     setOpenAtLogin,
     lowPerformanceMode,
     setLowPerformanceMode,
+    hapticsEnabled,
+    setHapticsEnabled,
     closeOnLaunch,
     setCloseOnLaunch,
     minimizeToTrayOnClose,
@@ -422,6 +431,9 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   const [isVideoPreviewOn, setIsVideoPreviewOn] = React.useState(false);
   const videoPreviewRef = React.useRef<HTMLVideoElement | null>(null);
   const videoPreviewStreamRef = React.useRef<MediaStream | null>(null);
+  const [batteryLevel, setBatteryLevel] = React.useState<number | null>(null);
+  const [batteryCharging, setBatteryCharging] = React.useState(false);
+  const [showControllerStatusModal, setShowControllerStatusModal] = React.useState(false);
 
   // Live mic test with complete AudioContext and MediaStream lifecycle cleanup
   React.useEffect(() => {
@@ -566,6 +578,53 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
       }
     };
   }, [activeTab, isVideoPreviewOn, voiceCallContext?.selectedVideoInput]);
+
+  // Bateria do sistema/controle (navigator.getBattery) + tipo de conexão
+  React.useEffect(() => {
+    let cancelled = false;
+    let bat: any = null;
+    const update = (b: any) => {
+      if (cancelled) return;
+      setBatteryLevel(Math.round(b.level * 100));
+      setBatteryCharging(!!b.charging);
+    };
+    const poll = async () => {
+      try {
+        const nav: any = navigator as any;
+        if (nav.getBattery) {
+          bat = await nav.getBattery();
+          update(bat);
+          bat.addEventListener("levelchange", () => update(bat));
+          bat.addEventListener("chargingchange", () => update(bat));
+        }
+      } catch {}
+    };
+    if (isGamepadConnected) void poll();
+    else { setBatteryLevel(null); setBatteryCharging(false); }
+    return () => {
+      cancelled = true;
+      try { bat?.removeEventListener("levelchange", update); bat?.removeEventListener("chargingchange", update); } catch {}
+    };
+  }, [isGamepadConnected]);
+
+  // Aviso bateria baixa (overlay se in-game, toast se no hub)
+  React.useEffect(() => {
+    if (!isGamepadConnected || batteryLevel === null || batteryCharging) return;
+    if (batteryLevel > 20) return;
+    const key = `checkpoint_low_bat_${batteryLevel}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    window.setTimeout(() => sessionStorage.removeItem(key), 600000);
+    const msg = `Bateria do controle em ${batteryLevel}% — conecte o cabo!`;
+    // Se estiver em jogo (overlay ativo), envia para overlay; senão toast no hub
+    if (window.electronAPI?.updateOverlayPanel) {
+      // Fallback: notificação local + overlay
+      try { window.electronAPI?.showBatteryWarning?.(batteryLevel); } catch {}
+    }
+    // Toast local
+    // Usa notify se disponível via contexto de notificações (não temos acesso direto aqui, então usa evento)
+    window.dispatchEvent(new CustomEvent("checkpoint:low-battery", { detail: { level: batteryLevel } }));
+  }, [batteryLevel, batteryCharging, isGamepadConnected]);
 
   React.useEffect(() => {
     setProfileVisibility(userProfile?.profileVisibility ?? "public");
@@ -1220,6 +1279,156 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                   )}
                 </div>
               </div>
+              <div className="mt-3.5 flex items-center justify-between gap-5 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <motion.div
+                    animate={hapticsEnabled ? { x: [0, -1.2, 1.2, -1.2, 0], rotate: [0, -1, 1, -1, 0] } : { x: 0, rotate: 0 }}
+                    transition={hapticsEnabled ? { duration: 0.45, repeat: Infinity, repeatDelay: 2.2, ease: "easeInOut" } : { duration: 0.2 }}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border will-change-transform transform-gpu ${hapticsEnabled ? "bg-emerald-500/15 border-emerald-400/25 text-emerald-300" : "bg-white/[0.04] border-white/10 text-white/30"}`}
+                  >
+                    <Gamepad2 className="h-4.5 w-4.5" />
+                  </motion.div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white whitespace-nowrap flex items-center gap-2">
+                      {t("hapticsEnabled")}
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider border ${hapticsEnabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/20" : "bg-white/[0.04] text-white/35 border-white/10"}`}>
+                        {hapticsEnabled ? "Ligada" : "Desligada"}
+                      </span>
+                    </p>
+                    <p className="text-[10px] font-medium text-white/40 mt-0.5">{t("hapticsEnabledHint")}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { playHapticPattern("action"); } catch {}
+                      window.dispatchEvent(new CustomEvent("checkpoint:test-haptics"));
+                      playSound("select");
+                    }}
+                    className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/[0.06] hover:bg-white/15 border border-white/10 text-white/60 hover:text-white transition-all hover:scale-105 active:scale-95"
+                    title="Testar vibração"
+                  >
+                    <Vibrate className="h-4 w-4" />
+                  </button>
+                  <Switch
+                    checked={hapticsEnabled}
+                    onCheckedChange={(v) => {
+                      setHapticsEnabled(v);
+                      playSound(v ? "favoriteOn" : "favoriteOff");
+                      if (v) {
+                        try { playHapticPattern("action"); } catch {}
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Bateria & Conexão */}
+              <div className="mt-3.5 flex items-center justify-between gap-4 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${batteryLevel !== null && batteryLevel <= 20 && !batteryCharging ? "bg-red-500/15 border-red-400/20 text-red-300" : batteryCharging ? "bg-emerald-500/15 border-emerald-400/20 text-emerald-300" : "bg-white/[0.04] border-white/10 text-white/60"}`}>
+                    {batteryCharging ? <BatteryCharging className="h-4.5 w-4.5" /> : batteryLevel !== null && batteryLevel <= 20 ? <BatteryLow className="h-4.5 w-4.5" /> : <Battery className="h-4.5 w-4.5" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-white flex items-center gap-2">
+                      Bateria
+                      {batteryLevel !== null ? (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black border ${batteryLevel <= 20 && !batteryCharging ? "bg-red-500/15 text-red-300 border-red-400/20" : batteryCharging ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/20" : "bg-white/10 text-white/60 border-white/10"}`}>
+                          {batteryLevel}%
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/30 border border-white/10 font-bold">--%</span>
+                      )}
+                      {batteryCharging && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 font-bold uppercase">Carregando</span>}
+                    </p>
+                    <p className="text-[10px] font-medium text-white/40 truncate flex items-center gap-1.5">
+                      {isGamepadConnected ? (
+                        <>
+                          {connectedGamepadId?.toLowerCase().includes("bluetooth") || connectedGamepadId?.toLowerCase().includes("wireless") ? <Bluetooth className="h-3 w-3" /> : <Usb className="h-3 w-3" />}
+                          {connectedGamepadId?.toLowerCase().includes("bluetooth") || connectedGamepadId?.toLowerCase().includes("wireless") ? "Wireless (Bluetooth)" : "USB"}
+                        </>
+                      ) : (
+                        "Desconectado"
+                      )}
+                      {batteryLevel !== null && batteryLevel <= 20 && !batteryCharging && isGamepadConnected && (
+                        <span className="text-red-300 font-bold">• Bateria baixa!</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowControllerStatusModal(true);
+                    window.dispatchEvent(new CustomEvent("checkpoint:show-controller-status"));
+                    playSound("select");
+                    try { playHapticPattern("action"); } catch {}
+                  }}
+                  className="shrink-0 rounded-lg bg-white/10 hover:bg-white/15 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white/80 hover:text-white transition-all hover:scale-105 active:scale-95 border border-white/10"
+                >
+                  Ver status
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showControllerStatusModal && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                    className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30 backdrop-blur-xl will-change-transform transform-gpu"
+                  >
+                    <div className="p-4 space-y-3">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-white/40">Conexão</span>
+                        <span className="text-white font-semibold flex items-center gap-1.5">
+                          {isGamepadConnected ? (
+                            connectedGamepadId?.toLowerCase().includes("bluetooth") || connectedGamepadId?.toLowerCase().includes("wireless") ? (
+                              <>
+                                <Bluetooth className="h-3 w-3" /> Bluetooth
+                              </>
+                            ) : (
+                              <>
+                                <Usb className="h-3 w-3" /> USB
+                              </>
+                            )
+                          ) : (
+                            "--"
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-white/40">Bateria</span>
+                        <span className="text-white font-semibold">
+                          {batteryLevel !== null ? `${batteryLevel}% ${batteryCharging ? "(Carregando)" : ""}` : "Desconhecida"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-white/40">Família</span>
+                        <span className="text-white font-semibold capitalize">{gamepadFamily}</span>
+                      </div>
+                      <div className="flex justify-between text-xs gap-4">
+                        <span className="text-white/40 shrink-0">ID</span>
+                        <span className="text-white/60 truncate max-w-[180px] text-[10px] text-right">{connectedGamepadId || "--"}</span>
+                      </div>
+                      {batteryLevel !== null && batteryLevel <= 20 && !batteryCharging && isGamepadConnected && (
+                        <div className="rounded-xl bg-red-500/10 border border-red-400/20 p-2.5 text-[11px] text-red-300 font-medium">
+                          ⚠️ Bateria baixa! Conecte o cabo para continuar jogando.
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowControllerStatusModal(false)}
+                        className="w-full mt-1 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-colors"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </section>
           )}
 

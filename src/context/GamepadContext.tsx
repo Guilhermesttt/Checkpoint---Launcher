@@ -89,18 +89,13 @@ const isGamepadOverlayTogglePressed = (gamepad: Gamepad) =>
   || (isPressed(gamepad.buttons[8]) && isPressed(gamepad.buttons[9]));
 
 // ─── Feedback háptico (vibração) ─────────────────────────────────────────────
-// Sistema baseado em PADRÕES: cada padrão é uma sequência de um ou mais pulsos
-// (delay, duração, intensidade fraca/forte). "nav" e "action" são pulsos
-// únicos e curtos; "launch" é uma pequena "ignição" de 3 toques crescendo de
-// intensidade — a sensação de "carregando... vai!" ao entrar num jogo.
-// Silenciosamente ignorado em controles/navegadores sem vibrationActuator.
 type HapticPatternName = "nav" | "action" | "launch";
 
 interface HapticStep {
-  delay: number;           // ms a partir do disparo do padrão
-  duration: number;        // ms de duração do pulso
-  weakMagnitude: number;   // 0–1, motor fraco (alta frequência)
-  strongMagnitude: number; // 0–1, motor forte (baixa frequência)
+  delay: number;
+  duration: number;
+  weakMagnitude: number;
+  strongMagnitude: number;
 }
 
 const HAPTIC_PATTERNS: Record<HapticPatternName, HapticStep[]> = {
@@ -113,11 +108,19 @@ const HAPTIC_PATTERNS: Record<HapticPatternName, HapticStep[]> = {
   ],
 };
 
+const isHapticsEnabledGlobal = (): boolean => {
+  try {
+    const v = localStorage.getItem("checkpoint_haptics_enabled_global");
+    return v !== "false";
+  } catch { return true; }
+};
+
 const getHapticActuator = (gp: Gamepad) =>
   (gp as unknown as { vibrationActuator?: { playEffect: (type: string, params: object) => Promise<unknown> } })
     .vibrationActuator;
 
 const playPatternOnGamepad = (gp: Gamepad, steps: HapticStep[]) => {
+  if (!isHapticsEnabledGlobal()) return;
   const actuator = getHapticActuator(gp);
   if (!actuator?.playEffect) return;
 
@@ -133,14 +136,10 @@ const playPatternOnGamepad = (gp: Gamepad, steps: HapticStep[]) => {
   });
 };
 
-// Usado internamente pelo pollGamepads — já sabe qual `gp` disparou o input.
 const fireHaptic = (gp: Gamepad, kind: "nav" | "action" = "nav") => {
   playPatternOnGamepad(gp, HAPTIC_PATTERNS[kind]);
 };
 
-// Função pública: chame de QUALQUER arquivo do app (não precisa estar dentro
-// do GamepadProvider). Ela varre os gamepads ativos e toca o padrão em todos.
-// Ex: playHapticPattern("launch") ao iniciar um jogo.
 export const playHapticPattern = (pattern: HapticPatternName) => {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
   Array.from(gamepads)
@@ -149,19 +148,15 @@ export const playHapticPattern = (pattern: HapticPatternName) => {
 };
 
 // ─── Aceleração progressiva do analógico ────────────────────────────────────
-// Quanto mais tempo o eixo fica pressionado, mais rápido repete.
-// Intervalos em ms: começa devagar, acelera até o máximo.
-const AXIS_INITIAL_DELAY = 320;   // ms antes do primeiro repeat
-const AXIS_FAST_INTERVAL = 80;   // ms no pico de velocidade
-const AXIS_ACCEL_STEPS = 5;    // quantos repeats até atingir velocidade máxima
-
-// Deadzone adaptativa: mais precisa ao centro, aceita diagonais
+const AXIS_INITIAL_DELAY = 320;
+const AXIS_FAST_INTERVAL = 80;
+const AXIS_ACCEL_STEPS = 5;
 const AXIS_DEADZONE = 0.28;
 
 interface AxisState {
   direction: "up" | "down" | "left" | "right" | null;
-  heldSince: number;  // performance.now() quando o eixo foi pressionado
-  lastFire: number;   // último disparo
+  heldSince: number;
+  lastFire: number;
   repeatCount: number;
 }
 
@@ -170,6 +165,10 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isGamepadConnected, setIsGamepadConnected] = useState(false);
   const [gamepadFamily, setGamepadFamily] = useState<GamepadFamily>("generic");
   const [connectedGamepadId, setConnectedGamepadId] = useState<string | null>(null);
+
+  const [overlayHasFocus, setOverlayHasFocus] = useState(false);
+  const overlayFocusRef = useRef(false); // CORREÇÃO: Ref para manter o valor atualizado no pollGamepads
+
   const requestRef = useRef<number>(0);
   const lastButtonState = useRef<Record<string, boolean>>({});
   const lastGuideToggle = useRef<number>(0);
@@ -178,13 +177,29 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     v: { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 },
   });
 
-  // Refs que o pollGamepads usa — garante valores frescos sem re-criar o callback
   const activeInputRef = useRef<InputType>("mouse");
   activeInputRef.current = activeInputType;
   const isConnectedRef = useRef(false);
   isConnectedRef.current = isGamepadConnected;
   const connectedIdRef = useRef<string | null>(null);
   connectedIdRef.current = connectedGamepadId;
+
+  // Listener para foco do overlay
+  React.useEffect(() => {
+    const handleOverlayFocus = (event: CustomEvent) => {
+      const hasFocus = event.detail?.hasFocus;
+      setOverlayHasFocus(hasFocus);
+      overlayFocusRef.current = hasFocus; // Atualiza a ref simultaneamente
+    };
+    window.addEventListener("checkpoint:overlay-focus-changed", handleOverlayFocus as EventListener);
+    return () => window.removeEventListener("checkpoint:overlay-focus-changed", handleOverlayFocus as EventListener);
+  }, []);
+
+  React.useEffect(() => {
+    if (overlayHasFocus) {
+      setActiveInputType("mouse");
+    }
+  }, [overlayHasFocus]);
 
   const handleGamepadConnected = useCallback((e: GamepadEvent) => {
     setIsGamepadConnected(true);
@@ -218,7 +233,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .forEach((s) => s.callback());
   }, []);
 
-  // Calcula o intervalo de repeat baseado em quantas vezes já disparou
   const getRepeatInterval = (repeatCount: number): number => {
     const t = Math.min(repeatCount / AXIS_ACCEL_STEPS, 1);
     return AXIS_INITIAL_DELAY + (AXIS_FAST_INTERVAL - AXIS_INITIAL_DELAY) * t;
@@ -238,26 +252,34 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const gamepadFound = activeGamepad !== null;
     const now = performance.now();
 
-    // ── Overlay toggle (Guide ou Share+Options) ──────────────────────────────
+    // ── Overlay toggle ──────────────────────────────
     connectedGamepads.forEach((gp) => {
       const isOverlayToggle = isGamepadOverlayTogglePressed(gp);
       const stateKey = `${gp.index}:overlay-toggle`;
       const wasPressed = lastButtonState.current[stateKey];
       const outsideCooldown = lastGuideToggle.current === 0 || now - lastGuideToggle.current > 650;
+
       if (isOverlayToggle && !wasPressed && outsideCooldown) {
         lastGuideToggle.current = now;
-        void window.electronAPI?.toggleOverlayPanel().catch(() => undefined);
+
+        // CORREÇÃO: Evita crash caso a chamada seja síncrona ou undefined
+        try {
+          const res = window.electronAPI?.toggleOverlayPanel();
+          if (res && typeof res.catch === 'function') {
+            res.catch(() => undefined);
+          }
+        } catch (error) {
+          console.error("Erro ao alternar overlay:", error);
+        }
       }
       lastButtonState.current[stateKey] = isOverlayToggle;
     });
 
-    if (activeGamepad) {
+    // CORREÇÃO: Usando `overlayFocusRef.current` no lugar do state travado no closure
+    if (activeGamepad && document.hasFocus() && !overlayFocusRef.current) {
       const gp = activeGamepad;
       let inputDetected = false;
 
-      // ── Botões digitais (X, O, SQUARE, TRIANGLE, bumpers, share/options, guide) ──
-      // L2/R2 e o D-pad físico (12-15) são tratados nos loops dedicados abaixo,
-      // por isso são ignorados aqui — evita o double-dispatch do bug original.
       gp.buttons.forEach((button, buttonIndex) => {
         if (DEDICATED_BUTTON_INDEXES.has(buttonIndex)) return;
 
@@ -292,7 +314,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         lastButtonState.current[stateKey] = pressed;
       });
 
-      // ── D-pad físico (única fonte de disparo para DPAD_*, prioridade sobre analógico) ──
+      // ── D-pad físico ─────────────────────────────────────────────────────
       const dpadButtons: Array<[number, GamepadButtonName]> = [
         [12, "DPAD_UP"], [13, "DPAD_DOWN"], [14, "DPAD_LEFT"], [15, "DPAD_RIGHT"],
       ];
@@ -310,12 +332,11 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (pressed) dpadActive = true;
       });
 
-      // ── Analógico esquerdo: navegação com aceleração progressiva ──────────
+      // ── Analógico esquerdo ──────────────────────────────────────────────
       if (!dpadActive) {
         const xAxis = gp.axes[0] ?? 0;
         const yAxis = gp.axes[1] ?? 0;
 
-        // Normaliza dentro da deadzone para movimento suave
         const normalizeAxis = (v: number) => {
           if (Math.abs(v) < AXIS_DEADZONE) return 0;
           return (v - Math.sign(v) * AXIS_DEADZONE) / (1 - AXIS_DEADZONE);
@@ -331,7 +352,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (hDir) {
           const btnName = hDir === "left" ? "DPAD_LEFT" : "DPAD_RIGHT";
           if (hState.direction !== hDir) {
-            // Nova direção: dispara imediatamente
             hState.direction = hDir;
             hState.heldSince = now;
             hState.lastFire = now;
@@ -340,7 +360,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
             fireHaptic(gp, "nav");
             inputDetected = true;
           } else {
-            // Repeat com aceleração
             const held = now - hState.heldSince;
             const interval = held < AXIS_INITIAL_DELAY
               ? AXIS_INITIAL_DELAY
@@ -390,12 +409,11 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
           vState.repeatCount = 0;
         }
       } else {
-        // D-pad está ativo: reseta estado do analógico para não disparar duplo
         axisState.current.h = { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 };
         axisState.current.v = { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 };
       }
 
-      // ── Analógico direito: scroll / câmera ───────────────────────────────
+      // ── Analógico direito ────────────────────────────────────────────────
       const rightX = gp.axes[2] ?? 0;
       const rightY = gp.axes[3] ?? 0;
       const RIGHT_DEADZONE = 0.2;
@@ -420,7 +438,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    // ── Atualiza estado de conexão ────────────────────────────────────────────
     if (gamepadFound && activeGamepad) {
       if (!isConnectedRef.current) {
         setIsGamepadConnected(true);
@@ -445,7 +462,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     requestRef.current = requestAnimationFrame(pollGamepads);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatchButtonPress]);
 
   useEffect(() => {
@@ -460,7 +476,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [handleGamepadConnected, handleGamepadDisconnected, pollGamepads]);
 
-  // ── Troca de input por mouse/teclado ──────────────────────────────────────
   useEffect(() => {
     const onMouse = () => {
       if (activeInputRef.current !== "mouse") {
@@ -489,7 +504,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  // ── Atributo data-gamepad-navigation no root ──────────────────────────────
   useEffect(() => {
     const root = document.documentElement;
     if (isGamepadConnected && activeInputType === "gamepad") {

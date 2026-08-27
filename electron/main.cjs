@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tray, globalShortcut, desktopCapturer, Notification, safeStorage, nativeImage, protocol, net } = require("electron");
 
 const crypto = require("node:crypto");
 const { z } = require("zod");
@@ -140,8 +140,10 @@ const windowBehaviorController = createWindowBehaviorController({
   showWindow: () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.setAlwaysOnTop(true);
       mainWindow.show();
       mainWindow.focus();
+      mainWindow.setAlwaysOnTop(false);
     }
   },
   requestConfirmation: () => {
@@ -1418,13 +1420,33 @@ const setOverlayPanelOpen = (open) => {
   } else {
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.blur();
+    
+    // Devolve o foco ao Hub se ele estiver visível (ou seja, se não houver um jogo rodando)
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.setAlwaysOnTop(true);
+          mainWindow.show();
+          mainWindow.focus();
+          mainWindow.setAlwaysOnTop(false);
+        }
+      }, 50);
+    }
   }
 
   sendOverlayEvent("overlay:panel-visibility", {
     open: overlayPanelOpen,
     state: overlayPanelState,
   });
+
+  // Notifica a janela principal para bloquear/desbloquear inputs do controle
+  // enquanto o overlay in-game estiver aberto.
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("overlay:hub-input-lock", { locked: overlayPanelOpen });
+  }
 };
+
 
 const requestOverlayPanelToggle = (source = "unknown") => {
   const normalizedSource = String(source || "unknown");
@@ -1475,23 +1497,39 @@ const saveOverlaySettings = () => {
 
 const loadRecentCaptures = async () => {
   try {
-    const directory = captureDirectory();
-    await fs.promises.mkdir(directory, { recursive: true });
-    const entries = await fs.promises.readdir(directory, { withFileTypes: true });
-    const imageEntries = entries.filter((entry) => entry.isFile() && /\.(png|jpe?g)$/i.test(entry.name));
+    const baseDir = captureDirectory();
+    await fs.promises.mkdir(baseDir, { recursive: true });
+    const entries = await fs.promises.readdir(baseDir, { withFileTypes: true });
+    
+    let allFiles = [];
+    for (const entry of entries) {
+      if (entry.isFile() && /\.(png|jpe?g)$/i.test(entry.name)) {
+        allFiles.push({ path: path.join(baseDir, entry.name), name: entry.name });
+      } else if (entry.isDirectory()) {
+        const subDir = path.join(baseDir, entry.name);
+        const subEntries = await fs.promises.readdir(subDir, { withFileTypes: true }).catch(() => []);
+        for (const sub of subEntries) {
+          if (sub.isFile() && /\.(png|jpe?g)$/i.test(sub.name)) {
+            allFiles.push({ path: path.join(subDir, sub.name), name: sub.name });
+          }
+        }
+      }
+    }
+
     const withStats = await Promise.all(
-      imageEntries.map(async (entry) => {
-        const filePath = path.join(directory, entry.name);
-        const stat = await fs.promises.stat(filePath);
+      allFiles.map(async (fileObj) => {
+        const stat = await fs.promises.stat(fileObj.path).catch(() => null);
+        if (!stat) return null;
         return {
-          id: `${stat.mtimeMs}:${entry.name}`,
-          name: entry.name,
-          url: pathToFileURL(filePath).toString(),
+          id: `${stat.mtimeMs}:${fileObj.name}`,
+          name: fileObj.name,
+          url: `cp-media://${fileObj.path.replace(/\\/g, "/")}`,
           createdAt: stat.mtime.toISOString(),
         };
-      }),
+      })
     );
     recentCaptures = withStats
+      .filter(Boolean)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, CAPTURE_HISTORY_LIMIT);
   } catch (error) {
@@ -1542,13 +1580,14 @@ const captureCurrentDisplay = async () => {
       throw lastCaptureError || new Error("Nenhuma imagem de tela foi retornada.");
     }
 
-    const directory = captureDirectory();
-    await fs.promises.mkdir(directory, { recursive: true });
     const gameTitle = String(overlayPanelState.currentGame?.title || "Desktop")
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 70) || "Desktop";
+    const directory = path.join(captureDirectory(), gameTitle);
+    await fs.promises.mkdir(directory, { recursive: true });
+    
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `${gameTitle} ${stamp}.png`;
     const filePath = path.join(directory, fileName);
@@ -1557,7 +1596,7 @@ const captureCurrentDisplay = async () => {
     const capture = {
       id: `${Date.now()}:${fileName}`,
       name: fileName,
-      url: pathToFileURL(filePath).toString(),
+      url: `cp-media://${filePath.replace(/\\/g, "/")}`,
       createdAt: new Date().toISOString(),
       gameId: String(overlayPanelState.currentGame?.id || ""),
       gameTitle: String(overlayPanelState.currentGame?.title || ""),
@@ -1607,7 +1646,8 @@ const deleteCapture = async (captureId) => {
 
   try {
     const directory = path.resolve(captureDirectory());
-    const filePath = path.resolve(fileURLToPath(capture.url));
+    const isFileURL = capture.url.startsWith("file:");
+    const filePath = path.resolve(isFileURL ? fileURLToPath(capture.url) : decodeURIComponent(capture.url.replace("cp-media://", "")));
     const relativePath = path.relative(directory, filePath);
     if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
       return { ok: false, error: "Arquivo de captura invalido." };
@@ -2519,6 +2559,74 @@ registerSecureIpcHandler("retro:search-thegamesdb", async (_event, request) =>
 registerSecureIpcHandler("retro:thegamesdb-screenshots", async (_event, request) =>
   theGamesDb.getGameScreenshots(request || {}));
 
+registerSecureIpcHandler("media:get-local-game-screenshots", async (_event, request) => {
+  const { title, launcherType, steamAppId } = request;
+  let results = [];
+
+  // 1. Get from Hub captures
+  try {
+    const hubDir = captureDirectory();
+    const safeTitle = String(title || "Desktop")
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 70) || "Desktop";
+    const gameDir = path.join(hubDir, safeTitle);
+    
+    let allFiles = [];
+    if (fs.existsSync(hubDir)) {
+      const files = await fs.promises.readdir(hubDir);
+      allFiles.push(...files.filter(f => f.startsWith(safeTitle) && /\.(png|jpe?g)$/i.test(f)).map(f => path.join(hubDir, f)));
+    }
+    if (fs.existsSync(gameDir)) {
+      const files = await fs.promises.readdir(gameDir);
+      allFiles.push(...files.filter(f => /\.(png|jpe?g)$/i.test(f)).map(f => path.join(gameDir, f)));
+    }
+
+    for (const filePath of allFiles) {
+      const stat = await fs.promises.stat(filePath);
+      results.push({
+        url: `cp-media://${filePath.replace(/\\/g, "/")}`,
+        createdAt: stat.mtimeMs,
+        source: 'hub'
+      });
+    }
+  } catch (err) {
+    console.warn("Failed to read hub screenshots", err);
+  }
+
+  // 2. Get from Steam if applicable
+  if (launcherType === "steam" && steamAppId) {
+    try {
+      const mainSteamPath = "C:\\Program Files (x86)\\Steam";
+      const userdataDir = path.join(mainSteamPath, "userdata");
+      if (fs.existsSync(userdataDir)) {
+        const userDirs = await fs.promises.readdir(userdataDir);
+        for (const uid of userDirs) {
+          const screenshotsDir = path.join(userdataDir, uid, "760", "remote", String(steamAppId), "screenshots");
+          if (fs.existsSync(screenshotsDir)) {
+            const files = await fs.promises.readdir(screenshotsDir);
+            const imageFiles = files.filter(f => /\.(png|jpe?g)$/i.test(f) && !f.includes("_vr"));
+            for (const f of imageFiles) {
+              const filePath = path.join(screenshotsDir, f);
+              const stat = await fs.promises.stat(filePath);
+              results.push({
+                url: `cp-media://${filePath.replace(/\\/g, "/")}`,
+                createdAt: stat.mtimeMs,
+                source: 'steam'
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to read steam screenshots", err);
+    }
+  }
+
+  results.sort((a, b) => b.createdAt - a.createdAt);
+  return results.map(r => r.url);
+});
 
 registerSecureIpcHandler("media:get-screen-sources", async () => {
   const sources = await desktopCapturer.getSources({
@@ -3523,6 +3631,10 @@ registerSecureIpcHandler("auth:poll-google-status", async (_event, state) => {
   }
 });
 
+registerSecureIpcHandler("shell:open-path", async (_event, pathStr) => {
+  return shell.openPath(pathStr);
+});
+
 registerSecureIpcHandler("shell:open-external", async (_event, url) => {
   const rawUrl = String(url || "").trim();
   if (!isSafeOpenExternalUrl(rawUrl)) {
@@ -3887,6 +3999,10 @@ registerSecureIpcHandler("update:quit-and-install", () => {
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
+  protocol.handle("cp-media", (request) => {
+    const filePath = decodeURIComponent(request.url.replace("cp-media://", ""));
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
   try {
     if (IS_SMOKE_TEST) {
       const requiredFiles = [

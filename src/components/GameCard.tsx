@@ -54,12 +54,12 @@ const GameCard: React.FC<GameCardProps> = ({
 
   const visuallyActive = isActive || isFocused;
 
-  // 3D Parallax Tilt Effect with Spring Physics
+  // 3D Parallax Tilt - 60fps console smooth (reduced range, snappier spring)
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const springConfig = { damping: 22, stiffness: 160 };
-  const rotateX = useSpring(useTransform(mouseY, [-CARD_HEIGHT / 2, CARD_HEIGHT / 2], [8, -8]), springConfig);
-  const rotateY = useSpring(useTransform(mouseX, [-CARD_WIDTH / 2, CARD_WIDTH / 2], [-8, 8]), springConfig);
+  const springConfig = { damping: 26, stiffness: 220 };
+  const rotateX = useSpring(useTransform(mouseY, [-CARD_HEIGHT / 2, CARD_HEIGHT / 2], [5, -5]), springConfig);
+  const rotateY = useSpring(useTransform(mouseX, [-CARD_WIDTH / 2, CARD_WIDTH / 2], [-5, 5]), springConfig);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -218,6 +218,8 @@ const GameCard: React.FC<GameCardProps> = ({
           height: CARD_HEIGHT,
           rotateX,
           rotateY,
+          backfaceVisibility: "hidden" as const,
+          WebkitBackfaceVisibility: "hidden" as const,
         }}
         animate={{
           scale: visuallyActive ? 1.05 : 0.95,
@@ -228,36 +230,42 @@ const GameCard: React.FC<GameCardProps> = ({
           stiffness: 220,
           damping: 20,
         }}
-        className={`relative overflow-hidden rounded-[28px] bg-[#090A0D] border transition-all duration-200 flex flex-col justify-between ${
+        className={`relative isolate rounded-[28px] bg-[#090A0D] border transform-gpu will-change-transform flex flex-col justify-between transition-[border-color,box-shadow] duration-200 ${
           visuallyActive
             ? "border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
             : "border-white/[0.08] hover:border-white/25 shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
         }`}
       >
-        {/* Full-Bleed Cover Image Artwork */}
-        {hasAllFailed ? (
-          <div
-            className="absolute inset-0 flex items-center justify-center p-5 text-center"
-            style={{ background: FALLBACK_CARD_BACKGROUND }}
-          >
-            <span className="line-clamp-3 text-xs font-display font-medium text-white/70">
-              {title}
-            </span>
-          </div>
-        ) : (
-          <img
-            src={currentImageSrc}
-            alt={title}
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-108"
-            loading="lazy"
-            decoding="async"
-            draggable={false}
-            onError={handleImageError}
-          />
-        )}
+        {/* Clip container isolado - borda arredondada fica aqui, fora do layer de transform 3D */}
+        <div className="absolute inset-0 overflow-hidden rounded-[28px] isolate">
+          {/* Full-Bleed Cover Image Artwork */}
+          {hasAllFailed ? (
+            <div
+              className="absolute inset-0 flex items-center justify-center p-5 text-center"
+              style={{ background: FALLBACK_CARD_BACKGROUND }}
+            >
+              <span className="line-clamp-3 text-xs font-display font-medium text-white/70">
+                {title}
+              </span>
+            </div>
+          ) : (
+            <img
+              src={currentImageSrc}
+              alt={title}
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              onError={handleImageError}
+            />
+          )}
 
-        {/* Cinematic Vignette Overlay (Darker at bottom for text contrast) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/20 pointer-events-none" />
+          {/* Cinematic Vignette Overlay (Darker at bottom for text contrast) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/20 pointer-events-none" />
+
+          {/* Ambient Gloss Highlight on Top Edge */}
+          <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
+        </div>
 
         {/* Top Badges (Platform & Favorite) */}
         <div className="absolute left-3 right-3 top-3 z-20 flex items-center justify-between pointer-events-none">
@@ -297,7 +305,7 @@ const GameCard: React.FC<GameCardProps> = ({
         </div>
 
         {/* Bottom Title and Source Metadata (Ultra Clean) */}
-        <div className="relative z-20 mt-auto p-4 flex flex-col justify-end">
+        <div className="relative z-20 mt-auto p-4 flex flex-col justify-end pointer-events-none">
           <h3 className="line-clamp-2 text-sm font-display font-semibold text-white tracking-tight leading-snug drop-shadow-md">
             {title}
           </h3>
@@ -305,9 +313,6 @@ const GameCard: React.FC<GameCardProps> = ({
             {platformBadge?.label || "Jogo"} • Pherielium
           </p>
         </div>
-
-        {/* Ambient Gloss Highlight on Top Edge */}
-        <div className="absolute inset-x-0 top-0 h-1/3 bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
       </motion.div>
     </div>
   );

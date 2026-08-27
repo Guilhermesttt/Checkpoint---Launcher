@@ -30,6 +30,7 @@ declare global {
         thumbnail: string;
         appIcon: string | null;
       }>>;
+      getLocalGameScreenshots?: (request: { title?: string; launcherType?: string; steamAppId?: string | number }) => Promise<string[]>;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
       loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
@@ -307,6 +308,7 @@ declare global {
         callback: (payload: { steamStatus?: string; discordStatus?: string }) => void,
       ) => () => void;
       openExternalUrl: (url: string) => Promise<void>;
+      openPath?: (path: string) => Promise<string>;
       copyToClipboard: (value: string) => Promise<{ ok: boolean }>;
       scanLocalGames: () => Promise<Array<{ name: string; path: string }>>;
       listLocalGames: (uid: string) => Promise<import("./domain").Game[]>;
@@ -580,6 +582,13 @@ declare global {
         | { kind: "voice-mute" }
         | { kind: "voice-deafen" }
       ) => void) => () => void;
+
+      /**
+       * Listener emitido pelo processo principal sempre que o painel do overlay
+       * in-game abre ou fecha. Use para bloquear/desbloquear inputs do controle
+       * no hub enquanto o overlay estiver visível.
+       */
+      onOverlayHubInputLock: (callback: (payload: { locked: boolean }) => void) => () => void;
 
       // ─ Real-time achievement push events (main → renderer) ─────────────────
       /**

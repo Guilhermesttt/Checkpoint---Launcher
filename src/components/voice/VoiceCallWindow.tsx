@@ -775,7 +775,7 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
         />
         <div className="flex justify-between px-0.5">
           {scaleMarks.map((m, i) => (
-            <span key={i} className="text-[8px] font-mono text-white/25">
+            <span key={i} className="text-[10px] font-medium font-mono text-white/25">
               {Math.round(m)}
             </span>
           ))}
@@ -795,8 +795,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
           className="relative flex flex-col w-full max-w-6xl h-[88vh] overflow-hidden rounded-[28px] border border-white/10 bg-[#080808] shadow-[0_30px_90px_rgba(0,0,0,0.9)]"
         >
-          {/* Top Bar Header */}
-          <div className="flex items-center justify-between px-6 py-3.5 border-b border-white/[0.08] bg-[#0a0a0a] z-20">
+          {/* Top Bar Header — h-14 consistent */}
+          <div className="flex items-center justify-between h-14 px-6 border-b border-white/[0.08] bg-[#0a0a0a] z-20">
             {/* Left Info: Friend & Duration & Focus Indicator & Category */}
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)] border border-white/15">
@@ -902,17 +902,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                 <span className="hidden sm:inline">Convidar</span>
               </Button>
 
-              {/* View Switcher: Grid Mode vs Focus Mode */}
-              <div className="flex items-center gap-1 bg-white/6 p-1 rounded-xl border border-white/8">
+              {/* View Switcher: Grid vs Focus — Grade active white pill, Foco ghost per audit */}
+              <div className="flex items-center gap-1 bg-white/6 p-1 rounded-full border border-white/8">
                 <Button
                   type="button"
                   variant={!isFocusedMode ? "secondary" : "ghost"}
                   size="sm"
                   onClick={() => setFocusedFeedId(null)}
                   title="Visualização em Grade (Todos os participantes)"
-                  className={`h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold ${!isFocusedMode
-                    ? "bg-white text-black hover:!bg-white/90 hover:!text-black"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-colors ${!isFocusedMode
+                    ? "bg-white text-black font-bold hover:!bg-white hover:!text-black"
+                    : "text-white/60 hover:text-white/85 hover:bg-white/10 font-medium"
                     }`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" />
@@ -929,9 +929,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                     }
                   }}
                   title="Modo Foco / Destaque"
-                  className={`h-8 gap-1.5 rounded-lg px-2.5 text-xs font-semibold ${isFocusedMode
-                    ? "bg-white text-black hover:!bg-white/90 hover:!text-black"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-colors ${isFocusedMode
+                    ? "bg-white text-black font-bold hover:!bg-white hover:!text-black"
+                    : "text-white/60 hover:text-white/85 hover:bg-white/10 font-medium"
                     }`}
                 >
                   <Pin className="h-3.5 w-3.5" />
@@ -970,6 +970,14 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             <div className="flex items-center justify-center gap-2 bg-amber-500/20 border-b border-amber-500/30 px-4 py-2 text-amber-300 text-xs font-bold animate-pulse z-10">
               <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
               <span>Conexão de voz instável. Reconectando via ICE restart...</span>
+            </div>
+          )}
+
+          {/* Global Connecting Status Bar — consolidated, replaces per-card duplicates */}
+          {callState === "connecting" && !isReconnecting && (
+            <div className="flex items-center justify-center gap-2 bg-white/[0.04] border-b border-white/10 px-4 py-2 text-white/80 text-xs font-medium z-10">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-white/70" />
+              <span>Conectando...</span>
             </div>
           )}
 
@@ -1375,8 +1383,8 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                               <Phone className="h-3.5 w-3.5 animate-bounce text-amber-300" /> Chamando...
                             </span>
                           ) : focusedFeed.isConnecting ? (
-                            <span className="text-sky-300 font-bold flex items-center gap-1.5 animate-pulse">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-300" /> Conectando...
+                            <span className="text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full bg-white/10 border border-white/10 text-white/70 flex items-center gap-1.5">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin text-white/60" /> Conectando...
                             </span>
                           ) : focusedFeed.isDeafened ? (
                             <span className="text-rose-400 font-bold flex items-center gap-1.5">
@@ -1694,12 +1702,12 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
 
                               {/* Discord-style Top-Left Name & Status Pill */}
                               {feed.isConnecting ? (
-                                <div className="absolute top-3.5 left-3.5 flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)] pointer-events-none max-w-[calc(100%-110px)] z-10">
-                                  <Loader2 className="h-3.5 w-3.5 text-sky-400 animate-spin shrink-0" />
+                                <div className="absolute top-3.5 left-3.5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg pointer-events-none max-w-[calc(100%-110px)] z-10">
+                                  <Loader2 className="h-3.5 w-3.5 text-white/60 animate-spin shrink-0" />
                                   <span className="text-xs sm:text-sm font-bold text-white tracking-wide truncate">
                                     {feed.title}
                                   </span>
-                                  <span className="text-[10px] font-black text-sky-300 uppercase tracking-wider bg-sky-500/20 px-1.5 py-0.5 rounded border border-sky-400/30 shrink-0">
+                                  <span className="text-[10px] font-bold tracking-wider px-2.5 py-1 rounded-full bg-white/10 border border-white/10 text-white/70 shrink-0">
                                     Conectando...
                                   </span>
                                 </div>
@@ -2239,17 +2247,17 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Bottom Call Controls Dock (Discord 6-Button Grid) */}
-          <div className="flex items-center justify-center gap-2.5 p-3.5 sm:p-4 border-t border-white/[0.08] bg-black/50 backdrop-blur-2xl z-20">
+          {/* Bottom Call Controls Dock — gap-3, h-10 w-10 rounded-full, end call #FF2B55 per audit */}
+          <div className="flex items-center justify-center gap-3 p-3.5 sm:p-4 border-t border-white/[0.08] bg-black/50 backdrop-blur-2xl z-20">
             {/* 1. Mute Button */}
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={onToggleMute}
-              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isMuted
-                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105 hover:!bg-rose-500/90"
-                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
+              className={`h-10 w-10 rounded-full border flex items-center justify-center transition-colors ${isMuted
+                ? "bg-[#FF2B55] border-[#FF2B55] text-white shadow-[0_4px_16px_rgba(255,43,85,0.35)]"
+                : "bg-white/[0.06] hover:bg-white/10 border-white/10 text-white"
                 }`}
               title={isMuted ? "Desmutar microfone" : "Mutar microfone"}
             >
@@ -2263,9 +2271,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={onToggleCamera}
-                className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isCameraOn
-                  ? "bg-white text-black shadow-md scale-105 hover:bg-white/90"
-                  : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
+                className={`h-10 w-10 rounded-full border flex items-center justify-center transition-colors ${isCameraOn
+                  ? "bg-white border-white text-black shadow-md"
+                  : "bg-white/[0.06] hover:bg-white/10 border-white/10 text-white"
                   }`}
                 title={isCameraOn ? "Desligar câmera" : "Ligar câmera"}
               >
@@ -2279,9 +2287,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               variant="ghost"
               size="icon"
               onClick={onToggleScreenShare}
-              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isSharingScreen
-                ? "bg-white text-black shadow-md scale-105 hover:bg-white/90"
-                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
+              className={`h-10 w-10 rounded-full border flex items-center justify-center transition-colors ${isSharingScreen
+                ? "bg-white border-white text-black shadow-md"
+                : "bg-white/[0.06] hover:bg-white/10 border-white/10 text-white"
                 }`}
               title={isSharingScreen ? "Parar transmissão" : "Transmitir tela ou jogo"}
             >
@@ -2294,9 +2302,9 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               variant="ghost"
               size="icon"
               onClick={onToggleDeafen}
-              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isDeafened
-                ? "bg-rose-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.45)] scale-105 hover:!bg-rose-500/90"
-                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
+              className={`h-10 w-10 rounded-full border flex items-center justify-center transition-colors ${isDeafened
+                ? "bg-[#FF2B55] border-[#FF2B55] text-white shadow-[0_4px_16px_rgba(255,43,85,0.35)]"
+                : "bg-white/[0.06] hover:bg-white/10 border-white/10 text-white"
                 }`}
               title={isDeafened ? "Desativar silêncio total" : "Silenciar tudo (Deafen)"}
             >
@@ -2309,25 +2317,25 @@ export const VoiceCallWindow: React.FC<VoiceCallWindowProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => setIsSettingsOpen((prev) => !prev)}
-              className={`h-12 w-12 rounded-2xl transition-all duration-200 ${isSettingsOpen
-                ? "bg-white text-black shadow-md hover:bg-white/90"
-                : "bg-white/[0.06] text-white hover:!bg-white/[0.12] hover:!text-white hover:scale-105"
+              className={`h-10 w-10 rounded-full border flex items-center justify-center transition-colors ${isSettingsOpen
+                ? "bg-white border-white text-black shadow-md"
+                : "bg-white/[0.06] hover:bg-white/10 border-white/10 text-white"
                 }`}
               title="Ajustes de voz & entrada"
             >
               <Settings className="h-5 w-5" />
             </Button>
 
-            {/* Unified Disconnect / End Call Button */}
+            {/* Unified Disconnect / End Call Button — h-10 px-6 rounded-full bg-[#FF2B55] hover:bg-[#FF1A45] */}
             <Button
               type="button"
               variant="destructive"
               onClick={onHangUp}
-              className="h-12 gap-2 rounded-2xl bg-rose-600 px-6 text-xs font-black uppercase tracking-wider shadow-lg shadow-rose-600/35 transition-all duration-200 hover:bg-rose-500 hover:scale-105 active:scale-95 ml-2"
+              className="h-10 px-6 rounded-full bg-[#FF2B55] hover:bg-[#FF1A45] text-white font-bold text-xs tracking-wide shadow-[0_4px_16px_rgba(255,43,85,0.35)] flex items-center justify-center gap-2 transition-colors ml-2"
               title={isOnlyOnePersonInRoom ? "Encerrar chamada" : "Desconectar da chamada"}
             >
-              <PhoneOff className="h-4.5 w-4.5" />
-              <span>{isOnlyOnePersonInRoom ? "Encerrar Chamada" : "Desconectar"}</span>
+              <PhoneOff className="h-4 w-4" />
+              <span>{isOnlyOnePersonInRoom ? "ENCERRAR CHAMADA" : "Desconectar"}</span>
             </Button>
           </div>
 

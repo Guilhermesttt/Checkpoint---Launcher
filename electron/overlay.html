@@ -2692,7 +2692,7 @@
                 <h2>Conversas</h2>
                 <p>Continue suas conversas sem sair do jogo.</p>
               </div>
-              <div class="conversation-list" id="conversation-list"></div>
+              <div class="conversation-list" id="conversation-list" data-gamepad-id="chat-list" data-gamepad-nav-up="chat-search" data-gamepad-nav-down="chat-list-item-0"></div>
             </div>
             <div class="chat-layout" id="panel-chat-view" hidden>
               <header class="chat-header">
@@ -3765,8 +3765,16 @@
         empty.textContent = "Suas conversas com amigos do Phelierium aparecerão aqui.";
         conversationRoot.appendChild(empty);
       }
-      chatFriends.forEach((friend) => {
+      chatFriends.forEach((friend, index) => {
         const row = document.createElement("button");
+        row.type = "button";
+        row.className = "conversation-row";
+        row.setAttribute("data-gamepad-id", `chat-list-item-${index}`);
+        row.setAttribute("data-gamepad-nav-up", index === 0 ? "chat-list" : `chat-list-item-${index - 1}`);
+        row.setAttribute("data-gamepad-nav-down", `chat-list-item-${index + 1}`);
+        row.setAttribute("tabIndex", "0");
+        row.setAttribute("role", "button");
+        row.setAttribute("aria-label", `Conversa com ${friend.name || overlayT("player")}`);
         row.type = "button";
         row.className = "conversation-row";
         const avatar = document.createElement("img");
@@ -3789,6 +3797,12 @@
         }
         row.append(avatar, copy, meta);
         row.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "select-chat", friendId: friend.id }));
+        row.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            window.achievementOverlay.panelAction({ kind: "select-chat", friendId: friend.id });
+          }
+        });
         conversationRoot.appendChild(row);
       });
 
@@ -4416,6 +4430,19 @@
         if (Boolean(open) !== Boolean(wasOpen) && Date.now() - lastOverlayUiSoundAt > 120) {
           playOverlayUiSound("ui-click");
         }
+        
+        // Gerencia foco do overlay gamepad
+        if (overlayGamepad?.setOverlayFocus) {
+          overlayGamepad.setOverlayFocus(open);
+        }
+      });
+      
+      // Escuta mudanças de foco do overlay para desabilitar gamepad no app principal
+      window.addEventListener("checkpoint:overlay-focus-changed", (event) => {
+        const hasFocus = event.detail?.hasFocus;
+        document.body.classList.toggle("overlay-has-focus", hasFocus);
+        // Notifica o GamepadContext do app principal
+        window.dispatchEvent(new CustomEvent("checkpoint:overlay-focus-changed", { detail: { hasFocus: event.detail.hasFocus } }));
       });
       window.achievementOverlay.onPanelState(renderPanelState);
       window.achievementOverlay.onPanelCommand?.((command) => {

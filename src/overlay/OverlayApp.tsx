@@ -28,6 +28,8 @@ import {
   UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/Shandc/button";
+import { useGamepadButton } from "../context/GamepadContext";
+import { useGamepadFocusNavigation } from "../hooks/useGamepadFocusNavigation";
 
 interface AchievementToast {
   id: string;
@@ -258,34 +260,26 @@ const OverlayApp: React.FC = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [isPanelVisible, viewingImage]);
 
-  useEffect(() => {
-    if (!isPanelVisible) return;
-    let raf = 0;
-    const prevButtons = new Map<number, boolean>();
+  const { moveSystemFocus } = useGamepadFocusNavigation({
+    playSound: (type) => playOverlaySound("toggle"),
+    activeCategory: activeView,
+    isSystemCategory: true,
+  });
 
-    function poll() {
-      const gps = navigator.getGamepads?.() ?? [];
-      for (const g of gps) {
-        if (!g) continue;
-        g.buttons.forEach((b, i) => {
-          const pressed = b.pressed;
-          const prev = prevButtons.get(i) || false;
-          if (pressed && !prev) {
-            if (i === 0) {
-              const active = document.activeElement as HTMLElement | null;
-              active?.click?.();
-            } else if (i === 1) {
-              closePanel();
-            }
-          }
-          prevButtons.set(i, pressed);
-        });
-      }
-      raf = requestAnimationFrame(poll);
-    }
-    raf = requestAnimationFrame(poll);
-    return () => cancelAnimationFrame(raf);
-  }, [isPanelVisible]);
+  useGamepadButton("DPAD_UP", () => moveSystemFocus("up"), isPanelVisible, 100);
+  useGamepadButton("DPAD_DOWN", () => moveSystemFocus("down"), isPanelVisible, 100);
+  useGamepadButton("DPAD_LEFT", () => moveSystemFocus("left"), isPanelVisible, 100);
+  useGamepadButton("DPAD_RIGHT", () => moveSystemFocus("right"), isPanelVisible, 100);
+  useGamepadButton("O", () => closePanel(), isPanelVisible, 100);
+  useGamepadButton(
+    "X",
+    () => {
+      const active = document.activeElement as HTMLElement | null;
+      active?.click?.();
+    },
+    isPanelVisible,
+    100
+  );
 
   const handleSelectChat = (friendId: string) => {
     setActiveView("chats");
@@ -461,6 +455,7 @@ const OverlayApp: React.FC = () => {
               exit={{ scale: 0.96, opacity: 0, y: 15 }}
               transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="relative flex h-[82vh] w-[90vw] max-w-6xl overflow-hidden rounded-[28px] border border-white/15 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#1c1d28] via-[#0d0e12] to-[#050507] shadow-[0_30px_100px_rgba(0,0,0,0.95)]"
+              data-system-page="true"
             >
               {/* Sidebar Navigation */}
               <div className="flex w-64 flex-col border-r border-white/[0.08] bg-white/[0.02] p-5">
@@ -484,7 +479,7 @@ const OverlayApp: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveView("game")}
-                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "game"
+                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-emerald-400 data-[gamepad-focused=true]:ring-offset-2 data-[gamepad-focused=true]:ring-offset-black data-[gamepad-focused=true]:outline-none ${activeView === "game"
                       ? "bg-white text-black shadow-md"
                       : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
@@ -494,7 +489,7 @@ const OverlayApp: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveView("achievements")}
-                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "achievements"
+                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-emerald-400 data-[gamepad-focused=true]:ring-offset-2 data-[gamepad-focused=true]:ring-offset-black data-[gamepad-focused=true]:outline-none ${activeView === "achievements"
                       ? "bg-white text-black shadow-md"
                       : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
@@ -504,7 +499,7 @@ const OverlayApp: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveView("friends")}
-                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "friends"
+                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-emerald-400 data-[gamepad-focused=true]:ring-offset-2 data-[gamepad-focused=true]:ring-offset-black data-[gamepad-focused=true]:outline-none ${activeView === "friends"
                       ? "bg-white text-black shadow-md"
                       : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
@@ -514,7 +509,7 @@ const OverlayApp: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveView("chats")}
-                    className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "chats"
+                    className={`flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-emerald-400 data-[gamepad-focused=true]:ring-offset-2 data-[gamepad-focused=true]:ring-offset-black data-[gamepad-focused=true]:outline-none ${activeView === "chats"
                       ? "bg-white text-black shadow-md"
                       : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
@@ -529,7 +524,7 @@ const OverlayApp: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveView("media")}
-                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${activeView === "media"
+                    className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all data-[gamepad-focused=true]:ring-2 data-[gamepad-focused=true]:ring-emerald-400 data-[gamepad-focused=true]:ring-offset-2 data-[gamepad-focused=true]:ring-offset-black data-[gamepad-focused=true]:outline-none ${activeView === "media"
                       ? "bg-white text-black shadow-md"
                       : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
