@@ -43,6 +43,7 @@ public/download
 
 .test-profile
 .superpowers
+.worktrees
 scratch
 patches
 desktop-startup.log
