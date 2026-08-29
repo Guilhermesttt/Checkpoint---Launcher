@@ -50,9 +50,6 @@ const GameCard: React.FC<GameCardProps> = ({
 }) => {
   const [imageFailed, setImageFailed] = useState(false);
   const [useFallbackSteamUrl, setUseFallbackSteamUrl] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
-
-  const visuallyActive = isActive || isFocused;
 
   // 3D Parallax Tilt - 60fps console smooth (reduced range, snappier spring)
   const mouseX = useMotionValue(0);
@@ -199,12 +196,10 @@ const GameCard: React.FC<GameCardProps> = ({
       onContextMenu={onContextMenu}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      onFocus={() => setIsFocused(true)}
-      onBlur={() => setIsFocused(false)}
       role="button"
       tabIndex={0}
       aria-label={title}
-      aria-pressed={visuallyActive}
+      aria-pressed={isActive}
       data-game-card={true}
       className="group relative flex items-center justify-center p-0 text-left select-none focus:outline-none cursor-pointer perspective-1000"
       style={{
@@ -222,8 +217,8 @@ const GameCard: React.FC<GameCardProps> = ({
           WebkitBackfaceVisibility: "hidden" as const,
         }}
         animate={{
-          scale: visuallyActive ? 1.05 : 0.95,
-          y: visuallyActive ? -8 : 0,
+          scale: isActive ? 1.05 : 0.95,
+          y: isActive ? -8 : 0,
         }}
         transition={{
           type: "spring",
@@ -231,7 +226,7 @@ const GameCard: React.FC<GameCardProps> = ({
           damping: 20,
         }}
         className={`relative isolate rounded-[28px] bg-[#090A0D] border transform-gpu will-change-transform flex flex-col justify-between transition-[border-color,box-shadow] duration-200 ${
-          visuallyActive
+          isActive
             ? "border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
             : "border-white/[0.08] hover:border-white/25 shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
         }`}
@@ -294,7 +289,7 @@ const GameCard: React.FC<GameCardProps> = ({
         {/* Central Interactive Play/Action Indicator */}
         <div
           className={`absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-all duration-300 ${
-            visuallyActive
+            isActive
               ? "opacity-100 scale-100"
               : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-95"
           }`}

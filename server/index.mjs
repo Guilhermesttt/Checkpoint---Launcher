@@ -179,7 +179,7 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
@@ -200,6 +200,8 @@ app.use(
         ],
         frameSrc: ["'self'"],
         objectSrc: ["'none'"],
+        baseUri: ["'none'"],
+        frameAncestors: ["'none'"],
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -221,6 +223,7 @@ app.use(
 app.use(express.json({ limit: "128kb" }));
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use(express.static(path.join(__dirname, "..", "public")));
 
 const steamOpenIdEndpoint = "https://steamcommunity.com/openid/login";
 const epicStoreGraphqlEndpoint = "https://store.epicgames.com/graphql";
@@ -261,14 +264,14 @@ const steamAuthLimiter = rateLimit({
 
 const steamPublicLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 60,
+  limit: 250,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const steamPrivateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 30,
+  limit: 150,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -1124,14 +1127,14 @@ const pickSteamTrailerUrl = (movies) => {
   for (const m of list) {
     const mp4 = m?.mp4;
     const webm = m?.webm;
+    let u = null;
     if (mp4 && typeof mp4 === "object") {
-      const u = mp4.max || mp4["480"];
-      if (u) return u;
+      u = mp4.max || mp4["480"];
     }
-    if (webm && typeof webm === "object") {
-      const u = webm.max || webm["480"];
-      if (u) return u;
+    if (!u && webm && typeof webm === "object") {
+      u = webm.max || webm["480"];
     }
+    if (u) return { url: u, thumbnail: m?.thumbnail || null };
   }
   return null;
 };
@@ -3399,6 +3402,7 @@ app.post("/api/steam/disconnect", steamPrivateLimiter, requireFirebaseUser, asyn
       steam_id: null,
       steam_username: null,
       steam_avatar: null,
+      last_steam_sync_at: null,
     });
     res.json({ ok: true });
   } catch {
@@ -3736,7 +3740,7 @@ app.get("/api/epic/search", steamPublicLimiter, async (req, res) => {
 
 app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
   const catalogId = String(req.query.catalogId ?? "").trim();
-  const namespace = String(req.query.namespace ?? epicSandboxId ?? "").trim();
+  const namespace = String(req.query.namespace ?? req.query.sandboxId ?? "").trim();
   const storeLocale = resolveStoreLocale(req.query.language);
   if (!catalogId || !namespace) {
     res.status(400).json({ error: "catalogId ou namespace inválido." });
@@ -3755,7 +3759,8 @@ app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
       namespace,
       catalogId,
       storeLocale.locale,
-    );
+    ).catch(() => null);
+
     if (!catalogItem) {
       res.status(404).json({ error: "Detalhes não encontrados para este item Epic." });
       return;
@@ -3764,8 +3769,8 @@ app.get("/api/epic/app-details", steamPublicLimiter, async (req, res) => {
     const result = buildEpicDetails(catalogId, namespace, catalogItem);
     appDetailsCache.set(cacheKey, { data: result, timestamp: Date.now() });
     res.json(result);
-  } catch {
-    res.status(500).json({ error: "Erro interno ao buscar detalhes da Epic Games Store." });
+  } catch (error) {
+    res.status(404).json({ error: "Detalhes não encontrados." });
   }
 });
 
@@ -3975,7 +3980,7 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
     const appEntry = payload?.[appId];
     if (!appEntry?.success || !appEntry?.data) {
       res
-        .status(404)
+        .status(200)
         .json({ error: "Detalhes não encontrados para este appId." });
       return;
     }
@@ -4011,8 +4016,14 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
           ? data.categories.map((c) => c.description)
           : []),
       ],
-      trailerUrl,
+      trailerUrl: trailerUrl?.url || null,
+      trailerThumbnail: trailerUrl?.thumbnail || null,
       sizeGB: parseDiskSizeGb(requirements),
+      pcRequirements: data?.pc_requirements ?? null,
+      supportedLanguages: data?.supported_languages ?? null,
+      metacritic: data?.metacritic ?? null,
+      priceOverview: data?.price_overview ?? null,
+      dlc: data?.dlc ?? [],
     };
 
     appDetailsCache.set(cacheKey, { data: result, timestamp: Date.now() });
@@ -4022,15 +4033,13 @@ app.get("/api/steam/app-details", steamPublicLimiter, async (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, "../dist")));
-
-app.get("/{*path}", (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist/index.html"));
+app.use((_req, res) => {
+  res.status(404).json({ error: "Rota nao encontrada." });
 });
 
-export const startServer = () => {
-  const server = app.listen(port, () => {
-    console.log(`Backend ativo em http://localhost:${port}`);
+export const startServer = ({ host = process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1" } = {}) => {
+  const server = app.listen(port, host, () => {
+    console.log(`Backend ativo em http://${host}:${port}`);
     void cleanupExpiredChatData()
       .then(({ deletedMessages, deletedAttachments }) => {
         if (deletedMessages > 0 || deletedAttachments > 0) {

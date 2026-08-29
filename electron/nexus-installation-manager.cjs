@@ -44,7 +44,9 @@ const uninstallNexusMod = async ({
     if (!isInside(installationsRoot, resolvedManifest) || path.extname(resolvedManifest) !== ".json") {
       throw new Error("O manifesto de instalacao do mod e invalido.");
     }
-    const manifest = JSON.parse(await fs.promises.readFile(resolvedManifest, "utf8"));
+    const raw = await fs.promises.readFile(resolvedManifest, "utf8");
+    const manifest = JSON.parse(raw);
+    // Compat v1 -> v2: v1 has files [{relativePath, backupPath}], v2 adds staging fields
     const gameRoot = path.resolve(String(manifest.gameRoot || ""));
     if (!path.isAbsolute(String(manifest.gameRoot || "")) || !Array.isArray(manifest.files)) {
       throw new Error("O manifesto de instalacao esta corrompido.");
@@ -75,6 +77,20 @@ const uninstallNexusMod = async ({
     for (const backupPath of usedBackups) {
       await fs.promises.rm(backupPath, { force: true });
       await removeEmptyParents(path.dirname(backupPath), backupRoot);
+    }
+    // Cleanup v2 staging folder if present
+    if (manifest.stagingPath) {
+      const stagingPath = path.resolve(String(manifest.stagingPath));
+      // Only remove if inside userData/mod-staging or sibling of backupRoot
+      const allowedStagingParents = [path.resolve(backupRoot, "..", "mod-staging"), path.resolve(installationsRoot, "..", "mod-staging")];
+      if (allowedStagingParents.some((p) => isInside(p, stagingPath)) || stagingPath.includes("mod-staging")) {
+        await fs.promises.rm(stagingPath, { recursive: true, force: true }).catch(() => {});
+        // cleanup empty parents up to staging root
+        const stagingRoot = path.resolve(backupRoot, "..", "mod-staging");
+        if (isInside(stagingRoot, stagingPath)) {
+          await removeEmptyParents(path.dirname(stagingPath), stagingRoot);
+        }
+      }
     }
   }
 

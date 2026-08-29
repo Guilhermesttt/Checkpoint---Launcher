@@ -47,4 +47,13 @@ if (fs.existsSync(unpackedUpdateConfig)) {
   if (!updateConfig.includes("provider: github")) fail("Provider invalido no app-update.yml.");
 }
 
-console.log(`[release:verify] ${artifactName} v${version}: metadados e SHA-512 validos.`);
+const legendaryPath = path.join(root, "bin", "legendary.exe");
+if (fs.existsSync(legendaryPath)) {
+  const EXPECTED_LEGENDARY_SHA256 = "4c01a14c0acb0c46069b197ae7212ea4ea6b861661126ca0593cdac31658fb01";
+  const actualLegHash = crypto.createHash("sha256").update(fs.readFileSync(legendaryPath)).digest("hex");
+  if (actualLegHash !== EXPECTED_LEGENDARY_SHA256) {
+    fail(`Hash SHA-256 do bin/legendary.exe invalido: ${actualLegHash}`);
+  }
+}
+
+console.log(`[release:verify] ${artifactName} v${version}: metadados, binarios e SHA-512 validos.`);

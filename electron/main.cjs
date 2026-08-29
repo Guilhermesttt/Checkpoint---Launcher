@@ -11,8 +11,21 @@ app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enable
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-require("dotenv").config({ path: path.join(__dirname, "..", ".env"), quiet: true });
 const { pathToFileURL, fileURLToPath } = require("node:url");
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "cp-media",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+]);
 const { createAchievementBridge } = require("./achievement-bridge.cjs");
 const { readAchievementLibrarySummary } = require("./achievement-summary.cjs");
 const { normalizeLaunchProfile } = require("./launch-profile.cjs");
@@ -33,7 +46,10 @@ const {
   parseProcessSnapshot,
 } = require("./game-process-monitor.cjs");
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
+const { createLegendaryManager } = require("./legendary-manager.cjs");
+const { createEpicAccount } = require("./epic-account.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
+const { cleanupPlatformAchievementFiles } = require("./platform-data-cleanup.cjs");
 const { createWindowBehaviorController } = require("./window-behavior.cjs");
 const { createRetroArtworkImporter } = require("./retro-artwork-importer.cjs");
 const { createTheGamesDbClient } = require("./thegamesdb.cjs");
@@ -444,6 +460,8 @@ const ensureNexusDownloadRoot = async () => {
   return nexusDownloadMigrationPromise;
 };
 
+const getNexusStagingRoot = () => path.join(app.getPath("userData"), "mod-staging");
+
 const installSupportedNexusZip = async ({
   gameDomain,
   archivePath,
@@ -451,6 +469,9 @@ const installSupportedNexusZip = async ({
   modId,
   fileId,
   modName,
+  modVersion,
+  modAuthor,
+  priority,
 }) => {
   return runModOperation("install", {
     gameDomain,
@@ -458,9 +479,13 @@ const installSupportedNexusZip = async ({
     gameRoot: gameFolder,
     backupRoot: path.join(app.getPath("userData"), "nexus-backups"),
     manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+    stagingRoot: getNexusStagingRoot(),
     modId,
     fileId,
     modName,
+    modVersion,
+    modAuthor,
+    priority,
   });
 };
 
@@ -748,11 +773,11 @@ registerSecureIpcHandler("nexus:list-downloaded-files", async (_event, rawGameDo
   return downloads.sort((left, right) => right.downloadedAt - left.downloadedAt);
 });
 
-registerSecureIpcHandler("nexus:prepare-free-download", (_event, request) => {
+registerSecureIpcHandler("nexus:prepare-free-download", async (_event, request) => {
   const gameDomain = normalizeGameDomain(request?.gameDomain);
   const modId = normalizeModId(request?.modId);
   const fileId = normalizeModId(request?.fileId);
-  getNexusApiKey();
+  await getNexusApiKey();
   const expiresAt = Date.now() + NEXUS_DOWNLOAD_REQUEST_TTL_MS;
   pendingNexusDownload = {
     gameDomain,
@@ -804,6 +829,9 @@ registerSecureIpcHandler("nexus:install-downloaded-mod", async (_event, request)
       modId,
       fileId,
       modName: baseState.modName,
+      modVersion: String(request?.modVersion || "").slice(0, 80),
+      modAuthor: String(request?.modAuthor || "").slice(0, 120),
+      priority: Number(request?.priority) || 0,
       }),
     );
     return publishNexusDownloadState({
@@ -811,7 +839,7 @@ registerSecureIpcHandler("nexus:install-downloaded-mod", async (_event, request)
       ...installation,
       status: "completed",
       installed: true,
-      installationError: "",
+      installationError: installation.warnings?.length ? installation.warnings.join(" | ") : "",
     });
   } catch (error) {
     publishNexusDownloadState({
@@ -822,6 +850,12 @@ registerSecureIpcHandler("nexus:install-downloaded-mod", async (_event, request)
     });
     throw error;
   }
+});
+
+registerSecureIpcHandler("nexus:preview-mod", async (_event, request) => {
+  const gameDomain = normalizeGameDomain(request?.gameDomain);
+  const archivePath = assertAllowedArchive(request?.filePath, getAllowedNexusDownloadRoots());
+  return runModOperation("preview", { archivePath, gameDomain });
 });
 
 registerSecureIpcHandler("nexus:adopt-installed-mod", async (_event, request) => {
@@ -836,6 +870,7 @@ registerSecureIpcHandler("nexus:adopt-installed-mod", async (_event, request) =>
     archivePath,
     gameRoot: String(request?.gameFolder || "").slice(0, 2048),
     manifestRoot: path.join(app.getPath("userData"), "nexus-installations"),
+    stagingRoot: getNexusStagingRoot(),
     gameDomain,
     modId,
     fileId,
@@ -896,10 +931,18 @@ const isExternalProtocol = (rawUrl) => {
 
 const isSafeOpenExternalUrl = (rawUrl) => {
   try {
-    const url = new URL(String(rawUrl));
+    const raw = String(rawUrl || "").trim();
+    if (/[\x00-\x1F\x7F]/.test(raw)) return false;
+    const url = new URL(raw);
+    if (url.username || url.password) return false;
     if (url.protocol === "https:") return true;
     if (url.protocol === "http:") return isLocalAppUrl(url.toString());
-    return url.protocol === "steam:" || url.protocol === "com.epicgames.launcher:";
+    return (
+      url.protocol === "steam:" ||
+      url.protocol === "com.epicgames.launcher:" ||
+      url.protocol === "checkpoint:" ||
+      url.protocol === "nxm:"
+    );
   } catch {
     return false;
   }
@@ -1091,10 +1134,17 @@ const createWindow = async () => {
 
   configureHidAccess(mainWindow.webContents.session);
 
-  // Permite que o renderer carregue imagens diretamente do archive.org (capas de jogos retrô).
-  // Injeta CORS permissivo em TODAS as respostas do archive.org incluindo CDNs de redirect.
+  // Permite que o renderer carregue imagens diretamente de CDNs externas sem bloqueio de CORS
   mainWindow.webContents.session.webRequest.onHeadersReceived(
-    { urls: ["https://archive.org/*", "https://*.archive.org/*"] },
+    {
+      urls: [
+        "https://archive.org/*",
+        "https://*.archive.org/*",
+        "https://*.steamstatic.com/*",
+        "https://*.epicgames.com/*",
+        "https://*.akamaized.net/*",
+      ],
+    },
     (details, callback) => {
       const headers = { ...details.responseHeaders };
       headers["Access-Control-Allow-Origin"] = ["*"];
@@ -1523,7 +1573,7 @@ const loadRecentCaptures = async () => {
         return {
           id: `${stat.mtimeMs}:${fileObj.name}`,
           name: fileObj.name,
-          url: `cp-media://${fileObj.path.replace(/\\/g, "/")}`,
+          url: pathToFileURL(fileObj.path).toString(),
           createdAt: stat.mtime.toISOString(),
         };
       })
@@ -1596,7 +1646,7 @@ const captureCurrentDisplay = async () => {
     const capture = {
       id: `${Date.now()}:${fileName}`,
       name: fileName,
-      url: `cp-media://${filePath.replace(/\\/g, "/")}`,
+      url: pathToFileURL(filePath).toString(),
       createdAt: new Date().toISOString(),
       gameId: String(overlayPanelState.currentGame?.id || ""),
       gameTitle: String(overlayPanelState.currentGame?.title || ""),
@@ -1647,7 +1697,7 @@ const deleteCapture = async (captureId) => {
   try {
     const directory = path.resolve(captureDirectory());
     const isFileURL = capture.url.startsWith("file:");
-    const filePath = path.resolve(isFileURL ? fileURLToPath(capture.url) : decodeURIComponent(capture.url.replace("cp-media://", "")));
+    const filePath = path.resolve(isFileURL ? fileURLToPath(capture.url) : decodeURIComponent(capture.url.replace(/^cp-media:\/\/(?:local\/)?/i, "")));
     const relativePath = path.relative(directory, filePath);
     if (!relativePath || relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
       return { ok: false, error: "Arquivo de captura invalido." };
@@ -2586,7 +2636,7 @@ registerSecureIpcHandler("media:get-local-game-screenshots", async (_event, requ
     for (const filePath of allFiles) {
       const stat = await fs.promises.stat(filePath);
       results.push({
-        url: `cp-media://${filePath.replace(/\\/g, "/")}`,
+        url: `cp-media://local/${encodeURI(filePath.replace(/\\/g, "/"))}`,
         createdAt: stat.mtimeMs,
         source: 'hub'
       });
@@ -2611,7 +2661,7 @@ registerSecureIpcHandler("media:get-local-game-screenshots", async (_event, requ
               const filePath = path.join(screenshotsDir, f);
               const stat = await fs.promises.stat(filePath);
               results.push({
-                url: `cp-media://${filePath.replace(/\\/g, "/")}`,
+                url: `cp-media://local/${encodeURI(filePath.replace(/\\/g, "/"))}`,
                 createdAt: stat.mtimeMs,
                 source: 'steam'
               });
@@ -2822,47 +2872,364 @@ const searchEpicGamesStore = async (rawQuery) => {
   return items;
 };
 
+registerSecureIpcHandler("launcher:open-epic-login-window", async () => {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const authWindow = new BrowserWindow({
+      width: 580,
+      height: 720,
+      show: false,
+      autoHideMenuBar: true,
+      title: "Checkpoint - Conectar Epic Games",
+      backgroundColor: "#0a0b10",
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      }
+    });
+
+    const EPIC_OAUTH_URL = "https://www.epicgames.com/id/login?redirectUrl=https%3A%2F%2Fwww.epicgames.com%2Fid%2Fapi%2Fredirect%3FclientId%3D34a02cf8f4414e29b15921876da36f9a%26responseType%3Dcode";
+
+    authWindow.loadURL(EPIC_OAUTH_URL);
+
+    authWindow.once('ready-to-show', () => {
+      authWindow.show();
+    });
+
+    authWindow.webContents.on('did-finish-load', async () => {
+      const url = authWindow.webContents.getURL();
+      if (url.startsWith('https://www.epicgames.com/id/api/redirect')) {
+        try {
+          const jsonText = await authWindow.webContents.executeJavaScript('document.body ? document.body.innerText : ""');
+          let data = null;
+          try {
+            data = JSON.parse(jsonText);
+          } catch {
+            data = null;
+          }
+
+          if (data && (data.authorizationCode || data.sid)) {
+            await authWindow.webContents.executeJavaScript(`
+              document.head.innerHTML = \`
+                <style>
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    background: radial-gradient(circle at top, #111422 0%, #08090d 100%);
+                    color: #ffffff;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    overflow: hidden;
+                    user-select: none;
+                  }
+                  .card {
+                    background: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    border-radius: 24px;
+                    padding: 40px 32px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                    max-width: 360px;
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+                  }
+                  .badge {
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 16px;
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 20px;
+                    box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+                  }
+                  .spinner {
+                    width: 24px;
+                    height: 24px;
+                    border: 3px solid rgba(255, 255, 255, 0.3);
+                    border-top-color: #ffffff;
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                  }
+                  h1 { font-size: 18px; font-weight: 700; margin: 0 0 8px 0; }
+                  p { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin: 0; line-height: 1.5; }
+                  @keyframes spin { to { transform: rotate(360deg); } }
+                </style>
+              \`;
+              document.body.innerHTML = \`
+                <div class="card">
+                  <div class="badge">
+                    <div class="spinner"></div>
+                  </div>
+                  <h1>Autenticação Concluída!</h1>
+                  <p>Conectando sua conta Epic Games ao Checkpoint Launcher...</p>
+                </div>
+              \`;
+            `).catch(() => undefined);
+
+            if (!resolved) {
+              resolved = true;
+              const code = data.authorizationCode || data.sid;
+              setTimeout(() => {
+                try {
+                  authWindow.close();
+                } catch {}
+                resolve(code);
+              }, 400);
+            }
+            return;
+          } else if (data && (data.errorCode || data.message)) {
+            await authWindow.webContents.executeJavaScript(`
+              document.head.innerHTML = \`
+                <style>
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    background: radial-gradient(circle at top, #1c1316 0%, #08090d 100%);
+                    color: #ffffff;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100vh;
+                    overflow: hidden;
+                  }
+                  .card {
+                    background: rgba(255, 255, 255, 0.04);
+                    border: 1px solid rgba(239, 68, 68, 0.2);
+                    border-radius: 24px;
+                    padding: 40px 32px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    text-align: center;
+                    max-width: 360px;
+                  }
+                  .badge {
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 16px;
+                    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 20px;
+                    font-size: 24px;
+                    box-shadow: 0 0 24px rgba(239, 68, 68, 0.4);
+                  }
+                  h1 { font-size: 18px; font-weight: 700; margin: 0 0 8px 0; }
+                  p { font-size: 13px; color: rgba(255, 255, 255, 0.7); margin: 0; }
+                </style>
+              \`;
+              document.body.innerHTML = \`
+                <div class="card">
+                  <div class="badge">✕</div>
+                  <h1>Falha na Autenticação</h1>
+                  <p>\${${JSON.stringify(data.message || "Erro desconhecido ao autenticar.")}}</p>
+                </div>
+              \`;
+            `).catch(() => undefined);
+          }
+        } catch (e) {
+          console.error("Failed to parse Epic login JSON:", e);
+        }
+      }
+    });
+
+    authWindow.on('closed', () => {
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    });
+  });
+});
+
+let legendaryManager = null;
+let epicAccount = null;
+
+const getEpicAccount = () => {
+  if (!epicAccount) {
+    if (!legendaryManager) {
+      legendaryManager = createLegendaryManager({
+        userDataPath: app.getPath("userData"),
+      });
+    }
+    epicAccount = createEpicAccount({
+      legendary: legendaryManager,
+      emitProgress: (progress) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("epic:progress", progress);
+        }
+      },
+    });
+  }
+  return epicAccount;
+};
+
+registerSecureIpcHandler("epic:get-status", () => getEpicAccount().getStatus());
+registerSecureIpcHandler("epic:authenticate", (_event, request) => getEpicAccount().authenticate(request));
+registerSecureIpcHandler("epic:list-library", () => getEpicAccount().listLibrary());
+registerSecureIpcHandler("epic:get-achievements", (_event, request) => getEpicAccount().getAchievements(request));
+registerSecureIpcHandler("epic:logout", () => getEpicAccount().logout());
+
+registerSecureIpcHandler("library:purge-platform", async (_event, uid, platform) => {
+  const result = getLocalGameLibrary().purgePlatform(uid, platform);
+  const cleanupRes = await cleanupPlatformAchievementFiles({
+    userDataPath: app.getPath("userData"),
+    steamAppIds: result.steamAppIds,
+    epicCatalogIds: result.epicCatalogIds,
+    platform,
+  });
+  return {
+    ...result,
+    deletedFiles: cleanupRes.deletedFiles,
+  };
+});
+
+registerSecureIpcHandler("library:get-platform-cleanup", (_event, uid, platform) =>
+  getLocalGameLibrary().getPlatformCleanup(uid, platform));
+
+registerSecureIpcHandler("library:set-platform-cleanup-phase", (_event, uid, platform, operationId, phase) =>
+  getLocalGameLibrary().setPlatformCleanupPhase(uid, platform, operationId, phase));
+
+registerSecureIpcHandler("library:complete-platform-cleanup", (_event, uid, platform, operationId) =>
+  getLocalGameLibrary().completePlatformCleanup(uid, platform, operationId));
+
 registerSecureIpcHandler("launcher:search-epic-store", async (_event, query) =>
   searchEpicGamesStore(query));
 
 const fetchEpicGamesStoreDetails = async (rawRequest) => {
-  const productSlug = String(rawRequest?.productSlug || "")
+  const supportedLocales = new Set(["pt-BR", "en-US", "es-ES", "fr-FR", "de-DE", "it-IT"]);
+  const locale = supportedLocales.has(rawRequest?.language) ? rawRequest.language : "pt-BR";
+
+  let productSlug = String(rawRequest?.productSlug || "")
     .trim()
     .replace(/^\/+|\/+$/g, "")
     .replace(/\/home$/i, "");
-  if (!/^[a-z0-9][a-z0-9-]{0,199}$/i.test(productSlug)) {
-    throw new Error("Produto Epic invalido.");
-  }
-  const supportedLocales = new Set(["pt-BR", "en-US", "es-ES", "fr-FR", "de-DE", "it-IT"]);
-  const locale = supportedLocales.has(rawRequest?.language) ? rawRequest.language : "pt-BR";
-  const cacheKey = `${locale}:${productSlug.toLocaleLowerCase("en-US")}`;
-  const cached = epicStoreDetailsCache.get(cacheKey);
-  if (cached && Date.now() - cached.createdAt < 15 * 60 * 1_000) return cached.details;
 
-  const url = `https://store-content-ipv4.ak.epicgames.com/api/${locale}/content/products/${encodeURIComponent(productSlug)}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "Accept-Language": `${locale},en;q=0.8`,
-      Referer: `https://store.epicgames.com/${locale}/p/${productSlug}`,
-    },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) {
-    throw new Error(`A Epic nao retornou os detalhes do jogo (status ${response.status}).`);
+  const titleQuery = String(rawRequest?.title || rawRequest?.appName || "").trim();
+  const catalogId = String(rawRequest?.catalogId || "").trim();
+  const namespace = String(rawRequest?.namespace || "").trim();
+
+  let searchFallbackItem = null;
+  if (!productSlug && titleQuery) {
+    const cacheKeyByTitle = `${locale}:title:${titleQuery.toLowerCase()}`;
+    const cachedByTitle = epicStoreDetailsCache.get(cacheKeyByTitle);
+    if (cachedByTitle && Date.now() - cachedByTitle.createdAt < 15 * 60 * 1_000) {
+      return cachedByTitle.details;
+    }
+
+    try {
+      const searchResults = await searchEpicGamesStore(titleQuery);
+      if (Array.isArray(searchResults) && searchResults.length > 0) {
+        const normalizedQuery = titleQuery.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const match =
+          (catalogId ? searchResults.find((item) => item.catalogId && item.catalogId.toLowerCase() === catalogId.toLowerCase()) : null) ||
+          searchResults.find((item) => {
+            const normTitle = String(item.title || item.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+            if (!normTitle || !normalizedQuery) return false;
+            if (normTitle === normalizedQuery) return true;
+            if (normTitle.length >= 4 && normalizedQuery.length >= 4) {
+              if (normTitle.startsWith(normalizedQuery) || normalizedQuery.startsWith(normTitle)) return true;
+              if (normTitle.includes(normalizedQuery) && normalizedQuery.length / normTitle.length > 0.65) return true;
+              if (normalizedQuery.includes(normTitle) && normTitle.length / normalizedQuery.length > 0.65) return true;
+            }
+            return false;
+          });
+
+        if (match) {
+          searchFallbackItem = match;
+          if (match.productSlug) {
+            productSlug = match.productSlug;
+          }
+        }
+      }
+    } catch (searchErr) {
+      console.warn("[EpicStore] Erro ao buscar produto por título:", searchErr?.message || searchErr);
+    }
   }
-  const payload = await response.json();
-  const details = normalizeEpicStoreDetails(payload, {
-    productSlug,
-    catalogId: String(rawRequest?.catalogId || "").trim(),
-    namespace: String(rawRequest?.namespace || "").trim(),
-  }, readInstalledEpicGames());
-  if (!details) throw new Error("Detalhes nao encontrados na Epic Games Store.");
-  epicStoreDetailsCache.set(cacheKey, { createdAt: Date.now(), details });
-  if (epicStoreDetailsCache.size > 50) {
-    epicStoreDetailsCache.delete(epicStoreDetailsCache.keys().next().value);
+
+  if (productSlug && /^[a-z0-9][a-z0-9-_.]{0,199}$/i.test(productSlug)) {
+    const cacheKey = `${locale}:${productSlug.toLocaleLowerCase("en-US")}`;
+    const cached = epicStoreDetailsCache.get(cacheKey);
+    if (cached && Date.now() - cached.createdAt < 15 * 60 * 1_000) return cached.details;
+
+    try {
+      const url = `https://store-content-ipv4.ak.epicgames.com/api/${locale}/content/products/${encodeURIComponent(productSlug)}`;
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "Accept-Language": `${locale},en;q=0.8`,
+          Referer: `https://store.epicgames.com/${locale}/p/${productSlug}`,
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        const details = normalizeEpicStoreDetails(
+          payload,
+          {
+            productSlug,
+            catalogId: catalogId || searchFallbackItem?.catalogId,
+            namespace: namespace || searchFallbackItem?.namespace,
+          },
+          readInstalledEpicGames(),
+        );
+
+        if (details) {
+          epicStoreDetailsCache.set(cacheKey, { createdAt: Date.now(), details });
+          if (titleQuery) {
+            epicStoreDetailsCache.set(`${locale}:title:${titleQuery.toLowerCase()}`, { createdAt: Date.now(), details });
+          }
+          if (epicStoreDetailsCache.size > 100) {
+            epicStoreDetailsCache.delete(epicStoreDetailsCache.keys().next().value);
+          }
+          return details;
+        }
+      }
+    } catch (contentErr) {
+      console.warn("[EpicStore] Erro ao buscar endpoint de conteúdo:", contentErr?.message || contentErr);
+    }
   }
-  return details;
+
+  if (searchFallbackItem) {
+    const cardDetails = {
+      catalogId: searchFallbackItem.catalogId || catalogId,
+      namespace: searchFallbackItem.namespace || namespace,
+      appName: searchFallbackItem.appName || String(rawRequest?.appName || ""),
+      title: searchFallbackItem.title || searchFallbackItem.name || titleQuery,
+      image: searchFallbackItem.backgroundImage || searchFallbackItem.image || searchFallbackItem.cardImage || "",
+      cardImage: searchFallbackItem.cardImage || searchFallbackItem.image || "",
+      backgroundImage: searchFallbackItem.backgroundImage || searchFallbackItem.image || searchFallbackItem.cardImage || "",
+      logoImage: "",
+      description: searchFallbackItem.description || "",
+      aboutTheGame: searchFallbackItem.description ? `<p>${searchFallbackItem.description}</p>` : "",
+      screenshots: searchFallbackItem.backgroundImage ? [searchFallbackItem.backgroundImage] : (searchFallbackItem.cardImage ? [searchFallbackItem.cardImage] : []),
+      releaseDate: "",
+      developer: "",
+      publisher: "",
+      tags: searchFallbackItem.category ? [searchFallbackItem.category] : [],
+      trailerUrl: "",
+      productSlug: searchFallbackItem.productSlug || "",
+      productUrl: searchFallbackItem.productUrl || (searchFallbackItem.productSlug ? `https://store.epicgames.com/p/${searchFallbackItem.productSlug}` : ""),
+      epicLaunchId: searchFallbackItem.epicLaunchId || (namespace && catalogId ? `${namespace}:${catalogId}` : catalogId),
+      executablePath: searchFallbackItem.executablePath || "",
+      source: "epic-store",
+    };
+    if (titleQuery) {
+      epicStoreDetailsCache.set(`${locale}:title:${titleQuery.toLowerCase()}`, { createdAt: Date.now(), details: cardDetails });
+    }
+    return cardDetails;
+  }
+
+  return null;
 };
 
 registerSecureIpcHandler("launcher:fetch-epic-store-details", async (_event, request) =>
@@ -3506,17 +3873,53 @@ const stopGameProcessMonitor = (watcherKey) => {
   }
 };
 
+const runFocusOptimizer = (action) => {
+  try {
+    const { execFile } = require("node:child_process");
+    const scriptPath = path.join(__dirname, "scripts", "focus-optimizer.ps1");
+    const processes = ["chrome", "msedge", "Spotify", "Discord", "ms-teams", "slack"];
+    execFile("powershell.exe", [
+      "-NoProfile",
+      "-ExecutionPolicy", "Bypass",
+      "-File", scriptPath,
+      "-Action", action,
+      "-ProcessNames", processes.join(",")
+    ], (err) => {
+      if (err) console.error(`[focus-optimizer] Error running ${action}:`, err);
+      else console.info(`[focus-optimizer] ${action} executed.`);
+    });
+  } catch (e) {}
+};
+
 const finishMonitoredGameSession = (watcherKey) => {
   const restoreLauncher = activeGameMonitors.get(watcherKey)?.restoreLauncher === true;
   stopGameProcessMonitor(watcherKey);
   stopGameWatcher(watcherKey);
+  runFocusOptimizer("resume");
   if (restoreLauncher && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
     mainWindow.focus();
   }
 };
 
+const runGameMacros = (gameId) => {
+  try {
+    const { execFile } = require("node:child_process");
+    const fs = require("node:fs");
+    const scriptsDir = path.join(app.getPath("userData"), "scripts");
+    const macroPath = path.join(scriptsDir, `${gameId}.ps1`);
+    if (fs.existsSync(macroPath)) {
+      execFile("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", macroPath], (err) => {
+        if (err) console.error(`[macros] Error running macro for ${gameId}:`, err);
+        else console.info(`[macros] Macro executed for ${gameId}.`);
+      });
+    }
+  } catch(e) {}
+};
+
 const startGameProcessMonitor = (watcherKey, executablePath, options = {}) => {
+  runFocusOptimizer("suspend");
+  runGameMacros(watcherKey);
   const existingMonitor = activeGameMonitors.get(watcherKey);
   if (existingMonitor) {
     clearInterval(existingMonitor.timer);
@@ -3632,7 +4035,19 @@ registerSecureIpcHandler("auth:poll-google-status", async (_event, state) => {
 });
 
 registerSecureIpcHandler("shell:open-path", async (_event, pathStr) => {
-  return shell.openPath(pathStr);
+  let target = String(pathStr || "").trim();
+  if (target.startsWith("cp-media://")) {
+    try {
+      let rawPath = decodeURIComponent(target.replace(/^cp-media:\/\/(?:local\/)?/i, ""));
+      if (process.platform === "win32") {
+        rawPath = rawPath.replace(/^\/+([a-zA-Z]:)/, "$1");
+      }
+      target = path.resolve(rawPath);
+    } catch {
+      // fallback to original target
+    }
+  }
+  return shell.openPath(target);
 });
 
 registerSecureIpcHandler("shell:open-external", async (_event, url) => {
@@ -3783,6 +4198,18 @@ registerSecureIpcHandler("overlay:dismiss-notification", async (_event, payload)
 
 registerSecureIpcHandler("overlay:toggle-panel", async () => {
   return { open: requestOverlayPanelToggle("gamepad") };
+});
+
+// ─ Battery warning notification ───────────────────────────────────────────────
+registerSecureIpcHandler("system:show-battery-warning", async (_event, requestedLevel) => {
+  const level = Math.min(100, Math.max(0, Math.round(Number(requestedLevel) || 0)));
+  sendOverlayEvent("overlay:social", {
+    kind: "info",
+    title: `🔋 Bateria em ${level}%`,
+    message: "Conecte o cabo para não perder a sessão de jogo!",
+    duration: 7000,
+    sound: true,
+  });
 });
 
 registerSecureIpcHandler("overlay:show-game-start", async (_event, payload) => {
@@ -3999,9 +4426,40 @@ registerSecureIpcHandler("update:quit-and-install", () => {
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
 app.whenReady().then(async () => {
-  protocol.handle("cp-media", (request) => {
-    const filePath = decodeURIComponent(request.url.replace("cp-media://", ""));
-    return net.fetch(pathToFileURL(filePath).toString());
+  protocol.handle("cp-media", async (request) => {
+    try {
+      let rawPath = decodeURIComponent(request.url.replace(/^cp-media:\/\/(?:local\/)?/i, ""));
+      if (process.platform === "win32") {
+        rawPath = rawPath.replace(/^\/+([a-zA-Z]:)/, "$1");
+      }
+      const normalized = path.resolve(rawPath);
+      if (!fs.existsSync(normalized)) {
+        return new Response("Not found", { status: 404 });
+      }
+      try {
+        return await net.fetch(pathToFileURL(normalized).toString());
+      } catch {
+        const ext = path.extname(normalized).toLowerCase();
+        const mimeTypes = {
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.webp': 'image/webp',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.mp4': 'video/mp4',
+          '.webm': 'video/webm'
+        };
+        const buffer = await fs.promises.readFile(normalized);
+        return new Response(buffer, {
+          status: 200,
+          headers: { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' }
+        });
+      }
+    } catch (e) {
+      console.error("[cp-media] Error fetching media file:", request.url, e);
+      return new Response("Not found", { status: 404 });
+    }
   });
   try {
     if (IS_SMOKE_TEST) {

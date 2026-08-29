@@ -5,10 +5,11 @@ import bgVideo from "../assets/karavanbraam_pindown.io.mp4";
 
 interface DynamicBackgroundProps {
   backgroundImage: string;
+  videoUrl?: string;
   reducedEffects?: boolean;
 }
 
-const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, reducedEffects = false }) => {
+const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, videoUrl, reducedEffects = false }) => {
   const low = useLowPerf();
   const noFx = reducedEffects || low;
 
@@ -21,19 +22,21 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
       />
 
       <AnimatePresence mode="popLayout">
-        <motion.img
-          key={backgroundImage}
-          src={backgroundImage}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: noFx ? 0.3 : 0.45 }}
-          exit={{ opacity: 0 }}
-          transition={{
-            duration: noFx ? 0.1 : 0.65,
-            ease: "easeOut"
-          }}
-          style={{ transform: "translate3d(0,0,0)" }}
-          className={`absolute inset-0 w-full h-full object-cover will-change-transform transform-gpu ${noFx ? "" : "blur-[36px] scale-[1.06]"}`}
-        />
+        {backgroundImage ? (
+          <motion.img
+            key={backgroundImage}
+            src={backgroundImage}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: noFx ? 0.3 : 0.45 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: noFx ? 0.1 : 0.65,
+              ease: "easeOut"
+            }}
+            style={{ transform: "translate3d(0,0,0)" }}
+            className={`absolute inset-0 w-full h-full object-cover will-change-transform transform-gpu ${noFx ? "" : "blur-[36px] scale-[1.06]"}`}
+          />
+        ) : null}
       </AnimatePresence>
 
       {/* Base gradients using CSS variable for unified dark background */}

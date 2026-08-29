@@ -48,6 +48,7 @@ beforeEach(() => {
   Reflect.deleteProperty(window, "electronAPI");
   gamepads = [];
   nextFrame = null;
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
   Object.defineProperty(navigator, "getGamepads", {
     configurable: true,
     value: vi.fn(() => gamepads),

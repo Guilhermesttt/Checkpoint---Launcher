@@ -567,9 +567,25 @@ describe("overlay de conquistas", () => {
     expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Portal 2.png");
     expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("1 de 2");
 
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    // Navega para a proxima captura usando o botao ">"
+    document.getElementById("capture-viewer-next")?.click();
     expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Half-Life 2.png");
     expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("2 de 2");
+
+    // Navega de volta usando o botao "<"
+    document.getElementById("capture-viewer-previous")?.click();
+    expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Portal 2.png");
+    expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("1 de 2");
+
+    // Navega ciclicamente para a anterior (vai para a ultima)
+    document.getElementById("capture-viewer-previous")?.click();
+    expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Half-Life 2.png");
+    expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("2 de 2");
+
+    // Navega pelo teclado
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(document.getElementById("capture-viewer-name")?.textContent).toBe("Portal 2.png");
+    expect(document.getElementById("capture-viewer-counter")?.textContent).toBe("1 de 2");
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(document.getElementById("capture-viewer")?.classList.contains("is-open")).toBe(false);

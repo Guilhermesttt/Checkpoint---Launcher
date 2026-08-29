@@ -39,6 +39,7 @@ import { useControllerLedStatus } from "../hooks/useControllerLed";
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../services/supabase";
 import { saveProfileVisibility } from "../services/profilePrivacy";
+import { PlatformRemovalTransition } from "../components/PlatformRemovalTransition";
 import type { SettingsTab } from "../services/launcherNavigation";
 import type { ProfileVisibility } from "../types/domain";
 
@@ -86,28 +87,6 @@ const SETTINGS_DETAIL_COPY = {
   "de-DE": { moreThemes: "Weitere Themes", comingSoon: "Neue Pakete folgen bald", audioTitle: "Soundeffekte und Audio", audioHint: "Passe Navigation, Musik und Hinweislautstärke an.", performanceTitle: "Leistungsmodus", performanceHint: "Reduziert Animationen und Unschärfe auf älteren PCs.", playerProfile: "Spielerprofil", playerProfileHint: "Informationen deines cloud-synchronisierten Kontos.", playerFallback: "Phelierium-Spieler", noEmail: "Keine E-Mail verknüpft", activeAccount: "Aktives Konto", security: "Kontosicherheit", securityHint: "Verwalte Passwort und Wiederherstellungsoptionen.", resetPassword: "Passwort zurücksetzen", resetPasswordHint: "Sendet eine Sicherheits-E-Mail zum Ändern des Passworts.", emailSent: "E-Mail gesendet!", sending: "Wird gesendet...", sendEmail: "E-Mail senden", overlayLab: "Overlay-Labor", overlayLabHint: "Vorschau der Overlays während des Spielens.", testWelcome: "Willkommen testen", testWelcomeHint: "Zeigt die Social-Karte beim Spielstart.", testAchievement: "Erfolg testen", testAchievementHint: "Zeigt die vollständige Erfolgsbenachrichtigung." },
   "it-IT": { moreThemes: "Altri temi", comingSoon: "Nuovi pacchetti in arrivo", audioTitle: "Effetti sonori e audio", audioHint: "Regola il volume di navigazione, musica e avvisi.", performanceTitle: "Modalità prestazioni", performanceHint: "Riduce animazioni e sfocatura sui computer più datati.", playerProfile: "Profilo giocatore", playerProfileHint: "Informazioni dell'account sincronizzato nel cloud.", playerFallback: "Giocatore Phelierium", noEmail: "Nessuna e-mail collegata", activeAccount: "Account attivo", security: "Sicurezza account", securityHint: "Gestisci password e opzioni di recupero.", resetPassword: "Reimposta password", resetPasswordHint: "Invia un'e-mail di sicurezza per modificare la password.", emailSent: "E-mail inviata!", sending: "Invio...", sendEmail: "Invia e-mail", overlayLab: "Laboratorio overlay", overlayLabHint: "Anteprima degli overlay durante il gioco.", testWelcome: "Prova benvenuto", testWelcomeHint: "Mostra la scheda social all'avvio di un gioco.", testAchievement: "Prova obiettivo", testAchievementHint: "Mostra la notifica completa dell'obiettivo." },
 } as const;
-
-const RetroAchievementsSettingsCard: React.FC<{
-  username?: string;
-  connected?: boolean;
-  busy?: boolean;
-  error?: string;
-  onConnect?: (username: string) => Promise<void>;
-  onDisconnect?: () => Promise<void>;
-}> = () => {
-  return (
-    <article
-      aria-label="RetroAchievements"
-      className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center justify-between"
-    >
-      <div>
-        <h4 className="text-sm font-semibold text-white">RetroAchievements</h4>
-        <p className="text-xs text-white/50">Integre conquistas retrô à sua conta.</p>
-      </div>
-      <span className="text-xs font-mono text-purple-400">Em Breve</span>
-    </article>
-  );
-};
 
 const ACHIEVEMENT_NOTIFICATION_COPY = {
   "pt-BR": {
@@ -326,20 +305,20 @@ export interface SettingsPageV2Props {
   discordAvatar?: string;
   steamConnecting: boolean;
   discordConnecting: boolean;
-  retroAchievementsConnected: boolean;
-  retroAchievementsUsername?: string;
-  retroAchievementsConnecting: boolean;
-  retroAchievementsError?: string;
+  epicConnected?: boolean;
+  epicDisplayName?: string;
+  epicConnecting?: boolean;
   onConnectSteam: () => void;
   onConnectDiscord: () => void;
-  onConnectRetroAchievements: (username: string) => Promise<void>;
+  onConnectEpic?: () => void;
   onDisconnectSteam: () => void;
   onDisconnectDiscord: () => void;
-  onDisconnectRetroAchievements: () => Promise<void>;
+  onDisconnectEpic?: () => void;
   onTestOverlayWelcome: () => void;
   onTestOverlayAchievement: () => void;
   initialTab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
+  platformOperations?: { steam?: { status?: string; phase?: string }; epic?: { status?: string; phase?: string } };
 }
 
 export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
@@ -347,6 +326,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   effectsVolume,
   achievementVolume,
   notificationVolume,
+  platformOperations,
   musicVolume,
   soundTheme,
   visualTheme,
@@ -354,6 +334,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   appThemeOptions,
   SteamIcon,
   DiscordIcon,
+  EpicIcon,
   onLanguageChange,
   onEffectsVolumeChange,
   onAchievementVolumeChange,
@@ -370,16 +351,15 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
   discordAvatar,
   steamConnecting,
   discordConnecting,
-  retroAchievementsConnected,
-  retroAchievementsUsername,
-  retroAchievementsConnecting,
-  retroAchievementsError,
+  epicConnected,
+  epicDisplayName,
+  epicConnecting,
   onConnectSteam,
   onConnectDiscord,
-  onConnectRetroAchievements,
+  onConnectEpic,
   onDisconnectSteam,
   onDisconnectDiscord,
-  onDisconnectRetroAchievements,
+  onDisconnectEpic,
   onTestOverlayWelcome,
   onTestOverlayAchievement,
   initialTab,
@@ -1102,41 +1082,46 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                   description={t("connectedAccountsHint")}
                 />
                 <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-                  <article aria-label="Steam" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                        <SteamIcon className="h-4.5 w-4.5 text-white/70" />
+                  <PlatformRemovalTransition
+                    active={platformOperations?.steam?.status === "disconnecting"}
+                    phase={platformOperations?.steam?.phase}
+                  >
+                    <article aria-label="Steam" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                          <SteamIcon className="h-4.5 w-4.5 text-white/70" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white whitespace-nowrap">Steam</p>
+                          <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">
+                            {steamConnected ? t("connected") : t("notConnected")}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white whitespace-nowrap">Steam</p>
-                        <p className="text-[10px] font-medium text-white/40 mt-0.5 whitespace-nowrap">
-                          {steamConnected ? t("connected") : t("notConnected")}
-                        </p>
-                      </div>
-                    </div>
-                    {steamConnected ? (
-                      <div role="group" aria-label={`${t("unlink")} Steam`} className="flex shrink-0 flex-col items-end gap-1">
+                      {steamConnected ? (
+                        <div role="group" aria-label={`${t("unlink")} Steam`} className="flex shrink-0 flex-col items-end gap-1">
+                          <button
+                            type="button"
+                            onClick={onDisconnectSteam}
+                            onMouseEnter={() => playSound("hover")}
+                            className="cursor-pointer rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                          >
+                            {t("unlink")}
+                          </button>
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          onClick={onDisconnectSteam}
+                          onClick={onConnectSteam}
                           onMouseEnter={() => playSound("hover")}
-                          className="cursor-pointer rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                          disabled={steamConnecting}
+                          className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
                         >
-                          {t("unlink")}
+                          {steamConnecting ? t("connecting") : t("connectSteam")}
                         </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={onConnectSteam}
-                        onMouseEnter={() => playSound("hover")}
-                        disabled={steamConnecting}
-                        className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
-                      >
-                        {steamConnecting ? t("connecting") : t("connectSteam")}
-                      </button>
-                    )}
-                  </article>
+                      )}
+                    </article>
+                  </PlatformRemovalTransition>
 
                   <article aria-label="Discord" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
                     <div className="flex min-w-0 items-center gap-3">
@@ -1175,16 +1160,45 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       </button>
                     )}
                   </article>
-                </div>
-                <div className="mt-3.5">
-                  <RetroAchievementsSettingsCard
-                    username={retroAchievementsUsername}
-                    connected={retroAchievementsConnected}
-                    busy={retroAchievementsConnecting}
-                    error={retroAchievementsError}
-                    onConnect={onConnectRetroAchievements}
-                    onDisconnect={onDisconnectRetroAchievements}
-                  />
+
+                  <PlatformRemovalTransition
+                    active={platformOperations?.epic?.status === "disconnecting"}
+                    phase={platformOperations?.epic?.phase}
+                  >
+                    <article aria-label="Epic Games" className="grid min-h-19 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-white/6 bg-white/[0.035] p-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10">
+                          <EpicIcon className="h-4.5 w-4.5 text-white/70" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white whitespace-nowrap">Epic Games</p>
+                          <p className="max-w-27.5 truncate text-[10px] font-medium text-white/40 mt-0.5">
+                            {epicConnected ? epicDisplayName || t("connected") : t("notConnected")}
+                          </p>
+                        </div>
+                      </div>
+                      {epicConnected ? (
+                        <button
+                          type="button"
+                          onClick={onDisconnectEpic}
+                          onMouseEnter={() => playSound("hover")}
+                          className="shrink-0 cursor-pointer rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase text-red-400 transition-all duration-200 hover:scale-105 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                        >
+                          {t("unlink")}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onConnectEpic}
+                          onMouseEnter={() => playSound("hover")}
+                          disabled={epicConnecting}
+                          className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 text-[9px] font-bold uppercase text-white/70 transition-all duration-200 hover:scale-105 hover:bg-white/10 hover:text-white active:scale-95 disabled:opacity-50"
+                        >
+                          {epicConnecting ? t("connecting") : "Conectar Epic"}
+                        </button>
+                      )}
+                    </article>
+                  </PlatformRemovalTransition>
                 </div>
               </section>
               <section className="rounded-[28px] border border-white/10 bg-black/40 p-6 md:p-7 backdrop-blur-3xl shadow-[0_20px_70px_rgba(0,0,0,0.45)]">

@@ -97,4 +97,60 @@ describe("biblioteca SQLite", () => {
     ]);
     library.close();
   });
+
+  it("purges only matching games and their sessions", () => {
+    const directory = mkdtempSync(join(tmpdir(), "checkpoint-library-"));
+    temporaryDirectories.push(directory);
+    const library = createLocalGameLibrary(directory);
+
+    const steamGame = { id: "steam-1", title: "Steam Game", launcherType: "steam", steamAppId: "730" };
+    const epicGame = { id: "epic-1", title: "Epic Game", launcherType: "epic", epicCatalogId: "fn-cat" };
+    const localGame = { id: "local-1", title: "Local Game", launcherType: "local" };
+
+    library.create("alice", steamGame);
+    library.create("alice", epicGame);
+    library.create("alice", localGame);
+
+    const validSession = {
+      startedAt: new Date(Date.now() - 3600000).toISOString(),
+      endedAt: new Date().toISOString(),
+      durationMinutes: 60,
+    };
+    library.recordSession("alice", steamGame.id, validSession);
+    library.recordSession("alice", epicGame.id, validSession);
+
+    const result = library.purgePlatform("alice", "steam");
+    expect(result).toMatchObject({
+      games: 1,
+      sessions: 1,
+      gameIds: [steamGame.id],
+      steamAppIds: ["730"],
+    });
+
+    const remaining = library.list("alice").map((game: any) => game.id);
+    expect(remaining).toEqual(expect.arrayContaining([epicGame.id, localGame.id]));
+    expect(remaining).not.toContain(steamGame.id);
+
+    library.close();
+  });
+
+  it("persists the last cleanup phase across library reopen", () => {
+    const directory = mkdtempSync(join(tmpdir(), "checkpoint-library-"));
+    temporaryDirectories.push(directory);
+    const library1 = createLocalGameLibrary(directory);
+
+    library1.setPlatformCleanupPhase("alice", "epic", "op-1", "removing-cloud-data");
+    library1.close();
+
+    const library2 = createLocalGameLibrary(directory);
+    const state = library2.getPlatformCleanup("alice", "epic");
+    expect(state).toMatchObject({
+      operationId: "op-1",
+      phase: "removing-cloud-data",
+    });
+
+    library2.completePlatformCleanup("alice", "epic", "op-1");
+    expect(library2.getPlatformCleanup("alice", "epic")).toBeNull();
+    library2.close();
+  });
 });

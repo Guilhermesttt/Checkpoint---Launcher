@@ -2,6 +2,7 @@ import React from "react";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import { supabase } from "../services/supabase";
+import { LoadingState } from "../components/ui/loading-state";
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,14 +60,20 @@ const DesktopAuth: React.FC = () => {
         </h1>
         <p className="mt-2 text-xs text-white/50 max-w-xs">{message}</p>
 
-        {status !== "done" && (
+        {status === "loading" && (
+          <div className="mt-6">
+            <LoadingState label="Validando autenticação Google..." variant="Orbit" />
+          </div>
+        )}
+
+        {status !== "done" && status !== "loading" && (
           <button
             onClick={handleGoogleLogin}
             disabled={!state || status === "loading"}
             className="mt-8 w-full bg-white text-black rounded-full py-3.5 px-6 font-display font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-3 hover:scale-102 active:scale-98 transition-all disabled:opacity-50 cursor-pointer shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
           >
             <GoogleIcon />
-            <span>{status === "loading" ? "Conectando..." : "Continuar com Google"}</span>
+            <span>Continuar com Google</span>
           </button>
         )}
       </div>

@@ -47,6 +47,7 @@ export interface Game {
   cardImage?: string;
   logoImage?: string;
   trailerUrl?: string;
+  trailerThumbnail?: string;
   category?: string;
   description?: string;
   isFavorite?: boolean;
@@ -58,6 +59,7 @@ export interface Game {
   epicCatalogId?: string;
   epicLaunchId?: string;
   epicStoreUrl?: string;
+  productSlug?: string;
   steamPlaytimeMinutes?: number;
   locallyTrackedMinutes?: number;
   steamLastPlayedAt?: string;
@@ -115,6 +117,7 @@ export interface UserProfile {
   discordAvatar?: string;
   steamAvatar?: string;
   steamUsername?: string;
+  epicGamesCount?: number;
   retroAchievementsUlid?: string;
   retroAchievementsUsername?: string;
   status?: "online" | "playing" | "offline";

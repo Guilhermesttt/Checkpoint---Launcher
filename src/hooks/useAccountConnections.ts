@@ -1,23 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { isBackendHealthy } from "../services/api";
 import {
-  disconnectSteamAccount,
   getSteamLinkUrl,
-  syncSteamLibraryToLocal,
 } from "../services/steam";
 import {
   disconnectDiscordAccount,
   getDiscordLinkUrl,
 } from "../services/discord";
-import { deleteLibraryGamesByLauncher } from "../services/localLibrary";
-import type { SoundEffectType } from "./useSoundEffects";
+import { usePlatformOperations } from "./usePlatformOperations";
+import type { SoundEffectType } from "../hooks/useSoundEffects";
 import type { LauncherLanguage } from "../context/PreferencesContext";
-
-const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
-const steamIdKey = (uid: string) => `checkpoint_steam_id_${uid}`;
+import type { UserProfile } from "../types/domain";
 
 interface UseAccountConnectionsProps {
   userUid?: string;
+  profile?: UserProfile | null;
   resolvedSteamId?: string | null;
   playSound: (type: SoundEffectType) => void;
   notify: (msg: string, type: "success" | "error" | "info") => void;
@@ -29,7 +25,7 @@ interface UseAccountConnectionsProps {
 
 export function useAccountConnections({
   userUid,
-  resolvedSteamId,
+  profile,
   playSound,
   notify,
   refreshProfile,
@@ -39,7 +35,7 @@ export function useAccountConnections({
 }: UseAccountConnectionsProps) {
   const [steamConnecting, setSteamConnecting] = useState(false);
   const [discordConnecting, setDiscordConnecting] = useState(false);
-  const [steamSyncing, setSteamSyncing] = useState(false);
+  const [epicConnecting, setEpicConnecting] = useState(false);
 
   const steamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const steamFocusRef = useRef<(() => void) | null>(null);
@@ -67,88 +63,64 @@ export function useAccountConnections({
     };
   }, []);
 
-  const handleSyncSteam = async () => {
-    if (!userUid || !resolvedSteamId) {
-      notify("Conecte sua conta Steam para sincronizar.", "info");
-      return;
-    }
-    playSound("select");
-    const healthy = await isBackendHealthy();
-    if (!healthy) {
-      notify("Backend Steam offline.", "error");
-      return;
-    }
-    setSteamSyncing(true);
-    try {
-      const count = await syncSteamLibraryToLocal(userUid, resolvedSteamId, language);
-      notify(
-        count === 0
-          ? "Nenhum jogo retornado. Verifique se o perfil é público."
-          : `${count} jogos importados/atualizados.`,
-        count === 0 ? "info" : "success",
-      );
-      await refreshProfile();
-      await onLibraryChanged?.();
-    } catch (e) {
-      notify(e instanceof Error ? e.message : "Falha na sincronização Steam.", "error");
-    } finally {
-      setSteamSyncing(false);
-    }
-  };
-
   const connectSteam = () => {
     if (!userUid) return;
     playSound("select");
     setSteamConnecting(true);
 
-    notify(
-      "Iniciando conexão com Steam. Isso pode levar alguns segundos se o servidor estiver acordando...",
-      "info",
-    );
-
-    isBackendHealthy().then(async (h) => {
-      if (!h) {
-        notify("O servidor Steam demorou demais para responder. Tente novamente em instantes.", "error");
-        setSteamConnecting(false);
-        return;
-      }
-      try {
-        const url = await getSteamLinkUrl();
-        if (window.electronAPI?.openExternalUrl) {
-          await window.electronAPI.openExternalUrl(url);
-          notify("Navegador aberto! Conecte sua conta Steam e volte ao app.", "info");
-
-          // Polling automático para atualizar o perfil e detectar a conexão Steam
-          let attempts = 0;
-          const maxAttempts = 40; // 40 * 1.5s = 60s max timeout
-
-          const checkSteam = async () => {
-            attempts++;
-            const prof = await refreshProfile();
-            if (prof?.steamId || attempts >= maxAttempts) {
-              if (steamIntervalRef.current) clearInterval(steamIntervalRef.current);
-              steamIntervalRef.current = null;
-              if (steamFocusRef.current) window.removeEventListener("focus", steamFocusRef.current);
-              steamFocusRef.current = null;
-              setSteamConnecting(false);
-            }
-          };
-
-          const onFocus = () => {
-            void checkSteam();
-          };
-
-          steamIntervalRef.current = setInterval(checkSteam, 1500);
-          steamFocusRef.current = onFocus;
-          window.addEventListener("focus", onFocus);
-        } else {
-          window.open(url, "_blank");
+    getSteamLinkUrl()
+      .then(async (url) => {
+        if (!url) {
+          notify("Backend Steam offline.", "error");
+          setSteamConnecting(false);
+          return;
         }
-      } catch (e) {
-        notify(e instanceof Error ? e.message : "Não foi possível conectar com a Steam.", "error");
+        try {
+          if (window.electronAPI?.openExternalUrl) {
+            await window.electronAPI.openExternalUrl(url);
+            notify("Navegador aberto! Conecte sua conta Steam e volte ao app.", "info");
+
+            let attempts = 0;
+            const maxAttempts = 40;
+
+            const checkSteam = async () => {
+              attempts++;
+              const prof = await refreshProfile();
+              if (prof?.steamId || attempts >= maxAttempts) {
+                if (steamIntervalRef.current) clearInterval(steamIntervalRef.current);
+                steamIntervalRef.current = null;
+                if (steamFocusRef.current) window.removeEventListener("focus", steamFocusRef.current);
+                steamFocusRef.current = null;
+                setSteamConnecting(false);
+                if (prof?.steamId) {
+                  notify("Steam conectada com sucesso! Sincronizando jogos...", "info");
+                  void handleSyncSteam();
+                }
+              }
+            };
+
+            const onFocus = () => {
+              void checkSteam();
+            };
+
+            if (steamIntervalRef.current) clearInterval(steamIntervalRef.current);
+            if (steamFocusRef.current) window.removeEventListener("focus", steamFocusRef.current);
+            steamIntervalRef.current = setInterval(checkSteam, 1500);
+            steamFocusRef.current = onFocus;
+            window.addEventListener("focus", onFocus);
+          } else {
+            window.open(url, "_blank");
+            setSteamConnecting(false);
+          }
+        } catch {
+          notify("Não foi possível abrir o navegador.", "error");
+          setSteamConnecting(false);
+        }
+      })
+      .catch((err) => {
+        notify(err?.message || "Erro ao conectar Steam.", "error");
         setSteamConnecting(false);
-      }
-    });
+      });
   };
 
   const connectDiscord = () => {
@@ -156,66 +128,89 @@ export function useAccountConnections({
     playSound("select");
     setDiscordConnecting(true);
 
-    isBackendHealthy().then(async (h) => {
-      if (!h) {
-        notify("Backend Discord offline.", "error");
-        setDiscordConnecting(false);
-        return;
-      }
-      try {
-        const url = await getDiscordLinkUrl();
-        if (window.electronAPI?.openExternalUrl) {
-          await window.electronAPI.openExternalUrl(url);
-          notify("Navegador aberto! Conecte sua conta Discord e volte ao app.", "info");
-
-          // Polling automático para atualizar o perfil e detectar a conexão Discord
-          let attempts = 0;
-          const maxAttempts = 40;
-
-          const checkDiscord = async () => {
-            attempts++;
-            const prof = await refreshProfile();
-            if (prof?.discordId || attempts >= maxAttempts) {
-              if (discordIntervalRef.current) clearInterval(discordIntervalRef.current);
-              discordIntervalRef.current = null;
-              if (discordFocusRef.current) window.removeEventListener("focus", discordFocusRef.current);
-              discordFocusRef.current = null;
-              setDiscordConnecting(false);
-            }
-          };
-
-          const onFocus = () => {
-            void checkDiscord();
-          };
-
-          discordIntervalRef.current = setInterval(checkDiscord, 1500);
-          discordFocusRef.current = onFocus;
-          window.addEventListener("focus", onFocus);
-        } else {
-          window.open(url, "_blank");
+    getDiscordLinkUrl()
+      .then(async (url) => {
+        if (!url) {
+          notify("Backend Discord offline.", "error");
+          setDiscordConnecting(false);
+          return;
         }
-      } catch (e) {
-        notify(e instanceof Error ? e.message : "Não foi possível conectar com o Discord.", "error");
+        try {
+          if (window.electronAPI?.openExternalUrl) {
+            await window.electronAPI.openExternalUrl(url);
+            notify(
+              "Navegador aberto! Conecte sua conta Discord e volte ao app.",
+              "info",
+            );
+
+            let attempts = 0;
+            const maxAttempts = 40;
+
+            const checkDiscord = async () => {
+              attempts++;
+              const prof = await refreshProfile();
+              if (prof?.discordId || attempts >= maxAttempts) {
+                if (discordIntervalRef.current)
+                  clearInterval(discordIntervalRef.current);
+                discordIntervalRef.current = null;
+                if (discordFocusRef.current)
+                  window.removeEventListener("focus", discordFocusRef.current);
+                discordFocusRef.current = null;
+                setDiscordConnecting(false);
+              }
+            };
+
+            const onFocus = () => {
+              void checkDiscord();
+            };
+
+            discordIntervalRef.current = setInterval(checkDiscord, 1500);
+            discordFocusRef.current = onFocus;
+            window.addEventListener("focus", onFocus);
+          } else {
+            window.open(url, "_blank");
+          }
+        } catch (e) {
+          notify(
+            e instanceof Error
+              ? e.message
+              : "Não foi possível conectar com o Discord.",
+            "error",
+          );
+          setDiscordConnecting(false);
+        }
+      })
+      .catch((err) => {
+        notify(err?.message || "Erro ao conectar Discord.", "error");
         setDiscordConnecting(false);
-      }
-    });
+      });
   };
 
-  const handleDisconnectSteam = async () => {
-    if (!userUid) return;
-    playSound("back");
-    try {
-      await disconnectSteamAccount();
-      await deleteLibraryGamesByLauncher(userUid, "steam");
-      localStorage.removeItem(steamDiscKey(userUid));
-      localStorage.removeItem(steamIdKey(userUid));
+  const platformOps = usePlatformOperations({
+    userUid,
+    profile,
+    language,
+    onRefreshLibrary: async () => {
       await refreshProfile();
       setSelectedIndex(0);
       await onLibraryChanged?.();
-      notify("Steam desconectada e biblioteca atualizada.", "success");
-    } catch {
-      notify("Erro ao desconectar conta Steam.", "error");
-    }
+    },
+    notify,
+  });
+
+  const handleSyncSteam = async () => {
+    playSound("select");
+    return platformOps.syncPlatform("steam", language);
+  };
+
+  const handleSyncEpic = async () => {
+    playSound("select");
+    return platformOps.syncPlatform("epic", language);
+  };
+
+  const handleDisconnectSteam = async () => {
+    playSound("back");
+    return platformOps.disconnectPlatform("steam");
   };
 
   const handleDisconnectDiscord = async () => {
@@ -229,16 +224,28 @@ export function useAccountConnections({
     }
   };
 
+  const handleDisconnectEpic = async () => {
+    playSound("back");
+    return platformOps.disconnectPlatform("epic");
+  };
+
   return {
     steamConnecting,
     setSteamConnecting,
     discordConnecting,
     setDiscordConnecting,
-    steamSyncing,
+    epicConnecting,
+    setEpicConnecting,
+    steamSyncing: platformOps.operations.steam.status === "syncing",
+    epicSyncing: platformOps.operations.epic.status === "syncing",
+    platformOperations: platformOps.operations,
+    platformOps,
     connectSteam,
     connectDiscord,
     handleDisconnectSteam,
     handleDisconnectDiscord,
+    handleDisconnectEpic,
     handleSyncSteam,
+    handleSyncEpic,
   };
 }

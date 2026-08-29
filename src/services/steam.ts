@@ -98,7 +98,13 @@ export interface SteamAppDetails {
   publisher?: string;
   tags?: string[];
   trailerUrl?: string;
+  trailerThumbnail?: string;
   sizeGB?: number | null;
+  pcRequirements?: { minimum?: string; recommended?: string } | null;
+  supportedLanguages?: string | null;
+  metacritic?: { score: number; url: string } | null;
+  priceOverview?: { currency: string; initial: number; final: number; discount_percent: number; final_formatted: string } | null;
+  dlc?: number[];
 }
 
 export interface SteamAchievement {
@@ -111,6 +117,23 @@ export interface SteamAchievement {
   iconGray: string;
   hidden: boolean;
 }
+
+export const mapSteamTagsToCategory = (tags?: string[]): string => {
+  if (!tags || !tags.length) return "ACTION";
+  const str = tags.join(" ").toLowerCase();
+  if (str.includes("rpg")) return "RPG";
+  if (str.includes("strategy") || str.includes("estratégia")) return "STRATEGY";
+  if (str.includes("fps") || str.includes("shooter") || str.includes("tiro")) return "FPS";
+  if (str.includes("racing") || str.includes("corrida")) return "RACING";
+  if (str.includes("sports") || str.includes("esporte")) return "SPORTS";
+  if (str.includes("simulation") || str.includes("simulação")) return "SIMULATION";
+  if (str.includes("puzzle") || str.includes("quebra-cabeça")) return "PUZZLE";
+  if (str.includes("indie")) return "INDIE";
+  if (str.includes("adventure") || str.includes("aventura")) return "ADVENTURE";
+  if (str.includes("survival") || str.includes("sobrevivência")) return "SURVIVAL";
+  if (str.includes("horror") || str.includes("terror")) return "HORROR";
+  return "ACTION";
+};
 
 export type SteamAppDetailsFetchResult =
   | { ok: true; data: SteamAppDetails }
@@ -131,7 +154,7 @@ export const fetchSteamAppDetailsResult = async (
     const body = (await response
       .json()
       .catch(() => ({}))) as SteamAppDetails & { error?: string };
-    if (!response.ok) {
+    if (!response.ok || body.error) {
       const fromApi = typeof body.error === "string" ? body.error : null;
       const message =
         fromApi ||
@@ -246,6 +269,8 @@ export const fetchSteamAchievementSchema = async (
     return { achievements: [], total: 0, unlocked: 0 };
   }
 };
+
+export const fetchSteamAchievementsSchema = fetchSteamAchievementSchema;
 
 export const searchSteamGames = async (query: string) => {
   const response = await fetch(
@@ -446,7 +471,7 @@ const buildSteamAssets = (appid: number) => ({
       backgroundImage,
       cardImage: coverImage,
       logoImage: details?.logoImage || "",
-      category: "STEAM",
+      category: mapSteamTagsToCategory(details?.tags) || "ACTION",
       description: resolvedDescription,
       aboutTheGame: details?.aboutTheGame || details?.description || "",
       executablePath: appIdStr,
@@ -460,6 +485,7 @@ const buildSteamAssets = (appid: number) => ({
       totalAchievements: achievementStats?.total ?? existing?.totalAchievements ?? 0,
       completedAchievements: achievementStats?.unlocked ?? existing?.completedAchievements ?? 0,
       trailerUrl: details?.trailerUrl || "",
+      trailerThumbnail: details?.trailerThumbnail || "",
       screenshots: details?.screenshots || [],
       releaseDate: details?.releaseDate || "",
       developer: details?.developer || "",

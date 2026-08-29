@@ -98,6 +98,15 @@ const createLocalGameLibrary = (userDataPath) => {
       ended_at TEXT NOT NULL,
       duration_minutes INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS platform_cleanup_state (
+      owner_uid TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      operation_id TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (owner_uid, platform)
+    );
   `);
 
   try {
@@ -185,7 +194,14 @@ const createLocalGameLibrary = (userDataPath) => {
     const row = db.prepare(`
       SELECT game_id, data_json FROM games WHERE owner_uid = ? AND game_id = ?
     `).get(uid, gameId);
-    if (!row) throw new Error("Jogo local nao encontrado.");
+    if (!row) {
+      if (patch.title) {
+        const normalized = writeGame(uid, { ...patch, id: gameId });
+        markDirty(uid);
+        return normalized;
+      }
+      return null;
+    }
     const current = parseGameRow(row);
     const normalized = writeGame(uid, { ...current, ...patch, id: gameId });
     markDirty(uid);
@@ -403,6 +419,126 @@ const createLocalGameLibrary = (userDataPath) => {
     `).run(uid);
   };
 
+  const purgePlatform = (rawUid, rawPlatform) => {
+    const uid = asUid(rawUid);
+    const platform = String(rawPlatform || "").trim().toLowerCase();
+    if (platform !== "steam" && platform !== "epic") {
+      throw new Error("Plataforma invalida para limpeza.");
+    }
+
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const rows = db.prepare(`
+        SELECT game_id, data_json, launcher_type, steam_app_id
+        FROM games
+        WHERE owner_uid = ?
+      `).all(uid);
+
+      const targetGameIds = [];
+      const steamAppIds = [];
+      const epicCatalogIds = [];
+
+      for (const row of rows) {
+        let gameObj = null;
+        try {
+          gameObj = JSON.parse(row.data_json);
+        } catch {}
+
+        const launcherType = String(row.launcher_type || gameObj?.launcherType || "").toLowerCase();
+        const steamAppId = String(row.steam_app_id || gameObj?.steamAppId || "").trim();
+        const epicCatalogId = String(gameObj?.epicCatalogId || "").trim();
+
+        const isMatch =
+          launcherType === platform ||
+          (platform === "steam" && Boolean(steamAppId)) ||
+          (platform === "epic" && Boolean(epicCatalogId));
+
+        if (isMatch) {
+          targetGameIds.push(row.game_id);
+          if (steamAppId) steamAppIds.push(steamAppId);
+          if (epicCatalogId) epicCatalogIds.push(epicCatalogId);
+        }
+      }
+
+      let deletedSessions = 0;
+      for (const gameId of targetGameIds) {
+        const sessionRes = db.prepare(`
+          DELETE FROM game_sessions WHERE owner_uid = ? AND game_id = ?
+        `).run(uid, gameId);
+        deletedSessions += Number(sessionRes.changes || 0);
+
+        db.prepare(`
+          DELETE FROM games WHERE owner_uid = ? AND game_id = ?
+        `).run(uid, gameId);
+      }
+
+      if (platform === "steam") {
+        db.prepare(`
+          UPDATE library_state SET steam_id = NULL WHERE owner_uid = ?
+        `).run(uid);
+      }
+
+      markDirty(uid);
+      db.exec("COMMIT");
+
+      return {
+        games: targetGameIds.length,
+        sessions: deletedSessions,
+        gameIds: targetGameIds,
+        steamAppIds,
+        epicCatalogIds,
+      };
+    } catch (err) {
+      db.exec("ROLLBACK");
+      throw err;
+    }
+  };
+
+  const getPlatformCleanup = (rawUid, rawPlatform) => {
+    const uid = asUid(rawUid);
+    const platform = String(rawPlatform || "").trim().toLowerCase();
+    const row = db.prepare(`
+      SELECT operation_id, phase, updated_at
+      FROM platform_cleanup_state
+      WHERE owner_uid = ? AND platform = ?
+    `).get(uid, platform);
+
+    if (!row) return null;
+    return {
+      operationId: row.operation_id,
+      phase: row.phase,
+      updatedAt: row.updated_at,
+    };
+  };
+
+  const setPlatformCleanupPhase = (rawUid, rawPlatform, rawOpId, rawPhase) => {
+    const uid = asUid(rawUid);
+    const platform = String(rawPlatform || "").trim().toLowerCase();
+    const operationId = String(rawOpId || "").trim();
+    const phase = String(rawPhase || "").trim();
+    const now = Date.now();
+
+    db.prepare(`
+      INSERT INTO platform_cleanup_state (owner_uid, platform, operation_id, phase, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(owner_uid, platform) DO UPDATE SET
+        operation_id = excluded.operation_id,
+        phase = excluded.phase,
+        updated_at = excluded.updated_at
+    `).run(uid, platform, operationId, phase, now);
+  };
+
+  const completePlatformCleanup = (rawUid, rawPlatform, rawOpId) => {
+    const uid = asUid(rawUid);
+    const platform = String(rawPlatform || "").trim().toLowerCase();
+    const operationId = String(rawOpId || "").trim();
+
+    db.prepare(`
+      DELETE FROM platform_cleanup_state
+      WHERE owner_uid = ? AND platform = ? AND operation_id = ?
+    `).run(uid, platform, operationId);
+  };
+
   const close = () => db.close();
 
   return {
@@ -412,6 +548,10 @@ const createLocalGameLibrary = (userDataPath) => {
     update,
     remove,
     removeByLauncher,
+    purgePlatform,
+    getPlatformCleanup,
+    setPlatformCleanupPhase,
+    completePlatformCleanup,
     recordSession,
     bulkUpsert,
     importLegacy,

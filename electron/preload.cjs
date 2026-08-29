@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   listNexusDownloadedFiles: (gameDomain) => ipcRenderer.invoke("nexus:list-downloaded-files", gameDomain),
   prepareNexusFreeDownload: (request) => ipcRenderer.invoke("nexus:prepare-free-download", request),
   installNexusDownloadedMod: (request) => ipcRenderer.invoke("nexus:install-downloaded-mod", request),
+  previewNexusMod: (request) => ipcRenderer.invoke("nexus:preview-mod", request),
   adoptNexusInstalledMod: (request) => ipcRenderer.invoke("nexus:adopt-installed-mod", request),
   removeNexusInstalledMod: (request) => ipcRenderer.invoke("nexus:remove-installed-mod", request),
   openNexusDownloadLocation: (gameDomain) => ipcRenderer.invoke("nexus:open-download-location", gameDomain),
@@ -52,6 +53,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     const handler = (_event, payload) => callback(payload);
     ipcRenderer.on("nexus:download-state", handler);
     return () => ipcRenderer.removeListener("nexus:download-state", handler);
+  },
+  openEpicLoginWindow: () => ipcRenderer.invoke("launcher:open-epic-login-window"),
+  getEpicStatus: () => ipcRenderer.invoke("epic:get-status"),
+  authenticateEpic: (request) => ipcRenderer.invoke("epic:authenticate", request),
+  getEpicLibrary: () => ipcRenderer.invoke("epic:list-library"),
+  getEpicAchievements: (request) => ipcRenderer.invoke("epic:get-achievements", request),
+  logoutEpic: () => ipcRenderer.invoke("epic:logout"),
+  onEpicProgress: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("epic:progress", handler);
+    return () => ipcRenderer.removeListener("epic:progress", handler);
   },
   searchEpicStore: (query) => ipcRenderer.invoke("launcher:search-epic-store", query),
   fetchEpicStoreDetails: (request) => ipcRenderer.invoke("launcher:fetch-epic-store-details", request),
@@ -90,6 +103,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getLocalLibrarySummary: (uid) => ipcRenderer.invoke("library:get-summary", uid),
   markLocalLibrarySummarySynced: (uid, revision) => ipcRenderer.invoke("library:mark-summary-synced", uid, revision),
   clearLocalSteamId: (uid) => ipcRenderer.invoke("library:clear-steam-id", uid),
+  purgeLocalPlatformData: (uid, platform) => ipcRenderer.invoke("library:purge-platform", uid, platform),
+  getPlatformCleanupState: (uid, platform) => ipcRenderer.invoke("library:get-platform-cleanup", uid, platform),
+  setPlatformCleanupPhase: (uid, platform, operationId, phase) => ipcRenderer.invoke("library:set-platform-cleanup-phase", uid, platform, operationId, phase),
+  completePlatformCleanup: (uid, platform, operationId) => ipcRenderer.invoke("library:complete-platform-cleanup", uid, platform, operationId),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
   testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
   setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),
@@ -166,4 +183,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   toggleFullScreen: () => ipcRenderer.invoke("window:fullscreen-toggle"),
   setFullScreen: (flag) => ipcRenderer.invoke("window:fullscreen-set", flag),
   isFullScreen: () => ipcRenderer.invoke("window:fullscreen-get"),
+  // ─ Battery / Controller warnings ────────────────────────────────────────────
+  showBatteryWarning: (level) => ipcRenderer.invoke("system:show-battery-warning", level),
 });

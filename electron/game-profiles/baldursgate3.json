@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "gameDomain": "baldursgate3",
+  "displayName": "Baldur's Gate 3",
+  "engine": "Divinity 4.0",
+  "aliases": ["bg3"],
+  "detection": {
+    "executableCandidates": ["bin/bg3.exe", "bin/bg3_dx11.exe"],
+    "steamAppIds": [1086940]
+  },
+  "rootFolders": ["Data", "Mods", "bin", "Generated", "Public"],
+  "rootFiles": ["bink2w64.dll", "dinput8.dll"],
+  "routingRules": [
+    {
+      "name": "PAK to Mods",
+      "condition": { "extension": ".pak", "rootRelative": true },
+      "targetPath": "Mods/{filename}"
+    }
+  ],
+  "deployment": { "preferredMethod": "hardlink", "fallback": "copy" },
+  "installRules": { "allowRootFallback": false, "forbiddenPaths": ["PlayerProfiles"], "maxFileCount": 30000, "maxEntryBytes": 805306368 }
+}

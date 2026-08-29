@@ -237,7 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (user?.uid) {
         if (window.electronAPI && typeof (window.electronAPI as any).clearLocalSteamId === "function") {
-          await (window.electronAPI as any).clearLocalSteamId(user.uid).catch((e) => console.warn("[Auth] clearLocalSteamId error:", e));
+          await (window.electronAPI as any).clearLocalSteamId(user.uid).catch((e: unknown) => console.warn("[Auth] clearLocalSteamId error:", e));
         }
       }
     } catch (e) {

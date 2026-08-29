@@ -1,0 +1,148 @@
+{
+  "timestamp": "2026-08-29T07:06:40.903Z",
+  "overallStatus": "PASSED",
+  "controls": [
+    {
+      "id": 1,
+      "name": "SQL Injection & Parameterized Access",
+      "category": "Database",
+      "status": "PASS"
+    },
+    {
+      "id": 2,
+      "name": "XSS & Store HTML Sanitization",
+      "category": "Renderer",
+      "status": "PASS"
+    },
+    {
+      "id": 3,
+      "name": "Auth Token & Credentials Boundary",
+      "category": "Auth",
+      "status": "PASS"
+    },
+    {
+      "id": 4,
+      "name": "Password Hashing & Auth Provider",
+      "category": "Auth",
+      "status": "PASS"
+    },
+    {
+      "id": 5,
+      "name": "Sensitive Data & Error Redaction",
+      "category": "Observability",
+      "status": "PASS"
+    },
+    {
+      "id": 6,
+      "name": "OAuth State & CSRF Nonces",
+      "category": "Auth",
+      "status": "PASS"
+    },
+    {
+      "id": 7,
+      "name": "Rate Limiting & Abuse Prevention",
+      "category": "API",
+      "status": "PASS"
+    },
+    {
+      "id": 8,
+      "name": "Security Headers & CORS Config",
+      "category": "API",
+      "status": "PASS"
+    },
+    {
+      "id": 9,
+      "name": "Dependency Security Audit",
+      "category": "Supply Chain",
+      "status": "PASS"
+    },
+    {
+      "id": 10,
+      "name": "Secret & Credential Scanner",
+      "category": "Source",
+      "status": "PASS"
+    },
+    {
+      "id": 11,
+      "name": "Transport Security & HTTPS Enforcement",
+      "category": "Network",
+      "status": "PASS"
+    },
+    {
+      "id": 12,
+      "name": "Row Level Security & Scoped RPCs",
+      "category": "Database",
+      "status": "PASS"
+    },
+    {
+      "id": 13,
+      "name": "Strict Input Validation & Zod Schemas",
+      "category": "API",
+      "status": "PASS"
+    },
+    {
+      "id": 14,
+      "name": "Error Information Leakage Prevention",
+      "category": "Observability",
+      "status": "PASS"
+    },
+    {
+      "id": 15,
+      "name": "Upload & Media Boundary Validation",
+      "category": "Storage",
+      "status": "PASS"
+    },
+    {
+      "id": 16,
+      "name": "Packaged & API Content Security Policy",
+      "category": "Renderer",
+      "status": "PASS"
+    },
+    {
+      "id": 17,
+      "name": "Desktop IPC Security & Window Isolation",
+      "category": "Desktop",
+      "status": "PASS"
+    },
+    {
+      "id": 18,
+      "name": "Executable Integrity & Safe Spawning",
+      "category": "Desktop",
+      "status": "PASS"
+    },
+    {
+      "id": 19,
+      "name": "Transactional Local Purge & Cleanup Journal",
+      "category": "Lifecycle",
+      "status": "PASS"
+    },
+    {
+      "id": 20,
+      "name": "Automated CI/CD Release Gate",
+      "category": "Release",
+      "status": "PASS"
+    }
+  ],
+  "steps": {
+    "secrets": {
+      "passed": true,
+      "duration": 8403,
+      "exitCode": 0
+    },
+    "security-tests": {
+      "passed": true,
+      "duration": 3413,
+      "exitCode": 0
+    },
+    "typecheck": {
+      "passed": true,
+      "duration": 552,
+      "exitCode": 0
+    },
+    "build": {
+      "passed": true,
+      "duration": 26013,
+      "exitCode": 0
+    }
+  }
+}

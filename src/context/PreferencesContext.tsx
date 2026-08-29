@@ -135,12 +135,12 @@ const translations = {
     launching: "Iniciando...",
     play: "Jogar",
     connectedAccounts: "Contas conectadas",
-    connectedAccountsHint: "Vincule Steam e Discord. A Epic usa busca de catálogo e atalhos, sem sincronizar conta.",
-    connectEpic: "Catálogo Epic",
+    connectedAccountsHint: "Vincule Steam, Epic Games e Discord para sincronizar bibliotecas e amigos.",
+    connectEpic: "Conectar Epic",
     connectDiscord: "Conectar Discord",
-    disconnectEpicTitle: "Desconectar Epic",
+    disconnectEpicTitle: "Desconectar Epic Games",
     disconnectEpicDescription:
-      "A Epic é usada apenas para busca de catálogo, artes, detalhes e atalhos.",
+      "Desvincular a Epic Games removerá os jogos da Epic sincronizados da sua biblioteca.",
     disconnectDiscordTitle: "Desconectar Discord",
     disconnectDiscordDescription:
       "Desvincular o Discord removerá a integração.",

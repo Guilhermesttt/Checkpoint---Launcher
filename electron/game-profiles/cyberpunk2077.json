@@ -1,8 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "gameDomain": "cyberpunk2077",
   "displayName": "Cyberpunk 2077",
+  "engine": "REDengine 4",
   "executable": "bin/x64/Cyberpunk2077.exe",
+  "detection": {
+    "executableCandidates": ["bin/x64/Cyberpunk2077.exe"],
+    "steamAppIds": [1091500],
+    "gogIds": ["1423042601"]
+  },
   "rootFolders": [
     "archive",
     "bin",
@@ -31,5 +37,15 @@
       },
       "targetPath": "archive/pc/mod/{filename}"
     }
-  ]
+  ],
+  "deployment": {
+    "preferredMethod": "hardlink",
+    "fallback": "copy"
+  },
+  "installRules": {
+    "allowRootFallback": false,
+    "forbiddenPaths": ["saves", "savegames"],
+    "maxFileCount": 30000,
+    "maxEntryBytes": 805306368
+  }
 }

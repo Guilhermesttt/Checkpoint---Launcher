@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -18,6 +18,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSteam } from "@fortawesome/free-brands-svg-icons";
 import ModalShell from "./ui/ModalShell";
 import { AddGameWizardSteps } from "./game/AddGameWizardSteps";
+import { LoadingState } from "./ui/loading-state";
 import { useAuth } from "../auth/AuthProvider";
 import { usePreferences } from "../context/PreferencesContext";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -26,7 +27,10 @@ import {
   createLibraryGame,
   updateLibraryGame,
 } from "../services/localLibrary";
-import { fetchSteamAppDetailsResult } from "../services/steam";
+import {
+  fetchSteamAppDetailsResult,
+  fetchSteamAchievementSchema,
+} from "../services/steam";
 import {
   fetchEpicAppDetailsResult,
   searchEpicGames,
@@ -51,6 +55,7 @@ interface AddGameModalProps {
   onClose: (silent?: boolean) => void;
   playSound: (type: SoundEffectType) => void;
   gameToEdit?: any | null;
+  initialLauncherType?: LauncherType;
   onSaved?: () => void;
 }
 
@@ -107,6 +112,8 @@ type GameFormData = {
   screenshots?: string[];
   source?: "manual" | "steam" | "epic";
   hasGame?: boolean;
+  totalAchievements?: number;
+  completedAchievements?: number;
 };
 
 const removeUndefined = (data: Record<string, unknown>) =>
@@ -186,6 +193,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   onClose,
   playSound,
   gameToEdit,
+  initialLauncherType,
   onSaved,
 }) => {
   const { user } = useAuth();
@@ -235,31 +243,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       editSubtitle: "Atualize os dados, as artes e a forma de inicialização deste jogo.",
       localDescription: "Jogos instalados no PC e executáveis personalizados.",
       steamDescription: "Metadados, biblioteca e inicialização pela Steam.",
-      epicDescription: "Catálogo da Epic com inicialização local opcional.",
+      epicDescription: "Metadados da Epic com inicialização local opcional.",
       platformSubtitle: "Escolha onde o jogo está instalado ou de onde ele vem.",
       automaticFill: "Preenchimento automático",
-      automaticFillHint: "Busque o jogo para importar capa, descrição e metadados.",
-      launchTitle: "Lançamento",
-      launchHint: "Configure o tamanho estimado e o executável do jogo.",
+      automaticFillHint: "Busque um jogo para importar capa, descrição e metadados.",
+      launchTitle: "Inicialização",
+      launchHint: "Defina o tamanho estimado e o executável do jogo.",
       gameDetails: "Identidade do jogo",
-      gameDetailsHint: "Revise como o jogo será exibido na sua biblioteca.",
+      gameDetailsHint: "Revise como o jogo será exibido na biblioteca.",
       visualAssets: "Artes da biblioteca",
-      visualAssetsHint: "Use links ou envie arquivos locais para personalizar o card.",
+      visualAssetsHint: "Use links ou arquivos locais para personalizar o card do jogo.",
       description: "Descrição",
       descriptionPlaceholder: "Uma breve descrição do jogo...",
       cancel: "Cancelar",
       saveChanges: "Salvar alterações",
       ready: "Pronto para salvar",
-      missingFields: "Complete os itens necessários",
+      missingFields: "Preencha os itens obrigatórios",
       setupStatus: "Status do cadastro",
       sourceReady: "Plataforma definida",
       titleReady: "Título informado",
       launchReady: "Jogo confirmado",
       selected: "Selecionado",
-      imageTooLarge: "A imagem ficou grande demais. Escolha uma arte menor ou use um link.",
+      imageTooLarge: "A imagem é muito grande. Escolha um arquivo menor ou use um link.",
     },
     "en-US": {
-      editInfo: "Edit information",
+      editInfo: "Edit game details",
       addGame: "Add Game",
       steamSearch: "Search Steam",
       epicSearch: "Search Epic",
@@ -327,12 +335,12 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       steamSearch: "Buscar en Steam",
       epicSearch: "Buscar en Epic",
       optional: "Opcional",
-      searchPlaceholder: "Buscar juego para autocompletar...",
+      searchPlaceholder: "Buscar juego para auto-completar...",
       title: "Título",
-      titlePlaceholder: "Nombre de tu juego",
+      titlePlaceholder: "Nombre del juego",
       category: "Categoría",
       cover: "Portada",
-      link: "Link",
+      link: "Enlace",
       platform: "Plataforma",
       steam: "Steam",
       local: "Local",
@@ -343,7 +351,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       executable: "Ejecutable",
       chooseExe: "Seleccionar .exe",
       executableHint:
-        "El navegador no expone la ruta local completa. En runtime de escritorio, la ruta local puede usarse para iniciar el juego.",
+        "El navegador no expone la ruta local completa. En el entorno de escritorio, la ruta local puede usarse para iniciar el juego.",
       noExecutable: "Ningún ejecutable seleccionado",
       noSearchResults: "No se encontraron resultados.",
       searchError: "Error al buscar juegos. Inténtalo de nuevo.",
@@ -351,38 +359,31 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       sizePlaceholder: "Ej: 42",
       missingCoverOrExe:
         "Añade una portada o selecciona un ejecutable antes de guardar.",
-      viewOnEpicStore: "Ver en Epic Games Store",
+      viewOnEpicStore: "Ver en la Epic Games Store",
       ownGameConfirmed: "Tengo este juego",
-      ownGameConfirm: "Confirmar que posees este juego",
+      ownGameConfirm: "Confirmar que poseo este juego",
       previewPanel: "Vista previa del panel",
       wallpaper: "Fondo",
       libraryKicker: "Biblioteca Checkpoint",
       addSubtitle: "Añade, organiza y prepara un nuevo juego para iniciarlo desde Checkpoint.",
-      editSubtitle: "Actualiza los datos, las imágenes y el método de inicio del juego.",
-      localDescription: "Juegos instalados en PC y ejecutables personalizados.",
+      editSubtitle: "Actualiza los datos, las imágenes y el método de inicio de este juego.",
+      localDescription: "Juegos instalados en el PC y ejecutables personalizados.",
       steamDescription: "Metadatos, biblioteca e inicio mediante Steam.",
-      epicDescription: "Catálogo de Epic con inicio local opcional.",
-      platformSubtitle: "Elige dónde está instalado el juego o de dónde viene.",
+      epicDescription: "Metadatos de Epic con soporte para inicio local.",
+      platformSubtitle: "Elige dónde está instalado o de dónde proviene el juego.",
       automaticFill: "Relleno automático",
-      automaticFillHint: "Busca el juego para importar imágenes, descripción y metadatos.",
-      launchTitle: "Lanzamiento",
-      launchHint: "Configura el tamaño estimado y el ejecutable del juego.",
+      automaticFillHint: "Busca un juego para importar portadas, descripción y metadatos.",
+      launchTitle: "Inicio",
+      launchHint: "Define el tamaño estimado y el ejecutable del juego.",
       gameDetails: "Identidad del juego",
-      gameDetailsHint: "Revisa cómo aparecerá el juego en tu biblioteca.",
+      gameDetailsHint: "Revisa cómo se mostrará el juego en la biblioteca.",
       visualAssets: "Imágenes de la biblioteca",
-      visualAssetsHint: "Usa enlaces o archivos locales para personalizar la tarjeta.",
+      visualAssetsHint: "Usa enlaces o archivos locales para personalizar la ficha del juego.",
       description: "Descripción",
       descriptionPlaceholder: "Una breve descripción del juego...",
       cancel: "Cancelar",
       saveChanges: "Guardar cambios",
       ready: "Listo para guardar",
-      missingFields: "Completa los elementos necesarios",
-      setupStatus: "Estado del registro",
-      sourceReady: "Plataforma definida",
-      titleReady: "Título informado",
-      launchReady: "Juego confirmado",
-      selected: "Seleccionado",
-      imageTooLarge: "La imagen es demasiado grande. Elige un archivo menor o usa un enlace.",
     },
   }[modalLanguage];
   const extraCopy = {
@@ -446,15 +447,15 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       sizeGB: "Größe (GB)",
       viewOnEpicStore: "Im Epic Games Store ansehen",
       ownGameConfirmed: "Ich besitze dieses Spiel",
-      ownGameConfirm: "Bestätigen, dass du dieses Spiel besitzt",
+      ownGameConfirm: "Bestätigen, dass Sie dieses Spiel besitzen",
       automaticFill: "Automatische Details",
-      automaticFillHint: "Suche ein Spiel, um Bilder und Metadaten zu importieren.",
+      automaticFillHint: "Suchen Sie ein Spiel, um Artwork, Beschreibung und Metadaten zu importieren.",
       gameDetails: "Spielidentität",
-      visualAssets: "Bibliotheksgrafik",
+      visualAssets: "Bibliotheksgrafiken",
       description: "Beschreibung",
       descriptionPlaceholder: "Eine kurze Beschreibung des Spiels...",
       cancel: "Abbrechen",
-      saveChanges: "Änderungen speichern",
+      saveChanges: "Speichern",
       ready: "Bereit zum Speichern",
       selected: "Ausgewählt",
     },
@@ -463,8 +464,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       addGame: "Aggiungi gioco",
       steamSearch: "Cerca su Steam",
       epicSearch: "Cerca su Epic",
-      optional: "Facoltativo",
-      searchPlaceholder: "Cerca un gioco per compilare automaticamente...",
+      optional: "Opzionale",
+      searchPlaceholder: "Cerca un gioco per compilare i dati...",
       title: "Titolo",
       titlePlaceholder: "Nome del gioco",
       category: "Categoria",
@@ -480,18 +481,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       noSearchResults: "Nessun risultato trovato.",
       searchError: "Errore durante la ricerca. Riprova.",
       sizeGB: "Dimensione (GB)",
-      viewOnEpicStore: "Vedi su Epic Games Store",
+      viewOnEpicStore: "Visualizza su Epic Games Store",
       ownGameConfirmed: "Possiedo questo gioco",
       ownGameConfirm: "Conferma di possedere questo gioco",
-      automaticFill: "Dettagli automatici",
-      automaticFillHint: "Cerca un gioco per importare immagini e metadati.",
+      automaticFill: "Dati automatici",
+      automaticFillHint: "Cerca un gioco per importare copertina, descrizione e metadati.",
       gameDetails: "Identità del gioco",
-      visualAssets: "Immagini della libreria",
+      visualAssets: "Elementi visivi della libreria",
       description: "Descrizione",
       descriptionPlaceholder: "Una breve descrizione del gioco...",
       cancel: "Annulla",
       saveChanges: "Salva modifiche",
-      ready: "Pronto per salvare",
+      ready: "Pronto per il salvataggio",
       selected: "Selezionato",
     },
   }[language as "fr-FR" | "de-DE" | "it-IT"] || {};
@@ -508,16 +509,55 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [searchSource, setSearchSource] = useState<"steam" | "epic">("steam");
+  const [searchSource, setSearchSource] = useState<"steam" | "epic">(() => {
+    if (gameToEdit?.launcherType === "epic" || initialLauncherType === "epic") return "epic";
+    return "steam";
+  });
 
-  const [formData, setFormData] = useState<GameFormData>({
-    title: "",
-    cardImage: "",
-    backgroundImage: "",
-    category: "ACTION",
-    description: "",
-    launcherType: "local" as "steam" | "local" | "epic",
-    executablePath: "",
+  const [formData, setFormData] = useState<GameFormData>(() => {
+    if (gameToEdit) {
+      return {
+        title: gameToEdit.title || "",
+        image: gameToEdit.image || "",
+        cardImage: gameToEdit.cardImage || "",
+        backgroundImage: gameToEdit.backgroundImage || gameToEdit.image || "",
+        logoImage: gameToEdit.logoImage || "",
+        category: gameToEdit.category || "ACTION",
+        description: gameToEdit.description || "",
+        aboutTheGame: gameToEdit.aboutTheGame || "",
+        launcherType: gameToEdit.launcherType || initialLauncherType || "local",
+        executablePath: gameToEdit.executablePath || "",
+        steamAppId: gameToEdit.steamAppId || "",
+        epicCatalogId: gameToEdit.epicCatalogId || "",
+        epicLaunchId: gameToEdit.epicLaunchId || "",
+        epicStoreUrl: gameToEdit.epicStoreUrl || "",
+        sizeGB: gameToEdit.sizeGB,
+        releaseDate: gameToEdit.releaseDate || "",
+        developer: gameToEdit.developer || "",
+        publisher: gameToEdit.publisher || "",
+        tags: gameToEdit.tags || [],
+        trailerUrl: gameToEdit.trailerUrl || "",
+        screenshots: gameToEdit.screenshots || [],
+        source: gameToEdit.source || "manual",
+        totalAchievements: gameToEdit.totalAchievements,
+        completedAchievements: gameToEdit.completedAchievements,
+        hasGame:
+          gameToEdit.hasGame ??
+          Boolean(gameToEdit.steamAppId || gameToEdit.epicCatalogId),
+      };
+    }
+    return {
+      title: "",
+      cardImage: "",
+      backgroundImage: "",
+      category: "ACTION",
+      description: "",
+      launcherType: initialLauncherType || "local",
+      executablePath: "",
+      source: "manual",
+      hasGame: false,
+      epicLaunchId: "",
+    };
   });
 
   useEffect(() => {
@@ -538,7 +578,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           category: gameToEdit.category || "ACTION",
           description: gameToEdit.description || "",
           aboutTheGame: gameToEdit.aboutTheGame || "",
-          launcherType: gameToEdit.launcherType || "local",
+          launcherType: gameToEdit.launcherType || initialLauncherType || "local",
           executablePath: gameToEdit.executablePath || "",
           steamAppId: gameToEdit.steamAppId || "",
           epicCatalogId: gameToEdit.epicCatalogId || "",
@@ -552,6 +592,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           trailerUrl: gameToEdit.trailerUrl || "",
           screenshots: gameToEdit.screenshots || [],
           source: gameToEdit.source || "manual",
+          totalAchievements: gameToEdit.totalAchievements,
+          completedAchievements: gameToEdit.completedAchievements,
           hasGame:
             gameToEdit.hasGame ??
             Boolean(gameToEdit.steamAppId || gameToEdit.epicCatalogId),
@@ -563,14 +605,16 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           backgroundImage: "",
           category: "ACTION",
           description: "",
-          launcherType: "local",
+          launcherType: initialLauncherType || "local",
           executablePath: "",
           source: "manual",
           hasGame: false,
           epicLaunchId: "",
         });
       }
-      setSearchSource(gameToEdit?.launcherType === "epic" ? "epic" : "steam");
+      setSearchSource(
+        (gameToEdit?.launcherType === "epic" || initialLauncherType === "epic") ? "epic" : "steam",
+      );
       setSearchQuery("");
       setSearchResults([]);
       setIsSearching(false);
@@ -703,7 +747,10 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     const appId = String(game.id);
     setLoading(true);
     try {
-      const details = await fetchSteamAppDetailsResult(appId, language);
+      const [details, schema] = await Promise.all([
+        fetchSteamAppDetailsResult(appId, language),
+        fetchSteamAchievementSchema(appId).catch(() => ({ achievements: [], total: 0, unlocked: 0 })),
+      ]);
       if (requestId !== detailsRequestRef.current) return;
       if (details.ok) {
         const d = details.data;
@@ -726,6 +773,8 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           executablePath:
             prev.launcherType === "steam" ? appId : prev.executablePath,
           steamAppId: appId,
+          totalAchievements: schema?.total || 0,
+          completedAchievements: schema?.unlocked || 0,
           sizeGB:
             typeof d.sizeGB === "number" && d.sizeGB > 0
               ? Math.round(d.sizeGB)
@@ -1070,16 +1119,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
     { label: copy.launchReady, ready: launchRequirementReady },
   ];
   const completedSetupChecks = setupChecks.filter((item) => item.ready).length;
+  const isSubmittingRef = useRef(false);
   const setupProgress = Math.round((completedSetupChecks / setupChecks.length) * 100);
 
   const handleSubmit = async () => {
-    if (isSaving || loading) return;
+    if (isSubmittingRef.current || isSaving || loading) return;
     if (!user?.uid || !isFormValid()) {
       if (formData.title && formData.launcherType === "local") {
         notify(copy.missingCoverOrExe, "error");
       }
       return;
     }
+    isSubmittingRef.current = true;
     setIsSaving(true);
     playSound("select");
     try {
@@ -1120,6 +1171,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       notify("Erro ao salvar jogo.", "error");
     } finally {
       setIsSaving(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -1575,19 +1627,18 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
           <button
             type="submit"
             form="add-game-form"
+            onClick={() => void handleSubmit()}
             disabled={isSaving || loading || !isFormValid()}
             className="inline-flex min-w-40 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-[12px] font-bold text-black transition-all hover:bg-white/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-white/25 disabled:text-black/50"
           >
             {isSaving ? (
-              <RefreshCw size={14} className="animate-spin" />
+              <LoadingState label={copy.saving} variant="Drive" dark size="sm" showTimer={false} />
             ) : (
-              <Check size={14} strokeWidth={3} />
+              <>
+                <Check size={14} strokeWidth={3} />
+                {gameToEdit ? copy.saveChanges : copy.confirmAdd}
+              </>
             )}
-            {isSaving
-              ? copy.saving
-              : gameToEdit
-                ? copy.saveChanges
-                : copy.confirmAdd}
           </button>
         </footer>
       </div>

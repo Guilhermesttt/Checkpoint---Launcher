@@ -31,6 +31,13 @@ declare global {
         appIcon: string | null;
       }>>;
       getLocalGameScreenshots?: (request: { title?: string; launcherType?: string; steamAppId?: string | number }) => Promise<string[]>;
+      openEpicLoginWindow?: () => Promise<string | null>;
+      getEpicStatus: () => Promise<EpicAccountStatus>;
+      authenticateEpic: (request: { code: string }) => Promise<{ success: boolean }>;
+      getEpicLibrary: () => Promise<EpicLibraryGame[]>;
+      getEpicAchievements: (request?: { sandboxId?: string; appName?: string }) => Promise<EpicAchievementsResult>;
+      logoutEpic: () => Promise<{ success: boolean }>;
+      onEpicProgress: (callback: (progress: EpicProgressEvent) => void) => () => void;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
       loadModProfiles?: (gameId: string) => Promise<Array<{ id: string; name: string; gameId: string; activeInstallIds: string[]; createdAt: string; updatedAt: string }>>;
@@ -267,9 +274,11 @@ declare global {
         installed: boolean;
       }>>;
       fetchEpicStoreDetails: (request: {
-        catalogId: string;
-        namespace: string;
-        productSlug: string;
+        catalogId?: string;
+        namespace?: string;
+        productSlug?: string;
+        title?: string;
+        appName?: string;
         language?: import("../context/PreferencesContext").LauncherLanguage;
       }) => Promise<{
         catalogId: string;
@@ -614,6 +623,48 @@ declare global {
       toggleFullScreen?: () => Promise<boolean>;
       setFullScreen?: (flag: boolean) => Promise<boolean>;
       isFullScreen?: () => Promise<boolean>;
+      // ─ Battery / Controller warnings ─────────────────────────────────────────
+      /**
+       * Exibe uma notificação de aviso de bateria baixa do controle.
+       * @param level Nível da bateria em % (0-100).
+       */
+      showBatteryWarning?: (level: number) => Promise<void>;
+      listLocalGames?: (uid: string) => Promise<any[]>;
+      createLocalGame?: (uid: string, game: any) => Promise<any>;
+      updateLocalGame?: (uid: string, gameId: string, patch: any) => Promise<void>;
+      deleteLocalGame?: (uid: string, gameId: string) => Promise<boolean>;
+      deleteLocalGamesByLauncher?: (uid: string, launcherType: string) => Promise<number>;
+      recordLocalGameSession?: (uid: string, gameId: string, session: any) => Promise<string>;
+      bulkUpsertLocalGames?: (uid: string, games: any[]) => Promise<any[]>;
+      importLegacyGames?: (uid: string, games: any[]) => Promise<any>;
+      needsLegacyGameImport?: (uid: string) => Promise<boolean>;
+      getLocalLibrarySummary?: (uid: string) => Promise<any>;
+      markLocalLibrarySummarySynced?: (uid: string, revision: number) => Promise<void>;
+      clearLocalSteamId?: (uid: string) => Promise<void>;
+      purgeLocalPlatformData: (uid: string, platform: import("./platformOperations").Platform) => Promise<{
+        games: number;
+        sessions: number;
+        gameIds: string[];
+        steamAppIds: string[];
+        epicCatalogIds: string[];
+        deletedFiles: string[];
+      }>;
+      getPlatformCleanupState: (uid: string, platform: import("./platformOperations").Platform) => Promise<{
+        operationId: string;
+        phase: string;
+        updatedAt: number;
+      } | null>;
+      setPlatformCleanupPhase: (
+        uid: string,
+        platform: import("./platformOperations").Platform,
+        operationId: string,
+        phase: string
+      ) => Promise<void>;
+      completePlatformCleanup: (
+        uid: string,
+        platform: import("./platformOperations").Platform,
+        operationId: string
+      ) => Promise<void>;
     };
   }
 
@@ -638,4 +689,48 @@ declare global {
   /** Opaque handle returned by onRealtimeAchievementUnlock — used for cleanup. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type RealtimeAchievementHandler = (...args: any[]) => void;
+
+  interface EpicAccountStatus {
+    authenticated: boolean;
+    accountId?: string;
+    displayName?: string;
+  }
+
+  interface EpicLibraryGame {
+    appName: string;
+    title: string;
+    catalogId: string;
+    namespace: string;
+    description: string;
+    keyImages: Array<{
+      type: string;
+      url: string;
+      md5?: string;
+      width?: number;
+      height?: number;
+    }>;
+  }
+
+  interface EpicAchievementItem {
+    apiName: string;
+    name: string;
+    description: string;
+    achieved: boolean;
+    unlockTime: number;
+    icon: string;
+    iconGray: string;
+    hidden: boolean;
+  }
+
+  interface EpicAchievementsResult {
+    total: number;
+    completed: number;
+    list: EpicAchievementItem[];
+  }
+
+  interface EpicProgressEvent {
+    phase: "authenticating" | "reading-library" | "reading-achievements" | "enriching-games" | "saving-games" | "refreshing-profile";
+    completed?: number;
+    total?: number;
+  }
 }

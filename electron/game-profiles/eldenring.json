@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "gameDomain": "eldenring",
+  "displayName": "Elden Ring",
+  "engine": "FromEngine",
+  "aliases": ["elden-ring"],
+  "detection": {
+    "executableCandidates": ["eldenring.exe"],
+    "steamAppIds": [1245620]
+  },
+  "rootFolders": ["mods", "parts", "movie", "shader", "sound", "modengine"],
+  "rootFiles": ["dinput8.dll", "modengine2_launcher.exe", "version.dll"],
+  "routingRules": [],
+  "deployment": { "preferredMethod": "hardlink", "fallback": "copy" },
+  "installRules": { "allowRootFallback": false, "forbiddenPaths": ["saves"], "maxFileCount": 30000, "maxEntryBytes": 805306368 }
+}

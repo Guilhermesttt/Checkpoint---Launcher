@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "gameDomain": "re-engine",
   "displayName": "RE Engine Games",
+  "engine": "RE Engine",
   "aliases": [
     "residentevilrequiem",
     "residentevil4",
@@ -13,6 +14,10 @@
     "mhrise",
     "dragonsdogma2"
   ],
+  "detection": {
+    "executableCandidates": ["re4.exe", "re2.exe", "re3.exe", "re8.exe", "dmc5.exe"],
+    "steamAppIds": [2050650, 883710, 952060, 1196590, 601150]
+  },
   "rootFolders": [
     "natives",
     "reframework",
@@ -34,5 +39,15 @@
     "sl.fsr3.dll",
     "sl.common.dll"
   ],
-  "routingRules": []
+  "routingRules": [],
+  "deployment": {
+    "preferredMethod": "hardlink",
+    "fallback": "copy"
+  },
+  "installRules": {
+    "allowRootFallback": false,
+    "forbiddenPaths": ["saves"],
+    "maxFileCount": 30000,
+    "maxEntryBytes": 805306368
+  }
 }

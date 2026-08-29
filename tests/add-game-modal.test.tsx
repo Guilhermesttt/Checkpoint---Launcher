@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,7 +11,9 @@ const mocks = vi.hoisted(() => ({
   deleteField: vi.fn(() => "__delete__"),
   notify: vi.fn(),
   fetchSteamDetails: vi.fn(),
+  fetchSteamAchievementSchema: vi.fn(),
   fetchEpicDetails: vi.fn(),
+  fetchEpicAchievements: vi.fn(),
   searchEpicGames: vi.fn(),
   fetch: vi.fn(),
 }));
@@ -52,11 +54,13 @@ vi.mock("../src/components/ui/ModalShell", () => ({
 
 vi.mock("../src/services/steam", () => ({
   fetchSteamAppDetailsResult: mocks.fetchSteamDetails,
+  fetchSteamAchievementSchema: mocks.fetchSteamAchievementSchema,
 }));
 
 vi.mock("../src/services/epic", () => ({
   fetchEpicAppDetailsResult: mocks.fetchEpicDetails,
   searchEpicGames: mocks.searchEpicGames,
+  fetchEpicAchievements: mocks.fetchEpicAchievements,
 }));
 
 vi.mock("../src/services/api", () => ({
@@ -85,9 +89,24 @@ const renderModal = (props: Partial<React.ComponentProps<typeof AddGameModal>> =
 
 describe("AddGameModal", () => {
   beforeEach(() => {
+    mocks.addDoc.mockReset();
+    mocks.updateDoc.mockReset();
+    mocks.notify.mockReset();
+    mocks.fetchSteamDetails.mockReset();
+    mocks.fetchSteamAchievementSchema.mockReset();
+    mocks.fetchEpicDetails.mockReset();
+    mocks.fetchEpicAchievements.mockReset();
+    mocks.searchEpicGames.mockReset();
+    mocks.fetch.mockReset();
     mocks.addDoc.mockResolvedValue({ id: "game-new" });
     mocks.updateDoc.mockResolvedValue(undefined);
     mocks.searchEpicGames.mockResolvedValue({ items: [] });
+    mocks.fetchSteamAchievementSchema.mockResolvedValue({
+      achievements: [],
+      total: 0,
+      unlocked: 0,
+    });
+    mocks.fetchEpicAchievements.mockResolvedValue({ total: 0, completed: 0, list: [] });
     mocks.fetch.mockResolvedValue({ json: async () => ({ items: [] }) });
     vi.stubGlobal("fetch", mocks.fetch);
   });
@@ -190,6 +209,115 @@ describe("AddGameModal", () => {
       }),
     );
     expect(onClose).toHaveBeenCalledWith(true);
+  });
+
+  it("preserva as conquistas ao editar um jogo da Epic", async () => {
+    const user = userEvent.setup();
+    renderModal({
+      gameToEdit: {
+        id: "epic-7",
+        title: "Alan Wake 2",
+        launcherType: "epic",
+        epicCatalogId: "catalog-7",
+        cardImage: "https://cdn.example.com/alan-wake-2.jpg",
+        totalAchievements: 66,
+        completedAchievements: 21,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /Salvar alterações/i }));
+
+    await waitFor(() => expect(mocks.updateDoc).toHaveBeenCalledWith(
+      "user-1",
+      "epic-7",
+      expect.objectContaining({
+        totalAchievements: 66,
+        completedAchievements: 21,
+      }),
+    ));
+  });
+
+  it("zera conquistas antigas ao selecionar outro jogo Epic sem conquistas", async () => {
+    mocks.searchEpicGames.mockResolvedValue({
+      items: [{
+        id: "new-catalog",
+        catalogId: "new-catalog",
+        namespace: "new-namespace",
+        productSlug: "new-game",
+        name: "New Epic Game",
+      }],
+    });
+    mocks.fetchEpicDetails.mockResolvedValue({
+      ok: true,
+      data: {
+        catalogId: "new-catalog",
+        namespace: "new-namespace",
+        appName: "new-app",
+        title: "New Epic Game",
+      },
+    });
+    mocks.fetchEpicAchievements.mockResolvedValue({ total: 0, completed: 0, list: [] });
+    const user = userEvent.setup();
+    renderModal({
+      gameToEdit: {
+        id: "epic-old",
+        title: "Old Epic Game",
+        launcherType: "epic",
+        epicCatalogId: "old-catalog",
+        totalAchievements: 50,
+        completedAchievements: 20,
+      },
+    });
+
+    const search = screen.getByRole("combobox", { name: /Buscar na Epic/i });
+    await user.type(search, "New Epic");
+    await user.click(await screen.findByRole("option", { name: /New Epic Game/i }));
+    await waitFor(() => expect(screen.getByLabelText("Título")).toHaveValue("New Epic Game"));
+    await user.click(screen.getByRole("button", { name: /Confirmar que possuo/i }));
+    await user.click(screen.getByRole("button", { name: /Salvar alterações/i }));
+
+    await waitFor(() => expect(mocks.updateDoc).toHaveBeenCalledWith(
+      "user-1",
+      "epic-old",
+      expect.objectContaining({
+        epicCatalogId: "new-catalog",
+        totalAchievements: 0,
+        completedAchievements: 0,
+      }),
+    ));
+  });
+
+  it("ignora conquistas Steam atrasadas depois de trocar de plataforma", async () => {
+    let resolveSchema!: (value: {
+      achievements: unknown[];
+      total: number;
+      unlocked: number;
+    }) => void;
+    mocks.fetchSteamAchievementSchema.mockReturnValue(new Promise((resolve) => {
+      resolveSchema = resolve;
+    }));
+    mocks.fetchSteamDetails.mockResolvedValue({
+      ok: true,
+      data: { title: "Portal 2", cardImage: "https://cdn.example.com/portal.jpg" },
+    });
+    mocks.fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [{ id: "620", name: "Portal 2" }] }),
+    });
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole("radio", { name: /^Steam/i }));
+    await user.type(screen.getByRole("combobox", { name: /Buscar na Steam/i }), "Portal");
+    await user.click(await screen.findByRole("option", { name: /Portal 2/i }));
+    await waitFor(() => expect(mocks.fetchSteamAchievementSchema).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("radio", { name: /^Epic Games/i }));
+
+    await act(async () => {
+      resolveSchema({ achievements: [], total: 0, unlocked: 0 });
+    });
+
+    expect(screen.getByLabelText("Título")).toHaveValue("");
   });
 
   it("cancela uma busca agendada ao trocar de plataforma", () => {

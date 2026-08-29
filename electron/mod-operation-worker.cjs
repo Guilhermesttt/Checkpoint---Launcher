@@ -4,6 +4,7 @@ const { parentPort } = require("node:worker_threads");
 const {
   adoptUniversalMod,
   installUniversalMod,
+  previewUniversalMod,
 } = require("./universal-mod-installer.cjs");
 const { uninstallNexusMod } = require("./nexus-installation-manager.cjs");
 
@@ -13,6 +14,7 @@ const operations = {
   install: installUniversalMod,
   adopt: adoptUniversalMod,
   uninstall: uninstallNexusMod,
+  preview: previewUniversalMod,
 };
 
 const serializeError = (error) => ({

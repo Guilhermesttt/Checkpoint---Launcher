@@ -22,7 +22,36 @@ export function useGameLibraryView({
 }) {
   const displayGames = useMemo(() => {
     const s = searchTerm.trim().toLowerCase();
-    const ordered = [...games].sort((a, b) => {
+
+    // Deduplicate games by id and unique launcher identity
+    const seenIds = new Set<string>();
+    const seenPlatforms = new Set<string>();
+    const uniqueGames: Game[] = [];
+
+    for (const g of games) {
+      if (!g || !g.id) continue;
+      if (seenIds.has(g.id)) continue;
+      seenIds.add(g.id);
+
+      const launcher = g.launcherType || "local";
+      let platformKey = "";
+      if (launcher === "steam" && g.steamAppId) {
+        platformKey = `steam_${g.steamAppId}`;
+      } else if (launcher === "epic" && (g.epicLaunchId || g.epicCatalogId)) {
+        platformKey = `epic_${(g.epicLaunchId || g.epicCatalogId || "").toLowerCase()}`;
+      } else if (launcher !== "local") {
+        platformKey = `${launcher}_${(g.title || "").toLowerCase().trim()}`;
+      }
+
+      if (platformKey && seenPlatforms.has(platformKey)) {
+        continue;
+      }
+      if (platformKey) seenPlatforms.add(platformKey);
+
+      uniqueGames.push(g);
+    }
+
+    const ordered = [...uniqueGames].sort((a, b) => {
       if (Boolean(a.isFavorite) === Boolean(b.isFavorite)) return 0;
       return a.isFavorite ? -1 : 1;
     });

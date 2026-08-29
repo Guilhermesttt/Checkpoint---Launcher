@@ -375,6 +375,8 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
         && sessionStorage.getItem("checkpoint_hidden_nexus_download_notice") === noticeKey
       ) return;
       setDownloadState(state);
+      // limpa awaiting para qualquer status ativo, não só terminal
+      if (state.fileId) setAwaitingFileId((cur) => cur === state.fileId ? "" : cur);
       setDownloadHistory((prev) => {
         const index = prev.findIndex(
           (item) => item.id === state.id || (item.fileId && item.fileId === state.fileId && item.gameDomain === state.gameDomain),
@@ -388,6 +390,9 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       });
       if (state.status === "completed" && state.fileId) {
         setDownloadedFileIds((current) => new Set(current).add(state.fileId as string));
+      }
+      if (state.status === "error" && state.error) {
+        setFilesError(state.error);
       }
       if (isTerminal) {
         downloadNoticeTimerRef.current = window.setTimeout(() => {
@@ -405,7 +410,6 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
     const unsubscribe = onNexusDownloadState((state) => {
       if (cancelled) return;
       showDownloadNotice(state);
-      setAwaitingFileId("");
     });
     return () => {
       cancelled = true;
@@ -489,15 +493,12 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
     mod.id.match(/:([1-9][0-9]*)$/)?.[1] || "";
 
   const adoptExistingMod = async (mod: InstalledModEntry, modId: string) => {
-    if (
-      gameDomain !== "residentevilrequiem"
-      || !gameFolder
-      || !mod.filePath
-      || !/\.zip$/i.test(mod.filePath)
-    ) {
-      throw new Error(
-        "Este formato não pode ser vinculado automaticamente. Remova-o manualmente.",
-      );
+    if (!gameFolder || !mod.filePath) {
+      throw new Error("Selecione a pasta do jogo antes de vincular.");
+    }
+    // Suporta zips/rar/7z via staging pipeline
+    if (!/\.(zip|rar|7z|tar|gz)$/i.test(mod.filePath)) {
+      throw new Error("Este formato não pode ser vinculado automaticamente. Remova-o manualmente.");
     }
     const adoption = await adoptNexusInstalledMod({
       gameDomain,
@@ -519,12 +520,22 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       return;
     }
     if (enabled && !mod.filePath) {
-      setInstalledActionError("Este formato ainda exige instalação manual.");
+      setInstalledActionError("Arquivo do mod não encontrado. Baixe novamente.");
       return;
     }
     if (enabled && !gameFolder) {
-      setInstalledActionError("Configure primeiro a pasta raiz do jogo.");
+      setInstalledActionError("Configure primeiro a pasta raiz do jogo em Configurar.");
       return;
+    }
+    // verify file still exists (user may have deleted download folder)
+    if (enabled && mod.filePath) {
+      try {
+        // Check via download listing will be done in main; just ensure extension valid
+        if (!/\.(zip|rar|7z|tar|gz)$/i.test(mod.filePath)) {
+          setInstalledActionError(`Formato não suportado: ${mod.filePath.split(".").pop()}`);
+          return;
+        }
+      } catch {}
     }
     setOptimisticModStates((current) => ({ ...current, [mod.id]: enabled }));
     setModActionIds((current) => new Set(current).add(mod.id));
@@ -545,8 +556,18 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
           manifestPath: result.manifestPath,
           installationError: "",
         });
+        setInstalledActionError("");
       } else {
-        const manifestPath = mod.manifestPath || await adoptExistingMod(mod, modId);
+        // Desativar: prefere manifest salvo; se não existe tenta adotar ou só desliga
+        let manifestPath = mod.manifestPath;
+        if (!manifestPath && mod.filePath) {
+          try {
+            manifestPath = await adoptExistingMod(mod, modId);
+          } catch (adoptErr) {
+            // Se não conseguiu adotar (já desinstalado manualmente), apenas desativa localmente
+            console.warn("[mods] adopt failing on disable, falling back to local toggle:", adoptErr);
+          }
+        }
         if (manifestPath) {
           await removeNexusInstalledMod({
             manifestPath,
@@ -693,10 +714,10 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
       setFilesError("O identificador deste mod não pôde ser reconhecido.");
       return;
     }
-    if (!gameFolder) {
-      setFilesError(
-        "Selecione primeiro a pasta raiz do jogo na aba Configurar.",
-      );
+    // gameFolder é opcional para download; se não houver, baixa sem auto-install
+    const effectiveFolder = gameFolder || "";
+    if (!nexusConnection.connected) {
+      setFilesError("Conecte sua conta Nexus em Configurar antes de baixar.");
       return;
     }
     try {
@@ -704,18 +725,20 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
         gameDomain,
         modId,
         fileId: file.id,
-        gameFolder,
+        gameFolder: effectiveFolder,
         modName: selectedMod.name,
         modAuthor: selectedMod.author,
         pictureUrl: selectedMod.pictureUrl,
         version: file.version || selectedMod.version || "",
       });
     } catch (prepareError) {
-      setFilesError(
-        prepareError instanceof Error
-          ? prepareError.message
-          : "Não foi possível preparar o download.",
-      );
+      const msg = prepareError instanceof Error ? prepareError.message : "Não foi possível preparar o download.";
+      // Improve message for missing premium / key issues
+      if (msg.toLowerCase().includes("chave")) {
+        setFilesError(`${msg} Vá em Configurar → Conectar chave Nexus.`);
+      } else {
+        setFilesError(msg);
+      }
       return;
     }
     const pageUrl = new URL(selectedMod.modPageUrl);
@@ -724,11 +747,18 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
     pageUrl.searchParams.set("nmm", "1");
     setAwaitingFileId(file.id);
     setFilesError("");
+    if (!effectiveFolder) {
+      setFilesError("Pasta do jogo não configurada: o download será feito sem instalação automática. Configure em Configurar para instalar com 1 clique.");
+      // clear warning after 6s
+      setTimeout(() => setFilesError(""), 6000);
+    }
     if (window.electronAPI?.openExternalUrl) {
       await window.electronAPI.openExternalUrl(pageUrl.toString());
     } else {
       window.open(pageUrl.toString(), "_blank", "noopener,noreferrer");
     }
+    // Fallback: se NXM não disparar em 30s, libera botão
+    setTimeout(() => setAwaitingFileId((cur) => cur === file.id ? "" : cur), 30000);
   };
 
   const importModFromUrl = async () => {
@@ -776,7 +806,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-100 overflow-hidden bg-[#050507]"
+          className="fixed inset-0 z-100 overflow-hidden bg-[#050507]"
         >
           <motion.div
             key={heroImage}
@@ -842,7 +872,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 overflow-hidden rounded-[30px] border border-white/10 bg-black/55 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-3xl">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-[30px] border border-white/10 bg-black/55 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-3xl flex flex-col">
               <AnimatePresence mode="wait">
                 {activeTab === "discover" && (
                   <motion.div
@@ -850,9 +880,9 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="flex h-full min-h-0 flex-col overflow-y-auto thin-scrollbar xl:grid xl:grid-cols-[minmax(0,1fr)_clamp(320px,25vw,390px)] xl:overflow-hidden"
+                    className="flex flex-1 min-h-0 overflow-hidden flex-col xl:grid xl:grid-cols-[minmax(0,1fr)_clamp(320px,25vw,390px)]"
                   >
-                    <section className="flex min-h-0 shrink-0 flex-col border-b border-white/8 p-4 sm:p-5 xl:shrink xl:border-b-0 xl:border-r xl:p-6">
+                    <section className="flex min-h-0 flex-1 flex-col overflow-hidden border-b border-white/8 p-4 sm:p-5 xl:border-b-0 xl:border-r xl:p-6">
                       <div className="mb-3 flex shrink-0 flex-wrap items-center gap-3">
                         <div className="relative min-w-60 flex-1">
                           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/25" />
@@ -924,7 +954,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                         </p>
                       )}
 
-                      <div className="min-h-0 flex-1 xl:overflow-y-auto xl:pr-2 thin-scrollbar">
+                      <div className="min-h-0 flex-1 overflow-y-auto xl:pr-2 thin-scrollbar">
                         {!gameDomain ? (
                           <EmptyCatalog
                             title="Vincule este jogo à Nexus"
@@ -1016,7 +1046,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                       </div>
                     </section>
 
-                    <aside className="min-h-0 shrink-0 p-4 sm:p-5 xl:shrink xl:overflow-y-auto xl:p-6 thin-scrollbar">
+                    <aside className="min-h-0 flex-1 xl:flex-1 overflow-y-auto p-4 sm:p-5 xl:p-6 thin-scrollbar border-t border-white/8 xl:border-t-0">
                       {selectedMod ? (
                         <motion.div key={selectedMod.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                           <div className="mb-5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
@@ -1268,7 +1298,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="h-full overflow-y-auto p-4 sm:p-5 lg:p-7 thin-scrollbar"
+                    className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-7 thin-scrollbar"
                   >
                     <div className="mx-auto max-w-5xl">
                       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1474,17 +1504,8 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                                 <Switch
                                   checked={displayedEnabled}
                                   onCheckedChange={(enabled) => void changeInstalledModState(mod, enabled)}
-                                  disabled={isBusy || (
-                                    displayedEnabled
-                                      ? !mod.manifestPath && !(
-                                        Boolean(gameFolder)
-                                        && /\.zip$/i.test(mod.filePath || "")
-                                      )
-                                      : !mod.filePath
-                                  )}
-                                  title={displayedEnabled && !mod.manifestPath
-                                    ? "O Phelierium verificará os arquivos antes de vincular este mod"
-                                    : undefined}
+                                  disabled={isBusy || (!displayedEnabled && !mod.filePath)}
+                                  title={!mod.filePath ? "Baixe o arquivo antes de ativar" : !gameFolder ? "Configure a pasta do jogo" : undefined}
                                   aria-label={`${displayedEnabled ? "Desativar" : "Ativar"} ${mod.name}`}
                                 />
                               </div>
@@ -1502,7 +1523,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="flex h-full min-h-0 flex-col overflow-y-auto p-4 thin-scrollbar sm:p-6"
+                    className="flex flex-1 min-h-0 flex-col overflow-y-auto p-4 thin-scrollbar sm:p-6"
                   >
                     <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
                       <div>
@@ -1662,7 +1683,7 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="h-full overflow-y-auto p-4 sm:p-5 lg:p-7 thin-scrollbar"
+                    className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 lg:p-7 thin-scrollbar"
                   >
                     <div className="mx-auto max-w-3xl space-y-5">
                       <div>

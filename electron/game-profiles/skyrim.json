@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "gameDomain": "skyrim",
+  "displayName": "The Elder Scrolls V: Skyrim",
+  "engine": "Creation Engine",
+  "aliases": ["skyrimspecialedition", "skyrimse", "skyrimvr"],
+  "detection": {
+    "executableCandidates": ["SkyrimSE.exe", "SkyrimVR.exe"],
+    "steamAppIds": [489830, 611670]
+  },
+  "rootFolders": ["Data", "mods", "SKSE", "plugins", "scripts", "Data/SKSE/Plugins"],
+  "rootFiles": ["dinput8.dll", "skse64_loader.exe", "version.dll"],
+  "routingRules": [
+    {
+      "name": "ESP/ESM to Data",
+      "condition": { "extension": ".esp", "rootRelative": true },
+      "targetPath": "Data/{filename}"
+    },
+    {
+      "name": "ESL to Data",
+      "condition": { "extension": ".esl", "rootRelative": true },
+      "targetPath": "Data/{filename}"
+    }
+  ],
+  "deployment": { "preferredMethod": "hardlink", "fallback": "copy" },
+  "installRules": { "allowRootFallback": false, "forbiddenPaths": ["saves"], "maxFileCount": 30000, "maxEntryBytes": 805306368 }
+}

@@ -13,12 +13,14 @@ interface GameRowProps {
 }
 
 const MAX_VISIBLE_DOTS = 15;
+const VIRTUAL_WINDOW = 6;
 
 const GameCardSlot = React.memo(
   ({
     game,
     index,
     isActive,
+    isWithinWindow,
     onSelect,
     onContextMenu,
     playSound,
@@ -26,6 +28,7 @@ const GameCardSlot = React.memo(
     game: Game;
     index: number;
     isActive: boolean;
+    isWithinWindow: boolean;
     onSelect: (index: number, openGame?: Game) => void;
     onContextMenu?: (action: string, game: Game) => void;
     playSound: (type: "select" | "back" | "navigate") => void;
@@ -42,6 +45,15 @@ const GameCardSlot = React.memo(
       (action: string) => onContextMenu?.(action as any, game),
       [game, onContextMenu],
     );
+
+    if (!isWithinWindow) {
+      return (
+        <div
+          className="shrink-0 w-[178px] h-[264px] rounded-[24px] pointer-events-none"
+          aria-hidden="true"
+        />
+      );
+    }
 
     return (
       <div className="shrink-0">
@@ -75,7 +87,8 @@ const GameCardSlot = React.memo(
     prev.game.launcherType === next.game.launcherType &&
     prev.game.isFavorite === next.game.isFavorite &&
     prev.index === next.index &&
-    prev.isActive === next.isActive,
+    prev.isActive === next.isActive &&
+    prev.isWithinWindow === next.isWithinWindow,
 );
 
 const GameRow: React.FC<GameRowProps> = ({
@@ -138,8 +151,6 @@ const GameRow: React.FC<GameRowProps> = ({
 
   return (
     <div className="relative w-full flex flex-col" style={{ gap: 0 }}>
-
-
       <div className="overflow-visible pb-2" ref={emblaRef}>
         <div
           className="flex items-center"
@@ -155,6 +166,7 @@ const GameRow: React.FC<GameRowProps> = ({
               game={game}
               index={idx}
               isActive={idx === canonicalIndex}
+              isWithinWindow={Math.abs(idx - canonicalIndex) <= VIRTUAL_WINDOW}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
               playSound={playSound}

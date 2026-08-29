@@ -38,12 +38,13 @@ const PATTERNS: Record<
   Orbit: { delays: orbit, dur: 950, round: false },
 };
 
-function useElapsed() {
+function useElapsed(enabled = true) {
   const [ds, setDs] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     const t = setInterval(() => setDs((d) => d + 1), 100);
     return () => clearInterval(t);
-  }, []);
+  }, [enabled]);
   const total = ds / 10;
   if (total < 60) return `${total.toFixed(1)}s`;
   return `${Math.floor(total / 60)}m ${(total % 60).toFixed(1)}s`;
@@ -53,25 +54,40 @@ export interface LoadingStateProps {
   label?: string;
   variant?: "Drive" | "Dots" | "Orbit" | string;
   className?: string;
+  showTimer?: boolean;
+  size?: "sm" | "md" | "lg";
+  dark?: boolean;
 }
 
 export function LoadingState({
   label = "Carregando",
   variant = "Drive",
   className = "",
+  showTimer = true,
+  size = "md",
+  dark = false,
 }: LoadingStateProps) {
-  const elapsed = useElapsed();
+  const elapsed = useElapsed(showTimer);
   const { delays, dur, round } = PATTERNS[variant] ?? PATTERNS.Drive;
+
+  const pixelSize = size === "sm" ? "size-[3px]" : size === "lg" ? "size-[5px]" : "size-[4px]";
+  const gridGap = size === "sm" ? "gap-[1px]" : "gap-[1.5px]";
+  const textSize = size === "sm" ? "text-[11px]" : size === "lg" ? "text-[14px]" : "text-[13px]";
+  const timerSize = size === "sm" ? "text-[10px]" : size === "lg" ? "text-[13px]" : "text-[12px]";
+
+  const shimmerGradient = dark
+    ? "linear-gradient(90deg, rgba(0,0,0,0.4) 35%, rgba(0,0,0,0.95) 50%, rgba(0,0,0,0.4) 65%)"
+    : "linear-gradient(90deg, rgba(255,255,255,0.4) 35%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.4) 65%)";
 
   return (
     <div className={`flex w-fit items-center gap-2.5 ${className}`}>
-      <span aria-hidden className="grid grid-cols-[repeat(3,4px)] gap-[1.5px]">
+      <span aria-hidden className={`grid grid-cols-[repeat(3,auto)] ${gridGap}`}>
         {delays.map((d, i) => (
           <span
             key={i}
-            className={`size-[4px] bg-white ${round ? "rounded-full" : "rounded-[1px]"}`}
+            className={`${pixelSize} ${dark ? "bg-black" : "bg-white"} ${round ? "rounded-full" : "rounded-[1px]"}`}
             style={{
-              opacity: d === null ? 0.07 : 0.15,
+              opacity: d === null ? (dark ? 0.1 : 0.07) : (dark ? 0.2 : 0.15),
               animation:
                 d === null
                   ? "none"
@@ -80,20 +96,23 @@ export function LoadingState({
           />
         ))}
       </span>
-      <span
-        className="bg-clip-text text-[13px] font-medium text-transparent"
-        style={{
-          backgroundImage:
-            "linear-gradient(90deg, rgba(255,255,255,0.4) 35%, rgba(255,255,255,0.95) 50%, rgba(255,255,255,0.4) 65%)",
-          backgroundSize: "200% 100%",
-          animation: "shimmer-text 1.4s linear infinite",
-        }}
-      >
-        {label}
-      </span>
-      <span className="font-mono text-[12px] text-white/50 tabular-nums">
-        {elapsed}
-      </span>
+      {label && (
+        <span
+          className={`bg-clip-text ${textSize} font-medium text-transparent`}
+          style={{
+            backgroundImage: shimmerGradient,
+            backgroundSize: "200% 100%",
+            animation: "shimmer-text 1.4s linear infinite",
+          }}
+        >
+          {label}
+        </span>
+      )}
+      {showTimer && (
+        <span className={`font-mono ${timerSize} ${dark ? "text-black/50" : "text-white/50"} tabular-nums`}>
+          {elapsed}
+        </span>
+      )}
     </div>
   );
 }

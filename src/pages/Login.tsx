@@ -22,6 +22,7 @@ import pherieliumLogo from "../assets/Pherielium_logo.png";
 import { useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "../auth/AuthProvider";
 import { NotificationProvider } from "../components/NotificationCenter";
+import { LoadingState } from "../components/ui/loading-state";
 
 // Vertex shader source code
 const vertexSmokeySource = `
@@ -418,11 +419,25 @@ const LoginContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState(false);
 
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
   useEffect(() => {
     if (user && !authLoading) {
       navigate("/app", { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  if (authLoading && !user) {
+    return (
+      <div className="min-h-screen w-full bg-[#030405] text-white flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+        <SmokeyBackground backdropBlurAmount="lg" color="#333333" className="opacity-95" />
+        <div className="relative z-10 flex flex-col items-center gap-6 p-8 md:p-10 rounded-[32px] border border-white/[0.08] bg-[#08090C]/80 backdrop-blur-2xl shadow-2xl">
+          <img src={pherieliumLogo} alt="Pherielium" className="w-16 h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.4)] animate-pulse" />
+          <LoadingState label="Verificando sessão..." variant="Orbit" />
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -459,11 +474,11 @@ const LoginContent: React.FC = () => {
   };
 
   const handleGoogleLogin = async () => {
-    setIsLoading(true);
+    setIsGoogleLoading(true);
     setError(null);
     try {
       await signInWithGoogle();
-      setIsLoading(false);
+      setIsGoogleLoading(false);
       setLoginSuccess(true);
       setTimeout(() => navigate("/app", { replace: true }), 1500);
       return;
@@ -471,7 +486,7 @@ const LoginContent: React.FC = () => {
       console.error("[Login] Erro no login Google:", err);
       setError(err?.message || "Falha ao entrar com Google.");
     } finally {
-      setIsLoading(false);
+      setIsGoogleLoading(false);
     }
   };
 
@@ -650,14 +665,15 @@ const LoginContent: React.FC = () => {
                 whileHover={{ scale: 1.01, boxShadow: "0 0 25px rgba(255,255,255,0.2)" }}
                 whileTap={{ scale: 0.98 }}
                 type="submit"
-                disabled={isLoading || authLoading}
+                disabled={isLoading || isGoogleLoading || authLoading}
                 className="w-full bg-white text-black font-body font-semibold text-sm rounded-2xl py-3.5 flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(255,255,255,0.15)] hover:bg-white/95 transition-all cursor-pointer disabled:opacity-50"
               >
                 {isLoading ? (
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full"
+                  <LoadingState
+                    label={mode === "login" ? "Entrando..." : "Criando conta..."}
+                    variant="Drive"
+                    dark
+                    size="sm"
                   />
                 ) : (
                   <span>{mode === "login" ? "Entrar" : "Criar conta"}</span>
@@ -679,11 +695,17 @@ const LoginContent: React.FC = () => {
               <button
                 type="button"
                 onClick={handleGoogleLogin}
-                disabled={isLoading || authLoading}
+                disabled={isLoading || isGoogleLoading || authLoading}
                 className="w-full flex items-center justify-center gap-2.5 py-3 px-4 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/20 text-white/85 hover:text-white rounded-2xl text-xs font-body font-medium transition-all duration-200 disabled:opacity-50 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99]"
               >
-                <GoogleIcon />
-                <span>Google</span>
+                {isGoogleLoading ? (
+                  <LoadingState label="Conectando Google..." variant="Orbit" size="sm" />
+                ) : (
+                  <>
+                    <GoogleIcon />
+                    <span>Google</span>
+                  </>
+                )}
               </button>
             </motion.div>
 

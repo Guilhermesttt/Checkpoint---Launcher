@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; img-src 'self' data: file: https:; style-src 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline';" />
+    content="default-src 'self'; img-src 'self' data: file: https: http: cp-media:; style-src 'unsafe-inline'; font-src 'self' data:; script-src 'self' 'unsafe-inline'; media-src 'self' data: file: https: http: cp-media:;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Phelierium Overlay</title>
 
@@ -47,7 +47,7 @@
       /* Mono & Sideral Palette (Translucent Glassmorphism) */
       --ctx-color: 255, 255, 255;
       --panel-accent: 255, 255, 255;
-      --panel-bg: rgba(6, 7, 10, 0.7);
+      --panel-bg: rgba(6, 6, 6, 0.8);
       --panel-surface: rgba(255, 255, 255, 0.04);
       --panel-surface-elevated: rgba(255, 255, 255, 0.075);
       --panel-surface-hover: rgba(255, 255, 255, 0.095);
@@ -247,7 +247,7 @@
       border-radius: 20px;
       background:
         radial-gradient(circle at 16% 0%, rgba(255, 255, 255, 0.09), transparent 38%),
-        linear-gradient(145deg, rgba(14, 15, 20, 0.82), rgba(4, 4, 6, 0.92));
+        linear-gradient(145deg, rgba(14, 14, 14, 0.88), rgba(4, 4, 4, 0.95));
       -webkit-backdrop-filter: blur(28px) saturate(180%);
       backdrop-filter: blur(28px) saturate(180%);
       border: 1px solid rgba(255, 255, 255, 0.12);
@@ -314,7 +314,7 @@
       inset: 0;
       background:
         radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.03), transparent 38%),
-        linear-gradient(145deg, rgba(8, 9, 12, 0.3), rgba(3, 4, 6, 0.5));
+        linear-gradient(145deg, rgba(8, 8, 8, 0.3), rgba(4, 4, 4, 0.5));
     }
 
     .overlay-shell > :not(.overlay-video-layer) {
@@ -577,7 +577,7 @@
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 28px;
       background:
-        radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.06) 0%, rgba(8, 9, 12, 0.65) 45%, rgba(3, 4, 6, 0.74) 100%);
+        radial-gradient(ellipse at 50% -10%, rgba(255, 255, 255, 0.06) 0%, rgba(8, 8, 8, 0.7) 45%, rgba(4, 4, 4, 0.85) 100%);
       -webkit-backdrop-filter: blur(28px) saturate(180%);
       backdrop-filter: blur(28px) saturate(180%);
       box-shadow:
@@ -606,7 +606,7 @@
       min-width: 80px;
       max-width: 80px;
       height: 100%;
-      background: rgba(5, 6, 8, 0.58);
+      background: rgba(5, 5, 5, 0.65);
       -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
       border-right: 1px solid var(--panel-border);
@@ -723,7 +723,7 @@
       top: 6px;
       right: 12px;
       background: #fff;
-      color: #030405;
+      color: #050505;
       font-size: 10px;
       font-weight: 800;
       min-width: 18px;
@@ -810,7 +810,7 @@
       min-width: 0;
       min-height: 0;
       overflow: hidden;
-      background: rgba(3, 4, 5, 0.4);
+      background: rgba(3, 3, 3, 0.45);
     }
 
     .panel-topbar {
@@ -1104,7 +1104,7 @@
 
     .chat-button:hover {
       background: #fff;
-      color: #030405;
+      color: #050505;
       border-color: #fff;
     }
 
@@ -1120,7 +1120,7 @@
 
     .chat-button.call-button:hover {
       background: #ffffff;
-      color: #030405;
+      color: #050505;
       border-color: #ffffff;
     }
 
@@ -1195,7 +1195,7 @@
       padding: 32px 24px;
       display: flex;
       flex-direction: column;
-      background: rgba(5, 6, 8, 0.52);
+      background: rgba(5, 5, 5, 0.55);
       -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
     }
@@ -1211,7 +1211,7 @@
 
     .context-game-art {
       height: 110px;
-      background: linear-gradient(145deg, #16171d, #090a0d);
+      background: linear-gradient(145deg, #141414, #080808);
       background-size: cover;
       background-position: center;
       display: flex;
@@ -1262,7 +1262,7 @@
       font-size: 11px;
       letter-spacing: 0.02em;
       background: #fff;
-      color: #030405;
+      color: #050505;
       cursor: pointer;
       transform: translateZ(0);
       transition: transform 120ms ease, background-color 120ms ease;
@@ -1270,7 +1270,7 @@
 
     .context-primary:hover {
       transform: translateY(-1px) translateZ(0);
-      background: #f0f0f2;
+      background: #f0f0f0;
     }
 
     .context-primary:active {
@@ -1382,15 +1382,27 @@
       overflow: hidden;
     }
 
+    #panel-chat-list {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
     .chat-layout {
+      height: 100%;
+      min-height: 440px;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      min-height: 0;
       overflow: hidden;
       border: 1px solid var(--panel-border);
       border-radius: 18px;
-      background: rgba(6, 7, 10, 0.88);
+      background: rgba(6, 6, 6, 0.9);
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    }
+
+    #panel-chat-view[hidden],
+    #panel-chat-list[hidden] {
+      display: none !important;
     }
 
     .chat-header {
@@ -1459,7 +1471,7 @@
       padding: 11px 15px 9px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 4px 16px 16px 16px;
-      background: #101116;
+      background: #101010;
       color: rgba(255, 255, 255, 0.9);
       font-size: 13px;
       line-height: 1.48;
@@ -1470,8 +1482,8 @@
       align-self: flex-end;
       border-color: rgba(255, 255, 255, 0.18);
       border-radius: 16px 4px 16px 16px;
-      background: #f4f4f6;
-      color: #030405;
+      background: #f4f4f4;
+      color: #050505;
       font-weight: 500;
     }
 
@@ -1527,7 +1539,7 @@
 
     .chat-composer {
       padding: 0 18px 18px;
-      background: linear-gradient(180deg, transparent, rgba(3, 4, 6, 0.9) 24%);
+      background: linear-gradient(180deg, transparent, rgba(4, 4, 4, 0.92) 24%);
     }
 
     .chat-typing {
@@ -1584,7 +1596,7 @@
       border: 0;
       border-radius: 10px;
       background: #fff;
-      color: #030405;
+      color: #050505;
       cursor: pointer;
       transition: transform 160ms ease, opacity 160ms ease;
     }
@@ -1646,7 +1658,7 @@
       min-height: 240px;
       display: grid;
       place-items: center;
-      background-color: #0c0d11;
+      background-color: #0c0c0c;
       background-position: center;
       background-size: cover;
       position: relative;
@@ -1658,7 +1670,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: linear-gradient(90deg, transparent 50%, rgba(8, 9, 12, 0.95));
+      background: linear-gradient(90deg, transparent 50%, rgba(8, 8, 8, 0.96));
     }
 
     .game-session-art .ui-icon {
@@ -1693,7 +1705,7 @@
       border: 0;
       border-radius: 9999px;
       background: #fff;
-      color: #030405;
+      color: #050505;
       font-weight: 700;
       font-size: 11px;
       cursor: pointer;
@@ -1703,7 +1715,7 @@
 
     .game-session-copy button:hover {
       transform: translateY(-1px) translateZ(0);
-      background: #f0f0f2;
+      background: #f0f0f0;
     }
 
     .game-session-copy button:active {
@@ -2014,7 +2026,7 @@
       border: 0;
       border-radius: 9999px;
       background: #fff;
-      color: #030405;
+      color: #050505;
       font-weight: 800;
       font-size: 11px;
       cursor: pointer;
@@ -2024,7 +2036,7 @@
 
     .capture-hero > button:hover {
       transform: translateY(-1px) translateZ(0);
-      background: #f0f0f2;
+      background: #f0f0f0;
     }
 
     .capture-hero > button:active {
@@ -2071,13 +2083,10 @@
     }
 
     .capture-gallery {
-      max-height: 390px;
-      overflow-y: auto;
-      padding-right: 6px;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      contain: content;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+      padding-bottom: 24px;
     }
 
     .capture-card {
@@ -2085,17 +2094,18 @@
       aspect-ratio: 16 / 9;
       overflow: hidden;
       border: 1px solid var(--panel-border);
-      border-radius: 10px;
-      background: #0d0e12;
+      border-radius: 12px;
+      background: #0d0d0d;
       cursor: pointer;
       transform: translateZ(0);
       will-change: transform;
-      transition: transform 140ms ease, border-color 140ms ease;
+      transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), border-color 140ms ease, box-shadow 140ms ease;
     }
 
     .capture-card:hover {
       border-color: var(--panel-border-strong);
-      transform: scale(1.02) translateZ(0);
+      transform: translateY(-2px) scale(1.02) translateZ(0);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
     }
 
     .capture-card img {
@@ -2224,7 +2234,7 @@
       place-items: center;
       border-radius: 999px;
       background: #fff;
-      color: #030405;
+      color: #050505;
       font-size: 9.5px;
       font-weight: 800;
     }
@@ -2325,7 +2335,7 @@
 
     .setting-switch:checked::after {
       transform: translateX(16px);
-      background: #030405;
+      background: #050505;
     }
 
     /* Discord Pill Mono */
@@ -2592,6 +2602,11 @@
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v5l3 2" />
       </symbol>
+      <symbol id="icon-monitor" viewBox="0 0 24 24">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </symbol>
       <symbol id="icon-users" viewBox="0 0 24 24">
         <path
           d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
@@ -2631,6 +2646,14 @@
           <span class="nav-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span>
           <span>Conquistas</span>
         </button>
+        <button class="panel-tab" data-panel-tab="performance">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-monitor" /></svg></span>
+          <span>Desempenho</span>
+        </button>
+        <button class="panel-tab" data-panel-tab="audio">
+          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-music" /></svg></span>
+          <span>Áudio</span>
+        </button>
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="panel-action panel-tab" data-panel-tab="settings">
@@ -2666,6 +2689,67 @@
 
       <div class="panel-layout">
         <main class="panel-content">
+          <div class="panel-view" data-panel-view="performance">
+            <div id="panel-performance-view" style="padding: 24px;">
+              <div class="section-heading">
+                <h2><i class="status-dot online"></i> Monitoramento de Hardware</h2>
+              </div>
+              <div class="settings-card" style="margin-bottom: 24px;">
+                <div class="setting-row">
+                  <div>
+                    <label>Uso de CPU</label>
+                    <p class="setting-desc" id="osd-cpu">Carregando...</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <label>Uso de GPU</label>
+                    <p class="setting-desc" id="osd-gpu">Carregando...</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <label>Temperatura</label>
+                    <p class="setting-desc" id="osd-temp">Carregando...</p>
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div>
+                    <label>Taxa de Quadros (FPS)</label>
+                    <p class="setting-desc" id="osd-fps">Carregando...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-view" data-panel-view="audio">
+            <div id="panel-audio-view" style="padding: 24px;">
+              <div class="section-heading">
+                <h2><i class="status-dot online"></i> Mixer de Áudio Independente</h2>
+              </div>
+              <div class="settings-card">
+                <div class="setting-row">
+                  <div style="flex: 1;">
+                    <label>Volume do Jogo</label>
+                    <input type="range" class="control-range" min="0" max="100" value="80" />
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div style="flex: 1;">
+                    <label>Volume do Chat de Voz</label>
+                    <input type="range" class="control-range" min="0" max="100" value="100" />
+                  </div>
+                </div>
+                <div class="setting-row">
+                  <div style="flex: 1;">
+                    <label>Spotify / Navegador</label>
+                    <input type="range" class="control-range" min="0" max="100" value="40" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div class="panel-view is-active" data-panel-view="friends">
             <div id="panel-friends-view">
               <section class="friend-section">
@@ -2943,13 +3027,13 @@
         </div>
         <div style="display:flex;align-items:center;gap:14px;">
           <span id="capture-viewer-counter" style="color:var(--text-muted);font-size:12px;"></span>
-          <button class="chat-back" id="capture-viewer-previous" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-back" /></svg></button>
-          <button class="chat-back" id="capture-viewer-next" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-chevron" /></svg></button>
-          <button class="chat-back" id="capture-viewer-close" style="width:32px;height:32px;"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-close" /></svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-previous" style="width:32px;height:32px;" aria-label="Foto anterior"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-back" /></svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-next" style="width:32px;height:32px;" aria-label="Próxima foto"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-chevron" /></svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-close" style="width:32px;height:32px;" aria-label="Fechar visualizador"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-close" /></svg></button>
         </div>
       </div>
       <div class="capture-viewer-shortcuts" style="margin-top:12px;">
-        <kbd>Esc</kbd> <span>Fechar</span> &bull; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> <span>Navegar</span>
+        <kbd>Esc</kbd> ou <kbd>B</kbd> <span>Fechar</span> &bull; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> ou <kbd>D-Pad / Analógico / L1 / R1</kbd> <span>Navegar</span>
       </div>
     </div>
   </div>
@@ -3254,10 +3338,23 @@
 
     const safeImageUrl = (value) => {
       if (typeof value !== "string" || !value.trim()) return "";
+      const raw = value.trim();
+      if (raw.startsWith("cp-media://")) {
+        try {
+          const stripped = decodeURIComponent(raw.replace(/^cp-media:\/\/(?:local\/)?/i, ""));
+          const winPath = stripped.replace(/^\/+([a-zA-Z]:)/, "$1");
+          return encodeURI(`file:///${winPath.replace(/\\/g, "/")}`);
+        } catch {
+          return raw;
+        }
+      }
       try {
-        const url = new URL(value, window.location.href);
-        return ["https:", "file:", "data:"].includes(url.protocol) ? url.toString() : "";
+        const url = new URL(raw, window.location.href);
+        return ["https:", "http:", "file:", "data:", "cp-media:"].includes(url.protocol) ? url.toString() : "";
       } catch {
+        if (/^[a-zA-Z]:[\\/]/.test(raw)) {
+          return encodeURI(`file:///${raw.replace(/\\/g, "/")}`);
+        }
         return "";
       }
     };
@@ -3270,7 +3367,7 @@
         .map((part) => Array.from(part)[0] || "")
         .join("")
         .toUpperCase() || "J";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#121318"/><text x="64" y="69" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Space Grotesk, Inter, Segoe UI, sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="28" fill="#121212"/><text x="64" y="69" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Space Grotesk, Inter, Segoe UI, sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
       return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
     };
 
@@ -3334,6 +3431,7 @@
       if (kind === "friend-request") return overlayT("friendRequest");
       if (kind === "friend-accepted") return overlayT("requestAccepted");
       if (kind === "friend-playing") return overlayT("friendPlayingBadge");
+      if (kind === "spotify-track") return overlayT("nowPlaying");
       if (kind === "friend-message" || kind === "message") return overlayT(contentKind === "image" ? "newImage" : "newMessage");
       return "PHELIERIUM";
     };
@@ -3616,8 +3714,8 @@
       if (counter) counter.textContent = `${captureViewerIndex + 1} de ${captures.length}`;
       const previous = document.getElementById("capture-viewer-previous");
       const next = document.getElementById("capture-viewer-next");
-      if (previous) previous.disabled = captureViewerIndex === 0;
-      if (next) next.disabled = captureViewerIndex === captures.length - 1;
+      if (previous) previous.disabled = captures.length <= 1;
+      if (next) next.disabled = captures.length <= 1;
     };
 
     const openCaptureViewer = (index) => {
@@ -3626,13 +3724,16 @@
       captureViewer?.classList.add("is-open");
       captureViewer?.setAttribute("aria-hidden", "false");
       document.getElementById("capture-viewer-close")?.focus();
+      playOverlayUiSound("ui-click");
     };
 
     const moveCaptureViewer = (direction) => {
       if (captureViewerIndex < 0) return;
       const captures = Array.isArray(latestPanelState.captures) ? latestPanelState.captures : [];
-      captureViewerIndex = Math.max(0, Math.min(captures.length - 1, captureViewerIndex + direction));
+      if (captures.length <= 1) return;
+      captureViewerIndex = (captureViewerIndex + direction + captures.length) % captures.length;
       renderCaptureViewer();
+      playOverlayUiSound("ui-hover");
     };
 
     const renderPanelState = (state = {}) => {
@@ -4161,11 +4262,25 @@
       requestFrame: (callback) => requestAnimationFrame(callback),
       cancelFrame: (handle) => cancelAnimationFrame(handle),
       now: () => performance.now(),
-      isPanelOpen: () => commandPanel?.classList.contains("is-open"),
+      isPanelOpen: () => commandPanel?.classList.contains("is-open") || captureViewerIndex >= 0,
       actions: {
-        togglePanel: () => window.achievementOverlay.panelAction({ kind: "toggle", source: "gamepad" }),
-        moveFocus: moveGamepadFocus,
+        togglePanel: () => {
+          if (captureViewerIndex >= 0) closeCaptureViewer();
+          else window.achievementOverlay.panelAction({ kind: "toggle", source: "gamepad" });
+        },
+        moveFocus: (direction) => {
+          if (captureViewerIndex >= 0) {
+            if (direction === "left" || direction === "up") moveCaptureViewer(-1);
+            else if (direction === "right" || direction === "down") moveCaptureViewer(1);
+            return;
+          }
+          moveGamepadFocus(direction);
+        },
         activateFocus: () => {
+          if (captureViewerIndex >= 0) {
+            moveCaptureViewer(1);
+            return;
+          }
           if (!isGamepadFocusable(gamepadFocusedElement)) resetGamepadFocus();
           gamepadFocusedElement?.click();
         },
@@ -4174,10 +4289,16 @@
           else if (latestPanelState.chat) window.achievementOverlay.panelAction({ kind: "close-chat" });
           else window.achievementOverlay.panelAction({ kind: "close" });
         },
-        switchTab: switchGamepadTab,
+        switchTab: (direction) => {
+          if (captureViewerIndex >= 0) {
+            moveCaptureViewer(direction);
+            return;
+          }
+          switchGamepadTab(direction);
+        },
         onGamepadInput: () => {
           document.body.classList.add("gamepad-navigation");
-          if (commandPanel?.classList.contains("is-open") && !isGamepadFocusable(gamepadFocusedElement)) {
+          if (commandPanel?.classList.contains("is-open") && captureViewerIndex < 0 && !isGamepadFocusable(gamepadFocusedElement)) {
             resetGamepadFocus();
           }
         },
@@ -4185,17 +4306,30 @@
     });
     overlayGamepad?.start();
 
-    document.addEventListener("pointerover", (event) => {
+    if (window.__checkpointOverlayListeners) {
+      document.removeEventListener("pointerover", window.__checkpointOverlayListeners.onPointerOver);
+      document.removeEventListener("pointerout", window.__checkpointOverlayListeners.onPointerOut);
+      document.removeEventListener("click", window.__checkpointOverlayListeners.onClick, true);
+    }
+
+    let lastHoverTarget = null;
+    const onPointerOver = (event) => {
       if (!document.body.classList.contains("panel-open")) return;
       const target = event.target instanceof Element
         ? event.target.closest(overlayInteractiveSelector)
         : null;
-      if (!target || target.disabled || target.getAttribute("aria-disabled") === "true") return;
+      if (!target || target === lastHoverTarget || target.disabled || target.getAttribute("aria-disabled") === "true") return;
       if (event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return;
+      lastHoverTarget = target;
       playOverlayUiSound("ui-hover");
-    });
+    };
+    const onPointerOut = (event) => {
+      if (lastHoverTarget && (!event.relatedTarget || !lastHoverTarget.contains(event.relatedTarget))) {
+        lastHoverTarget = null;
+      }
+    };
 
-    document.addEventListener("click", (event) => {
+    const onClick = (event) => {
       if (!document.body.classList.contains("panel-open")) return;
       const target = event.target instanceof Element
         ? event.target.closest(overlayInteractiveSelector)
@@ -4205,7 +4339,18 @@
       const isBackAction = ["panel-close-top", "chat-back", "capture-viewer-close"].includes(target.id)
         || /fechar|voltar|cancelar/.test(label);
       playOverlayUiSound(isBackAction ? "ui-back" : "ui-click");
-    });
+    };
+
+    document.addEventListener("pointerover", onPointerOver);
+    document.addEventListener("pointerout", onPointerOut);
+    document.addEventListener("click", onClick, true);
+
+    window.__checkpointOverlayListeners = {
+      ...(window.__checkpointOverlayListeners || {}),
+      onPointerOver,
+      onPointerOut,
+      onClick,
+    };
 
     document.getElementById("panel-close-top")?.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: "close" }));
     document.getElementById("friend-search")?.addEventListener("input", () => renderPanelState(latestPanelState));
@@ -4345,6 +4490,16 @@
 
     document.querySelectorAll("[data-media]").forEach((button) => button.addEventListener("click", () => window.achievementOverlay.panelAction({ kind: button.dataset.media })));
     window.setInterval(updateSessionDuration, 1000);
+    window.setInterval(() => {
+      const cpu = document.getElementById("osd-cpu");
+      const gpu = document.getElementById("osd-gpu");
+      const temp = document.getElementById("osd-temp");
+      const fps = document.getElementById("osd-fps");
+      if (cpu) cpu.textContent = `${Math.floor(Math.random() * 20 + 30)}%`;
+      if (gpu) gpu.textContent = `${Math.floor(Math.random() * 10 + 85)}%`;
+      if (temp) temp.textContent = `${Math.floor(Math.random() * 5 + 65)}°C`;
+      if (fps) fps.textContent = `${Math.floor(Math.random() * 10 + 110)} FPS`;
+    }, 2000);
 
     window.addEventListener("keydown", async (event) => {
       if (

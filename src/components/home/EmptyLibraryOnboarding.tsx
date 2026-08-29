@@ -1,71 +1,189 @@
 import React, { useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Check, Plus, Link2 } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Check, Plus, Link2, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 import { PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 
 export interface EmptyStateProps {
   searchTerm: string;
+  activeCategory?: string;
   onAddGame: () => void;
-  onConnect: () => void;
-  steamConnected: boolean;
+  onConnect?: () => void;
+  steamConnected?: boolean;
+  onSyncSteam?: () => void;
+  onConnectEpic?: () => void;
+  onSyncEpic?: () => void;
+  epicConnected?: boolean;
+  isSyncingSteam?: boolean;
+  isSyncingEpic?: boolean;
+  isConnectingSteam?: boolean;
+  isConnectingEpic?: boolean;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = React.memo(
-  ({ searchTerm, onAddGame, onConnect, steamConnected }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full max-w-md rounded-[32px] p-10 text-center bg-[rgba(14,16,24,0.34)] border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
-    >
-      <motion.div
-        animate={{ y: [0, -4, 0] }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-        className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)] will-change-transform transform-gpu"
-      >
-        <img
-          src={PHERIELIUM_LOGO_PATH}
-          alt="Pherielium"
-          className="w-8 h-8 object-contain opacity-70"
-          draggable={false}
-        />
-      </motion.div>
+const CATEGORY_META: Record<string, { label: string; preposition: string }> = {
+  ALL: { label: "Biblioteca", preposition: "na" },
+  FAVORITES: { label: "Favoritos", preposition: "nos" },
+  STEAM: { label: "Steam", preposition: "da" },
+  EPIC: { label: "Epic Games", preposition: "da" },
+  EA: { label: "EA App", preposition: "da" },
+  UBISOFT: { label: "Ubisoft", preposition: "da" },
+  GOG: { label: "GOG", preposition: "do" },
+  XBOX: { label: "Xbox", preposition: "do" },
+  RIOT: { label: "Riot Games", preposition: "da" },
+  BATTLENET: { label: "Battle.net", preposition: "da" },
+  ROCKSTAR: { label: "Rockstar", preposition: "da" },
+  LOCAL: { label: "Jogos Locais", preposition: "em" },
+};
 
-      <h3 className="mb-2 text-2xl font-display font-semibold tracking-tight text-white">
-        {searchTerm ? "Nenhum jogo encontrado" : "Biblioteca vazia"}
-      </h3>
-      <p className="mb-8 text-xs md:text-sm font-body text-white/45 leading-relaxed">
-        {searchTerm
-          ? "Não encontramos nenhum jogo correspondente à sua busca."
-          : steamConnected
-            ? "Você não possui jogos salvos. Adicione um jogo executável manualmente."
-            : "Adicione seu primeiro jogo ou conecte sua conta Steam para sincronizar."}
-      </p>
-      {!searchTerm && (
-        <div className="flex flex-wrap justify-center gap-3">
-          {!steamConnected && (
+export const EmptyState: React.FC<EmptyStateProps> = React.memo(
+  ({
+    searchTerm,
+    activeCategory = "ALL",
+    onAddGame,
+    onConnect,
+    steamConnected = false,
+    onSyncSteam,
+    onConnectEpic,
+    onSyncEpic,
+    epicConnected = false,
+    isSyncingSteam = false,
+    isSyncingEpic = false,
+    isConnectingSteam = false,
+    isConnectingEpic = false,
+  }) => {
+    const meta = CATEGORY_META[activeCategory] || {
+      label: activeCategory,
+      preposition: "em",
+    };
+
+    let title = "Biblioteca vazia";
+    let description = "Você não possui jogos salvos. Adicione um jogo executável manualmente.";
+
+    if (searchTerm) {
+      title = "Nenhum jogo encontrado";
+      description = "Não encontramos nenhum jogo correspondente à sua busca.";
+    } else if (activeCategory === "STEAM") {
+      if (steamConnected) {
+        title = "Nenhum jogo da Steam";
+        description = "Sua conta Steam está conectada. Sincronize sua biblioteca ou adicione um jogo manualmente.";
+      } else {
+        title = "Steam desconectada";
+        description = "Conecte sua conta Steam para sincronizar seus jogos automaticamente ou adicione manualmente.";
+      }
+    } else if (activeCategory === "EPIC") {
+      if (epicConnected) {
+        title = "Nenhum jogo da Epic Games";
+        description = "Sua conta Epic Games está conectada. Sincronize sua biblioteca ou adicione um jogo manualmente.";
+      } else {
+        title = "Epic Games desconectada";
+        description = "Conecte sua conta Epic Games para sincronizar seus jogos automaticamente ou adicione manualmente.";
+      }
+    } else if (activeCategory === "FAVORITES") {
+      title = "Nenhum favorito ainda";
+      description = "Marque seus jogos preferidos na biblioteca para encontrá-los facilmente aqui.";
+    } else if (activeCategory !== "ALL") {
+      title = `Nenhum jogo ${meta.preposition} ${meta.label}`;
+      description = `Você não possui jogos salvos ${meta.preposition} ${meta.label}. Adicione um executável ou atalho para esta categoria.`;
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md rounded-[32px] p-10 text-center bg-[rgba(14,16,24,0.34)] border border-white/[0.08] shadow-[0_25px_80px_rgba(0,0,0,0.55)] backdrop-blur-2xl"
+      >
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+          className="w-16 h-16 mx-auto mb-6 rounded-full bg-white/[0.03] border border-white/[0.08] flex items-center justify-center shadow-[0_0_30px_rgba(255,255,255,0.06)] will-change-transform transform-gpu"
+        >
+          <img
+            src={PHERIELIUM_LOGO_PATH}
+            alt="Pherielium"
+            className="w-8 h-8 object-contain opacity-70"
+            draggable={false}
+          />
+        </motion.div>
+
+        <h3 className="mb-2 text-2xl font-display font-semibold tracking-tight text-white">
+          {title}
+        </h3>
+        <p className="mb-8 text-xs md:text-sm font-body text-white/45 leading-relaxed">
+          {description}
+        </p>
+
+        {!searchTerm && (
+          <div className="flex flex-wrap justify-center gap-3">
+            {activeCategory === "STEAM" ? (
+              steamConnected ? (
+                <button
+                  type="button"
+                  onClick={onSyncSteam}
+                  disabled={isSyncingSteam}
+                  className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSteam ? "animate-spin" : ""}`} />
+                  {isSyncingSteam ? "Sincronizando..." : "Sincronizar Steam"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onConnect}
+                  disabled={isConnectingSteam}
+                  className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2 disabled:opacity-60"
+                >
+                  {isConnectingSteam ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Link2 className="w-3.5 h-3.5" />
+                  )}
+                  {isConnectingSteam ? "Conectando..." : "Conectar Steam"}
+                </button>
+              )
+            ) : activeCategory === "EPIC" ? (
+              epicConnected ? (
+                <button
+                  type="button"
+                  onClick={onSyncEpic}
+                  disabled={isSyncingEpic}
+                  className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingEpic ? "animate-spin" : ""}`} />
+                  {isSyncingEpic ? "Sincronizando..." : "Sincronizar Epic"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onConnectEpic}
+                  disabled={isConnectingEpic}
+                  className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2 disabled:opacity-60"
+                >
+                  {isConnectingEpic ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Link2 className="w-3.5 h-3.5" />
+                  )}
+                  {isConnectingEpic ? "Conectando..." : "Conectar Epic"}
+                </button>
+              )
+            ) : null}
+
             <button
               type="button"
-              onClick={onConnect}
-              className="cursor-pointer h-11 rounded-full px-6 text-xs font-body font-medium bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] text-white/90 hover:text-white transition-all duration-200 flex items-center gap-2"
+              onClick={onAddGame}
+              className="cursor-pointer h-11 rounded-full bg-white hover:bg-white/90 px-6 text-xs font-body font-semibold text-black transition-all duration-200 flex items-center gap-2 shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
             >
-              <Link2 className="w-3.5 h-3.5" />
-              Conectar Steam
+              <Plus className="w-3.5 h-3.5" />
+              {activeCategory !== "ALL" && activeCategory !== "FAVORITES"
+                ? `Novo Jogo (${meta.label})`
+                : "Novo Jogo"}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={onAddGame}
-            className="cursor-pointer h-11 rounded-full bg-white hover:bg-white/90 px-6 text-xs font-body font-semibold text-black transition-all duration-200 flex items-center gap-2 shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Novo Jogo
-          </button>
-        </div>
-      )}
-    </motion.div>
-  ),
+          </div>
+        )}
+      </motion.div>
+    );
+  },
 );
 
 EmptyState.displayName = "EmptyState";

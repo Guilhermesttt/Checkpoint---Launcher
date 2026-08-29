@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 
 import DynamicBackground from "../components/DynamicBackground";
+import WhatsNewModal from "../components/WhatsNewModal";
+import { EpicConnectModal } from "../components/settings/EpicConnectModal";
+import { PlatformLibrarySkeleton } from "../components/PlatformLibrarySkeleton";
+import { fetchEpicStatus } from "../services/epic";
 import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import LoadingState from "../components/ui/loading-state";
@@ -224,6 +228,11 @@ const Home: React.FC = () => {
     useState(false);
   const [disconnectDiscordModalOpen, setDisconnectDiscordModalOpen] =
     useState(false);
+  const [disconnectEpicModalOpen, setDisconnectEpicModalOpen] =
+    useState(false);
+  const [epicConnectModalOpen, setEpicConnectModalOpen] = useState(false);
+  const [epicAuthConnected, setEpicAuthConnected] = useState(false);
+  const [epicDisplayName, setEpicDisplayName] = useState("");
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
@@ -248,6 +257,7 @@ const Home: React.FC = () => {
 
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addModalInitialLauncherType, setAddModalInitialLauncherType] = useState<LauncherType | undefined>(undefined);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(() => {
@@ -272,6 +282,7 @@ const Home: React.FC = () => {
   const lastWheelTime = useRef<number>(0);
   const previousSteamIdRef = useRef<string | undefined>(undefined);
   const previousDiscordIdRef = useRef<string | undefined>(undefined);
+  const previousEpicAuthRef = useRef(false);
   const didInitConnectionRefs = useRef(false);
   const lastOverlayWelcomeGameRef = useRef<string | null>(null);
 
@@ -397,14 +408,22 @@ const Home: React.FC = () => {
     setSteamConnecting,
     discordConnecting,
     setDiscordConnecting,
+    epicConnecting,
+    setEpicConnecting,
     steamSyncing,
     connectSteam,
     connectDiscord,
     handleDisconnectSteam,
     handleDisconnectDiscord,
+    handleDisconnectEpic,
     handleSyncSteam,
+    epicSyncing,
+    handleSyncEpic,
+    platformOperations,
+    platformOps,
   } = useAccountConnections({
     userUid: user?.uid,
+    profile: userProfile,
     resolvedSteamId,
     playSound,
     notify,
@@ -413,6 +432,23 @@ const Home: React.FC = () => {
     onLibraryChanged: refreshLibrary,
     language: launcherLanguage,
   });
+
+  // Verifica se o usuário já está autenticado na Epic via Desktop IPC
+  const checkEpicStatus = useCallback(async () => {
+    try {
+      const data = await fetchEpicStatus();
+      const isConnected = data.authenticated === true;
+      setEpicAuthConnected(isConnected);
+      if (isConnected) previousEpicAuthRef.current = true;
+      if (data.displayName) setEpicDisplayName(data.displayName);
+    } catch {
+      setEpicAuthConnected(false);
+    }
+  }, []);
+
+  useEffect(() => { void checkEpicStatus(); }, [checkEpicStatus]);
+
+  const isAnySyncing = steamSyncing || epicSyncing;
 
   const connectRetroAchievements = useCallback(async (username: string) => {
     setRetroAchievementsConnecting(true);
@@ -509,6 +545,7 @@ const Home: React.FC = () => {
     if (!didInitConnectionRefs.current) {
       previousSteamIdRef.current = resolvedSteamId;
       previousDiscordIdRef.current = resolvedDiscordId;
+      previousEpicAuthRef.current = epicAuthConnected;
       didInitConnectionRefs.current = true;
       return;
     }
@@ -701,6 +738,7 @@ const Home: React.FC = () => {
     if (!didInitConnectionRefs.current) {
       previousSteamIdRef.current = resolvedSteamId;
       previousDiscordIdRef.current = resolvedDiscordId;
+      previousEpicAuthRef.current = epicAuthConnected;
       didInitConnectionRefs.current = true;
       return;
     }
@@ -721,7 +759,16 @@ const Home: React.FC = () => {
     } else {
       previousDiscordIdRef.current = resolvedDiscordId;
     }
-  }, [resolvedSteamId, resolvedDiscordId, user?.uid, notify, playSound, handleSyncSteam]);
+
+    if (!previousEpicAuthRef.current && epicAuthConnected) {
+      previousEpicAuthRef.current = epicAuthConnected;
+      notify("Conta Epic Games vinculada com sucesso!", "success");
+      playSound("select");
+      void handleSyncEpic();
+    } else {
+      previousEpicAuthRef.current = epicAuthConnected;
+    }
+  }, [resolvedSteamId, resolvedDiscordId, epicAuthConnected, user?.uid, notify, playSound, handleSyncSteam, handleSyncEpic]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -834,7 +881,8 @@ const Home: React.FC = () => {
     signOutModalOpen ||
     exitConfirmationOpen ||
     disconnectSteamModalOpen ||
-    disconnectDiscordModalOpen;
+    disconnectDiscordModalOpen ||
+    epicConnectModalOpen;
 
   useImagePreloader(
     useMemo(
@@ -886,13 +934,13 @@ const Home: React.FC = () => {
   });
 
   const closeTopGamepadSurface = useCallback(() => {
-    if (activeChatFriend) {
-      setActiveChatFriend(null);
+    if (friendProfileModal) {
+      setFriendProfileModal(null);
       playSound("back");
       return;
     }
-    if (friendProfileModal) {
-      setFriendProfileModal(null);
+    if (activeChatFriend) {
+      setActiveChatFriend(null);
       playSound("back");
       return;
     }
@@ -926,6 +974,16 @@ const Home: React.FC = () => {
       playSound("back");
       return;
     }
+    if (disconnectEpicModalOpen) {
+      setDisconnectEpicModalOpen(false);
+      playSound("back");
+      return;
+    }
+    if (epicConnectModalOpen) {
+      setEpicConnectModalOpen(false);
+      playSound("back");
+      return;
+    }
     if (isAddFriendModalOpen) {
       setIsAddFriendModalOpen(false);
       playSound("back");
@@ -946,6 +1004,8 @@ const Home: React.FC = () => {
     contextMenu,
     disconnectDiscordModalOpen,
     disconnectSteamModalOpen,
+    disconnectEpicModalOpen,
+    epicConnectModalOpen,
     exitConfirmationOpen,
     friendProfileModal,
     isAddFriendModalOpen,
@@ -1077,10 +1137,51 @@ const Home: React.FC = () => {
     }
   });
 
+  const categoryToLauncherType = useCallback((cat: string): LauncherType | undefined => {
+    switch (cat) {
+      case "STEAM": return "steam";
+      case "EPIC": return "epic";
+      case "EA": return "ea";
+      case "UBISOFT": return "ubisoft";
+      case "GOG": return "gog";
+      case "XBOX": return "xbox";
+      case "RIOT": return "riot";
+      case "BATTLENET": return "battlenet";
+      case "ROCKSTAR": return "rockstar";
+      case "LOCAL": return "local";
+      default: return undefined;
+    }
+  }, []);
+
+  const openAddGameModal = useCallback(
+    (gameOrLauncherType?: Game | LauncherType | null) => {
+      playSound("select");
+      if (gameOrLauncherType && typeof gameOrLauncherType === "object") {
+        setEditingGame(gameOrLauncherType);
+        setAddModalInitialLauncherType(gameOrLauncherType.launcherType);
+      } else {
+        setEditingGame(null);
+        setAddModalInitialLauncherType(
+          typeof gameOrLauncherType === "string"
+            ? gameOrLauncherType
+            : categoryToLauncherType(activeCategory),
+        );
+      }
+      setIsAddModalOpen(true);
+    },
+    [activeCategory, categoryToLauncherType, playSound],
+  );
+
+  const closeAddModal = useCallback((silent = false) => {
+    if (!silent) playSound("back");
+    setIsAddModalOpen(false);
+    setEditingGame(null);
+    setAddModalInitialLauncherType(undefined);
+  }, [playSound]);
+
   useGamepadButton("TRIANGLE", () => {
     if (isAnyModalOpen || searchOpen || isSystemCategory) return;
-    setIsAddModalOpen(true);
-    playSound("select");
+    openAddGameModal(categoryToLauncherType(activeCategory));
   });
 
   useGamepadButton("OPTIONS", () => {
@@ -1587,11 +1688,6 @@ const Home: React.FC = () => {
     [openDetails, playSound],
   );
 
-  const openAddGameModal = useCallback((gameToEdit?: Game | null) => {
-    playSound("showModal");
-    setEditingGame(gameToEdit ?? null);
-    setIsAddModalOpen(true);
-  }, [playSound]);
 
   const closeCtx = (silent = false) => {
     setContextMenu(null);
@@ -1623,11 +1719,6 @@ const Home: React.FC = () => {
     await signOutUser();
   };
 
-  const closeAddModal = (silent = false) => {
-    if (!silent) playSound("back");
-    setIsAddModalOpen(false);
-    setEditingGame(null);
-  };
 
   // Correção 4: Adição das listas de IDs calculadas para o AddFriendModal
   const checkpointFriendIds = useMemo(() => {
@@ -1667,6 +1758,7 @@ const Home: React.FC = () => {
           currentGame?.cardImage ||
           ""
         }
+        videoUrl={currentGame?.trailerUrl}
         reducedEffects={isAnyModalOpen}
       />
 
@@ -1707,6 +1799,7 @@ const Home: React.FC = () => {
         settingsLabel={t("settings")}
         language={launcherLanguage}
         playSound={playSound}
+        platformOperations={platformOperations}
         notificationCount={
           incomingFriendRequests.length
           + Object.values(unreadMessagesByFriend).reduce(
@@ -1786,54 +1879,88 @@ const Home: React.FC = () => {
 
               <div className="w-px h-4 bg-white/10" />
 
+              {/* STEAM PILL */}
               {resolvedSteamId ? (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => {
-                      playSound("back");
-                      setDisconnectSteamModalOpen(true);
-                    }}
-                    onMouseEnter={() => playSound("hover")}
-                    className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 group/steam"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.75)] group-hover/steam:bg-white/40 transition-all" />
-                    <div className="relative h-3 overflow-hidden min-w-[40px]">
-                      <span className="block group-hover/steam:hidden text-[10px] font-medium tracking-wider text-white/70">
+                <button
+                  onClick={handleSyncSteam}
+                  onMouseEnter={() => playSound("hover")}
+                  disabled={steamSyncing}
+                  className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 disabled:opacity-80 group/steam"
+                  title="Sincronizar jogos da Steam"
+                >
+                  {steamSyncing ? (
+                    <LoadingState label={t("syncing") || "Sincronizando..."} variant="Dots" size="sm" showTimer={false} />
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.75)] group-hover/steam:scale-110 transition-all" />
+                      <span className="text-[10px] font-medium tracking-wider text-white/70 group-hover/steam:text-white transition-colors">
                         Steam
                       </span>
-                      <span className="hidden group-hover/steam:block text-[10px] font-medium tracking-wider text-white/40 whitespace-nowrap">
-                        {t("unlink")}
-                      </span>
-                    </div>
-                  </button>
-
-                  <div className="w-px h-3 bg-white/10" />
-
-                  <button
-                    onClick={handleSyncSteam}
-                    onMouseEnter={() => playSound("hover")}
-                    disabled={steamSyncing}
-                    className="cursor-pointer flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 disabled:opacity-50 group"
-                  >
-                    <RefreshCw
-                      className={`w-3 h-3 text-white/40 group-hover:text-white/80 ${steamSyncing ? "animate-spin" : ""}`}
-                    />
-                    <span className="text-[10px] font-medium tracking-wider text-white/40 group-hover:text-white/80">
-                      {steamSyncing ? t("syncing") : t("sync")}
-                    </span>
-                  </button>
-                </div>
+                      <RefreshCw className="w-2.5 h-2.5 text-white/30 group-hover/steam:text-white/70 transition-colors" />
+                    </>
+                  )}
+                </button>
               ) : (
                 <button
                   onClick={connectSteam}
                   onMouseEnter={() => playSound("hover")}
                   disabled={steamConnecting}
-                  className="cursor-pointer flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.08] active:scale-95 group"
+                  className="cursor-pointer flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.08] active:scale-95 disabled:opacity-70 group"
                 >
-                  <div className="w-2 h-2 rounded-full bg-white/25" />
-                  <span className="text-[10px] font-medium tracking-wider text-white/45 group-hover:text-white transition-colors">
-                    {steamConnecting ? t("connecting") : t("connectSteam")}
-                  </span>
+                  {steamConnecting ? (
+                    <LoadingState label={t("connecting") || "Conectando..."} variant="Dots" size="sm" showTimer={false} />
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-white/25" />
+                      <span className="text-[10px] font-medium tracking-wider text-white/45 group-hover:text-white transition-colors">
+                        {t("connectSteam")}
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* EPIC GAMES PILL */}
+              {epicAuthConnected ? (
+                <button
+                  onClick={async () => {
+                    await handleSyncEpic();
+                    await checkEpicStatus();
+                  }}
+                  onMouseEnter={() => playSound("hover")}
+                  disabled={epicSyncing}
+                  className="cursor-pointer relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.06] active:scale-95 disabled:opacity-80 group/epic"
+                  title="Sincronizar jogos da Epic Games"
+                >
+                  {epicSyncing ? (
+                    <LoadingState label={t("syncing") || "Sincronizando..."} variant="Dots" size="sm" showTimer={false} />
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.75)] group-hover/epic:scale-110 transition-all" />
+                      <span className="text-[10px] font-medium tracking-wider text-white/70 group-hover/epic:text-white transition-colors">
+                        Epic
+                      </span>
+                      <RefreshCw className="w-2.5 h-2.5 text-white/30 group-hover/epic:text-white/70 transition-colors" />
+                    </>
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEpicConnectModalOpen(true)}
+                  onMouseEnter={() => playSound("hover")}
+                  disabled={epicConnecting}
+                  className="cursor-pointer flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all duration-200 hover:scale-105 hover:bg-white/[0.08] active:scale-95 disabled:opacity-70 group"
+                >
+                  {epicConnecting ? (
+                    <LoadingState label={t("connecting") || "Conectando..."} variant="Dots" size="sm" showTimer={false} />
+                  ) : (
+                    <>
+                      <div className="w-2 h-2 rounded-full bg-white/25" />
+                      <span className="text-[10px] font-medium tracking-wider text-white/45 group-hover:text-white transition-colors">
+                        {t("connectEpic") || "Conectar Epic"}
+                      </span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -1902,13 +2029,12 @@ const Home: React.FC = () => {
               discordAvatar={userProfile?.discordAvatar}
               steamConnecting={steamConnecting}
               discordConnecting={discordConnecting}
-              retroAchievementsConnected={Boolean(userProfile?.retroAchievementsUlid)}
-              retroAchievementsUsername={userProfile?.retroAchievementsUsername}
-              retroAchievementsConnecting={retroAchievementsConnecting}
-              retroAchievementsError={retroAchievementsError}
+              epicConnected={epicAuthConnected}
+              epicDisplayName={epicDisplayName}
+              epicConnecting={epicSyncing}
               onConnectSteam={connectSteam}
               onConnectDiscord={connectDiscord}
-              onConnectRetroAchievements={connectRetroAchievements}
+              onConnectEpic={() => setEpicConnectModalOpen(true)}
               onDisconnectSteam={() => {
                 playSound("back");
                 setDisconnectSteamModalOpen(true);
@@ -1917,7 +2043,10 @@ const Home: React.FC = () => {
                 playSound("back");
                 setDisconnectDiscordModalOpen(true);
               }}
-              onDisconnectRetroAchievements={disconnectRetroAchievementsAccount}
+              onDisconnectEpic={() => {
+                playSound("back");
+                setDisconnectEpicModalOpen(true);
+              }}
               onTestOverlayWelcome={() => {
                 playSound("select");
                 void window.electronAPI?.testOverlayWelcome();
@@ -1928,6 +2057,7 @@ const Home: React.FC = () => {
               }}
               initialTab={settingsTab}
               onTabChange={handleSettingsTabChange}
+              platformOperations={platformOperations}
             />
           ) : activeCategory === "FRIENDS" ? (
             <FriendsPage
@@ -1999,19 +2129,69 @@ const Home: React.FC = () => {
             <div className="flex-1 flex flex-col justify-between w-full h-full">
               <LoadingSkeleton />
             </div>
+          ) : (activeCategory === "ALL" && isAnySyncing && displayGames.length === 0) ? (
+            <div className="flex-1 flex flex-col justify-between w-full h-full">
+              {steamSyncing ? (
+                <PlatformLibrarySkeleton
+                  platform="steam"
+                  phase={platformOperations?.steam?.phase || "reading-library"}
+                  completed={platformOperations?.steam?.completed}
+                  total={platformOperations?.steam?.total}
+                />
+              ) : epicSyncing ? (
+                <PlatformLibrarySkeleton
+                  platform="epic"
+                  phase={platformOperations?.epic?.phase || "reading-library"}
+                  completed={platformOperations?.epic?.completed}
+                  total={platformOperations?.epic?.total}
+                />
+              ) : (
+                <LoadingSkeleton />
+              )}
+            </div>
+          ) : (activeCategory === "STEAM" && steamSyncing) ? (
+            <div className="flex-1 flex flex-col justify-between w-full h-full">
+              <PlatformLibrarySkeleton
+                platform="steam"
+                phase={platformOperations?.steam?.phase || "reading-library"}
+                completed={platformOperations?.steam?.completed}
+                total={platformOperations?.steam?.total}
+              />
+            </div>
+          ) : (activeCategory === "EPIC" && epicSyncing) ? (
+            <div className="flex-1 flex flex-col justify-between w-full h-full">
+              <PlatformLibrarySkeleton
+                platform="epic"
+                phase={platformOperations?.epic?.phase || "reading-library"}
+                completed={platformOperations?.epic?.completed}
+                total={platformOperations?.epic?.total}
+              />
+            </div>
           ) : displayGames.length === 0 ? (
             <div className="flex-1 flex items-center justify-center px-10">
               {onboardingCompleted ? (
                 <EmptyState
                   searchTerm={searchTerm}
-                  onAddGame={() => openAddGameModal()}
+                  activeCategory={activeCategory}
+                  onAddGame={() => openAddGameModal(categoryToLauncherType(activeCategory))}
                   onConnect={connectSteam}
+                  onSyncSteam={handleSyncSteam}
                   steamConnected={Boolean(resolvedSteamId)}
+                  isSyncingSteam={steamSyncing}
+                  isConnectingSteam={steamConnecting}
+                  onConnectEpic={() => setEpicConnectModalOpen(true)}
+                  onSyncEpic={async () => {
+                    await handleSyncEpic();
+                    await checkEpicStatus();
+                  }}
+                  epicConnected={epicAuthConnected}
+                  isSyncingEpic={epicSyncing}
+                  isConnectingEpic={epicConnecting}
                 />
               ) : (
                 <EmptyLibraryOnboarding
                   onConnectSteam={connectSteam}
-                  onOpenAddGame={() => openAddGameModal()}
+                  onOpenAddGame={() => openAddGameModal(categoryToLauncherType(activeCategory))}
                   onComplete={async () => {
                     if (!user?.uid) return;
                     localStorage.setItem(
@@ -2212,6 +2392,7 @@ const Home: React.FC = () => {
           onSaved={() => void refreshLibrary()}
           playSound={playSound}
           gameToEdit={editingGame}
+          initialLauncherType={addModalInitialLauncherType}
         />
       </React.Suspense>
 
@@ -2356,6 +2537,20 @@ const Home: React.FC = () => {
       />
 
       <ConfirmationModal
+        isOpen={disconnectEpicModalOpen}
+        title={t("disconnectEpicTitle")}
+        description={t("disconnectEpicDescription")}
+        confirmLabel={t("confirm")}
+        onClose={() => setDisconnectEpicModalOpen(false)}
+        onConfirm={async () => {
+          setDisconnectEpicModalOpen(false);
+          await handleDisconnectEpic();
+          await checkEpicStatus();
+        }}
+        playSound={playSound}
+      />
+
+      <ConfirmationModal
         isOpen={pendingFriendRemoval !== null}
         title="Desfazer amizade"
         description={
@@ -2441,6 +2636,31 @@ const Home: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <EpicConnectModal 
+        isOpen={epicConnectModalOpen}
+        playSound={playSound}
+        onClose={() => setEpicConnectModalOpen(false)}
+        operationState={platformOperations?.epic}
+        onDisconnect={async () => {
+          await handleDisconnectEpic();
+          await checkEpicStatus();
+        }}
+        onConnect={async (sid) => {
+          setEpicConnectModalOpen(false);
+          setEpicConnecting(true);
+          try {
+            await platformOps.connectEpic(sid);
+            notify("Epic Games conectada com sucesso! Sincronizando jogos...", "info");
+            await checkEpicStatus();
+            await handleSyncEpic();
+          } catch (err: any) {
+            notify(err?.message || "Erro ao conectar Epic Games.", "error");
+          } finally {
+            setEpicConnecting(false);
+          }
+        }}
+      />
     </div>
   );
 };

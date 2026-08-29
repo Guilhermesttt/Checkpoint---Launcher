@@ -1,5 +1,39 @@
 # Release Notes — Phelierium Game Hub
 
+## Phelierium Game Hub — v3.3.0 (Security & Platform Sync)
+
+Grande atualização com reformulação de segurança e sincronização de plataformas (Epic Games e Steam), ciclo de vida com journaling e purga transacional, sanitização estrita de descrições da loja, CSP reforçado e gate de segurança com 20 controles automatizados.
+
+### Destaques da versão 3.3.0
+
+#### 🛡️ Arquitetura Segura para Epic Games Desktop
+- **Isolamento de Credenciais e Processo:** Execução local do Legendary fixado na versão 0.21.0 com validação de hash SHA-256 (`4c01a1...`), sem tokens transitando pelo servidor remoto ou expostos ao renderer.
+- **Normalização Sanitizada:** Remoção integral de tokens brutos, refresh tokens e códigos de autorização nos payloads de conta e biblioteca.
+- **Superfície Express Minimizada:** Eliminação de endpoints privados da Epic no servidor remoto, tornando o backend estritamente voltado para callbacks OAuth e APIs públicas com rate limiting dedicado.
+
+#### 🔄 Ciclo de Vida Resiliente & Purga Transacional
+- **Máquina de Estados Pura por Plataforma:** Gerenciamento isolado das transições de conexão, sincronização e desconexão (`connecting`, `syncing`, `disconnecting`, `idle`, `error`) com suporte a progresso nativo e retry determinístico.
+- **Limpeza Atômica Local com Journaling:** Tabela SQLite `platform_cleanup_state` e transações atômicas para remoção de dados locais e caches de conquistas, com recuperação automática de limpezas interrompidas no boot.
+- **Purga em Nuvem com RPC Escopada:** Migração Supabase com função RPC `purge_my_platform_data(platform_name)` com `SECURITY DEFINER` e validação estrita do `auth.uid()` do chamador.
+
+#### ✨ Experiência Visual e Acessibilidade (UX)
+- **Skeletons de Biblioteca Dinâmicos:** `PlatformLibrarySkeleton` com animação de shimmer, contadores em tempo real e conformidade ARIA (`role="status"`, `aria-busy="true"`).
+- **Indicadores de Sincronização na Sidebar:** Badges e ícones animados para Steam e Epic durante sincronizações em segundo plano.
+- **Transições Suaves de Remoção:** `PlatformRemovalTransition` garantindo feedback contínuo de fases sem desaparecimento abrupto de cards nas configurações.
+
+#### 🔒 Gate de Lançamento e 20 Controles de Segurança
+- **Sanitização Centralizada com DOMPurify:** Sanitizador estrito `sanitizeStoreHtml` para descrições e requisitos da loja.
+- **Content Security Policy Estrito:** Meta tag CSP no empacotamento desktop sem `unsafe-eval` e Helmet CSP no servidor API.
+- **Varredura de Segredos & CI:** Script automatizado `scripts/scan-secrets.cjs` e workflow no GitHub Actions rodando os 20 controles antes de qualquer release.
+
+---
+
+## Phelierium Game Hub — v3.2.3
+
+Atualização com correção de carregamento de capturas locais no painel de detalhes dos jogos (`cp-media://`) e navegação completa por controle/gamepad e botões interativos no visualizador de capturas de tela do overlay.
+
+---
+
 ## Phelierium Game Hub — v3.2.2
 
 Atualização com redesenho cósmico do Overlay in-game, otimizações de performance estilo console 60 FPS e refinamentos sonoros do tema Phelierium.

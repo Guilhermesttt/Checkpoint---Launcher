@@ -1,5 +1,6 @@
 import React from "react";
 import DOMPurify from "dompurify";
+import { sanitizeStoreHtml } from "../utils/sanitizeStoreHtml";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   X, Play, Clock, CalendarClock, Trophy, Camera, Trash2, PackageOpen, ChevronLeft, ChevronRight,
@@ -19,6 +20,7 @@ import {
   fetchSteamAppDetailsResult,
   searchSteamGames,
   type SteamAchievement,
+  type SteamAppDetails,
 } from "../services/steam";
 import ModalShell from "./ui/ModalShell";
 import GlassButton from "./ui/GlassButton";
@@ -31,8 +33,9 @@ import {
 } from "../services/localLibrary";
 import { useNotification } from "./NotificationCenter";
 import { useGamepad, useGamepadButton } from "../context/GamepadContext";
+import { fetchEpicAppDetailsResult, fetchEpicAchievements } from "../services/epic";
+import { LoadingState } from "./ui/loading-state";
 import InputHints from "./ui/InputHints";
-import { fetchEpicAppDetailsResult } from "../services/epic";
 import { ModsSummaryBanner } from "./game/ModsSummaryBanner";
 import { AdvancedLaunchSettings } from "./game/AdvancedLaunchSettings";
 
@@ -110,11 +113,77 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const hydratedEpicGamesRef = React.useRef(new Set<string>());
   const hydratedSteamGamesRef = React.useRef(new Set<string>());
 
+  const [steamAppDetails, setSteamAppDetails] = React.useState<SteamAppDetails | null>(null);
+  const [isSteamAppDetailsLoading, setIsSteamAppDetailsLoading] = React.useState(false);
+
+  const [epicAppDetails, setEpicAppDetails] = React.useState<import("../services/epic").EpicAppDetails | null>(null);
+  const [isEpicAppDetailsLoading, setIsEpicAppDetailsLoading] = React.useState(false);
+
+  const isSteamGame = Boolean(
+    game?.launcherType === "steam" ||
+    game?.source === "steam" ||
+    (game?.steamAppId && game.steamAppId !== "0" && game.launcherType !== "epic"),
+  );
+
+  const isEpicGame = Boolean(
+    (game?.launcherType === "epic" ||
+    game?.source === "epic" ||
+    game?.epicCatalogId ||
+    game?.epicLaunchId) && !isSteamGame,
+  );
+
+  // Limpa estados temporários imediatamente ao trocar de jogo
+  React.useEffect(() => {
+    setSteamAppDetails(null);
+    setEpicAppDetails(null);
+    setAchievementItems([]);
+    setAchievementSourceAppId("");
+    setAchievementsError(null);
+    setCurrentGalleryIndex(0);
+  }, [game?.id]);
+
   // NOVOS ESTADOS (melhorias)
   const [isRunning, setIsRunning] = React.useState(false);
   const [refetchKey, setRefetchKey] = React.useState(0);
   const [achievementFilter, setAchievementFilter] = React.useState<"all" | "unlocked" | "locked">("all");
   const [achievementSearch, setAchievementSearch] = React.useState("");
+
+  const galleryItems = React.useMemo(() => {
+    const items: Array<{ type: "video" | "image"; url: string; thumbnail?: string }> = [];
+    if (isSteamGame) {
+      const trailerUrl = steamAppDetails?.trailerUrl || game?.trailerUrl;
+      const trailerThumbnail = steamAppDetails?.trailerThumbnail || game?.trailerThumbnail;
+      if (trailerUrl) {
+        items.push({ type: "video", url: trailerUrl, thumbnail: trailerThumbnail });
+      }
+      const screenshots = steamAppDetails?.screenshots?.length
+        ? steamAppDetails.screenshots
+        : game?.screenshots;
+      if (screenshots) {
+        screenshots.forEach((src) => items.push({ type: "image", url: src }));
+      }
+    } else if (isEpicGame) {
+      const trailerUrl = epicAppDetails?.trailerUrl || game?.trailerUrl;
+      const trailerThumbnail = epicAppDetails?.trailerThumbnail || game?.trailerThumbnail;
+      if (trailerUrl) {
+        items.push({ type: "video", url: trailerUrl, thumbnail: trailerThumbnail });
+      }
+      const screenshots = epicAppDetails?.screenshots?.length
+        ? epicAppDetails.screenshots
+        : game?.screenshots;
+      if (screenshots) {
+        screenshots.forEach((src) => items.push({ type: "image", url: src }));
+      }
+    } else {
+      if (game?.trailerUrl) {
+        items.push({ type: "video", url: game.trailerUrl, thumbnail: game.trailerThumbnail });
+      }
+      if (game?.screenshots) {
+        game.screenshots.forEach((src) => items.push({ type: "image", url: src }));
+      }
+    }
+    return items;
+  }, [isSteamGame, isEpicGame, steamAppDetails, epicAppDetails, game?.trailerUrl, game?.trailerThumbnail, game?.screenshots]);
 
   // ============================================================
   // INTERNACIONALIZAÇÃO (dicionário completo)
@@ -391,8 +460,142 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const localizedCategory = categoryLabels[String(game?.category || "").toUpperCase()]?.[language] || game?.category || copy.library;
 
   // ============================================================
-  // EFECTOS EXISTENTES (mantidos)
+  // EFECTOS EXISTENTES (mantidos e isolados por plataforma)
   // ============================================================
+  // Fetch Steam App Details (APENAS para jogos Steam)
+  React.useEffect(() => {
+    if (!game?.id || !isSteamGame) {
+      setSteamAppDetails(null);
+      setIsSteamAppDetailsLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    const fetchDetails = async () => {
+      let resolvedAppId = game.steamAppId;
+      if (!resolvedAppId && game.launcherType === "steam") {
+        // Fallback: search by name
+        const results = await searchSteamGames(game.title);
+        const normalizedTitle = normalizeSteamLookup(game.title);
+        const matched = results.find((candidate) => {
+          const rawName = typeof candidate.name === "string" ? candidate.name : (typeof candidate.title === "string" ? candidate.title : "");
+          return normalizeSteamLookup(rawName) === normalizedTitle;
+        });
+        if (matched && matched.id != null) {
+          resolvedAppId = String(matched.id).trim();
+        }
+      }
+
+      if (!resolvedAppId) {
+        setSteamAppDetails(null);
+        return;
+      }
+
+      setIsSteamAppDetailsLoading(true);
+      const result = await fetchSteamAppDetailsResult(resolvedAppId, language);
+      if (cancelled) return;
+      if (result.ok && result.data) {
+        setSteamAppDetails(result.data);
+      } else {
+        setSteamAppDetails(null);
+      }
+      setIsSteamAppDetailsLoading(false);
+    };
+
+    fetchDetails();
+    return () => { cancelled = true; };
+  }, [game?.id, game?.steamAppId, game?.title, game?.launcherType, isSteamGame, language]);
+
+  // Fetch Epic Store Details (APENAS para jogos Epic Games)
+  React.useEffect(() => {
+    if (!game?.id || !isEpicGame || !game.epicCatalogId) {
+      setEpicAppDetails(null);
+      setIsEpicAppDetailsLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    const fetchDetails = async () => {
+      setIsEpicAppDetailsLoading(true);
+      try {
+        const parts = decodeURIComponent(game.epicCatalogId || "").split(":");
+        const namespace = game.epicCatalogId?.includes(":") ? parts[0] : "";
+        const itemId = parts.length >= 2 ? parts[1] : game.epicCatalogId;
+
+        const result = await fetchEpicAppDetailsResult(
+          itemId || game.epicCatalogId || "",
+          namespace || undefined,
+          game.productSlug || undefined,
+          language,
+          game.title,
+          game.epicLaunchId,
+        );
+        if (cancelled) return;
+        if (result.ok && result.data) {
+          const d = result.data;
+          if (game.title && d.title) {
+            const normGame = game.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const normResult = d.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const isMatch = normGame === normResult ||
+              (normGame.length >= 4 && normResult.length >= 4 && (normGame.startsWith(normResult) || normResult.startsWith(normGame) || (normGame.includes(normResult) && normResult.length / normGame.length > 0.65))) ||
+              Boolean(d.catalogId && game.epicCatalogId && d.catalogId.toLowerCase() === game.epicCatalogId.toLowerCase());
+            if (!isMatch) {
+              console.warn(`[GameDetailPanel] Ignorando detalhes da Epic incompatíveis: "${d.title}" para "${game.title}"`);
+              if (!cancelled) setIsEpicAppDetailsLoading(false);
+              return;
+            }
+          }
+          setEpicAppDetails(d);
+          const enrichedGame: Game = {
+            ...game,
+            title: d.title || game.title,
+            cardImage: d.cardImage || game.cardImage,
+            backgroundImage: d.backgroundImage || game.backgroundImage,
+            logoImage: d.logoImage || game.logoImage,
+            description: d.description || game.description,
+            aboutTheGame: d.aboutTheGame || game.aboutTheGame,
+            screenshots: d.screenshots?.length ? d.screenshots : game.screenshots,
+            trailerUrl: d.trailerUrl || game.trailerUrl,
+            trailerThumbnail: d.trailerThumbnail || game.trailerThumbnail,
+            developer: d.developer || game.developer,
+            publisher: d.publisher || game.publisher,
+            tags: d.tags?.length ? d.tags : game.tags,
+            releaseDate: d.releaseDate || game.releaseDate,
+            productSlug: d.productSlug || game.productSlug,
+          };
+          if (user?.uid) {
+            void updateLibraryGame(user.uid, game.id, {
+              title: enrichedGame.title,
+              cardImage: enrichedGame.cardImage,
+              backgroundImage: enrichedGame.backgroundImage,
+              logoImage: enrichedGame.logoImage,
+              description: enrichedGame.description,
+              aboutTheGame: enrichedGame.aboutTheGame,
+              screenshots: enrichedGame.screenshots,
+              trailerUrl: enrichedGame.trailerUrl,
+              trailerThumbnail: enrichedGame.trailerThumbnail,
+              developer: enrichedGame.developer,
+              publisher: enrichedGame.publisher,
+              tags: enrichedGame.tags,
+              releaseDate: enrichedGame.releaseDate,
+              productSlug: enrichedGame.productSlug,
+              updatedAt: new Date().toISOString(),
+            }).then(() => onLibraryChanged?.()).catch(() => {});
+          }
+          if (onGameHydrated) {
+            onGameHydrated(enrichedGame);
+          }
+        }
+      } catch (err) {
+        console.warn("[GameDetailPanel] Falha ao buscar detalhes da Epic:", err);
+      }
+      if (!cancelled) setIsEpicAppDetailsLoading(false);
+    };
+
+    fetchDetails();
+    return () => { cancelled = true; };
+  }, [game?.id, game?.epicCatalogId, game?.title, game?.epicLaunchId, game?.productSlug, isEpicGame, language, onGameHydrated, onLibraryChanged, user?.uid]);
+
   // (todos os useEffect originais permanecem, pois não foram alterados)
   // Apenas adicionamos novos efeitos abaixo.
 
@@ -405,7 +608,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     if (!isOpen || !game?.executablePath) return;
     const checkRunning = async () => {
       try {
-        const running = await window.electronAPI?.isExecutableRunning(game.executablePath);
+        const running = await window.electronAPI?.isExecutableRunning(game.executablePath!);
         setIsRunning(!!running);
       } catch {
         setIsRunning(false);
@@ -456,43 +659,61 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
       try {
         if (game.launcherType === "epic") {
-          if (!window.electronAPI?.getEpicLocalAchievements) {
-            setAchievementsError(copy.achievementsEpicLocalEmpty);
+          // 1. Tenta buscar conquistas oficiais online da Epic via Legendary / API
+          let onlineAchievements: any = null;
+          try {
+            const achRes = await fetchEpicAchievements(undefined, game.epicLaunchId || game.title);
+            if (achRes.list && achRes.list.length > 0) {
+              onlineAchievements = achRes;
+            }
+          } catch (err) {
+            console.warn("Falha ao buscar conquistas online da Epic:", err);
+          }
+
+          if (onlineAchievements && onlineAchievements.list.length > 0) {
+            if (cancelled) return;
+            setAchievementSourceAppId("epic-online");
+            setAchievementItems(onlineAchievements.list);
+
+            if (user?.uid) {
+              void updateLibraryGame(user.uid, game.id, {
+                totalAchievements: onlineAchievements.total,
+                completedAchievements: onlineAchievements.completed,
+                achievementsUpdatedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }).catch(() => {}).then(() => onLibraryChanged?.());
+            }
             return;
           }
 
-          const localResult = await window.electronAPI.getEpicLocalAchievements({
-            gameId: game.id,
-            title: game.title,
-            epicCatalogId: game.epicCatalogId,
-            epicLaunchId: game.epicLaunchId,
-            executablePath: game.executablePath,
-          });
-          if (cancelled) return;
+          // 2. Fallback para arquivos locais se disponível
+          if (window.electronAPI?.getEpicLocalAchievements) {
+            const localResult = await window.electronAPI.getEpicLocalAchievements({
+              gameId: game.id,
+              title: game.title,
+              epicCatalogId: game.epicCatalogId,
+              epicLaunchId: game.epicLaunchId,
+              executablePath: game.executablePath,
+            });
+            if (cancelled) return;
 
-          setAchievementSourceAppId("epic-local");
-          setAchievementItems(localResult.achievements);
+            if (localResult.achievements && localResult.achievements.length > 0) {
+              setAchievementSourceAppId("epic-local");
+              setAchievementItems(localResult.achievements);
 
-          if (user?.uid) {
-            void updateLibraryGame(user.uid, game.id, {
-              totalAchievements: localResult.total,
-              completedAchievements: localResult.unlocked,
-              achievementsUpdatedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }).catch((error) => {
-              console.error("Erro ao salvar totais de conquistas da Epic:", error);
-            }).then(() => onLibraryChanged?.());
+              if (user?.uid) {
+                void updateLibraryGame(user.uid, game.id, {
+                  totalAchievements: localResult.total,
+                  completedAchievements: localResult.unlocked,
+                  achievementsUpdatedAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                }).catch(() => {}).then(() => onLibraryChanged?.());
+              }
+              return;
+            }
           }
 
-          if (localResult.achievements.length === 0) {
-            setAchievementsError(
-              localResult.status === "not-installed"
-                ? copy.achievementsEpicNotInstalled
-                : localResult.status === "binary-save"
-                  ? copy.achievementsEpicBinarySave
-                  : copy.achievementsEpicLocalEmpty,
-            );
-          }
+          setAchievementsError(copy.achievementsEmpty);
           return;
         }
 
@@ -787,19 +1008,66 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   // RENDER E COMPUTAÇÕES
   // ============================================================
 
-  const heroImage = game?.backgroundImage || game?.image;
-  const coverImage = game?.cardImage || game?.image || game?.backgroundImage;
-  const hasEpicLaunchShortcut = game?.launcherType === "epic" && String(game?.epicLaunchId || game?.executablePath || game?.epicCatalogId || "").split(":").filter(Boolean).length >= 3;
-  const safeAboutHtml = DOMPurify.sanitize(game?.aboutTheGame || game?.description || copy.noDescription, { ALLOWED_TAGS: ["b", "br", "em", "i", "li", "ol", "p", "strong", "ul"], ALLOWED_ATTR: [] });
+  const heroImage = isSteamGame
+    ? steamAppDetails?.backgroundImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_hero.jpg` : "") || game?.backgroundImage || game?.image
+    : isEpicGame
+      ? epicAppDetails?.backgroundImage || game?.backgroundImage || game?.image
+      : game?.backgroundImage || game?.image;
+
+  const coverImage = isSteamGame
+    ? steamAppDetails?.cardImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_600x900_2x.jpg` : "") || game?.cardImage || game?.image || game?.backgroundImage
+    : isEpicGame
+      ? epicAppDetails?.cardImage || game?.cardImage || game?.image || game?.backgroundImage
+      : game?.cardImage || game?.image || game?.backgroundImage;
+
+  const hasEpicLaunchShortcut = isEpicGame && String(game?.epicLaunchId || game?.executablePath || game?.epicCatalogId || "").split(":").filter(Boolean).length >= 3;
+  const sanitizedAboutHtml = React.useMemo(() => {
+    if (isSteamGame) {
+      return sanitizeStoreHtml(steamAppDetails?.aboutTheGame || steamAppDetails?.description || game?.aboutTheGame || game?.description || copy.noDescription);
+    }
+    if (isEpicGame) {
+      return sanitizeStoreHtml(epicAppDetails?.aboutTheGame || epicAppDetails?.description || game?.aboutTheGame || game?.description || copy.noDescription);
+    }
+    return sanitizeStoreHtml(game?.aboutTheGame || game?.description || copy.noDescription);
+  }, [isSteamGame, isEpicGame, steamAppDetails, epicAppDetails, game?.aboutTheGame, game?.description, copy.noDescription]);
+
+  const sanitizedSupportedLanguagesHtml = React.useMemo(
+    () => sanitizeStoreHtml(steamAppDetails?.supportedLanguages || ""),
+    [steamAppDetails?.supportedLanguages],
+  );
+  const sanitizedMinRequirementsHtml = React.useMemo(
+    () => sanitizeStoreHtml(steamAppDetails?.pcRequirements?.minimum || ""),
+    [steamAppDetails?.pcRequirements?.minimum],
+  );
+  const sanitizedRecRequirementsHtml = React.useMemo(
+    () => sanitizeStoreHtml(steamAppDetails?.pcRequirements?.recommended || ""),
+    [steamAppDetails?.pcRequirements?.recommended],
+  );
+  const safeAboutHtml = sanitizedAboutHtml;
   const achievementsTotal = game?.totalAchievements ?? 0;
   const achievementsDone = game?.completedAchievements ?? 0;
   const detailedAchievementsUnlocked = achievementItems.filter((achievement) => achievement.achieved).length;
 
-  const lastSessionSource = game?.launcherType === "steam" ? game?.steamLastPlayedAt || game?.lastPlayedAt : game?.lastPlayedAt;
+  const lastSessionSource = isSteamGame ? game?.steamLastPlayedAt || game?.lastPlayedAt : game?.lastPlayedAt;
   const lastSession = lastSessionSource ? new Date(lastSessionSource).toLocaleDateString(locale) : copy.neverStarted;
-  const platformLabel = game?.launcherType === "steam" ? copy.steamLabel : game?.launcherType === "epic" ? copy.epicLabel : copy.localLabel;
-  const aboutPreview = (game?.aboutTheGame || game?.description || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  const achievementSourceLabel = achievementSourceAppId === "epic-local" ? copy.achievementsEpicLocalSource : achievementSourceAppId ? copy.steamLabel : copy.achievementsSteamFallback;
+  const platformLabel = isSteamGame ? copy.steamLabel : isEpicGame ? copy.epicLabel : copy.localLabel;
+  const aboutPreview = (isSteamGame
+    ? (steamAppDetails?.aboutTheGame || steamAppDetails?.description || game?.aboutTheGame || game?.description || "")
+    : isEpicGame
+      ? (epicAppDetails?.aboutTheGame || epicAppDetails?.description || game?.aboutTheGame || game?.description || "")
+      : (game?.aboutTheGame || game?.description || "")).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  const displayScreenshots = isSteamGame
+    ? steamAppDetails?.screenshots?.length ? steamAppDetails.screenshots : (game?.screenshots || [])
+    : isEpicGame
+      ? epicAppDetails?.screenshots?.length ? epicAppDetails.screenshots : (game?.screenshots || [])
+      : game?.screenshots || [];
+  const achievementSourceLabel =
+    achievementSourceAppId === "epic-online" || achievementSourceAppId === "epic-local"
+      ? copy.epicLabel
+      : achievementSourceAppId
+        ? copy.steamLabel
+        : copy.achievementsSteamFallback;
 
   const formatHours = (hours: number = 0) => {
     const h = Math.floor(hours);
@@ -1129,14 +1397,14 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       <div className="w-full">
                         <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-4 flex items-center gap-2">
                           <Camera className="w-3 h-3" /> {copy.photoWall}
-                          {game.screenshots && game.screenshots.length > 0 && (
-                            <span className="ml-1 px-2 py-0.5 rounded-md bg-white/[0.07] border border-white/10 text-[9px] font-black text-white/40">{game.screenshots.length}</span>
+                          {displayScreenshots.length > 0 && (
+                            <span className="ml-1 px-2 py-0.5 rounded-md bg-white/[0.07] border border-white/10 text-[9px] font-black text-white/40">{displayScreenshots.length}</span>
                           )}
                         </h3>
-                        {game.screenshots && game.screenshots.length > 0 ? (
+                        {displayScreenshots.length > 0 ? (
                           <div className="flex flex-col sm:flex-row gap-3">
                             <div onClick={() => { setGalleryModalOpen(true); setCurrentGalleryIndex(0); playSound("select"); }} className="flex-1 rounded-[20px] overflow-hidden border border-white/10 relative group cursor-pointer h-[200px] sm:h-[260px] shadow-xl min-w-0">
-                              <img src={game.screenshots[game.screenshots.length - 1] || undefined} alt="" className="w-full h-full object-cover group-hover:scale-105 will-change-transform transition-transform duration-700 ease-out" />
+                              <img src={displayScreenshots[displayScreenshots.length - 1] || undefined} alt="" className="w-full h-full object-cover group-hover:scale-105 will-change-transform transition-transform duration-700 ease-out" />
                               <div className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-5 transition-opacity duration-300 ${activeInputType === "gamepad" && isGamepadConnected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                                 <span className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-white text-[10px] font-black tracking-wider shadow-[0_0_15px_rgba(0,0,0,0.5)]">
                                   {activeInputType === "gamepad" && isGamepadConnected ? (
@@ -1167,9 +1435,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                                 </span>
                               </div>
                             </div>
-                            {game.screenshots.length > 1 && (
+                            {displayScreenshots.length > 1 && (
                               <div className="flex sm:flex-col gap-3 w-full sm:w-[120px] shrink-0 flex-row sm:flex-col">
-                                {game.screenshots.slice(0, Math.min(3, game.screenshots.length - 1)).map((src, i) => (
+                                {displayScreenshots.slice(0, Math.min(3, displayScreenshots.length - 1)).map((src, i) => (
                                   <div
                                     key={i}
                                     onClick={() => { setGalleryModalOpen(true); setCurrentGalleryIndex(i); playSound("select"); }}
@@ -1205,19 +1473,64 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     <motion.div key="panel-about" role="tabpanel" id="panel-about" aria-labelledby="tab-about" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="w-full flex flex-col gap-8">
                       <div>
                         <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-4">{copy.about}</h3>
-                        <div className="text-white/70 leading-relaxed text-sm prose prose-invert prose-p:my-0 pb-2" dangerouslySetInnerHTML={{ __html: safeAboutHtml }} />
+                        {isSteamAppDetailsLoading || isEpicAppDetailsLoading ? (
+                          <div className="w-full h-32 flex items-center justify-center">
+                            <LoadingState label="Carregando informações da loja..." variant="Orbit" />
+                          </div>
+                        ) : (
+                          <div className="text-white/70 leading-relaxed text-sm prose prose-invert prose-p:my-0 pb-2" dangerouslySetInnerHTML={{ __html: sanitizedAboutHtml }} />
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 gap-y-6 gap-x-12 pt-6 border-t border-white/[0.07]">
-                        <TechnicalDetail label={copy.developer} value={game.developer} fallback={copy.notInformed} />
-                        <TechnicalDetail label={copy.publisher} value={game.publisher} fallback={copy.notInformed} />
-                        <TechnicalDetail label={copy.releaseDate} value={game.releaseDate} fallback={copy.notInformed} />
+
+                      {sanitizedSupportedLanguagesHtml && (
+                        <div>
+                          <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-3">Idiomas Suportados</h3>
+                          <div className="text-white/60 text-xs" dangerouslySetInnerHTML={{ __html: sanitizedSupportedLanguagesHtml }} />
+                        </div>
+                      )}
+
+                      {(sanitizedMinRequirementsHtml || sanitizedRecRequirementsHtml) && (
+                        <div>
+                          <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-3">Requisitos de Sistema</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {sanitizedMinRequirementsHtml && (
+                              <div className="bg-white/[0.02] p-4 rounded-xl border border-white/[0.05] prose prose-invert prose-sm" dangerouslySetInnerHTML={{ __html: sanitizedMinRequirementsHtml }} />
+                            )}
+                            {sanitizedRecRequirementsHtml && (
+                              <div className="bg-white/[0.02] p-4 rounded-xl border border-white/[0.05] prose prose-invert prose-sm" dangerouslySetInnerHTML={{ __html: sanitizedRecRequirementsHtml }} />
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-6 pt-6 border-t border-white/[0.07]">
+                        <TechnicalDetail label={copy.developer} value={steamAppDetails?.developer || epicAppDetails?.developer || game.developer} fallback={copy.notInformed} />
+                        <TechnicalDetail label={copy.publisher} value={steamAppDetails?.publisher || epicAppDetails?.publisher || game.publisher} fallback={copy.notInformed} />
+                        <TechnicalDetail label={copy.releaseDate} value={steamAppDetails?.releaseDate || epicAppDetails?.releaseDate || game.releaseDate} fallback={copy.notInformed} />
                         <TechnicalDetail label={copy.category} value={localizedCategory} fallback={copy.notInformed} />
+                        
+                        {steamAppDetails?.metacritic && (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black tracking-[0.2em] text-white/35 uppercase mb-2">Metacritic</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${steamAppDetails.metacritic.score >= 75 ? 'bg-green-500/20 text-green-400' : steamAppDetails.metacritic.score >= 50 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {steamAppDetails.metacritic.score}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {steamAppDetails?.priceOverview && (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black tracking-[0.2em] text-white/35 uppercase mb-2">Preço (Steam)</span>
+                            <span className="text-sm font-semibold text-white/80">{steamAppDetails.priceOverview.final_formatted}</span>
+                          </div>
+                        )}
                       </div>
-                      {game.tags && game.tags.length > 0 && (
+                      {((epicAppDetails?.tags && epicAppDetails.tags.length > 0) || (game.tags && game.tags.length > 0)) && (
                         <div>
                           <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-3">{copy.popularTags}</h3>
                           <div className="flex flex-wrap gap-2">
-                            {game.tags.slice(0, 15).map((tag, i) => (
+                            {(epicAppDetails?.tags?.length ? epicAppDetails.tags : game.tags || []).slice(0, 15).map((tag, i) => (
                               <span key={i} className="px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-[10px] font-semibold text-white/65 tracking-wide">{tag}</span>
                             ))}
                           </div>
@@ -1277,9 +1590,12 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         </div>
                       </div>
 
-                      {/* Loading com skeleton */}
+                      {/* Loading com skeleton e LoadingState */}
                       {isAchievementsLoading && (
                         <div className="flex flex-col gap-4 min-h-[200px] justify-center">
+                          <div className="flex justify-center py-2">
+                            <LoadingState label="Sincronizando conquistas..." variant="Dots" />
+                          </div>
                           <AchievementSkeleton />
                           <AchievementSkeleton />
                           <AchievementSkeleton />
@@ -1484,7 +1800,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               GALERIA
               ============================================================ */}
           <ModalShell
-            isOpen={Boolean(galleryModalOpen && game.screenshots && game.screenshots.length > 0)}
+            isOpen={Boolean(galleryModalOpen && galleryItems.length > 0)}
             onClose={() => { setGalleryModalOpen(false); playSound("modalClose"); }}
             maxWidthClassName="max-w-none w-full h-full"
             className="p-0 bg-transparent border-0 shadow-none h-full"
@@ -1498,52 +1814,89 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 <div className="flex items-center gap-4">
                   <span className="text-sm sm:text-base font-bold text-white shadow-sm">{game.title}</span>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
-                  <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-white/50 uppercase">{currentGalleryIndex + 1} de {game.screenshots?.length ?? 0}</span>
+                  <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-white/50 uppercase">{currentGalleryIndex + 1} de {galleryItems.length}</span>
                 </div>
                 <button onClick={() => { setGalleryModalOpen(false); playSound("modalClose"); }} className="p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-md" aria-label="Fechar galeria"><X className="w-5 h-5 text-white" /></button>
               </div>
 
               <button
-                onClick={() => { setCurrentGalleryIndex((c) => c > 0 ? c - 1 : (game.screenshots?.length ?? 1) - 1); playSound("navigate"); }}
+                onClick={() => { setCurrentGalleryIndex((c) => c > 0 ? c - 1 : galleryItems.length - 1); playSound("navigate"); }}
                 className="absolute left-0 top-0 bottom-0 w-1/6 flex items-center justify-start pl-4 sm:pl-8 z-40 group outline-none"
                 aria-label={copy.previous}
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-black/40 border border-white/10 opacity-30 group-hover:opacity-100 group-hover:scale-110 transition-all backdrop-blur-md"><ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" /></div>
               </button>
               <button
-                onClick={() => { setCurrentGalleryIndex((c) => c < (game.screenshots?.length ?? 1) - 1 ? c + 1 : 0); playSound("navigate"); }}
+                onClick={() => { setCurrentGalleryIndex((c) => c < galleryItems.length - 1 ? c + 1 : 0); playSound("navigate"); }}
                 className="absolute right-0 top-0 bottom-0 w-1/6 flex items-center justify-end pr-4 sm:pr-8 z-40 group outline-none"
                 aria-label={copy.next}
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-black/40 border border-white/10 opacity-30 group-hover:opacity-100 group-hover:scale-110 transition-all backdrop-blur-md"><ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" /></div>
               </button>
 
-              <div className="w-full h-full max-h-screen p-8 sm:p-12 md:p-24 flex items-center justify-center">
+              <div className="w-full h-full max-h-screen p-8 pt-24 pb-36 sm:px-16 sm:pt-24 sm:pb-40 md:px-24 md:pt-24 md:pb-48 flex items-center justify-center">
                 <AnimatePresence mode="wait">
-                  <motion.img
-                    key={currentGalleryIndex}
-                    initial={{ opacity: 0, filter: "blur(8px)", scale: 0.98 }}
-                    animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
-                    exit={{ opacity: 0, filter: "blur(8px)", scale: 1.02 }}
-                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                    src={game.screenshots?.[currentGalleryIndex] || undefined}
-                    alt={`Screenshot ${currentGalleryIndex + 1}`}
-                    className="max-w-full max-h-full object-contain rounded-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-                  />
+                  {galleryItems[currentGalleryIndex]?.type === "video" ? (
+                    (galleryItems[currentGalleryIndex].url.includes("youtube") || galleryItems[currentGalleryIndex].url.includes("youtu.be")) ? (
+                      <motion.iframe
+                        key={currentGalleryIndex}
+                        src={`https://www.youtube.com/embed/${galleryItems[currentGalleryIndex].url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/)?.[1]}?autoplay=1&controls=1`}
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.02 }}
+                        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                        className="w-full h-full max-w-6xl max-h-[80vh] rounded-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10"
+                        allow="autoplay; encrypted-media; fullscreen"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <motion.video
+                        key={currentGalleryIndex}
+                        src={galleryItems[currentGalleryIndex].url}
+                        autoPlay
+                        controls
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.02 }}
+                        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                        className="max-w-full max-h-full object-contain rounded-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10"
+                      />
+                    )
+                  ) : (
+                    <motion.img
+                      key={currentGalleryIndex}
+                      initial={{ opacity: 0, filter: "blur(8px)", scale: 0.98 }}
+                      animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
+                      exit={{ opacity: 0, filter: "blur(8px)", scale: 1.02 }}
+                      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                      src={galleryItems[currentGalleryIndex]?.url || undefined}
+                      alt={`Galeria ${currentGalleryIndex + 1}`}
+                      className="max-w-full max-h-full object-contain rounded-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                    />
+                  )}
                 </AnimatePresence>
               </div>
 
               <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center bg-gradient-to-t from-black/90 to-transparent pt-12 pb-6 z-50">
-                <div className="flex justify-center gap-2 mb-6 overflow-x-auto max-w-full px-4">
-                  {game.screenshots?.map((src, idx) => (
+                <div className="flex justify-center gap-2 mb-6 overflow-x-auto max-w-full px-4 hide-scrollbar">
+                  {galleryItems.map((item, idx) => (
                     <button
                       key={idx}
                       onClick={() => { setCurrentGalleryIndex(idx); playSound("navigate"); }}
-                      className={`w-16 h-10 sm:w-20 sm:h-12 rounded-lg overflow-hidden border-2 transition-all duration-300 flex-shrink-0 ${idx === currentGalleryIndex ? "border-white scale-110 shadow-[0_0_15px_rgba(255,255,255,0.3)]" : "border-transparent opacity-40 hover:opacity-80"
+                      className={`w-16 h-10 sm:w-20 sm:h-12 rounded-lg overflow-hidden transition-all duration-300 flex-shrink-0 relative outline-none focus:outline-none ${idx === currentGalleryIndex ? "scale-110 opacity-100 shadow-[0_0_15px_rgba(255,255,255,0.15)]" : "opacity-40 hover:opacity-80"
                         }`}
-                      aria-label={`Ir para imagem ${idx + 1}`}
+                      aria-label={`Ir para item ${idx + 1}`}
                     >
-                      <img src={src || undefined} className="w-full h-full object-cover" />
+                      {item.type === "video" ? (
+                        <div className="w-full h-full bg-black/80 flex items-center justify-center relative">
+                          {item.thumbnail && (
+                            <img src={item.thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen" />
+                          )}
+                          <Play className="w-6 h-6 text-white/80 relative z-10" />
+                        </div>
+                      ) : (
+                        <img src={item.url || undefined} className="w-full h-full object-cover" />
+                      )}
                     </button>
                   ))}
                 </div>
