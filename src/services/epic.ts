@@ -299,6 +299,7 @@ export const syncEpicLibraryToLocal = async (
           launcherType: "epic" as LauncherType,
           epicCatalogId: catalogId,
           epicLaunchId: appName,
+          epicNamespace: namespace || "",
           productSlug: productSlug || validDetails?.productSlug || existing?.productSlug || "",
           totalAchievements: achievements.total || existing?.totalAchievements || 0,
           completedAchievements: achievements.completed || existing?.completedAchievements || 0,

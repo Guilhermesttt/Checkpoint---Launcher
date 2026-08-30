@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { createEpicAccount } from "../electron/epic-account.cjs";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import {
+  createEpicAccount,
+  normalizeAchievementList,
+  fetchGraphQLAchievements,
+  readLegendaryToken,
+  readLegendaryAccountId,
+} from "../electron/epic-account.cjs";
 
 describe("epic-account", () => {
   it("returns normalized status when authenticated", async () => {
@@ -165,5 +171,190 @@ describe("epic-account", () => {
     const result = await account.logout();
     expect(result).toEqual({ success: true });
     expect(legendary.logout).toHaveBeenCalled();
+  });
+
+  it("returns empty when appName is missing", async () => {
+    const legendary = { run: vi.fn(), logout: vi.fn() };
+    const account = createEpicAccount({ legendary: legendary as any });
+    const result = await account.getAchievements({});
+    expect(result).toEqual({ total: 0, completed: 0, list: [] });
+  });
+
+  it("uses cache when available and skips API calls", async () => {
+    const cachedData = {
+      total: 3,
+      completed: 1,
+      list: [
+        { apiName: "CACHED_ACH", name: "Cached Achievement", achieved: false, unlockTime: 0, icon: "", iconGray: "", hidden: false },
+      ],
+    };
+    const cache = {
+      readCache: vi.fn().mockResolvedValue(cachedData),
+      writeCache: vi.fn(),
+    };
+    const legendary = { run: vi.fn(), logout: vi.fn() };
+
+    const account = createEpicAccount({
+      legendary: legendary as any,
+      achievementsCache: cache as any,
+    });
+    const result = await account.getAchievements({ appName: "Fortnite" });
+
+    expect(result).toEqual(cachedData);
+    expect(cache.readCache).toHaveBeenCalledWith("Fortnite");
+    expect(legendary.run).not.toHaveBeenCalled();
+  });
+
+  it("falls back to GraphQL when Legendary returns no achievements", async () => {
+    const legendary = {
+      run: vi.fn().mockRejectedValue(new Error("command not found")),
+      logout: vi.fn(),
+    };
+    const cache = {
+      readCache: vi.fn().mockResolvedValue(null),
+      writeCache: vi.fn(),
+    };
+
+    const account = createEpicAccount({
+      legendary: legendary as any,
+      achievementsCache: cache as any,
+    });
+
+    const result = await account.getAchievements({
+      appName: "Fortnite",
+      sandboxId: "sandbox-123",
+    });
+
+    expect(result.total).toBe(0);
+    expect(cache.writeCache).not.toHaveBeenCalled();
+  });
+
+  it("writes results to cache after successful fetch", async () => {
+    const rawAchievements = {
+      total_achievements: 1,
+      user_unlocked: 1,
+      achievements: [
+        {
+          name: "ACH_1",
+          display_name: "First",
+          unlocked: true,
+          unlock_date: "2026-08-01T12:00:00Z",
+          icon_url: "https://icon.com/1.png",
+          hidden: false,
+        },
+      ],
+    };
+    const legendary = {
+      run: vi.fn().mockResolvedValue(JSON.stringify(rawAchievements)),
+      logout: vi.fn(),
+    };
+    const cache = {
+      readCache: vi.fn().mockResolvedValue(null),
+      writeCache: vi.fn(),
+    };
+
+    const account = createEpicAccount({
+      legendary: legendary as any,
+      achievementsCache: cache as any,
+    });
+    await account.getAchievements({ appName: "Fortnite" });
+
+    expect(cache.writeCache).toHaveBeenCalledWith(
+      "Fortnite",
+      expect.objectContaining({ total: 1, completed: 1 }),
+    );
+  });
+});
+
+describe("normalizeAchievementList", () => {
+  it("deduplicates achievements by apiName", () => {
+    const raw = [
+      { name: "ACH_1", display_name: "First" },
+      { name: "ACH_1", display_name: "First Duplicate" },
+      { name: "ACH_2", display_name: "Second" },
+    ];
+    const result = normalizeAchievementList(raw);
+    expect(result).toHaveLength(2);
+    expect(result[0].apiName).toBe("ACH_1");
+    expect(result[1].apiName).toBe("ACH_2");
+  });
+
+  it("handles GraphQL-style field names", () => {
+    const raw = [
+      {
+        achievementName: "GQL_ACH",
+        unlockedDisplayName: "GraphQL Achievement",
+        unlockedDescription: "Unlocked desc",
+        lockedDescription: "Locked desc",
+        unlockedIconLink: "https://icon.com/unlocked.png",
+        lockedIconLink: "https://icon.com/locked.png",
+        hidden: true,
+        unlocked: true,
+        unlockDate: "2026-01-15T10:30:00Z",
+      },
+    ];
+    const result = normalizeAchievementList(raw);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      apiName: "GQL_ACH",
+      name: "GraphQL Achievement",
+      description: "Unlocked desc",
+      icon: "https://icon.com/unlocked.png",
+      iconGray: "https://icon.com/locked.png",
+      hidden: true,
+      achieved: true,
+    });
+  });
+
+  it("returns empty for empty input", () => {
+    expect(normalizeAchievementList([])).toEqual([]);
+    expect(normalizeAchievementList(null as any)).toEqual([]);
+  });
+});
+
+describe("epic-account GraphQL fallback chain", () => {
+  it("tries Legendary first, then GraphQL, then returns empty", async () => {
+    const legendary = {
+      run: vi.fn().mockRejectedValue(new Error("not supported")),
+      logout: vi.fn(),
+    };
+    const emitProgress = vi.fn();
+
+    const account = createEpicAccount({
+      legendary: legendary as any,
+      emitProgress,
+    });
+
+    const result = await account.getAchievements({
+      appName: "TestGame",
+      sandboxId: "test-sandbox",
+    });
+
+    expect(result).toEqual({ total: 0, completed: 0, list: [] });
+    expect(legendary.run).toHaveBeenCalledWith([
+      "achievements",
+      "TestGame",
+      "--json",
+    ]);
+  });
+
+  it("emits reading-achievements-graphql phase when falling back to GraphQL", async () => {
+    const legendary = {
+      run: vi.fn().mockRejectedValue(new Error("not supported")),
+      logout: vi.fn(),
+    };
+    const emitProgress = vi.fn();
+
+    const account = createEpicAccount({
+      legendary: legendary as any,
+      emitProgress,
+    });
+
+    await account.getAchievements({
+      appName: "TestGame",
+      sandboxId: "test-sandbox",
+    });
+
+    expect(emitProgress).toHaveBeenCalledWith({ phase: "reading-achievements" });
   });
 });

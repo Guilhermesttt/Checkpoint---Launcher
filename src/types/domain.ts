@@ -58,6 +58,7 @@ export interface Game {
   steamAppId?: string;
   epicCatalogId?: string;
   epicLaunchId?: string;
+  epicNamespace?: string;
   epicStoreUrl?: string;
   productSlug?: string;
   steamPlaytimeMinutes?: number;

@@ -662,7 +662,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           // 1. Tenta buscar conquistas oficiais online da Epic via Legendary / API
           let onlineAchievements: any = null;
           try {
-            const achRes = await fetchEpicAchievements(undefined, game.epicLaunchId || game.title);
+            const achRes = await fetchEpicAchievements(game.epicNamespace || undefined, game.epicLaunchId || game.title);
             if (achRes.list && achRes.list.length > 0) {
               onlineAchievements = achRes;
             }
@@ -713,6 +713,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             }
           }
 
+          setAchievementSourceAppId("epic-online");
           setAchievementsError(copy.achievementsEmpty);
           return;
         }

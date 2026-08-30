@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, LogOut, CheckCircle2, LogIn, ChevronDown, ChevronUp, KeyRound } from "lucide-react";
+import { X, ExternalLink, LogOut, CheckCircle2, LogIn, ChevronDown, ChevronUp, KeyRound, AlertCircle } from "lucide-react";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 import { LoadingState } from "../ui/loading-state";
 import { fetchEpicStatus } from "../../services/epic";
@@ -55,7 +55,7 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
 
   const isOperationBusy = Boolean(
     operationState &&
-      (operationState.status === "syncing" || operationState.status === "connecting" || operationState.status === "disconnecting"),
+    (operationState.status === "syncing" || operationState.status === "connecting" || operationState.status === "disconnecting"),
   );
   const isBusy = loading || disconnecting || isOperationBusy;
   const busyLabel =
@@ -153,27 +153,27 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => !isBusy && onClose()}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50"
+            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50"
           />
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#0a0b0f] border border-white/10 rounded-3xl shadow-2xl z-50 overflow-hidden font-sans"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-black border border-neutral-800 rounded-2xl shadow-2xl z-50 overflow-hidden font-sans"
           >
             <div className="p-6">
-              <div className="flex items-center justify-between pb-5 border-b border-white/10">
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center overflow-hidden">
-                    <img src="/Pherielium_logo.png" alt="Pherielium" className="w-7 h-7 object-contain" />
+                  <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center font-bold text-black tracking-wider text-xs">
+                    EPIC
                   </div>
-                  <h2 className="text-lg font-bold text-white tracking-tight">Conectar Epic Games</h2>
+                  <h2 className="text-lg font-bold text-white">Conectar Epic Games</h2>
                 </div>
                 <button
                   onClick={() => !isBusy && onClose()}
                   disabled={isBusy}
-                  className="text-white/40 hover:text-white transition-colors disabled:opacity-30 cursor-pointer"
+                  className="text-neutral-500 hover:text-white transition-colors disabled:opacity-30 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -181,23 +181,23 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
 
               <div className="mt-6 space-y-5">
                 {currentAccount?.authenticated && (
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/10">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-neutral-900/50 border border-neutral-800">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-white shrink-0">
-                        <CheckCircle2 size={18} />
+                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white shrink-0">
+                        <CheckCircle2 size={16} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate">
+                        <p className="text-xs font-bold text-white truncate">
                           {currentAccount.displayName || "Conta Conectada"}
                         </p>
-                        <p className="text-[11px] text-white/50">Conta atualmente vinculada</p>
+                        <p className="text-[10px] text-neutral-400">Conta atualmente vinculada</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleDisconnectCurrent}
                       disabled={isBusy}
-                      className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-transparent hover:bg-white text-neutral-300 hover:text-black border border-neutral-700 hover:border-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
                     >
                       <LogOut size={13} />
                       Desconectar
@@ -205,15 +205,15 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                   </div>
                 )}
 
-                <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.07] space-y-4">
-                  <p className="text-[13px] text-white/60 leading-relaxed">
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
+                  <p className="text-xs text-neutral-400 leading-relaxed">
                     Faça login com sua conta da Epic Games em uma janela integrada para importar seus jogos automaticamente.
                   </p>
                   <button
                     type="button"
                     onClick={handleQuickLogin}
                     disabled={isBusy}
-                    className="w-full py-3.5 bg-white hover:bg-white/90 text-black rounded-2xl font-bold shadow-lg shadow-white/10 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
+                    className="w-full py-3 bg-white hover:bg-neutral-200 text-black rounded-xl font-bold transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
                   >
                     {isBusy ? (
                       <LoadingState label={busyLabel} variant="Drive" size="sm" />
@@ -226,13 +226,18 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                   </button>
                 </div>
 
-                {error && <div className="text-white text-xs p-3 rounded-xl bg-white/5 border border-white/10">{error}</div>}
+                {error && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-neutral-900 border border-neutral-700">
+                    <AlertCircle className="w-4 h-4 text-white shrink-0 mt-0.5" />
+                    <span className="text-white text-xs leading-relaxed">{error}</span>
+                  </div>
+                )}
 
-                <div className="pt-1">
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => setShowManualInput(!showManualInput)}
-                    className="flex items-center justify-between w-full text-xs text-white/40 hover:text-white/70 transition-colors py-1 cursor-pointer"
+                    className="flex items-center justify-between w-full text-xs text-neutral-500 hover:text-neutral-300 transition-colors py-1 cursor-pointer"
                   >
                     <span className="flex items-center gap-1.5 font-medium">
                       <KeyRound size={13} />
@@ -246,13 +251,13 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 space-y-3 pt-3 border-t border-white/5"
+                      className="mt-3 space-y-3 pt-3 border-t border-neutral-800 overflow-hidden"
                     >
                       <button
                         type="button"
                         onClick={handleOpenAuthUrl}
                         disabled={isBusy}
-                        className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-medium rounded-xl border border-white/10 transition-colors cursor-pointer"
+                        className="flex items-center gap-2 w-full px-3 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium rounded-lg border border-neutral-800 transition-colors cursor-pointer"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         Abrir página de autorização no navegador
@@ -265,12 +270,12 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                           disabled={isBusy}
                           onChange={(e) => setSid(e.target.value)}
                           placeholder="Cole o código ou JSON aqui..."
-                          className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                          className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
                         />
                         <button
                           type="submit"
                           disabled={!sid.trim() || isBusy}
-                          className="w-full py-2.5 bg-white/10 hover:bg-white/15 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
+                          className="w-full py-2.5 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 text-black rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
                         >
                           Confirmar Código
                         </button>

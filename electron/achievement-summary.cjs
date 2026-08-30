@@ -46,8 +46,10 @@ const publicAggregate = (aggregate) => ({
 
 const readAchievementLibrarySummary = async (userDataPath) => {
   const achievementsDir = path.join(userDataPath, "achievements");
+  const epicCacheDir = path.join(achievementsDir, "epic-cache");
   const byGameIdInternal = new Map();
   const bySteamAppIdInternal = new Map();
+  const byEpicAppNameInternal = new Map();
   const steamAppIdByGameId = new Map();
   const gameIdsBySteamAppId = new Map();
 
@@ -80,6 +82,42 @@ const readAchievementLibrarySummary = async (userDataPath) => {
       }
     } catch {
       // Um cache corrompido nao deve impedir a reconciliacao dos outros jogos.
+    }
+  }
+
+  let epicCacheFiles = [];
+  try {
+    epicCacheFiles = await fs.promises.readdir(epicCacheDir);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+
+  for (const file of epicCacheFiles) {
+    if (!file.toLowerCase().endsWith(".json")) continue;
+    const epicAppName = path.basename(file, ".json");
+    try {
+      const cached = await readJson(path.join(epicCacheDir, file));
+      const list = cached?.data?.list || cached?.list || [];
+      if (!Array.isArray(list) || list.length === 0) continue;
+
+      const ids = list
+        .map((ach) => String(ach?.apiName || "").trim())
+        .filter(Boolean);
+      const epicAggregate = byEpicAppNameInternal.get(epicAppName) || createAggregate();
+      ids.forEach((id) => epicAggregate.definitionIds.add(id));
+      list
+        .filter((ach) => ach?.achieved)
+        .forEach((ach) => epicAggregate.unlockedIds.add(String(ach.apiName).trim()));
+      byEpicAppNameInternal.set(epicAppName, epicAggregate);
+
+      const gameAggregate = byGameIdInternal.get(`epic_${epicAppName}`) || createAggregate();
+      ids.forEach((id) => gameAggregate.definitionIds.add(id));
+      list
+        .filter((ach) => ach?.achieved)
+        .forEach((ach) => gameAggregate.unlockedIds.add(String(ach.apiName).trim()));
+      byGameIdInternal.set(`epic_${epicAppName}`, gameAggregate);
+    } catch {
+      // Cache corrompido nao deve impedir outros.
     }
   }
 
@@ -126,10 +164,14 @@ const readAchievementLibrarySummary = async (userDataPath) => {
   const bySteamAppId = Object.fromEntries(
     Array.from(bySteamAppIdInternal, ([appId, aggregate]) => [appId, publicAggregate(aggregate)]),
   );
+  const byEpicAppName = Object.fromEntries(
+    Array.from(byEpicAppNameInternal, ([appName, aggregate]) => [appName, publicAggregate(aggregate)]),
+  );
 
   return {
     byGameId,
     bySteamAppId,
+    byEpicAppName,
     updatedAt: new Date().toISOString(),
   };
 };
