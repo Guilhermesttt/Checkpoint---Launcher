@@ -222,11 +222,10 @@ const GameRow = React.memo<GameRowProps>(
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onMouseEnter={handleMouseEnter}
-        className={`group relative flex flex-col gap-3.5 rounded-2xl border p-4 sm:p-5 transition-all duration-200 cursor-pointer overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-white/60 transform-gpu will-change-transform ${
-          hasPlatinum
+        className={`group relative flex flex-col gap-3.5 rounded-2xl border p-4 sm:p-5 transition-all duration-200 cursor-pointer overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-white/60 transform-gpu will-change-transform ${hasPlatinum
             ? "border-[#38bdf8]/35 bg-[#38bdf8]/[0.05] hover:border-[#38bdf8]/60 hover:bg-[#38bdf8]/[0.09] shadow-[0_4px_30px_rgba(56,189,248,0.1)]"
             : "border-white/[0.08] bg-neutral-900/40 hover:border-white/20 hover:bg-neutral-800/60 shadow-lg"
-        }`}
+          }`}
         style={{ minHeight: `${ESTIMATED_ROW_HEIGHT}px` }}
       >
         {hasPlatinum && (
@@ -236,11 +235,10 @@ const GameRow = React.memo<GameRowProps>(
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <div
-              className={`relative h-16 w-12 sm:h-18 sm:w-13 shrink-0 overflow-hidden rounded-xl transition-all duration-300 group-hover:scale-105 ${
-                hasPlatinum
+              className={`relative h-16 w-12 sm:h-18 sm:w-13 shrink-0 overflow-hidden rounded-xl transition-all duration-300 group-hover:scale-105 ${hasPlatinum
                   ? "ring-2 ring-[#38bdf8]/60 shadow-[0_0_15px_rgba(56,189,248,0.3)]"
                   : "bg-neutral-800 border border-white/10"
-              }`}
+                }`}
             >
               {game.cardImage || game.image ? (
                 <img
@@ -263,9 +261,8 @@ const GameRow = React.memo<GameRowProps>(
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h3
-                  className={`truncate text-base font-bold transition-colors ${
-                    hasPlatinum ? "text-white group-hover:text-[#7dd3fc]" : "text-neutral-100 group-hover:text-white"
-                  }`}
+                  className={`truncate text-base font-bold transition-colors ${hasPlatinum ? "text-white group-hover:text-[#7dd3fc]" : "text-neutral-100 group-hover:text-white"
+                    }`}
                 >
                   {game.title}
                 </h3>
@@ -298,11 +295,10 @@ const GameRow = React.memo<GameRowProps>(
           <div className="flex items-center justify-between sm:justify-end gap-5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5">
             <div className="flex items-center gap-2.5 sm:gap-3.5">
               <div
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${
-                  hasPlatinum
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${hasPlatinum
                     ? "border-[#38bdf8]/40 bg-[#38bdf8]/10 text-[#38bdf8] shadow-[0_0_8px_rgba(56,189,248,0.15)]"
                     : "border-white/5 bg-black/20 text-white/30"
-                }`}
+                  }`}
                 title="Troféu de Platina (300 XP)"
               >
                 <PSNTrophyIcon type="platinum" size={15} glow={hasPlatinum} />
@@ -312,11 +308,10 @@ const GameRow = React.memo<GameRowProps>(
                 </span>
               </div>
               <div
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${
-                  trophyCounts.gold > 0
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${trophyCounts.gold > 0
                     ? "border-amber-400/30 bg-amber-400/10 text-amber-300 shadow-[0_0_8px_rgba(251,191,36,0.15)]"
                     : "border-white/5 bg-black/20 text-white/30"
-                }`}
+                  }`}
                 title="Troféus de Ouro (90 XP cada)"
               >
                 <PSNTrophyIcon type="gold" size={15} glow={trophyCounts.gold > 0} />
@@ -328,11 +323,10 @@ const GameRow = React.memo<GameRowProps>(
                 </span>
               </div>
               <div
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${
-                  trophyCounts.silver > 0
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${trophyCounts.silver > 0
                     ? "border-slate-300/30 bg-slate-300/10 text-slate-200"
                     : "border-white/5 bg-black/20 text-white/30"
-                }`}
+                  }`}
                 title="Troféus de Prata (30 XP cada)"
               >
                 <PSNTrophyIcon type="silver" size={15} />
@@ -344,11 +338,10 @@ const GameRow = React.memo<GameRowProps>(
                 </span>
               </div>
               <div
-                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${
-                  trophyCounts.bronze > 0
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border transition-all duration-200 ${trophyCounts.bronze > 0
                     ? "border-[#cd7f32]/40 bg-[#cd7f32]/10 text-[#cd7f32]"
                     : "border-white/5 bg-black/20 text-white/30"
-                }`}
+                  }`}
                 title="Troféus de Bronze (15 XP cada)"
               >
                 <PSNTrophyIcon type="bronze" size={15} />
@@ -370,9 +363,8 @@ const GameRow = React.memo<GameRowProps>(
                 </span>
               </div>
               <ChevronRight
-                className={`h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 ${
-                  hasPlatinum ? "text-[#38bdf8]" : "text-neutral-500 group-hover:text-white"
-                }`}
+                className={`h-4 w-4 transition-transform duration-200 group-hover:translate-x-1 ${hasPlatinum ? "text-[#38bdf8]" : "text-neutral-500 group-hover:text-white"
+                  }`}
               />
             </div>
           </div>
@@ -693,17 +685,15 @@ const TrophiesPage: React.FC<TrophiesPageProps> = ({ games, onOpenGame, playSoun
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleFilterSelect(f.id)}
                 onMouseEnter={() => playSound?.("hover")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white/50 outline-none ${
-                  filter === f.id
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white/50 outline-none ${filter === f.id
                     ? "bg-white text-black shadow-md"
                     : "bg-transparent text-neutral-400 hover:text-white hover:bg-white/5"
-                }`}
+                  }`}
               >
                 <span>{f.label}</span>
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
-                    filter === f.id ? "bg-black/10 text-black" : "bg-white/10 text-white/60"
-                  }`}
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${filter === f.id ? "bg-black/10 text-black" : "bg-white/10 text-white/60"
+                    }`}
                 >
                   {f.count}
                 </span>
@@ -790,10 +780,10 @@ const TrophiesPage: React.FC<TrophiesPageProps> = ({ games, onOpenGame, playSoun
                 {filter === "platinum"
                   ? "Nenhum jogo platinado ainda"
                   : filter === "in-progress"
-                  ? "Nenhum jogo em progresso no momento"
-                  : filter === "not-started"
-                  ? "Você já iniciou todos os seus jogos!"
-                  : "Nenhum jogo encontrado"}
+                    ? "Nenhum jogo em progresso no momento"
+                    : filter === "not-started"
+                      ? "Você já iniciou todos os seus jogos!"
+                      : "Nenhum jogo encontrado"}
               </h3>
               <p className="text-xs text-neutral-500 mt-1 max-w-sm">
                 {filter === "platinum"

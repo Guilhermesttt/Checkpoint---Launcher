@@ -210,7 +210,12 @@ html[data-launcher-theme="sunset"] {
     font-synthesis: none;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-display);
   }
 
@@ -269,6 +274,7 @@ html[data-launcher-theme="sunset"] {
 }
 
 @layer utilities {
+
   /* ── Checkpoint Global Custom Scrollbars ── */
   *::-webkit-scrollbar {
     width: 6px;
@@ -360,17 +366,14 @@ html[data-launcher-theme="sunset"] {
     height: 8px;
   }
 
-  .detail-panel-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-    margin: 8px 0;
+  .detail-panel-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.45);
+    /* mais opaco, não deixa escurecer junto */
+    border-radius: 999px;
   }
 
-  .detail-panel-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.45);
-    border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-    transition: all 0.2s ease;
+  .detail-panel-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
   }
 
   .detail-panel-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -569,8 +572,14 @@ html[data-launcher-theme="sunset"] {
   }
 
   /* ── Unified radius + elevation system ── */
-  .radius-card { border-radius: var(--radius-card); }
-  .radius-panel { border-radius: var(--radius-panel); }
+  .radius-card {
+    border-radius: var(--radius-card);
+  }
+
+  .radius-panel {
+    border-radius: var(--radius-panel);
+  }
+
   .text-eyebrow {
     font-size: 10px;
     font-weight: 700;
@@ -578,6 +587,7 @@ html[data-launcher-theme="sunset"] {
     text-transform: uppercase;
     line-height: 1.2;
   }
+
   .text-meta {
     font-size: 11px;
     font-weight: 500;
@@ -715,9 +725,12 @@ body.low-performance::before {
 }
 
 @keyframes pixel-on {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.12;
   }
+
   50% {
     opacity: 1;
   }
@@ -727,6 +740,7 @@ body.low-performance::before {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -736,5 +750,3 @@ img,
 video {
   -webkit-user-drag: none;
 }
-
-

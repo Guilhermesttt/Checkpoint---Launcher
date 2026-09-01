@@ -196,9 +196,8 @@ const PlatformCard: React.FC<{
   compact?: boolean;
 }> = ({ name, connected, username, avatar, icon, connectedLabel, disconnectedLabel, compact = false }) => (
   <div
-    className={`flex items-center rounded-2xl border ${compact ? "gap-3 p-2.5" : "gap-3.5 p-3.5"} ${
-      connected ? "border-white/14 bg-white/[0.045]" : "border-white/[0.06] bg-black/25"
-    }`}
+    className={`flex items-center rounded-2xl border ${compact ? "gap-3 p-2.5" : "gap-3.5 p-3.5"} ${connected ? "border-white/14 bg-white/[0.045]" : "border-white/[0.06] bg-black/25"
+      }`}
   >
     <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.07] text-white/75 ${compact ? "h-9 w-9" : "h-10 w-10"}`}>
       {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : icon}

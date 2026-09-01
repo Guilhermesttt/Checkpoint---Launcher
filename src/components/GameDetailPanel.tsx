@@ -1339,6 +1339,91 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return getUnifiedTierIndex(achievement as any, totalInGame, { isRarest: !!isRarest, isPlatinaText: !!isPlatina });
   }, [tierMap, achievementItems]);
 
+  // Pré-cálculo e enriquecimento em passada única para 60 FPS estáveis
+  const enrichedOtherAchievements = React.useMemo(() => {
+    const totalInGame = achievementItems.length;
+    return otherAchievements.map((achievement, index) => {
+      const tierIndex = getAchievementTierIndex(achievement, totalInGame, index + 1);
+      const isUltra = isUltraRare(achievement.percent) && achievement.achieved;
+      const formattedDate = formatAchievementDate(achievement.unlockTime);
+      return {
+        achievement,
+        tierIndex,
+        isUltra,
+        formattedDate,
+        key: achievement.apiName || `${achievement.name}-${index}`,
+      };
+    });
+  }, [otherAchievements, achievementItems.length, getAchievementTierIndex, locale]);
+
+  // Virtual Windowing (Windowing Nativo de Alta Performance)
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const [containerHeight, setContainerHeight] = React.useState(800);
+  const achievementsListRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !isOpen) return;
+
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        setScrollTop(el.scrollTop);
+        rafId = null;
+      });
+    };
+
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    setScrollTop(el.scrollTop);
+    setContainerHeight(el.clientHeight || 800);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.contentRect.height > 0) {
+            setContainerHeight(entry.contentRect.height);
+          }
+        }
+      });
+      resizeObserver.observe(el);
+    }
+
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      if (rafId !== null) window.cancelAnimationFrame(rafId);
+      if (resizeObserver) resizeObserver.disconnect();
+    };
+  }, [isOpen]);
+
+  const ACHIEVEMENT_ROW_HEIGHT = 100; // 88px card + 12px gap
+  const OVERSCAN_BUFFER = 5; // Buffer de segurança para scroll suave a 60 FPS
+
+  const { visibleAchievements, topSpacerHeight, bottomSpacerHeight } = React.useMemo(() => {
+    const total = enrichedOtherAchievements.length;
+    if (total <= 35) {
+      return { visibleAchievements: enrichedOtherAchievements, topSpacerHeight: 0, bottomSpacerHeight: 0 };
+    }
+
+    let listOffsetTop = 750;
+    if (achievementsListRef.current && scrollRef.current) {
+      const containerRect = scrollRef.current.getBoundingClientRect();
+      const listRect = achievementsListRef.current.getBoundingClientRect();
+      listOffsetTop = listRect.top - containerRect.top + scrollTop;
+    }
+
+    const relativeScroll = Math.max(0, scrollTop - listOffsetTop);
+    const start = Math.max(0, Math.floor(relativeScroll / ACHIEVEMENT_ROW_HEIGHT) - OVERSCAN_BUFFER);
+    const end = Math.min(total, Math.ceil((relativeScroll + containerHeight) / ACHIEVEMENT_ROW_HEIGHT) + OVERSCAN_BUFFER);
+
+    return {
+      visibleAchievements: enrichedOtherAchievements.slice(start, end),
+      topSpacerHeight: start * ACHIEVEMENT_ROW_HEIGHT,
+      bottomSpacerHeight: Math.max(0, (total - end) * ACHIEVEMENT_ROW_HEIGHT),
+    };
+  }, [enrichedOtherAchievements, scrollTop, containerHeight]);
+
   // Hub anti-farm: detecta novas conquistas desbloqueadas via hub e marca para o nível
   React.useEffect(() => {
     if (!game?.id || !user?.uid || achievementItems.length === 0) return;
@@ -1412,7 +1497,6 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
       }
     },
     scrollRef: scrollRef as React.RefObject<HTMLElement>,
-    scrollSpeed: 25,
     disableX: true,
     disableO: false,
     enabled: isOpen,
@@ -1499,7 +1583,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           </button>
 
           {/* Fundo Hero */}
-          <div className="fixed top-0 left-0 right-0 h-[65vh] pointer-events-none z-0">
+          <div className="fixed top-0 left-0 h-[65vh] pointer-events-none z-0" style={{ right: "var(--scrollbar-w, 10px)" }}>
             <motion.img
               initial={{ scale: 1.05, opacity: 0 }}
               animate={{ scale: 1, opacity: 0.65 }}
@@ -1898,18 +1982,26 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                             <div className="flex flex-col gap-3">
                               {mostRecentAchievement && <div className="w-full h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mt-2" />}
                               <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase">Todas as Conquistas</h3>
-                              <div className="flex flex-col gap-3">
-                                {otherAchievements.map((achievement, index) => (
+                              <div ref={achievementsListRef} className="flex flex-col gap-3">
+                                {topSpacerHeight > 0 && (
+                                  <div style={{ height: topSpacerHeight }} aria-hidden="true" />
+                                )}
+                                {visibleAchievements.map(({ achievement, tierIndex, isUltra, formattedDate, key }) => (
                                   <AchievementRow
-                                    key={achievement.apiName || `${achievement.name}-${index}`}
+                                    key={key}
                                     achievement={achievement}
                                     lockedLabel={copy.achievementsLocked}
                                     unlockedLabel={copy.achievementsUnlocked}
                                     unlockedAtLabel={copy.achievementsUnlockedAt}
                                     formatDate={formatAchievementDate}
-                                    tierIndex={getAchievementTierIndex(achievement, achievementItems.length, index + 1)}
+                                    formattedDate={formattedDate}
+                                    tierIndex={tierIndex}
+                                    isUltra={isUltra}
                                   />
                                 ))}
+                                {bottomSpacerHeight > 0 && (
+                                  <div style={{ height: bottomSpacerHeight }} aria-hidden="true" />
+                                )}
                               </div>
                             </div>
                           )}
@@ -2365,109 +2457,157 @@ const NavTab: React.FC<{ label?: string; active?: boolean; onClick?: () => void;
   </button>
 );
 
-const AchievementRow: React.FC<{
+const ACHIEVEMENT_TIER_CONFIGS = [
+  { color: "#38bdf8", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.30)", glow: "0 0 14px rgba(56,189,248,0.28)", label: "Platina" },
+  { color: "#facc15", bg: "rgba(250,204,21,0.10)", border: "rgba(250,204,21,0.30)", glow: "0 0 12px rgba(250,204,21,0.22)", label: "Ouro" },
+  { color: "#f1f5f9", bg: "rgba(241,245,249,0.12)", border: "rgba(241,245,249,0.35)", glow: "0 0 14px rgba(241,245,249,0.30)", label: "Prata" },
+  { color: "#cd7f32", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.25)", glow: "", label: "Bronze" },
+  { color: "#71797E", bg: "rgba(113,121,126,0.05)", border: "rgba(113,121,126,0.15)", glow: "", label: "" },
+] as const;
+
+const AchievementRow = React.memo<{
   achievement: SteamAchievement;
   lockedLabel: string;
   unlockedLabel: string;
   unlockedAtLabel: string;
-  formatDate: (unixTime: number) => string | null;
+  formatDate?: (unixTime: number) => string | null;
+  formattedDate?: string | null;
   onManualUnlock?: () => void;
   featured?: boolean;
   tierIndex?: number;
-}> = React.memo(({ achievement, lockedLabel, unlockedLabel, unlockedAtLabel, formatDate, onManualUnlock, featured, tierIndex }) => {
-  const unlockedAt = formatDate(achievement.unlockTime);
-  const tiers = [
-    { color: "#38bdf8", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.30)", glow: "0 0 14px rgba(56,189,248,0.28)", label: "Platina" },
-    { color: "#facc15", bg: "rgba(250,204,21,0.10)", border: "rgba(250,204,21,0.30)", glow: "0 0 12px rgba(250,204,21,0.22)", label: "Ouro" },
-    { color: "#f1f5f9", bg: "rgba(241,245,249,0.12)", border: "rgba(241,245,249,0.35)", glow: "0 0 14px rgba(241,245,249,0.30)", label: "Prata" },
-    { color: "#cd7f32", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.25)", glow: "", label: "Bronze" },
-    { color: "#71797E", bg: "rgba(113,121,126,0.05)", border: "rgba(113,121,126,0.15)", glow: "", label: "" },
-  ];
-  const tier = tiers[tierIndex ?? (achievement.achieved ? 3 : 4)];
-  const isUltra = isUltraRare(achievement.percent) && achievement.achieved;
+  isUltra?: boolean;
+}>(({
+  achievement,
+  lockedLabel,
+  unlockedLabel,
+  unlockedAtLabel,
+  formatDate,
+  formattedDate,
+  onManualUnlock,
+  featured,
+  tierIndex,
+  isUltra = false,
+}) => {
+  const tier = ACHIEVEMENT_TIER_CONFIGS[tierIndex ?? (achievement.achieved ? 3 : 4)];
+  const isAchieved = achievement.achieved;
+  const unlockedAt = formattedDate ?? (formatDate ? formatDate(achievement.unlockTime) : null);
+
   return (
     <div
-      className={`flex ${featured ? 'items-start md:items-center' : 'items-center'} gap-5 rounded-[20px] border p-5 transition-all duration-300 cursor-pointer group`}
-      style={{
-        borderColor: achievement.achieved ? tier.border : (tierIndex != null ? `${tier.color}15` : "rgba(255,255,255,0.04)"),
-        backgroundColor: achievement.achieved ? tier.bg : (tierIndex != null ? `${tier.color}05` : "rgba(255,255,255,0.01)"),
-        boxShadow: achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : undefined,
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(2px)'; e.currentTarget.style.boxShadow = `0 8px 32px ${tier.color}20, inset 0 0 0 1px ${tier.border}`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.boxShadow = (achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : ''); }}
-      onFocus={(e) => { e.currentTarget.style.outline = 'none'; e.currentTarget.style.boxShadow = `0 0 0 3px ${tier.color}60`; }}
-      onBlur={(e) => { e.currentTarget.style.boxShadow = (achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : ''); }}
       tabIndex={0}
       role="button"
-      aria-label={achievement.achieved ? `${unlockedLabel}: ${achievement.name}` : `${lockedLabel}: ${achievement.name}`}
+      aria-label={isAchieved ? `${unlockedLabel}: ${achievement.name}` : `${lockedLabel}: ${achievement.name}`}
+      className={`flex ${featured ? 'items-start md:items-center' : 'items-center'} gap-4 sm:gap-5 rounded-[20px] border p-4 sm:p-5 transition-all duration-200 cursor-pointer group hover:translate-x-1 focus-visible:outline-none transform-gpu will-change-transform`}
+      style={{
+        borderColor: isAchieved ? tier.border : (tierIndex != null ? `${tier.color}15` : "rgba(255,255,255,0.04)"),
+        backgroundColor: isAchieved ? tier.bg : (tierIndex != null ? `${tier.color}05` : "rgba(255,255,255,0.01)"),
+        boxShadow: isAchieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : undefined,
+      }}
     >
       <div className="relative shrink-0">
         <div
-          className={`flex ${featured ? 'h-16 w-16' : 'h-12 w-12'} items-center justify-center overflow-hidden rounded-xl border bg-black/40 transition-all duration-300 group-hover:scale-105`}
+          className={`flex ${featured ? 'h-16 w-16' : 'h-12 w-12'} items-center justify-center overflow-hidden rounded-xl border bg-black/40 transition-transform duration-200 group-hover:scale-105`}
           style={{
-            borderColor: achievement.achieved ? tier.border : (tierIndex != null ? `${tier.color}25` : "rgba(255,255,255,0.08)"),
-            opacity: achievement.achieved ? 1 : 1,
-            filter: undefined,
+            borderColor: isAchieved ? tier.border : (tierIndex != null ? `${tier.color}25` : "rgba(255,255,255,0.08)"),
           }}
         >
-          {(achievement.icon || achievement.iconGray)
-            ? <img src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" decoding="async" style={{ opacity: achievement.achieved ? 1 : 0.45, filter: achievement.achieved ? undefined : "grayscale(1) brightness(0.6) contrast(0.9)" }} />
-            : <Trophy className={featured ? 'h-8 w-8' : 'h-6 w-6'} style={{ color: tier.color, opacity: achievement.achieved ? 0.9 : 0.4 }} fill={achievement.achieved ? "currentColor" : "none"} strokeWidth={1.5} />
-          }
+          {(achievement.icon || achievement.iconGray) ? (
+            <img
+              src={isAchieved ? achievement.icon : achievement.iconGray || achievement.icon}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+              loading="lazy"
+              decoding="async"
+              style={{
+                opacity: isAchieved ? 1 : 0.45,
+                filter: isAchieved ? undefined : "grayscale(1) brightness(0.6) contrast(0.9)",
+              }}
+            />
+          ) : (
+            <Trophy
+              className={featured ? 'h-8 w-8' : 'h-6 w-6'}
+              style={{ color: tier.color, opacity: isAchieved ? 0.9 : 0.4 }}
+              fill={isAchieved ? "currentColor" : "none"}
+              strokeWidth={1.5}
+            />
+          )}
         </div>
-        {achievement.achieved && (
+        {isAchieved && (
           <div
-            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60"
+            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60 shadow-sm"
             style={{ backgroundColor: tier.color }}
           >
             <Trophy className="h-2.5 w-2.5 text-black" fill="currentColor" strokeWidth={2} />
           </div>
         )}
-        {!achievement.achieved && tierIndex != null && (
+        {!isAchieved && tierIndex != null && (
           <div
-            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60"
+            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60 shadow-sm"
             style={{ backgroundColor: tier.color, opacity: tierIndex === 4 ? 0.5 : 0.85 }}
           >
             <Trophy className="h-2.5 w-2.5 text-black/70" fill="currentColor" strokeWidth={2} />
           </div>
         )}
       </div>
+
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className={`truncate ${featured ? 'text-lg' : 'text-sm'} font-bold tracking-wide transition-all`} style={{ color: achievement.achieved ? tier.color : "rgba(255,255,255,0.5)" }}>{achievement.name}</h4>
+              <h4
+                className={`truncate ${featured ? 'text-lg' : 'text-sm'} font-bold tracking-wide transition-colors`}
+                style={{ color: isAchieved ? tier.color : "rgba(255,255,255,0.6)" }}
+              >
+                {achievement.name}
+              </h4>
               {isUltra && (
-                <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wider" style={{ borderColor: `${tier.color}40`, backgroundColor: `${tier.color}15`, color: tier.color }}>
+                <span
+                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wider shadow-sm"
+                  style={{
+                    borderColor: `${tier.color}40`,
+                    backgroundColor: `${tier.color}15`,
+                    color: tier.color,
+                  }}
+                >
                   ✨ Ultra-raro
                 </span>
               )}
             </div>
-            <p className={`mt-1 text-xs leading-relaxed transition-colors ${achievement.achieved ? "text-white/55" : "text-white/30"}`}>{achievement.description || " "}</p>
-            {!achievement.achieved && tier.label && (
+            <p className={`mt-1 text-xs leading-relaxed transition-colors ${isAchieved ? "text-white/55" : "text-white/30"}`}>
+              {achievement.description || " "}
+            </p>
+            {!isAchieved && tier.label && (
               <span className="mt-1.5 inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: `${tier.color}99` }}>
                 <Trophy className="h-2 w-2" fill="currentColor" strokeWidth={0} /> {tier.label} {isUltraRare(achievement.percent) ? "• Ultra-raro" : ""}
               </span>
             )}
           </div>
+
           <div className="flex shrink-0 items-center gap-2">
-            {!achievement.achieved && onManualUnlock && (
-              <button type="button" onClick={(e) => { e.stopPropagation(); onManualUnlock(); }} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white transition-colors">Desbloquear</button>
+            {!isAchieved && onManualUnlock && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onManualUnlock(); }}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              >
+                Desbloquear
+              </button>
             )}
             <span
               className="rounded-lg border px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-all"
               style={{
-                borderColor: achievement.achieved ? tier.border : "rgba(255,255,255,0.08)",
-                backgroundColor: achievement.achieved ? tier.bg : "rgba(255,255,255,0.02)",
-                color: achievement.achieved ? tier.color : "rgba(255,255,255,0.3)",
-                boxShadow: achievement.achieved && tier.glow ? tier.glow : undefined,
+                borderColor: isAchieved ? tier.border : "rgba(255,255,255,0.08)",
+                backgroundColor: isAchieved ? tier.bg : "rgba(255,255,255,0.02)",
+                color: isAchieved ? tier.color : "rgba(255,255,255,0.3)",
+                boxShadow: isAchieved && tier.glow ? tier.glow : undefined,
               }}
             >
-              {achievement.achieved ? unlockedLabel : lockedLabel}
+              {isAchieved ? unlockedLabel : lockedLabel}
             </span>
           </div>
         </div>
-        {achievement.achieved && unlockedAt && (
+
+        {isAchieved && unlockedAt && (
           <p className="mt-2 text-[10px] font-bold tracking-widest uppercase" style={{ color: `${tier.color}66` }}>
             {unlockedAtLabel} <span style={{ color: `${tier.color}cc` }}>{unlockedAt}</span>
           </p>
@@ -2475,7 +2615,23 @@ const AchievementRow: React.FC<{
       </div>
     </div>
   );
-});
+}, (prev, next) => (
+  prev.achievement.apiName === next.achievement.apiName &&
+  prev.achievement.achieved === next.achievement.achieved &&
+  prev.achievement.unlockTime === next.achievement.unlockTime &&
+  prev.achievement.name === next.achievement.name &&
+  prev.achievement.description === next.achievement.description &&
+  prev.achievement.icon === next.achievement.icon &&
+  prev.achievement.iconGray === next.achievement.iconGray &&
+  prev.achievement.percent === next.achievement.percent &&
+  prev.tierIndex === next.tierIndex &&
+  prev.isUltra === next.isUltra &&
+  prev.featured === next.featured &&
+  prev.formattedDate === next.formattedDate &&
+  prev.lockedLabel === next.lockedLabel &&
+  prev.unlockedLabel === next.unlockedLabel &&
+  prev.onManualUnlock === next.onManualUnlock
+));
 
 const TechnicalDetail: React.FC<{ label: string; value?: string; fallback: string; }> = ({ label, value, fallback }) => (
   <div>

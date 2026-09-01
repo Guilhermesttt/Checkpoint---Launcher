@@ -181,11 +181,10 @@ const GamingRadarPage: React.FC = () => {
               key={source}
               type="button"
               onClick={() => setActiveSource(source)}
-              className={`cursor-pointer rounded-full border px-4 py-1.5 text-xs font-medium tracking-wide transition-all ${
-                activeSource === source
+              className={`cursor-pointer rounded-full border px-4 py-1.5 text-xs font-medium tracking-wide transition-all ${activeSource === source
                   ? "border-white bg-white text-black shadow-md font-semibold"
                   : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white"
-              }`}
+                }`}
             >
               {source === "__all__" ? copy.all : source}
             </button>

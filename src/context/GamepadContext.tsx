@@ -426,17 +426,24 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const rightX = gp.axes[2] ?? 0;
       const rightY = gp.axes[3] ?? 0;
       const RIGHT_DEADZONE = 0.2;
-      const rightActive =
-        Math.abs(rightX) > RIGHT_DEADZONE || Math.abs(rightY) > RIGHT_DEADZONE;
 
-      if (!isLauncherInputLocked() && rightActive) {
-        inputDetected = true;
+      const normalizeRightAxis = (v: number) => {
+        if (Math.abs(v) < RIGHT_DEADZONE) return 0;
+        return (v - Math.sign(v) * RIGHT_DEADZONE) / (1 - RIGHT_DEADZONE);
+      };
+
+      const nRightX = normalizeRightAxis(rightX);
+      const nRightY = normalizeRightAxis(rightY);
+      const rightActive = nRightX !== 0 || nRightY !== 0;
+
+      if (!isLauncherInputLocked()) {
+        if (rightActive) inputDetected = true;
+        // Sempre dispara (mesmo em 0,0) pra quem escuta saber quando o stick soltou.
+        // Valor já normalizado 0→1 a partir da deadzone, então dá pra usar direto
+        // como fator de velocidade proporcional (leve = devagar, no talo = rápido).
         window.dispatchEvent(
           new CustomEvent("gamepad:rightstick", {
-            detail: {
-              x: Math.abs(rightX) > RIGHT_DEADZONE ? rightX : 0,
-              y: Math.abs(rightY) > RIGHT_DEADZONE ? rightY : 0,
-            },
+            detail: { x: nRightX, y: nRightY },
           }),
         );
       }

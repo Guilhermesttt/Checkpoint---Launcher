@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useGamepadButton } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
 
 interface UseGamepadNavigationProps {
   onClose?: () => void;
-  scrollRef?: React.RefObject<HTMLElement>;
+  scrollRef?: React.RefObject<HTMLElement | null>;
   scrollSpeed?: number;
   /** Desabilita X (útil quando o painel define ação própria, ex.: Jogar) */
   disableX?: boolean;
@@ -18,7 +18,7 @@ interface UseGamepadNavigationProps {
 export function useGamepadNavigation({
   onClose,
   scrollRef,
-  scrollSpeed = 15,
+  scrollSpeed = 18,
   disableX = false,
   disableO = false,
   enabled = true,
@@ -44,25 +44,38 @@ export function useGamepadNavigation({
     priority,
   );
 
+  const rightStickXRef = useRef(0);
+  const rightStickYRef = useRef(0);
+
   useEffect(() => {
     if (!enabled || !scrollRef?.current) return;
 
-    const handleRightStick = (e: Event) => {
-      const customEvent = e as CustomEvent<{ x: number; y: number }>;
-      const { x, y } = customEvent.detail;
+    const MAX_PX_PER_FRAME = scrollSpeed;
 
-      if (Math.abs(y) > 0 || Math.abs(x) > 0) {
-        scrollRef.current!.scrollBy({
-          top: y * scrollSpeed,
-          left: x * scrollSpeed,
-          behavior: "auto",
-        });
-      }
+    const handleRightStick = (e: Event) => {
+      const detail = (e as CustomEvent<{ x: number; y: number }>).detail;
+      rightStickXRef.current = detail?.x ?? 0;
+      rightStickYRef.current = detail?.y ?? 0;
     };
+
+    let rafId = requestAnimationFrame(function tick() {
+      if (scrollRef.current && (rightStickYRef.current !== 0 || rightStickXRef.current !== 0)) {
+        if (rightStickYRef.current !== 0) {
+          scrollRef.current.scrollTop += rightStickYRef.current * MAX_PX_PER_FRAME;
+        }
+        if (rightStickXRef.current !== 0) {
+          scrollRef.current.scrollLeft += rightStickXRef.current * MAX_PX_PER_FRAME;
+        }
+      }
+      rafId = requestAnimationFrame(tick);
+    });
 
     window.addEventListener("gamepad:rightstick", handleRightStick);
     return () => {
       window.removeEventListener("gamepad:rightstick", handleRightStick);
+      cancelAnimationFrame(rafId);
+      rightStickXRef.current = 0;
+      rightStickYRef.current = 0;
     };
   }, [scrollRef, scrollSpeed, enabled]);
 }
