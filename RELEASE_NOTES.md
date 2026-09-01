@@ -28,6 +28,26 @@ Grande atualização com reformulação de segurança e sincronização de plata
 
 ---
 
+## Phelierium Game Hub — v3.2.4 (Console-Grade 60 FPS & Gamepad Smoothness)
+
+Atualização massiva de performance estilo console de última geração (60 FPS fluidos), rolagem ultra-responsiva com o analógico do controle, virtualização e memoização em todo o hub, e painel de mods em tela cheia.
+
+### Destaques da versão 3.2.4
+
+#### ⚡ Performance 60 FPS Console-Grade em Todo o Hub
+- **Virtualização de Lista Nativa (Windowing com RAF & Spacers):** Renderização sob demanda no Painel de Detalhes de Conquistas e na Página de Troféus. Apenas os cards visíveis permanecem no DOM, mantendo 60 FPS cravados mesmo em jogos com centenas de conquistas.
+- **Pré-cálculo e Enriquecimento em Passada Única:** Tiers, datas e formatações calculados antecipadamente em lote via `useMemo`, eliminando reflows e gargalos de renderização.
+- **Memoização Estrita com Aceleração por Hardware GPU:** Subcomponentes `AchievementRow`, `GameRow`, `FriendOnlineCard`, `ModGameCard` e itens de timeline encapsulados com comparadores `areEqual` e classes `transform-gpu` / `will-change-transform`.
+
+#### 🎮 Navegação e Rolagem por Controle de Próxima Geração
+- **Loop Contínuo de Scroll com `requestAnimationFrame`:** Desacoplamento completo do polling do gamepad para rolagem vertical e horizontal instantânea e aveludada.
+- **Deadzone Proporcional e Curva de Resposta Suave:** Micro-ajustes cirúrgicos em inclinações leves e aceleração rápida para navegar por listas longas sem esforço.
+
+#### 🛠️ Gerenciador de Mods em Tela Cheia
+- **Experiência Imersiva Fullscreen (100vw, 100vh):** O painel de gerenciamento de mods agora abre diretamente no corpo da janela (`createPortal`), sem cortes ou limites de container, com atalhos nativos para `Escape` e botão `O` do controle.
+
+---
+
 ## Phelierium Game Hub — v3.2.3
 
 Atualização com correção de carregamento de capturas locais no painel de detalhes dos jogos (`cp-media://`) e navegação completa por controle/gamepad e botões interativos no visualizador de capturas de tela do overlay.
