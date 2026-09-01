@@ -3228,6 +3228,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
 
     let emailOtp = null;
     let supaUid = null;
+    let hashedToken = null;
 
     if (supabaseAdmin) {
       let linkData;
@@ -3262,7 +3263,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       }
 
       emailOtp = linkData?.properties?.email_otp || null;
-      const hashedToken = linkData?.properties?.hashed_token || null;
+      hashedToken = linkData?.properties?.hashed_token || null;
       supaUid = linkData?.user?.id || null;
 
       try {
@@ -3303,7 +3304,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       status: "complete",
       email: userEmail,
       emailOtp,
-      hashedToken: linkData?.properties?.hashed_token || null,
+      hashedToken,
       uid: supaUid,
       createdAt: Date.now(),
     });
