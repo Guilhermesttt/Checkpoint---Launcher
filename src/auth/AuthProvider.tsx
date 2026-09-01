@@ -193,6 +193,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data?.status === "complete") {
             let sessionEstablished = false;
 
+            // Prioridade Máxima: Tokens já autenticados e trocados diretamente pelo Backend
+            if (data.accessToken && data.refreshToken) {
+              const { error: sessionErr } = await supabase.auth.setSession({
+                access_token: data.accessToken,
+                refresh_token: data.refreshToken,
+              });
+              if (!sessionErr) {
+                return;
+              }
+            }
+
             // Estratégia 1: token_hash com type 'email' (padrão GoTrue Supabase v2 para generateLink)
             if (data.hashedToken) {
               const { data: res, error: hashError } = await supabase.auth.verifyOtp({
@@ -204,31 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
 
-            // Estratégia 2: resolução direta do actionLink assinado pelo Supabase Admin
-            if (!sessionEstablished && data.actionLink) {
-              try {
-                const res = await fetch(data.actionLink, { method: "GET", redirect: "follow" });
-                const url = res.url || "";
-                if (url.includes("access_token=")) {
-                  const hashParams = new URLSearchParams(url.split("#")[1] || "");
-                  const accessToken = hashParams.get("access_token");
-                  const refreshToken = hashParams.get("refresh_token");
-                  if (accessToken && refreshToken) {
-                    const { error: sessionErr } = await supabase.auth.setSession({
-                      access_token: accessToken,
-                      refresh_token: refreshToken,
-                    });
-                    if (!sessionErr) {
-                      sessionEstablished = true;
-                    }
-                  }
-                }
-              } catch {
-                // segue para os fallbacks
-              }
-            }
-
-            // Estratégia 3: token_hash com type 'magiclink'
+            // Estratégia 2: token_hash com type 'magiclink'
             if (!sessionEstablished && data.hashedToken) {
               const { data: res, error: hashError } = await supabase.auth.verifyOtp({
                 token_hash: data.hashedToken,
@@ -239,7 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
 
-            // Estratégia 4: email_otp com type 'email'
+            // Estratégia 3: email_otp com type 'email'
             if (!sessionEstablished && data.email && data.emailOtp) {
               const { data: res, error: emailOtpError } = await supabase.auth.verifyOtp({
                 email: data.email,
@@ -251,7 +238,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             }
 
-            // Estratégia 5: email_otp com type 'magiclink'
+            // Estratégia 4: email_otp com type 'magiclink'
             if (!sessionEstablished && data.email && data.emailOtp) {
               const { data: res, error: magicOtpError } = await supabase.auth.verifyOtp({
                 email: data.email,

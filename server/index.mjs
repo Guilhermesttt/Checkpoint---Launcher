@@ -3230,6 +3230,8 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
     let supaUid = null;
     let hashedToken = null;
     let actionLink = null;
+    let accessToken = null;
+    let refreshToken = null;
 
     if (supabaseAdmin) {
       let linkData;
@@ -3267,6 +3269,22 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       hashedToken = linkData?.properties?.hashed_token || null;
       actionLink = linkData?.properties?.action_link || null;
       supaUid = linkData?.user?.id || null;
+
+      if (actionLink) {
+        try {
+          // O backend resolve o link mágico diretamente com o GoTrue do Supabase (sem passar pelo navegador)
+          const verifyRes = await fetch(actionLink, { method: "GET", redirect: "manual" });
+          const location = verifyRes.headers.get("location") || "";
+          if (location) {
+            const hashPart = location.includes("#") ? location.split("#")[1] : (location.includes("?") ? location.split("?")[1] : "");
+            const parsedParams = new URLSearchParams(hashPart);
+            accessToken = parsedParams.get("access_token");
+            refreshToken = parsedParams.get("refresh_token");
+          }
+        } catch (ex) {
+          console.warn("[google-oauth] Erro ao resolver tokens no backend:", ex?.message || ex);
+        }
+      }
 
       try {
         const updatedAt = new Date().toISOString();
@@ -3308,6 +3326,8 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       emailOtp,
       hashedToken,
       actionLink,
+      accessToken,
+      refreshToken,
       uid: supaUid,
       createdAt: Date.now(),
     });
@@ -3350,7 +3370,7 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
     return;
   }
 
-  if (!pending.emailOtp && !pending.email && !pending.actionLink) {
+  if (!pending.emailOtp && !pending.email && !pending.actionLink && !pending.accessToken) {
     res.json({ status: "pending" });
     return;
   }
@@ -3362,6 +3382,8 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
     emailOtp: pending.emailOtp,
     hashedToken: pending.hashedToken,
     actionLink: pending.actionLink,
+    accessToken: pending.accessToken,
+    refreshToken: pending.refreshToken,
     uid: pending.uid,
   });
 });
