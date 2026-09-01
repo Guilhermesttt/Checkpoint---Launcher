@@ -3229,6 +3229,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
     let emailOtp = null;
     let supaUid = null;
     let hashedToken = null;
+    let actionLink = null;
 
     if (supabaseAdmin) {
       let linkData;
@@ -3264,6 +3265,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
 
       emailOtp = linkData?.properties?.email_otp || null;
       hashedToken = linkData?.properties?.hashed_token || null;
+      actionLink = linkData?.properties?.action_link || null;
       supaUid = linkData?.user?.id || null;
 
       try {
@@ -3305,6 +3307,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       email: userEmail,
       emailOtp,
       hashedToken,
+      actionLink,
       uid: supaUid,
       createdAt: Date.now(),
     });
@@ -3347,7 +3350,7 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
     return;
   }
 
-  if (!pending.emailOtp && !pending.email) {
+  if (!pending.emailOtp && !pending.email && !pending.actionLink) {
     res.json({ status: "pending" });
     return;
   }
@@ -3358,6 +3361,7 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
     email: pending.email,
     emailOtp: pending.emailOtp,
     hashedToken: pending.hashedToken,
+    actionLink: pending.actionLink,
     uid: pending.uid,
   });
 });
