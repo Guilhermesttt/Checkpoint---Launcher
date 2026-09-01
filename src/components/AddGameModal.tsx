@@ -994,7 +994,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }));
       playSound("select");
     } catch (error) {
-      notify(error instanceof Error ? error.message : copy.imageTooLarge, "error");
+      notify(error instanceof Error ? error.message : "Imagem muito grande para ser salva.", "error");
     } finally {
       e.target.value = "";
     }
@@ -1015,7 +1015,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
       }));
       playSound("select");
     } catch (error) {
-      notify(error instanceof Error ? error.message : copy.imageTooLarge, "error");
+      notify(error instanceof Error ? error.message : "Imagem muito grande para ser salva.", "error");
     } finally {
       e.target.value = "";
     }
@@ -1142,7 +1142,7 @@ const AddGameModal: React.FC<AddGameModalProps> = ({
         updatedAt: new Date().toISOString(),
       });
       if (new Blob([JSON.stringify(data)]).size > 850_000) {
-        notify(copy.imageTooLarge, "error");
+        notify("O tamanho das imagens é muito grande para ser salvo.", "error");
         return;
       }
       if (gameToEdit) {

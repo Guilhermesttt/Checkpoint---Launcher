@@ -3,6 +3,7 @@ import type { Game, SocialFriend } from "../types/domain";
 import { CATEGORIES } from "../components/Sidebar";
 import type { usePreferences } from "../context/PreferencesContext";
 import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
+import type { LibraryFilters } from "../components/LibraryFilterModal";
 
 export const normalizeCategory = (v?: string) =>
   v?.toUpperCase().replace(/[^A-Z0-9]/g, "") ?? "";
@@ -12,12 +13,14 @@ export function useGameLibraryView({
   activeCategory,
   searchTerm,
   socialFriends,
+  libraryFilters,
   t,
 }: {
   games: Game[];
   activeCategory: string;
   searchTerm: string;
   socialFriends: SocialFriend[];
+  libraryFilters?: LibraryFilters;
   t: ReturnType<typeof usePreferences>["t"];
 }) {
   const displayGames = useMemo(() => {
@@ -92,15 +95,68 @@ export function useGameLibraryView({
                               gCat === normalizeCategory(activeCategory) ||
                               gCat === normalizeCategory(categoryLabel)
                             );
-                          });
-    return s
-      ? filtered.filter(
+                              });
+    
+    // Apply additional library filters
+    let result = filtered;
+    if (libraryFilters) {
+      if (libraryFilters.launchers.length > 0) {
+        result = result.filter((g) => libraryFilters.launchers.includes(g.launcherType || "local"));
+      }
+      if (libraryFilters.categories.length > 0) {
+        result = result.filter((g) => g.category && libraryFilters.categories.includes(g.category));
+      }
+      if (libraryFilters.favoritesOnly) {
+        result = result.filter((g) => g.isFavorite);
+      }
+      if (libraryFilters.withAchievements) {
+        result = result.filter((g) => (g.totalAchievements || 0) > 0);
+      }
+      if (libraryFilters.minHours > 0) {
+        result = result.filter((g) => getGamePlayedHours(g) >= libraryFilters.minHours);
+      }
+      if (libraryFilters.maxHours > 0) {
+        result = result.filter((g) => getGamePlayedHours(g) <= libraryFilters.maxHours);
+      }
+    }
+
+    const textFiltered = s
+      ? result.filter(
         (g) =>
           g.title.toLowerCase().includes(s) ||
           (g.category ?? "").toLowerCase().includes(s),
       )
-      : filtered;
-  }, [activeCategory, games, searchTerm]);
+      : result;
+
+    // Apply sort
+    if (libraryFilters?.sortBy) {
+      const sorted = [...textFiltered];
+      sorted.sort((a, b) => {
+        let cmp = 0;
+        switch (libraryFilters.sortBy) {
+          case "title":
+            cmp = a.title.localeCompare(b.title);
+            break;
+          case "hours":
+            cmp = getGamePlayedHours(b) - getGamePlayedHours(a);
+            break;
+          case "recent": {
+            const aTime = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
+            const bTime = new Date(b.lastPlayedAt || b.steamLastPlayedAt || 0).getTime();
+            cmp = bTime - aTime;
+            break;
+          }
+          case "achievements":
+            cmp = (b.completedAchievements || 0) - (a.completedAchievements || 0);
+            break;
+        }
+        return libraryFilters.sortDir === "desc" ? -cmp : cmp;
+      });
+      return sorted;
+    }
+
+    return textFiltered;
+  }, [activeCategory, games, searchTerm, libraryFilters]);
 
   const continuePlayingGames = useMemo(
     () =>

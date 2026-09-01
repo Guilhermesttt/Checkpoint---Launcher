@@ -130,6 +130,29 @@ export const unlinkEpicAccount = async (uid: string) => {
   return epicGames.length;
 };
 
+export type EpicSessionValidation = {
+  valid: boolean;
+  reason?: "missing" | "expired" | "network";
+};
+
+/**
+ * Validates the Epic session through the encrypted credential vault. Returns
+ * `{ valid: true }` when tokens are fresh (or were refreshed), or a structured
+ * reason when re-authentication is required. The modal uses this to surface a
+ * re-auth CTA instead of a generic error.
+ */
+export const validateEpicSession = async (): Promise<EpicSessionValidation> => {
+  if (!window.electronAPI?.validateEpicSession) {
+    return { valid: false, reason: "missing" };
+  }
+  try {
+    return await window.electronAPI.validateEpicSession();
+  } catch (err) {
+    console.warn("Falha ao validar sessão Epic:", err);
+    return { valid: false, reason: "network" };
+  }
+};
+
 export const syncEpicLibraryToLocal = async (
   uid: string,
   language: LauncherLanguage = "pt-BR",
@@ -180,15 +203,17 @@ export const syncEpicLibraryToLocal = async (
     }
   });
 
-  // Limpa registros duplicados remanescentes da biblioteca local
-  for (const dupId of duplicateIdsToDelete) {
-    try {
-      await deleteLibraryGame(uid, dupId);
-    } catch {}
+  // Limpa registros duplicados remanescentes da biblioteca local em paralelo
+  if (duplicateIdsToDelete.size > 0) {
+    await Promise.all(
+      Array.from(duplicateIdsToDelete).map((dupId) =>
+        deleteLibraryGame(uid, dupId).catch(() => {}),
+      ),
+    );
   }
 
   let syncedCount = 0;
-  const BATCH_SIZE = 6;
+  const BATCH_SIZE = 10;
 
   for (let i = 0; i < games.length; i += BATCH_SIZE) {
     const batch = games.slice(i, i + BATCH_SIZE);
@@ -212,15 +237,32 @@ export const syncEpicLibraryToLocal = async (
         const embeddedAchievements = owned.achievements;
         const gameTitle = owned.title || owned.metadata?.title || owned.app_title || owned.app_name || "";
 
+        const epicKey = (appName || catalogId || gameTitle)
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9_]/g, "_");
+        const deterministicDocId = `${uid}_epic_${epicKey}`;
+
+        const existing =
+          (appName ? existingByLaunchId.get(appName.toLowerCase().trim()) : null) ||
+          (catalogId ? existingByCatalogId.get(catalogId.toLowerCase().trim()) : null) ||
+          (gameTitle ? existingByTitle.get(gameTitle.toLowerCase().trim()) : null) ||
+          existingById.get(deterministicDocId);
+
+        // Se o jogo já possui metadados completos em cache local, evita requisição de loja redundante
+        const needsStoreDetails = !existing || !existing.cardImage || !existing.description;
+
         const [detailsResult, achievements] = await Promise.all([
-          fetchEpicAppDetailsResult(
-            catalogId || appName,
-            namespace,
-            productSlug,
-            language,
-            gameTitle,
-            appName,
-          ).catch(() => null),
+          needsStoreDetails
+            ? fetchEpicAppDetailsResult(
+                catalogId || appName,
+                namespace,
+                productSlug,
+                language,
+                gameTitle,
+                appName,
+              ).catch(() => null)
+            : Promise.resolve(null),
           appName && !embeddedAchievements?.total_achievements
             ? fetchEpicAchievements(namespace, appName).catch(() => ({
               total: 0,
@@ -256,18 +298,6 @@ export const syncEpicLibraryToLocal = async (
         const rawLogoImage = keyImages.find(
           (image) => image.type === "DieselGameBoxLogo" || image.type === "ProductLogo",
         )?.url;
-
-        const epicKey = (appName || catalogId || gameTitle)
-          .toLowerCase()
-          .trim()
-          .replace(/[^a-z0-9_]/g, "_");
-        const deterministicDocId = `${uid}_epic_${epicKey}`;
-
-        const existing =
-          (appName ? existingByLaunchId.get(appName.toLowerCase().trim()) : null) ||
-          (catalogId ? existingByCatalogId.get(catalogId.toLowerCase().trim()) : null) ||
-          (gameTitle ? existingByTitle.get(gameTitle.toLowerCase().trim()) : null) ||
-          existingById.get(deterministicDocId);
 
         const docId = existing?.id || deterministicDocId;
         const resolvedCover = validDetails?.cardImage || tallImage || wideImage || existing?.cardImage || existing?.image || "";

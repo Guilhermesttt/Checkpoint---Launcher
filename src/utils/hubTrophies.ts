@@ -1,0 +1,139 @@
+/**
+ * Hub trophies — rastreia conquistas ganhas VIA HUB (anti-farm).
+ * Só conta pro nível o que foi desbloqueado com jogo iniciado pelo hub.
+ * Armazena em localStorage por usuário/jogo (leve, imediato).
+ * Futuro: sincronizar com Supabase `user_trophies.hub` para validação server-side.
+ */
+
+const keyFor = (uid: string, gameId: string) => `hub_trophies:${uid}:${gameId}`;
+
+export function getHubAchievementSet(uid: string, gameId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(keyFor(uid, gameId));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw) as string[];
+    return new Set(arr.map(s => String(s).toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+export function markHubAchievement(uid: string, gameId: string, apiName: string): void {
+  try {
+    const set = getHubAchievementSet(uid, gameId);
+    const lower = String(apiName).toLowerCase();
+    if (set.has(lower)) return;
+    set.add(lower);
+    localStorage.setItem(keyFor(uid, gameId), JSON.stringify([...set]));
+  } catch {}
+}
+
+export function isHubAchievement(uid: string, gameId: string, apiName: string): boolean {
+  return getHubAchievementSet(uid, gameId).has(String(apiName).toLowerCase());
+}
+
+export function clearHubAchievements(uid: string, gameId: string): void {
+  try { localStorage.removeItem(keyFor(uid, gameId)); } catch {}
+  try { localStorage.removeItem(countsKeyFor(uid, gameId)); } catch {}
+}
+
+const countsKeyFor = (uid: string, gameId: string) => `hub_counts:${uid}:${gameId}`;
+
+export function getHubCounts(uid: string, gameId: string): { platinum: number; gold: number; silver: number; bronze: number } {
+  try {
+    const raw = localStorage.getItem(countsKeyFor(uid, gameId));
+    if (raw) {
+      const obj = JSON.parse(raw) as any;
+      const c = {
+        platinum: Number(obj.platinum ?? 0),
+        gold: Number(obj.gold ?? 0),
+        silver: Number(obj.silver ?? 0),
+        bronze: Number(obj.bronze ?? 0),
+      };
+      // fallback para migração: se counts zerado mas set tem itens, trata como bronze
+      if (c.platinum + c.gold + c.silver + c.bronze === 0) {
+        const set = getHubAchievementSet(uid, gameId);
+        if (set.size > 0) {
+          c.bronze = set.size;
+          localStorage.setItem(countsKeyFor(uid, gameId), JSON.stringify(c));
+        }
+      }
+      return c;
+    }
+    // sem counts mas com set antigo -> migra
+    const set = getHubAchievementSet(uid, gameId);
+    if (set.size > 0) {
+      const c = { platinum: 0, gold: 0, silver: 0, bronze: set.size };
+      localStorage.setItem(countsKeyFor(uid, gameId), JSON.stringify(c));
+      return c;
+    }
+    return { platinum: 0, gold: 0, silver: 0, bronze: 0 };
+  } catch {
+    return { platinum: 0, gold: 0, silver: 0, bronze: 0 };
+  }
+}
+
+export function incrementHubCount(uid: string, gameId: string, tierIndex: number): void {
+  if (tierIndex === 4) return; // Ferro não conta
+  try {
+    const counts = getHubCounts(uid, gameId);
+    if (tierIndex === 0) counts.platinum++;
+    else if (tierIndex === 1) counts.gold++;
+    else if (tierIndex === 2) counts.silver++;
+    else if (tierIndex === 3) counts.bronze++;
+    localStorage.setItem(countsKeyFor(uid, gameId), JSON.stringify(counts));
+  } catch {}
+}
+
+export function getHubPointsForGame(uid: string, gameId: string): number {
+  const c = getHubCounts(uid, gameId);
+  // usa valores PSN + bônus ultra já está em hubCounts via tier? ultra precisa ser separado
+  // por simplicidade, ultra já está contado como tier normal + bônus será adicionado via markHubAchievement com tier
+  // aqui só soma base
+  return c.platinum * 300 + c.gold * 90 + c.silver * 30 + c.bronze * 15;
+}
+
+export function getAllHubPoints(uid: string, games: Array<{ id: string }>): number {
+  let total = 0;
+  for (const g of games) total += getHubPointsForGame(uid, g.id);
+  return total;
+}
+
+export function getHubAggregateCounts(uid: string, games: Array<{ id: string }>): import("./trophyTiers").GameTrophyCounts {
+  const agg = { platinum: 0, gold: 0, silver: 0, bronze: 0, iron: 0, total: 0, completed: 0, totalGold: 0, totalSilver: 0, totalBronze: 0, totalPlatinum: 0, points: 0, hubPoints: 0, importedPoints: 0, hub: { platinum: 0, gold: 0, silver: 0, bronze: 0 }, imported: { platinum: 0, gold: 0, silver: 0, bronze: 0 } } as any;
+  for (const g of games) {
+    const c = getHubCounts(uid, g.id);
+    const pts = c.platinum * 300 + c.gold * 90 + c.silver * 30 + c.bronze * 15;
+    agg.platinum += c.platinum;
+    agg.gold += c.gold;
+    agg.silver += c.silver;
+    agg.bronze += c.bronze;
+    agg.completed += c.platinum + c.gold + c.silver + c.bronze;
+    agg.total += c.platinum + c.gold + c.silver + c.bronze;
+    agg.points += pts;
+    agg.hubPoints += pts;
+    agg.hub!.platinum += c.platinum;
+    agg.hub!.gold += c.gold;
+    agg.hub!.silver += c.silver;
+    agg.hub!.bronze += c.bronze;
+  }
+  // totalPlatinum etc not needed for level, just keep 0
+  return agg;
+}
+
+/**
+ * Constrói achievementPercents com flag hubUnlocked para uso no calculateGameTrophyCounts.
+ * Se a conquista está achieved e está no set do hub, marca hubUnlocked=true.
+ */
+export function withHubFlag(
+  uid: string,
+  gameId: string,
+  percents: Array<{ percent: number; achieved: boolean; name?: string; description?: string; apiName?: string; id?: string }>
+): Array<{ percent: number; achieved: boolean; name?: string; description?: string; apiName?: string; id?: string; hubUnlocked?: boolean }> {
+  const hubSet = getHubAchievementSet(uid, gameId);
+  return percents.map(p => {
+    const key = String((p as any).apiName ?? (p as any).id ?? p.name ?? "").toLowerCase();
+    const isHub = p.achieved && hubSet.has(key);
+    return { ...p, hubUnlocked: isHub };
+  });
+}

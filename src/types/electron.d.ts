@@ -37,6 +37,7 @@ declare global {
       getEpicLibrary: () => Promise<EpicLibraryGame[]>;
       getEpicAchievements: (request?: { sandboxId?: string; appName?: string }) => Promise<EpicAchievementsResult>;
       logoutEpic: () => Promise<{ success: boolean }>;
+      validateEpicSession: () => Promise<{ valid: boolean; reason?: "missing" | "expired" | "network" }>;
       onEpicProgress: (callback: (progress: EpicProgressEvent) => void) => () => void;
       selectModGameDirectory: (gameTitle: string) => Promise<string | null>;
       detectModConflicts?: (manifestRoot: string) => Promise<Array<{ relativePath: string; mods: Array<{ installId: string; modId: string; name: string }> }>>;
@@ -380,7 +381,7 @@ declare global {
       }>;
       markLocalLibrarySummarySynced: (uid: string, revision: number) => Promise<void>;
       testOverlayWelcome: () => Promise<void>;
-      testOverlayAchievement: () => Promise<void>;
+      testOverlayAchievement: (tier?: "bronze" | "silver" | "gold" | "platinum") => Promise<void>;
       setAchievementVolume: (volume: number) => Promise<{ volume: number }>;
       setAchievementSoundTheme: (
         theme: import("../context/PreferencesContext").SoundTheme,
@@ -520,6 +521,13 @@ declare global {
         gameId: string,
         achievementId: string
       ) => Promise<{ duplicate: boolean }>;
+      notifyTrophyUnlock: (payload: {
+        trophyTitle: string;
+        trophyDescription?: string;
+        tier: "platinum" | "gold" | "silver" | "bronze";
+        xp?: number;
+        iconUrl?: string;
+      }) => Promise<{ shown: boolean; reason?: string }>;
       showFriendMessageOverlay: (payload: {
         senderName: string;
         messageText: string;

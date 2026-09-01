@@ -184,15 +184,24 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const connectedIdRef = useRef<string | null>(null);
   connectedIdRef.current = connectedGamepadId;
 
-  // Listener para foco do overlay
+  // Listener para foco do overlay via IPC do Electron e CustomEvent
   React.useEffect(() => {
+    const unbind = window.electronAPI?.onOverlayHubInputLock?.((payload: { locked: boolean }) => {
+      const isLocked = Boolean(payload?.locked);
+      setOverlayHasFocus(isLocked);
+      overlayFocusRef.current = isLocked;
+    });
+
     const handleOverlayFocus = (event: CustomEvent) => {
-      const hasFocus = event.detail?.hasFocus;
+      const hasFocus = Boolean(event.detail?.hasFocus);
       setOverlayHasFocus(hasFocus);
-      overlayFocusRef.current = hasFocus; // Atualiza a ref simultaneamente
+      overlayFocusRef.current = hasFocus;
     };
     window.addEventListener("checkpoint:overlay-focus-changed", handleOverlayFocus as EventListener);
-    return () => window.removeEventListener("checkpoint:overlay-focus-changed", handleOverlayFocus as EventListener);
+    return () => {
+      unbind?.();
+      window.removeEventListener("checkpoint:overlay-focus-changed", handleOverlayFocus as EventListener);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -461,18 +470,45 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
-    requestRef.current = requestAnimationFrame(pollGamepads);
+    if (gamepadFound && document.hasFocus()) {
+      requestRef.current = requestAnimationFrame(pollGamepads);
+    } else {
+      // Quando nenhum controle está conectado ou app em segundo plano, polling leve de 500ms
+      requestRef.current = window.setTimeout(pollGamepads, 500) as unknown as number;
+    }
   }, [dispatchButtonPress]);
 
   useEffect(() => {
-    window.addEventListener("gamepadconnected", handleGamepadConnected);
+    const handleConnected = (e: GamepadEvent) => {
+      handleGamepadConnected(e);
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        clearTimeout(requestRef.current);
+      }
+      requestRef.current = requestAnimationFrame(pollGamepads);
+    };
+
+    const handleFocus = () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        clearTimeout(requestRef.current);
+      }
+      requestRef.current = requestAnimationFrame(pollGamepads);
+    };
+
+    window.addEventListener("gamepadconnected", handleConnected);
     window.addEventListener("gamepaddisconnected", handleGamepadDisconnected);
+    window.addEventListener("focus", handleFocus);
     requestRef.current = requestAnimationFrame(pollGamepads);
 
     return () => {
-      window.removeEventListener("gamepadconnected", handleGamepadConnected);
+      window.removeEventListener("gamepadconnected", handleConnected);
       window.removeEventListener("gamepaddisconnected", handleGamepadDisconnected);
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      window.removeEventListener("focus", handleFocus);
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        clearTimeout(requestRef.current);
+      }
     };
   }, [handleGamepadConnected, handleGamepadDisconnected, pollGamepads]);
 

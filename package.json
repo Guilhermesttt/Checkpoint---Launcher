@@ -26,6 +26,7 @@
     "test:watch": "vitest",
     "test:typecheck": "tsc -p tsconfig.test.json",
     "test:coverage": "vitest run --coverage",
+    "test:coverage:trophies": "vitest run --config tests/coverage-thresholds.vitest.config.ts --coverage",
     "test:ci": "npm run test:typecheck && npm run test",
     "db:push": "npx supabase db push",
     "db:lint": "npx supabase db lint --linked --level warning",
@@ -109,6 +110,7 @@
     "@fontsource/stix-two-text": "^5.2.8",
     "@sapphi-red/web-noise-suppressor": "^0.4.0",
     "@supabase/supabase-js": "^2.112.2",
+    "@types/react-window": "^1.8.8",
     "adm-zip": "^0.6.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -122,6 +124,7 @@
     "livekit-server-sdk": "^2.18.0",
     "node-fetch": "^3.3.2",
     "node-stream-zip": "^1.16.0",
+    "react-window": "^2.3.0",
     "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },

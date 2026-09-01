@@ -198,7 +198,7 @@ const createLegendaryManager = ({
 
   const logout = async () => {
     try {
-      await run(["auth", "--delete"], { timeoutMs: 10000 });
+      await run(["auth", "--delete"], { timeoutMs: 2500 });
     } catch {}
 
     const possibleDirs = [

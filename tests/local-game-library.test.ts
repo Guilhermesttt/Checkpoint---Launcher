@@ -105,7 +105,7 @@ describe("biblioteca SQLite", () => {
 
     const steamGame = { id: "steam-1", title: "Steam Game", launcherType: "steam", steamAppId: "730" };
     const epicGame = { id: "epic-1", title: "Epic Game", launcherType: "epic", epicCatalogId: "fn-cat" };
-    const localGame = { id: "local-1", title: "Local Game", launcherType: "local" };
+    const localGame = { id: "local-1", title: "Local Game", launcherType: "local", steamAppId: "730" };
 
     library.create("alice", steamGame);
     library.create("alice", epicGame);

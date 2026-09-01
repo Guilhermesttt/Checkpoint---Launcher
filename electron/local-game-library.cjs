@@ -444,14 +444,26 @@ const createLocalGameLibrary = (userDataPath) => {
           gameObj = JSON.parse(row.data_json);
         } catch {}
 
-        const launcherType = String(row.launcher_type || gameObj?.launcherType || "").toLowerCase();
+        const launcherType = String(row.launcher_type || gameObj?.launcherType || "").toLowerCase().trim();
         const steamAppId = String(row.steam_app_id || gameObj?.steamAppId || "").trim();
         const epicCatalogId = String(gameObj?.epicCatalogId || "").trim();
 
-        const isMatch =
-          launcherType === platform ||
-          (platform === "steam" && Boolean(steamAppId)) ||
-          (platform === "epic" && Boolean(epicCatalogId));
+        // Jogos locais ou manuais nunca devem ser removidos ao desconectar plataformas externas
+        const isLocalOrManual =
+          launcherType === "local" ||
+          launcherType === "retro" ||
+          launcherType === "emulator" ||
+          launcherType === "ea" ||
+          launcherType === "ubisoft" ||
+          launcherType === "gog" ||
+          launcherType === "xbox" ||
+          launcherType === "riot" ||
+          launcherType === "battlenet" ||
+          launcherType === "rockstar" ||
+          launcherType === "itch" ||
+          gameObj?.source === "manual";
+
+        const isMatch = !isLocalOrManual && launcherType === platform;
 
         if (isMatch) {
           targetGameIds.push(row.game_id);

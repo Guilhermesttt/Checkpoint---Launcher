@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { EditableProfile } from "../types/domain";
+import { invalidate } from "../lib/queryCache";
 
 export const PROFILE_LIMITS = {
   displayName: 50,
@@ -98,6 +99,11 @@ export const saveCurrentUserProfile = async ({
         : (updateError || new Error("Nao foi possivel salvar o perfil."));
     }
   }
+
+  try {
+    invalidate("profile");
+    invalidate("trophies");
+  } catch {}
 
   return { ...normalized, photoURL };
 };

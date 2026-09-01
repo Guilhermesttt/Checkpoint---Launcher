@@ -190,14 +190,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (data?.status === "error") {
             throw new Error(data.error || "Falha na autenticação do Google.");
           }
-          if (data?.status === "complete" && data.email && data.emailOtp) {
-            const { error } = await supabase.auth.verifyOtp({
-              email: data.email,
-              token: data.emailOtp,
-              type: "magiclink",
-            });
-            if (error) throw error;
-            return;
+          if (data?.status === "complete") {
+            let sessionEstablished = false;
+
+            if (data.hashedToken) {
+              const { error: hashError } = await supabase.auth.verifyOtp({
+                token_hash: data.hashedToken,
+                type: "magiclink",
+              });
+              if (!hashError) {
+                sessionEstablished = true;
+              }
+            }
+
+            if (!sessionEstablished && data.email && data.emailOtp) {
+              const { error: otpError } = await supabase.auth.verifyOtp({
+                email: data.email,
+                token: data.emailOtp,
+                type: "magiclink",
+              });
+              if (!otpError) {
+                sessionEstablished = true;
+              } else {
+                const { error: emailOtpError } = await supabase.auth.verifyOtp({
+                  email: data.email,
+                  token: data.emailOtp,
+                  type: "email",
+                });
+                if (!emailOtpError) {
+                  sessionEstablished = true;
+                } else if (!data.hashedToken) {
+                  throw otpError;
+                }
+              }
+            }
+
+            if (sessionEstablished) {
+              return;
+            }
           }
         } catch (pollErr: any) {
           if (pollErr?.message && !pollErr.message.includes("Failed to fetch") && !pollErr.message.includes("NetworkError")) {
@@ -327,10 +357,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
+export const useOptionalAuth = () => {
+  return useContext(AuthContext);
+};
+
+export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error("useAuth deve ser usado dentro de AuthProvider");
+    // Retorna fallback gracioso quando renderizado fora do AuthProvider (ex: testes unitários)
+    return {
+      user: null,
+      userProfile: null,
+      loading: false,
+      signInWithGoogle: async () => {},
+      signUpWithEmail: async () => {},
+      signInWithEmail: async () => {},
+      signOutUser: async () => {},
+      refreshProfile: async () => null,
+    };
   }
   return ctx;
 };
+

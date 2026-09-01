@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import type { Game, UserProfile } from "../types/domain";
+import { cachedQuery, invalidate } from "../lib/queryCache";
 
 const sorted = (games: Game[]) =>
   [...games].sort((a, b) => a.title.localeCompare(b.title));
@@ -32,13 +33,33 @@ export const listLibraryGames = async (uid: string): Promise<Game[]> => {
   if (window.electronAPI?.listLocalGames) {
     return sorted(await window.electronAPI.listLocalGames(uid));
   }
-  const { data, error } = await supabase
-    .from("user_games")
-    .select("*")
-    .eq("user_id", uid);
-
-  if (error || !data) return [];
-  return sorted(data.map((row) => fromCloudGameRow(row as Record<string, any>)));
+  const cacheKey = `games:list:${uid}`;
+  return cachedQuery(
+    cacheKey,
+    async () => {
+      // Paginate to avoid huge single egress burst (100 rows per page)
+      const pageSize = 100;
+      let allRows: Record<string, any>[] = [];
+      let from = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("user_games")
+          .select("id,title,launcher_type,hours_played,steam_app_id,epic_catalog_id,is_favorite,data,updated_at")
+          .eq("user_id", uid)
+          .order("title", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error || !data) break;
+        allRows.push(...(data as Record<string, any>[]));
+        if (data.length < pageSize) break;
+        from += pageSize;
+        // Safety: cap at 500 games (5 pages) to avoid runaway egress
+        if (from >= 500) break;
+      }
+      if (allRows.length === 0) return [] as Game[];
+      return sorted(allRows.map((row) => fromCloudGameRow(row)));
+    },
+    { ttl: 30_000, stale: 60_000 }
+  );
 };
 
 export const createLibraryGame = async (
@@ -52,6 +73,7 @@ export const createLibraryGame = async (
   const newGame = { ...game, id } as Game;
   const { error } = await supabase.from("user_games").insert(toCloudGameRow(uid, newGame));
   if (error) throw error;
+  invalidate(`games:list:${uid}`);
   return newGame;
 };
 
@@ -78,6 +100,7 @@ export const updateLibraryGame = async (
     .eq("id", gameId)
     .eq("user_id", uid);
   if (error) throw error;
+  invalidate(`games:list:${uid}`);
   return updated;
 };
 
@@ -86,6 +109,7 @@ export const deleteLibraryGame = async (uid: string, gameId: string) => {
     return window.electronAPI.deleteLocalGame(uid, gameId);
   }
   await supabase.from("user_games").delete().eq("id", gameId).eq("user_id", uid);
+  invalidate(`games:list:${uid}`);
   return true;
 };
 
@@ -101,7 +125,8 @@ export const deleteLibraryGamesByLauncher = async (
     .delete()
     .eq("user_id", uid)
     .eq("launcher_type", launcherType)
-    .select();
+    .select("id");
+  invalidate(`games:list:${uid}`);
   return data?.length || 0;
 };
 
@@ -123,6 +148,7 @@ export const bulkUpsertLibraryGames = async (uid: string, games: Game[]) => {
     onConflict: "user_id,id",
   });
   if (error) throw error;
+  invalidate(`games:list:${uid}`);
   return games;
 };
 

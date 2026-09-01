@@ -129,7 +129,17 @@ const runChatRetentionCleanup = async ({
       .limit(CHAT_CLEANUP_BATCH_SIZE);
     if (chatId) query = query.eq("chat_id", chatId);
 
-    const { data: expiredMessages, error: selectError } = await query;
+    let { data: expiredMessages, error: selectError } = await query;
+    if (selectError && /attachment_path/i.test(selectError.message)) {
+      const fallbackQuery = await supabaseAdmin
+        .from("chat_messages")
+        .select("id")
+        .lt("created_at", cutoff)
+        .order("created_at", { ascending: true })
+        .limit(CHAT_CLEANUP_BATCH_SIZE);
+      expiredMessages = fallbackQuery.data;
+      selectError = fallbackQuery.error;
+    }
     if (selectError) throw selectError;
     if (!expiredMessages?.length) break;
 
@@ -245,7 +255,7 @@ const CACHE_TTL = 1000 * 60 * 60; // 1 hora
 const STEAM_PRESENCE_CACHE_TTL = 10 * 1000;
 const STEAM_OWNED_GAMES_CACHE_TTL = 10 * 60 * 1000;
 const STEAM_API_TIMEOUT_MS = 8 * 1000;
-const ACHIEVEMENT_SUMMARY_REQUEST_BUDGET_MS = 25 * 1000;
+const ACHIEVEMENT_SUMMARY_REQUEST_BUDGET_MS = 45 * 1000;
 const MAX_ACHIEVEMENT_CACHE_ENTRIES = 5000;
 const MAX_STEAM_OWNED_GAMES_CACHE_ENTRIES = 200;
 const MAX_ACHIEVEMENT_SUMMARY_APP_IDS = 250;
@@ -1139,6 +1149,45 @@ const pickSteamTrailerUrl = (movies) => {
   return null;
 };
 
+const achievementPercentagesCache = new Map();
+const ACHIEVEMENT_PERCENTAGES_TTL = 60 * 60 * 1000;
+
+const fetchSteamAchievementPercentages = async (appId) => {
+  const cacheKey = `pct_${appId}`;
+  const cached = achievementPercentagesCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < ACHIEVEMENT_PERCENTAGES_TTL) {
+    return cached.data;
+  }
+
+  const url = new URL(
+    "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/",
+  );
+  url.searchParams.set("gameappid", appId);
+  url.searchParams.set("format", "json");
+
+  try {
+    const response = await fetch(url.toString());
+    if (!response.ok) return {};
+    const payload = await response.json();
+    const raw = payload?.achievementpercentages?.achievements;
+    if (!Array.isArray(raw)) return {};
+
+    const map = {};
+    for (const item of raw) {
+      const name = String(item?.name ?? "").trim();
+      const pct = Number(item?.percent ?? 0);
+      if (name && pct > 0) {
+        map[name] = pct;
+      }
+    }
+
+    achievementPercentagesCache.set(cacheKey, { data: map, timestamp: Date.now() });
+    return map;
+  } catch {
+    return {};
+  }
+};
+
 const fetchSteamAchievementSchema = async (appId, language = "pt-BR") => {
   const storeLocale = resolveStoreLocale(language);
   const cacheKey = `${appId}:${storeLocale.locale}`;
@@ -1773,7 +1822,28 @@ app.get("/api/voice/rooms/public", steamPrivateLimiter, requireFirebaseUser, asy
       query = query.ilike("room_name", `%${search.trim()}%`);
     }
 
-    const { data: rooms, error } = await query;
+    let { data: rooms, error } = await query;
+    if (error && (/column .* does not exist/i.test(error.message) || /icon|avatar_url|theme_color/i.test(error.message))) {
+      const fallbackQuery = await supabaseAdmin
+        .from("voice_rooms")
+        .select(`
+        id,
+        host_uid,
+        room_name,
+        category,
+        is_private,
+        max_participants,
+        status,
+        created_at,
+        updated_at,
+        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+      `)
+        .eq("is_private", false)
+        .eq("status", "active")
+        .order("created_at", { ascending: false });
+      rooms = fallbackQuery.data;
+      error = fallbackQuery.error;
+    }
     if (error) {
       console.error("[VoiceRooms] Erro ao listar salas públicas:", error);
       return res.status(500).json({ error: "Erro ao carregar salas públicas." });
@@ -1824,7 +1894,7 @@ app.get("/api/voice/rooms/my", steamPrivateLimiter, requireFirebaseUser, async (
   const uid = req.firebaseUser.uid;
 
   try {
-    const { data: hostedRooms, error: hostError } = await supabaseAdmin
+    let { data: hostedRooms, error: hostError } = await supabaseAdmin
       .from("voice_rooms")
       .select(`
       id,
@@ -1845,6 +1915,29 @@ app.get("/api/voice/rooms/my", steamPrivateLimiter, requireFirebaseUser, async (
       .eq("host_uid", uid)
       .eq("status", "active")
       .order("updated_at", { ascending: false });
+
+    if (hostError && (/column .* does not exist/i.test(hostError.message) || /icon|avatar_url|theme_color/i.test(hostError.message))) {
+      const fallbackQuery = await supabaseAdmin
+        .from("voice_rooms")
+        .select(`
+        id,
+        host_uid,
+        room_name,
+        category,
+        is_private,
+        password_hash,
+        max_participants,
+        status,
+        created_at,
+        updated_at,
+        members:voice_room_members(user_id, display_name, avatar_url, joined_at, removed_at)
+      `)
+        .eq("host_uid", uid)
+        .eq("status", "active")
+        .order("updated_at", { ascending: false });
+      hostedRooms = fallbackQuery.data;
+      hostError = fallbackQuery.error;
+    }
 
     if (hostError) {
       console.error("[VoiceRooms] Erro ao buscar minhas salas:", hostError);
@@ -3169,6 +3262,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       }
 
       emailOtp = linkData?.properties?.email_otp || null;
+      const hashedToken = linkData?.properties?.hashed_token || null;
       supaUid = linkData?.user?.id || null;
 
       try {
@@ -3209,6 +3303,7 @@ app.get("/auth/google/callback", steamAuthLimiter, async (req, res) => {
       status: "complete",
       email: userEmail,
       emailOtp,
+      hashedToken: linkData?.properties?.hashed_token || null,
       uid: supaUid,
       createdAt: Date.now(),
     });
@@ -3261,6 +3356,7 @@ app.get("/auth/desktop/google/status", steamPublicLimiter, (req, res) => {
     status: "complete",
     email: pending.email,
     emailOtp: pending.emailOtp,
+    hashedToken: pending.hashedToken,
     uid: pending.uid,
   });
 });
@@ -3632,7 +3728,7 @@ app.post("/api/steam/achievement-summary", steamPrivateLimiter, requireFirebaseU
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(4, allowedAppIds.length) }, () => loadNext()));
+  await Promise.all(Array.from({ length: Math.min(12, allowedAppIds.length) }, () => loadNext()));
   const failedAppIds = appIds.filter((appId) => !Object.hasOwn(stats, appId));
   res.json({
     stats,
@@ -3843,9 +3939,10 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
     url.searchParams.set("appid", appId);
     url.searchParams.set("l", storeLocale.steam);
 
-    const [response, schema] = await Promise.all([
+    const [response, schema, percentages] = await Promise.all([
       fetch(url.toString()),
       fetchSteamAchievementSchema(appId, storeLocale.locale).catch(() => []),
+      fetchSteamAchievementPercentages(appId).catch(() => ({})),
     ]);
     if (!response.ok) {
       if (response.status === 400 || response.status === 404) {
@@ -3887,6 +3984,7 @@ app.get("/api/steam/achievements", steamPrivateLimiter, requireFirebaseUser, req
         icon: String(schemaItem?.icon ?? "").trim(),
         iconGray: String(schemaItem?.iconGray ?? "").trim(),
         hidden: Boolean(schemaItem?.hidden),
+        percent: percentages[apiName] ?? 0,
       };
     });
     const total = achievements.length;
@@ -3921,7 +4019,10 @@ app.get("/api/steam/achievement-schema", steamPublicLimiter, async (req, res) =>
   }
 
   try {
-    const schema = await fetchSteamAchievementSchema(appId, storeLocale.locale);
+    const [schema, percentages] = await Promise.all([
+      fetchSteamAchievementSchema(appId, storeLocale.locale),
+      fetchSteamAchievementPercentages(appId).catch(() => ({})),
+    ]);
     const achievements = schema.map((achievement) => ({
       apiName: achievement.apiName,
       achieved: false,
@@ -3931,6 +4032,7 @@ app.get("/api/steam/achievement-schema", steamPublicLimiter, async (req, res) =>
       icon: achievement.icon || "",
       iconGray: achievement.iconGray || "",
       hidden: Boolean(achievement.hidden),
+      percent: percentages[achievement.apiName] ?? 0,
     }));
 
     res.json({

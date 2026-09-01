@@ -18,6 +18,8 @@ import {
   fetchSteamAchievementDetails,
   fetchSteamAchievementSchema,
   fetchSteamAppDetailsResult,
+  getCachedSteamAchievementDetails,
+  setCachedSteamAchievementDetails,
   searchSteamGames,
   type SteamAchievement,
   type SteamAppDetails,
@@ -34,8 +36,18 @@ import {
 import { useNotification } from "./NotificationCenter";
 import { useGamepad, useGamepadButton } from "../context/GamepadContext";
 import { fetchEpicAppDetailsResult, fetchEpicAchievements } from "../services/epic";
+import {
+  getAchievementTierIndex as getUnifiedTierIndex,
+  isUltraRare,
+  getPlatinaCandidateApiName,
+  getRarestAchievementApiName,
+  buildGameTierMap,
+  isPlatinaByText,
+} from "../utils/trophyTiers";
+import { markHubAchievement, incrementHubCount } from "../utils/hubTrophies";
 import { LoadingState } from "./ui/loading-state";
 import InputHints from "./ui/InputHints";
+import { List } from "react-window";
 import { ModsSummaryBanner } from "./game/ModsSummaryBanner";
 import { AdvancedLaunchSettings } from "./game/AdvancedLaunchSettings";
 
@@ -68,6 +80,270 @@ const normalizeSteamLookup = (value: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+const DETAIL_PANEL_COPY: Record<string, Record<string, any>> = {
+  "pt-BR": {
+    tabPlay: "JOGAR",
+    tabCaptures: "CAPTURAS",
+    tabAchievements: "CONQUISTAS",
+    tabAbout: "SOBRE",
+    tabManage: "GERENCIAR",
+    tabMods: "MODS",
+    steamLabel: "Steam",
+    epicLabel: "Epic Games",
+    localLabel: "PC Local",
+    library: "Biblioteca",
+    timePlayed: "TEMPO JOGADO",
+    lastSession: "ÚLTIMA SESSÃO",
+    neverStarted: "Ainda não iniciado",
+    achievements: "CONQUISTAS",
+    appId: "App ID",
+    epicShortcutLabel: "Epic",
+    epicShortcut: "Atalho direto",
+    epicStore: "Via loja",
+    source: "Fonte",
+    sourceSteamSync: "Sync Steam",
+    sourceEpicCatalog: "Catálogo Epic",
+    sourceManual: "Manual",
+    photoWall: "Mural de fotos",
+    viewGallery: "Ver Galeria",
+    noScreenshot: "Nenhuma captura",
+    about: "Sobre",
+    seeMore: "Ver mais →",
+    popularTags: "Marcadores Populares",
+    developer: "Desenvolvedor",
+    publisher: "Distribuidora",
+    releaseDate: "Data de Lançamento",
+    category: "Categoria",
+    notInformed: "Não informado",
+    management: "Gerenciamento",
+    verify: "Verificar",
+    edit: "Editar",
+    createShortcut: "Criar Atalho",
+    remove: "Remover",
+    platform: "Plataforma",
+    noDescription: "Sem descrição disponível para este jogo.",
+    gallery: "GALERIA",
+    previous: "← Anterior",
+    next: "Próximo →",
+    removeGame: "Remover jogo",
+    cannotUndo: "Esta ação não pode ser desfeita",
+    confirmRemove: (title: string) =>
+      `Tem certeza que deseja remover "${title}" da sua biblioteca? Digite o nome do jogo para confirmar.`,
+    cancel: "Cancelar",
+    removing: "Removendo...",
+    close: "Fechar",
+    loginToRemove: "Você precisa estar logado para remover um jogo.",
+    removedSuccess: "Jogo removido.",
+    removeError: "Erro ao remover jogo.",
+    launchGenericError: "Falha ao iniciar o jogo.",
+    achievementsLoading: "Buscando conquistas...",
+    achievementsEmpty: "Nenhuma conquista encontrada.",
+    achievementsLocked: "Bloqueada",
+    achievementsUnlocked: "Desbloqueada",
+    achievementsUnlockedAt: "Desbloqueada em",
+    verifySuccess: "Executável encontrado.",
+    verifyNotFound: "Executável não encontrado.",
+    shortcutComingSoon: "Em breve.",
+    achievementsSource: "Suas conquistas",
+    achievementsLocalSource: "Conquistas locais",
+    achievementsEpicLocalSource: "Arquivos locais Epic",
+    achievementsSteamFallback: "Steam",
+    achievementsNeedSteam: "Conecte sua conta Steam para carregar conquistas.",
+    achievementsMissingAppId: "Este jogo não possui Steam App ID.",
+    achievementsEpicLocalEmpty: "Nenhum arquivo local de conquistas legível.",
+    achievementsEpicBinarySave: "Formato binário/protegido não suportado.",
+    achievementsEpicNotInstalled: "Jogo não instalado localmente.",
+    filterAll: "Todas",
+    filterUnlocked: "Desbloqueadas",
+    filterLocked: "Bloqueadas",
+    searchPlaceholder: "Buscar conquista...",
+    tryAgain: "Tentar novamente",
+    achievementsNoSupportTitle: "Este jogo não possui conquistas",
+    achievementsNoSupportDesc: "Não foram encontradas conquistas suportadas ou integradas para este título.",
+    noMatchingAchievements: "Nenhuma conquista corresponde ao filtro ou busca.",
+    running: "Em execução",
+    launch: "Jogar",
+    launching: "Iniciando...",
+    openFolder: "Abrir pasta",
+    confirmDeletePlaceholder: "Digite o nome do jogo",
+    gameRunning: "Jogo em execução",
+  },
+  "en-US": {
+    tabPlay: "PLAY",
+    tabCaptures: "CAPTURES",
+    tabAchievements: "ACHIEVEMENTS",
+    tabAbout: "ABOUT",
+    tabManage: "MANAGE",
+    tabMods: "MODS",
+    steamLabel: "Steam",
+    epicLabel: "Epic Games",
+    localLabel: "Local PC",
+    library: "Library",
+    timePlayed: "TIME PLAYED",
+    lastSession: "LAST SESSION",
+    neverStarted: "Not started",
+    achievements: "ACHIEVEMENTS",
+    appId: "App ID",
+    epicShortcutLabel: "Epic",
+    epicShortcut: "Direct shortcut",
+    epicStore: "Via store",
+    source: "Source",
+    sourceSteamSync: "Steam sync",
+    sourceEpicCatalog: "Epic catalog",
+    sourceManual: "Manual",
+    photoWall: "Photo wall",
+    viewGallery: "View gallery",
+    noScreenshot: "No screenshot",
+    about: "About",
+    seeMore: "See more →",
+    popularTags: "Popular tags",
+    developer: "Developer",
+    publisher: "Publisher",
+    releaseDate: "Release date",
+    category: "Category",
+    notInformed: "Not informed",
+    management: "Management",
+    verify: "Verify",
+    edit: "Edit",
+    createShortcut: "Create shortcut",
+    remove: "Remove",
+    platform: "Platform",
+    noDescription: "No description available.",
+    gallery: "GALLERY",
+    previous: "← Previous",
+    next: "Next →",
+    removeGame: "Remove game",
+    cannotUndo: "This action cannot be undone",
+    confirmRemove: (title: string) =>
+      `Are you sure you want to remove "${title}" from your library? Type the game name to confirm.`,
+    cancel: "Cancel",
+    removing: "Removing...",
+    close: "Close",
+    loginToRemove: "You must be logged in to remove a game.",
+    removedSuccess: "Game removed.",
+    removeError: "Error removing game.",
+    launchGenericError: "Failed to launch the game.",
+    achievementsLoading: "Loading achievements...",
+    achievementsEmpty: "No achievements found.",
+    achievementsLocked: "Locked",
+    achievementsUnlocked: "Unlocked",
+    achievementsUnlockedAt: "Unlocked on",
+    verifySuccess: "Executable found.",
+    verifyNotFound: "Executable not found.",
+    shortcutComingSoon: "Coming soon.",
+    achievementsSource: "Your achievements",
+    achievementsLocalSource: "Local achievements",
+    achievementsEpicLocalSource: "Epic local files",
+    achievementsSteamFallback: "Steam",
+    achievementsNeedSteam: "Connect your Steam account to load achievements.",
+    achievementsMissingAppId: "This game has no Steam App ID.",
+    achievementsEpicLocalEmpty: "No readable local achievement file found.",
+    achievementsEpicBinarySave: "Binary/protected save not supported.",
+    achievementsEpicNotInstalled: "Game not installed locally.",
+    filterAll: "All",
+    filterUnlocked: "Unlocked",
+    filterLocked: "Locked",
+    searchPlaceholder: "Search achievement...",
+    tryAgain: "Try again",
+    achievementsNoSupportTitle: "This game has no achievements",
+    achievementsNoSupportDesc: "No supported or integrated achievements were found for this title.",
+    noMatchingAchievements: "No achievements match your filter or search.",
+    running: "Running",
+    launch: "Play",
+    launching: "Launching...",
+    openFolder: "Open folder",
+    confirmDeletePlaceholder: "Type the game name",
+    gameRunning: "Game is running",
+  },
+  "es-ES": {
+    tabPlay: "JUGAR",
+    tabCaptures: "CAPTURAS",
+    tabAchievements: "LOGROS",
+    tabAbout: "ACERCA DE",
+    tabManage: "GESTIONAR",
+    tabMods: "MODS",
+    steamLabel: "Steam",
+    epicLabel: "Epic Games",
+    localLabel: "PC Local",
+    library: "Biblioteca",
+    timePlayed: "TIEMPO JUGADO",
+    lastSession: "ÚLTIMA SESIÓN",
+    neverStarted: "No iniciado",
+    achievements: "LOGROS",
+    appId: "App ID",
+    epicShortcutLabel: "Epic",
+    epicShortcut: "Acceso directo",
+    epicStore: "Vía tienda",
+    source: "Fuente",
+    sourceSteamSync: "Sync Steam",
+    sourceEpicCatalog: "Catálogo Epic",
+    sourceManual: "Manual",
+    photoWall: "Mural de fotos",
+    viewGallery: "Ver galería",
+    noScreenshot: "Sin capturas",
+    about: "Acerca de",
+    seeMore: "Ver más →",
+    popularTags: "Etiquetas populares",
+    developer: "Desarrollador",
+    publisher: "Distribuidora",
+    releaseDate: "Fecha de lanzamiento",
+    category: "Categoría",
+    notInformed: "No informado",
+    management: "Gestión",
+    verify: "Verificar",
+    edit: "Editar",
+    createShortcut: "Crear acceso directo",
+    remove: "Eliminar",
+    platform: "Plataforma",
+    noDescription: "Sin descripción.",
+    gallery: "GALERÍA",
+    previous: "← Anterior",
+    next: "Siguiente →",
+    removeGame: "Eliminar juego",
+    cannotUndo: "Esta acción no se puede deshacer",
+    confirmRemove: (title: string) =>
+      `¿Seguro que deseas eliminar "${title}" de tu biblioteca? Escribe el nombre del juego para confirmar.`,
+    cancel: "Cancelar",
+    removing: "Eliminando...",
+    close: "Cerrar",
+    loginToRemove: "Debes iniciar sesión para eliminar un juego.",
+    removedSuccess: "Juego eliminado.",
+    removeError: "Error al eliminar el juego.",
+    launchGenericError: "No se pudo iniciar el juego.",
+    achievementsLoading: "Cargando logros...",
+    achievementsEmpty: "No se encontraron logros.",
+    achievementsLocked: "Bloqueado",
+    achievementsUnlocked: "Desbloqueado",
+    achievementsUnlockedAt: "Desbloqueado el",
+    verifySuccess: "Ejecutable encontrado.",
+    verifyNotFound: "Ejecutable no encontrado.",
+    shortcutComingSoon: "Próximamente.",
+    achievementsSource: "Tus logros",
+    achievementsLocalSource: "Logros locales",
+    achievementsEpicLocalSource: "Archivos locales Epic",
+    achievementsSteamFallback: "Steam",
+    achievementsNeedSteam: "Conecta tu cuenta de Steam para cargar logros.",
+    achievementsMissingAppId: "Este juego no tiene Steam App ID.",
+    achievementsEpicLocalEmpty: "No se encontró archivo local legible.",
+    achievementsEpicBinarySave: "Formato binario/protegido no soportado.",
+    achievementsEpicNotInstalled: "Juego no instalado localmente.",
+    filterAll: "Todas",
+    filterUnlocked: "Desbloqueadas",
+    filterLocked: "Bloqueadas",
+    searchPlaceholder: "Buscar logro...",
+    tryAgain: "Reintentar",
+    achievementsNoSupportTitle: "Este juego no tiene logros",
+    achievementsNoSupportDesc: "No se encontraron logros admitidos o integrados para este título.",
+    noMatchingAchievements: "Ningún logro coincide con el filtro o búsqueda.",
+    running: "En execução",
+    launch: "Jugar",
+    launching: "Iniciando...",
+    openFolder: "Abrir carpeta",
+    confirmDeletePlaceholder: "Escribe el nombre del juego",
+    gameRunning: "El juego está en ejecución",
+  },
+};
+
 const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   game,
   isOpen,
@@ -82,9 +358,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const { notify } = useNotification();
   const { isGamepadConnected, gamepadFamily, activeInputType } = useGamepad();
 
+  const detailLanguage =
+    language === "pt-BR" || language === "en-US" || language === "es-ES"
+      ? language
+      : "en-US";
+  const copy = DETAIL_PANEL_COPY[detailLanguage as keyof typeof DETAIL_PANEL_COPY] || DETAIL_PANEL_COPY["en-US"];
+
   // Estados existentes
   const [isLaunching, setIsLaunching] = React.useState(false);
-  const [activeTab, setActiveTab] = React.useState("JOGAR");
+  const [activeTab, setActiveTab] = React.useState<string>(copy.tabPlay);
   const [launchError, setLaunchError] = React.useState<string | null>(null);
   const [galleryModalOpen, setGalleryModalOpen] = React.useState(false);
   const [currentGalleryIndex, setCurrentGalleryIndex] = React.useState(0);
@@ -127,26 +409,35 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
   const isEpicGame = Boolean(
     (game?.launcherType === "epic" ||
-    game?.source === "epic" ||
-    game?.epicCatalogId ||
-    game?.epicLaunchId) && !isSteamGame,
+      game?.source === "epic" ||
+      game?.epicCatalogId ||
+      game?.epicLaunchId) && !isSteamGame,
   );
 
-  // Limpa estados temporários imediatamente ao trocar de jogo
+  // Limpa estados temporários imediatamente ao trocar de jogo e reseta para a aba inicial "JOGAR"
   React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(copy.tabPlay);
+    }
     setSteamAppDetails(null);
     setEpicAppDetails(null);
     setAchievementItems([]);
     setAchievementSourceAppId("");
     setAchievementsError(null);
     setCurrentGalleryIndex(0);
-  }, [game?.id]);
+    prevAchievedRef.current = new Map();
+    hubInitialSetRef.current = null;
+  }, [game?.id, isOpen, copy.tabPlay]);
 
   // NOVOS ESTADOS (melhorias)
   const [isRunning, setIsRunning] = React.useState(false);
   const [refetchKey, setRefetchKey] = React.useState(0);
   const [achievementFilter, setAchievementFilter] = React.useState<"all" | "unlocked" | "locked">("all");
   const [achievementSearch, setAchievementSearch] = React.useState("");
+  const [debouncedAchievementSearch, setDebouncedAchievementSearch] = React.useState("");
+  const debounceTimerRef = React.useRef<number | null>(null);
+  const prevAchievedRef = React.useRef<Map<string, number>>(new Map());
+  const hubInitialSetRef = React.useRef<Set<string> | null>(null);
 
   const galleryItems = React.useMemo(() => {
     const items: Array<{ type: "video" | "image"; url: string; thumbnail?: string }> = [];
@@ -185,268 +476,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return items;
   }, [isSteamGame, isEpicGame, steamAppDetails, epicAppDetails, game?.trailerUrl, game?.trailerThumbnail, game?.screenshots]);
 
-  // ============================================================
-  // INTERNACIONALIZAÇÃO (dicionário completo)
-  // ============================================================
-  const detailLanguage =
-    language === "pt-BR" || language === "en-US" || language === "es-ES"
-      ? language
-      : "en-US";
+  // Debounce para busca de conquistas
+  React.useEffect(() => {
+    if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = window.setTimeout(() => {
+      setDebouncedAchievementSearch(achievementSearch);
+    }, 300);
+    return () => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    };
+  }, [achievementSearch]);
 
-  const copy = {
-    "pt-BR": {
-      tabPlay: "JOGAR",
-      tabCaptures: "CAPTURAS",
-      tabAchievements: "CONQUISTAS",
-      tabAbout: "SOBRE",
-      tabManage: "GERENCIAR",
-      tabMods: "MODS",
-      steamLabel: "Steam",
-      epicLabel: "Epic Games",
-      localLabel: "PC Local",
-      library: "Biblioteca",
-      timePlayed: "TEMPO JOGADO",
-      lastSession: "ÚLTIMA SESSÃO",
-      neverStarted: "Ainda não iniciado",
-      achievements: "CONQUISTAS",
-      appId: "App ID",
-      epicShortcutLabel: "Epic",
-      epicShortcut: "Atalho direto",
-      epicStore: "Via loja",
-      source: "Fonte",
-      sourceSteamSync: "Sync Steam",
-      sourceEpicCatalog: "Catálogo Epic",
-      sourceManual: "Manual",
-      photoWall: "Mural de fotos",
-      viewGallery: "Ver Galeria",
-      noScreenshot: "Nenhuma captura",
-      about: "Sobre",
-      seeMore: "Ver mais →",
-      popularTags: "Marcadores Populares",
-      developer: "Desenvolvedor",
-      publisher: "Distribuidora",
-      releaseDate: "Data de Lançamento",
-      category: "Categoria",
-      notInformed: "Não informado",
-      management: "Gerenciamento",
-      verify: "Verificar",
-      edit: "Editar",
-      createShortcut: "Criar Atalho",
-      remove: "Remover",
-      platform: "Plataforma",
-      noDescription: "Sem descrição disponível para este jogo.",
-      gallery: "GALERIA",
-      previous: "← Anterior",
-      next: "Próximo →",
-      removeGame: "Remover jogo",
-      cannotUndo: "Esta ação não pode ser desfeita",
-      confirmRemove: (title: string) =>
-        `Tem certeza que deseja remover "${title}" da sua biblioteca? Digite o nome do jogo para confirmar.`,
-      cancel: "Cancelar",
-      removing: "Removendo...",
-      close: "Fechar",
-      loginToRemove: "Você precisa estar logado para remover um jogo.",
-      removedSuccess: "Jogo removido.",
-      removeError: "Erro ao remover jogo.",
-      launchGenericError: "Falha ao iniciar o jogo.",
-      achievementsLoading: "Buscando conquistas...",
-      achievementsEmpty: "Nenhuma conquista encontrada.",
-      achievementsLocked: "Bloqueada",
-      achievementsUnlocked: "Desbloqueada",
-      achievementsUnlockedAt: "Desbloqueada em",
-      verifySuccess: "Executável encontrado.",
-      verifyNotFound: "Executável não encontrado.",
-      shortcutComingSoon: "Em breve.",
-      achievementsSource: "Suas conquistas",
-      achievementsLocalSource: "Conquistas locais",
-      achievementsEpicLocalSource: "Arquivos locais Epic",
-      achievementsSteamFallback: "Steam",
-      achievementsNeedSteam: "Conecte sua conta Steam para carregar conquistas.",
-      achievementsMissingAppId: "Este jogo não possui Steam App ID.",
-      achievementsEpicLocalEmpty: "Nenhum arquivo local de conquistas legível.",
-      achievementsEpicBinarySave: "Formato binário/protegido não suportado.",
-      achievementsEpicNotInstalled: "Jogo não instalado localmente.",
-      filterAll: "Todas",
-      filterUnlocked: "Desbloqueadas",
-      filterLocked: "Bloqueadas",
-      searchPlaceholder: "Buscar conquista...",
-      tryAgain: "Tentar novamente",
-      running: "Em execução",
-      launch: "Jogar",
-      launching: "Iniciando...",
-      openFolder: "Abrir pasta",
-      confirmDeletePlaceholder: "Digite o nome do jogo",
-      gameRunning: "Jogo em execução",
-    },
-    "en-US": {
-      tabPlay: "PLAY",
-      tabCaptures: "CAPTURES",
-      tabAchievements: "ACHIEVEMENTS",
-      tabAbout: "ABOUT",
-      tabManage: "MANAGE",
-      tabMods: "MODS",
-      steamLabel: "Steam",
-      epicLabel: "Epic Games",
-      localLabel: "Local PC",
-      library: "Library",
-      timePlayed: "TIME PLAYED",
-      lastSession: "LAST SESSION",
-      neverStarted: "Not started",
-      achievements: "ACHIEVEMENTS",
-      appId: "App ID",
-      epicShortcutLabel: "Epic",
-      epicShortcut: "Direct shortcut",
-      epicStore: "Via store",
-      source: "Source",
-      sourceSteamSync: "Steam sync",
-      sourceEpicCatalog: "Epic catalog",
-      sourceManual: "Manual",
-      photoWall: "Photo wall",
-      viewGallery: "View gallery",
-      noScreenshot: "No screenshot",
-      about: "About",
-      seeMore: "See more →",
-      popularTags: "Popular tags",
-      developer: "Developer",
-      publisher: "Publisher",
-      releaseDate: "Release date",
-      category: "Category",
-      notInformed: "Not informed",
-      management: "Management",
-      verify: "Verify",
-      edit: "Edit",
-      createShortcut: "Create shortcut",
-      remove: "Remove",
-      platform: "Platform",
-      noDescription: "No description available.",
-      gallery: "GALLERY",
-      previous: "← Previous",
-      next: "Next →",
-      removeGame: "Remove game",
-      cannotUndo: "This action cannot be undone",
-      confirmRemove: (title: string) =>
-        `Are you sure you want to remove "${title}" from your library? Type the game name to confirm.`,
-      cancel: "Cancel",
-      removing: "Removing...",
-      close: "Close",
-      loginToRemove: "You must be logged in to remove a game.",
-      removedSuccess: "Game removed.",
-      removeError: "Error removing game.",
-      launchGenericError: "Failed to launch the game.",
-      achievementsLoading: "Loading achievements...",
-      achievementsEmpty: "No achievements found.",
-      achievementsLocked: "Locked",
-      achievementsUnlocked: "Unlocked",
-      achievementsUnlockedAt: "Unlocked on",
-      verifySuccess: "Executable found.",
-      verifyNotFound: "Executable not found.",
-      shortcutComingSoon: "Coming soon.",
-      achievementsSource: "Your achievements",
-      achievementsLocalSource: "Local achievements",
-      achievementsEpicLocalSource: "Epic local files",
-      achievementsSteamFallback: "Steam",
-      achievementsNeedSteam: "Connect your Steam account to load achievements.",
-      achievementsMissingAppId: "This game has no Steam App ID.",
-      achievementsEpicLocalEmpty: "No readable local achievement file found.",
-      achievementsEpicBinarySave: "Binary/protected save not supported.",
-      achievementsEpicNotInstalled: "Game not installed locally.",
-      filterAll: "All",
-      filterUnlocked: "Unlocked",
-      filterLocked: "Locked",
-      searchPlaceholder: "Search achievement...",
-      tryAgain: "Try again",
-      running: "Running",
-      launch: "Play",
-      launching: "Launching...",
-      openFolder: "Open folder",
-      confirmDeletePlaceholder: "Type the game name",
-      gameRunning: "Game is running",
-    },
-    "es-ES": {
-      tabPlay: "JUGAR",
-      tabCaptures: "CAPTURAS",
-      tabAchievements: "LOGROS",
-      tabAbout: "ACERCA DE",
-      tabManage: "GESTIONAR",
-      tabMods: "MODS",
-      steamLabel: "Steam",
-      epicLabel: "Epic Games",
-      localLabel: "PC Local",
-      library: "Biblioteca",
-      timePlayed: "TIEMPO JUGADO",
-      lastSession: "ÚLTIMA SESIÓN",
-      neverStarted: "No iniciado",
-      achievements: "LOGROS",
-      appId: "App ID",
-      epicShortcutLabel: "Epic",
-      epicShortcut: "Acceso directo",
-      epicStore: "Vía tienda",
-      source: "Fuente",
-      sourceSteamSync: "Sync Steam",
-      sourceEpicCatalog: "Catálogo Epic",
-      sourceManual: "Manual",
-      photoWall: "Mural de fotos",
-      viewGallery: "Ver galería",
-      noScreenshot: "Sin capturas",
-      about: "Acerca de",
-      seeMore: "Ver más →",
-      popularTags: "Etiquetas populares",
-      developer: "Desarrollador",
-      publisher: "Distribuidora",
-      releaseDate: "Fecha de lanzamiento",
-      category: "Categoría",
-      notInformed: "No informado",
-      management: "Gestión",
-      verify: "Verificar",
-      edit: "Editar",
-      createShortcut: "Crear acceso directo",
-      remove: "Eliminar",
-      platform: "Plataforma",
-      noDescription: "Sin descripción.",
-      gallery: "GALERÍA",
-      previous: "← Anterior",
-      next: "Siguiente →",
-      removeGame: "Eliminar juego",
-      cannotUndo: "Esta acción no se puede deshacer",
-      confirmRemove: (title: string) =>
-        `¿Seguro que deseas eliminar "${title}" de tu biblioteca? Escribe el nombre del juego para confirmar.`,
-      cancel: "Cancelar",
-      removing: "Eliminando...",
-      close: "Cerrar",
-      loginToRemove: "Debes iniciar sesión para eliminar un juego.",
-      removedSuccess: "Juego eliminado.",
-      removeError: "Error al eliminar el juego.",
-      launchGenericError: "No se pudo iniciar el juego.",
-      achievementsLoading: "Cargando logros...",
-      achievementsEmpty: "No se encontraron logros.",
-      achievementsLocked: "Bloqueado",
-      achievementsUnlocked: "Desbloqueado",
-      achievementsUnlockedAt: "Desbloqueado el",
-      verifySuccess: "Ejecutable encontrado.",
-      verifyNotFound: "Ejecutable no encontrado.",
-      shortcutComingSoon: "Próximamente.",
-      achievementsSource: "Tus logros",
-      achievementsLocalSource: "Logros locales",
-      achievementsEpicLocalSource: "Archivos locales Epic",
-      achievementsSteamFallback: "Steam",
-      achievementsNeedSteam: "Conecta tu cuenta de Steam para cargar logros.",
-      achievementsMissingAppId: "Este juego no tiene Steam App ID.",
-      achievementsEpicLocalEmpty: "No se encontró archivo local legible.",
-      achievementsEpicBinarySave: "Formato binario/protegido no soportado.",
-      achievementsEpicNotInstalled: "Juego no instalado localmente.",
-      filterAll: "Todas",
-      filterUnlocked: "Desbloqueadas",
-      filterLocked: "Bloqueadas",
-      searchPlaceholder: "Buscar logro...",
-      tryAgain: "Reintentar",
-      running: "En ejecución",
-      launch: "Jugar",
-      launching: "Iniciando...",
-      openFolder: "Abrir carpeta",
-      confirmDeletePlaceholder: "Escribe el nombre del juego",
-      gameRunning: "El juego está en ejecución",
-    },
-  }[detailLanguage];
+  // ============================================================
+  // CATEGORIAS LOCALIZADAS
+  // ============================================================
 
   const locale = language;
   const categoryLabels: Record<string, Record<string, string>> = {
@@ -462,9 +505,9 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   // ============================================================
   // EFECTOS EXISTENTES (mantidos e isolados por plataforma)
   // ============================================================
-  // Fetch Steam App Details (APENAS para jogos Steam)
+  // Fetch Steam App Details (APENAS para jogos Steam quando painel aberto)
   React.useEffect(() => {
-    if (!game?.id || !isSteamGame) {
+    if (!isOpen || !game?.id || !isSteamGame) {
       setSteamAppDetails(null);
       setIsSteamAppDetailsLoading(false);
       return;
@@ -504,11 +547,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
     fetchDetails();
     return () => { cancelled = true; };
-  }, [game?.id, game?.steamAppId, game?.title, game?.launcherType, isSteamGame, language]);
+  }, [isOpen, game?.id, game?.steamAppId, game?.title, game?.launcherType, isSteamGame, language]);
 
-  // Fetch Epic Store Details (APENAS para jogos Epic Games)
+  // Fetch Epic Store Details (APENAS para jogos Epic Games quando painel aberto)
   React.useEffect(() => {
-    if (!game?.id || !isEpicGame || !game.epicCatalogId) {
+    if (!isOpen || !game?.id || !isEpicGame || !game.epicCatalogId) {
       setEpicAppDetails(null);
       setIsEpicAppDetailsLoading(false);
       return;
@@ -580,7 +623,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               releaseDate: enrichedGame.releaseDate,
               productSlug: enrichedGame.productSlug,
               updatedAt: new Date().toISOString(),
-            }).then(() => onLibraryChanged?.()).catch(() => {});
+            }).then(() => onLibraryChanged?.()).catch(() => { });
           }
           if (onGameHydrated) {
             onGameHydrated(enrichedGame);
@@ -594,7 +637,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
     fetchDetails();
     return () => { cancelled = true; };
-  }, [game?.id, game?.epicCatalogId, game?.title, game?.epicLaunchId, game?.productSlug, isEpicGame, language, onGameHydrated, onLibraryChanged, user?.uid]);
+  }, [isOpen, game?.id, game?.epicCatalogId, game?.title, game?.epicLaunchId, game?.productSlug, isEpicGame, language, onGameHydrated, onLibraryChanged, user?.uid]);
 
   // (todos os useEffect originais permanecem, pois não foram alterados)
   // Apenas adicionamos novos efeitos abaixo.
@@ -623,7 +666,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen || galleryModalOpen || deleteModalOpen || isLaunching) return;
-      const tabs = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabCaptures, copy.tabMods, copy.tabManage];
+      const tabs: string[] = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabCaptures, copy.tabMods, copy.tabManage];
       const currentIndex = tabs.indexOf(activeTab);
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
@@ -644,25 +687,130 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, activeTab, galleryModalOpen, deleteModalOpen, isLaunching, copy, playSound, onClose]);
 
+  const resolvedAppIdForLocal = (g: typeof game) => {
+    if (!g) return "";
+    return String(g.steamAppId || "").trim() || "";
+  };
+
   // Forçar recarregamento de conquistas quando refetchKey mudar
   React.useEffect(() => {
     let cancelled = false;
 
     const loadSteamAchievements = async () => {
-      setAchievementItems([]);
-      setAchievementSourceAppId("");
+      if (!isOpen || !game?.id) {
+        setAchievementItems([]);
+        setIsAchievementsLoading(false);
+        return;
+      }
+
       setAchievementsError(null);
+      let resolvedAppId = String(game.steamAppId || "").trim();
 
-      if (!game?.id) return;
+      // ── FASE 1: Verificar cache em memória instantâneo ──
+      const cached = resolvedAppId
+        ? getCachedSteamAchievementDetails(userProfile?.steamId || "", resolvedAppId, language)
+        : null;
 
-      setIsAchievementsLoading(true);
+      if (cached && cached.achievements.length > 0) {
+        setAchievementSourceAppId(resolvedAppId);
+        setAchievementItems(cached.achievements);
+        setIsAchievementsLoading(false);
+      }
 
+      // ── FASE 2: carregar dados locais imediatamente (disco, ~1ms) ──
+      let localDefs: Array<{ id: string; name: string; description: string; icon: string }> | null = null;
+      let localSteamAppId = "";
+      try {
+        if (window.electronAPI?.getLocalAchievementDefinitions) {
+          const raw = await window.electronAPI.getLocalAchievementDefinitions(game.id);
+          if (raw && (raw as any).achievements?.length > 0) {
+            localDefs = (raw as any).achievements;
+            localSteamAppId = (raw as any).steamAppId || "";
+          }
+        }
+      } catch { /* ignore */ }
+
+      if (cancelled) return;
+
+      // Se temos defs locais e ainda não tínhamos em cache de memória
+      if (localDefs && localDefs.length > 0 && (!cached || cached.achievements.length === 0)) {
+        const steamVerdeKey = localSteamAppId ? `steam_${localSteamAppId}` : "";
+        const progressKeys = [game.id, steamVerdeKey].filter(Boolean);
+        let localProgress: { unlockedAchievements?: Record<string, { unlockedAt?: string }> } | null = null;
+        if (window.electronAPI?.getLocalAchievementProgress) {
+          for (const key of progressKeys) {
+            try {
+              const p = await window.electronAPI.getLocalAchievementProgress(key);
+              if (p?.unlockedAchievements && Object.keys(p.unlockedAchievements).length > 0) {
+                localProgress = p;
+                break;
+              }
+            } catch { /* ignore */ }
+          }
+        }
+
+        let retroactiveState: Record<string, { earned?: boolean; earnedTime?: number }> = {};
+        if (window.electronAPI?.getLocalAchievementState) {
+          const stateKeys = [game.id, localSteamAppId].filter(Boolean);
+          for (const key of stateKeys) {
+            try {
+              const state = await window.electronAPI.getLocalAchievementState(key);
+              if (state && Object.keys(state).length > 0) {
+                retroactiveState = state;
+                break;
+              }
+            } catch { /* ignore */ }
+          }
+        }
+
+        if (cancelled) return;
+
+        const merged = localDefs.map((def) => {
+          const unlocked = localProgress?.unlockedAchievements?.[def.id]
+            || localProgress?.unlockedAchievements?.[def.id.toLowerCase()];
+          const emuState = retroactiveState[def.id] || retroactiveState[def.id.toLowerCase()];
+          const achieved = Boolean(unlocked || emuState?.earned);
+          const unlockTime = unlocked?.unlockedAt
+            ? Math.floor(new Date(unlocked.unlockedAt).getTime() / 1000)
+            : emuState?.earnedTime || 0;
+          return {
+            apiName: def.id,
+            name: def.name,
+            description: def.description,
+            icon: def.icon,
+            iconGray: "",
+            achieved,
+            unlockTime,
+            percent: 0,
+          } as SteamAchievement;
+        });
+
+        setAchievementSourceAppId(localSteamAppId || resolvedAppIdForLocal(game));
+        setAchievementItems(merged);
+        setIsAchievementsLoading(false);
+      } else if (!cached || cached.achievements.length === 0) {
+        // Se realmente não temos nada em cache, ativa loading suave
+        setIsAchievementsLoading(true);
+      }
+
+      // ── FASE 3: buscar dados atualizados em background e sincronizar ──
       try {
         if (game.launcherType === "epic") {
-          // 1. Tenta buscar conquistas oficiais online da Epic via Legendary / API
           let onlineAchievements: any = null;
+          const getEpicAppName = (game: any): string | undefined => {
+            return (
+              game.epicLaunchId ||
+              (game.epicCatalogId && game.epicCatalogId.includes(":")
+                ? game.epicCatalogId.split(":")[1]
+                : game.epicCatalogId) ||
+              game.title
+            );
+          };
+
+          const appName = getEpicAppName(game);
+          const sandboxId = game.epicNamespace || (game.epicCatalogId && game.epicCatalogId.includes(":") ? game.epicCatalogId.split(":")[0] : undefined);
           try {
-            const achRes = await fetchEpicAchievements(game.epicNamespace || undefined, game.epicLaunchId || game.title);
+            const achRes = await fetchEpicAchievements(sandboxId, appName);
             if (achRes.list && achRes.list.length > 0) {
               onlineAchievements = achRes;
             }
@@ -670,55 +818,78 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
             console.warn("Falha ao buscar conquistas online da Epic:", err);
           }
 
+          if (cancelled) return;
+
           if (onlineAchievements && onlineAchievements.list.length > 0) {
-            if (cancelled) return;
             setAchievementSourceAppId("epic-online");
             setAchievementItems(onlineAchievements.list);
-
+            setIsAchievementsLoading(false);
             if (user?.uid) {
               void updateLibraryGame(user.uid, game.id, {
                 totalAchievements: onlineAchievements.total,
                 completedAchievements: onlineAchievements.completed,
                 achievementsUpdatedAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-              }).catch(() => {}).then(() => onLibraryChanged?.());
+              }).catch(() => { }).then(() => onLibraryChanged?.());
             }
             return;
           }
 
-          // 2. Fallback para arquivos locais se disponível
+          const getEpicCatalogItemId = (catalogId?: string): string | undefined => {
+            if (catalogId && catalogId.includes(":")) {
+              return catalogId.split(":")[1];
+            }
+            return catalogId;
+          };
+
+          const getEpicFullLaunchId = (game: any): string | undefined => {
+            if (game.epicNamespace && game.epicCatalogId && game.epicLaunchId) {
+              const itemId = getEpicCatalogItemId(game.epicCatalogId);
+              if (itemId) {
+                return `${game.epicNamespace}:${itemId}:${game.epicLaunchId}`;
+              }
+            }
+            return game.epicLaunchId;
+          };
+
           if (window.electronAPI?.getEpicLocalAchievements) {
+            const catalogItemId = getEpicCatalogItemId(game.epicCatalogId);
+            const fullLaunchId = getEpicFullLaunchId(game);
             const localResult = await window.electronAPI.getEpicLocalAchievements({
-              gameId: game.id,
+              gameId: catalogItemId || game.id,
               title: game.title,
-              epicCatalogId: game.epicCatalogId,
-              epicLaunchId: game.epicLaunchId,
+              epicCatalogId: catalogItemId || game.epicCatalogId,
+              epicLaunchId: fullLaunchId || game.epicLaunchId,
               executablePath: game.executablePath,
             });
             if (cancelled) return;
-
             if (localResult.achievements && localResult.achievements.length > 0) {
               setAchievementSourceAppId("epic-local");
-              setAchievementItems(localResult.achievements);
-
+              setAchievementItems(
+                localResult.achievements.map((a: any) => ({
+                  ...a,
+                  percent: a.percent ?? 0,
+                })),
+              );
+              setIsAchievementsLoading(false);
               if (user?.uid) {
                 void updateLibraryGame(user.uid, game.id, {
                   totalAchievements: localResult.total,
                   completedAchievements: localResult.unlocked,
                   achievementsUpdatedAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
-                }).catch(() => {}).then(() => onLibraryChanged?.());
+                }).catch(() => { }).then(() => onLibraryChanged?.());
               }
               return;
             }
           }
 
           setAchievementSourceAppId("epic-online");
-          setAchievementsError(copy.achievementsEmpty);
+          if (!localDefs) {
+            setAchievementsError(copy.achievementsEmpty);
+          }
           return;
         }
-
-        let resolvedAppId = String(game.steamAppId || "").trim();
 
         if (!resolvedAppId) {
           const results = await searchSteamGames(game.title);
@@ -732,14 +903,18 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                   : "";
             return normalizeSteamLookup(rawName) === normalizedTitle;
           });
-
           if (matched && matched.id != null) {
             resolvedAppId = String(matched.id).trim();
           }
         }
 
         if (!resolvedAppId) {
+          if (localDefs) {
+            setIsAchievementsLoading(false);
+            return;
+          }
           setAchievementsError(copy.achievementsMissingAppId);
+          setIsAchievementsLoading(false);
           return;
         }
 
@@ -747,11 +922,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           game.launcherType === "local"
             ? await fetchSteamAchievementSchema(resolvedAppId, language)
             : userProfile?.steamId
-              ? await fetchSteamAchievementDetails(
-                userProfile.steamId,
-                resolvedAppId,
-                language,
-              )
+              ? await fetchSteamAchievementDetails(userProfile.steamId, resolvedAppId, language)
               : await fetchSteamAchievementSchema(resolvedAppId, language);
 
         if (cancelled) return;
@@ -773,45 +944,49 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           }
         }
 
-        if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementProgress) {
+        if (window.electronAPI?.getLocalAchievementProgress) {
           try {
-            const localProgress = await window.electronAPI.getLocalAchievementProgress(game.id);
+            const steamVerdeKey = resolvedAppId ? `steam_${resolvedAppId}` : "";
+            const progressKeys = [game.id, steamVerdeKey].filter(Boolean);
+            let localProgress: { unlockedAchievements?: Record<string, { unlockedAt?: string }> } | null = null;
+            for (const key of progressKeys) {
+              const p = await window.electronAPI.getLocalAchievementProgress(key);
+              if (p?.unlockedAchievements && Object.keys(p.unlockedAchievements).length > 0) {
+                localProgress = p;
+                break;
+              }
+            }
             if (localProgress && localProgress.unlockedAchievements) {
               const mappedAchievements = result.achievements.map((ach) => {
-                const unlocked = localProgress.unlockedAchievements[ach.apiName] || localProgress.unlockedAchievements[ach.apiName.toLowerCase()];
-                if (unlocked) {
-                  return {
-                    ...ach,
-                    achieved: true,
-                    unlockTime: unlocked.unlockedAt ? Math.floor(new Date(unlocked.unlockedAt).getTime() / 1000) : 0,
-                  };
+                const unlocked = localProgress!.unlockedAchievements![ach.apiName] || localProgress!.unlockedAchievements![ach.apiName.toLowerCase()];
+                if (unlocked && !ach.achieved) {
+                  return { ...ach, achieved: true, unlockTime: unlocked.unlockedAt ? Math.floor(new Date(unlocked.unlockedAt).getTime() / 1000) : 0 };
                 }
                 return ach;
               });
-              result = {
-                achievements: mappedAchievements,
-                total: mappedAchievements.length,
-                unlocked: mappedAchievements.filter((a) => a.achieved).length,
-              };
+              result = { achievements: mappedAchievements, total: mappedAchievements.length, unlocked: mappedAchievements.filter((a) => a.achieved).length };
             }
           } catch (e) {
             console.error("Erro ao carregar progresso de conquistas locais:", e);
           }
         }
 
-        if (game.launcherType === "local" && window.electronAPI?.getLocalAchievementState) {
+        if (window.electronAPI?.getLocalAchievementState) {
           try {
-            const appIdToQuery = (game.launcherType === "local" && game.id ? String(game.id).trim() : "") || resolvedAppId;
-            const retroactiveState = await window.electronAPI.getLocalAchievementState(appIdToQuery);
-            if (retroactiveState && Object.keys(retroactiveState).length > 0) {
+            const stateKeys = [game.id, resolvedAppId].filter(Boolean);
+            let retroactiveState: Record<string, { earned?: boolean; earnedTime?: number }> = {};
+            for (const key of stateKeys) {
+              const state = await window.electronAPI.getLocalAchievementState(key);
+              if (state && Object.keys(state).length > 0) {
+                retroactiveState = state;
+                break;
+              }
+            }
+            if (Object.keys(retroactiveState).length > 0) {
               result.achievements = result.achievements.map((ach) => {
                 const emuState = retroactiveState[ach.apiName] || retroactiveState[ach.apiName.toLowerCase()];
-                if (emuState && emuState.earned) {
-                  return {
-                    ...ach,
-                    achieved: true,
-                    unlockTime: emuState.earnedTime || 0,
-                  };
+                if (emuState && emuState.earned && !ach.achieved) {
+                  return { ...ach, achieved: true, unlockTime: emuState.earnedTime || 0 };
                 }
                 return ach;
               });
@@ -822,23 +997,48 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         }
 
         setAchievementSourceAppId(resolvedAppId);
-        setAchievementItems(result.achievements);
+        const prevMap = prevAchievedRef.current;
+        const mergedAchievements = prevMap.size > 0
+          ? result.achievements.map((a) => {
+            if (!a.achieved && prevMap.has(a.apiName.toLowerCase())) {
+              return { ...a, achieved: true, unlockTime: prevMap.get(a.apiName.toLowerCase()) ?? 0 };
+            }
+            return a;
+          })
+          : result.achievements;
 
-        if (user?.uid && (result.achievements.length > 0 || !game.totalAchievements)) {
-          const canResolveUnlockedProgress =
-            game.launcherType === "local" || Boolean(userProfile?.steamId);
+        if (mergedAchievements.length > 0) {
+          setAchievementItems(mergedAchievements);
+          setCachedSteamAchievementDetails(
+            userProfile?.steamId || "",
+            resolvedAppId,
+            { achievements: mergedAchievements, total: mergedAchievements.length, unlocked: mergedAchievements.filter(a => a.achieved).length },
+            language,
+          );
+        }
+        prevAchievedRef.current = new Map();
+
+        if (user?.uid && (mergedAchievements.length > 0 || !game.totalAchievements)) {
+          const unlockedCount = mergedAchievements.filter((achievement) => achievement.achieved).length;
           void updateLibraryGame(user.uid, game.id, {
-            totalAchievements: result.achievements.length,
-            completedAchievements: canResolveUnlockedProgress
-              ? result.achievements.filter((achievement) => achievement.achieved).length
-              : game.completedAchievements ?? 0,
+            totalAchievements: mergedAchievements.length,
+            completedAchievements: unlockedCount,
+            achievementsUpdatedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }).catch((error) => {
             console.error("Erro ao salvar totais de conquistas:", error);
           }).then(() => onLibraryChanged?.());
+
+          if (onGameHydrated) {
+            onGameHydrated({
+              ...game,
+              totalAchievements: mergedAchievements.length,
+              completedAchievements: unlockedCount,
+            });
+          }
         }
 
-        if (result.achievements.length === 0) {
+        if (result.achievements.length === 0 && !localDefs) {
           setAchievementsError(
             !userProfile?.steamId && game.launcherType !== "local"
               ? copy.achievementsNeedSteam
@@ -846,7 +1046,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           );
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && !localDefs && (!cached || cached.achievements.length === 0)) {
           setAchievementsError(copy.achievementsEmpty);
         }
       } finally {
@@ -868,27 +1068,25 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     copy.achievementsEpicNotInstalled,
     copy.achievementsMissingAppId,
     copy.achievementsNeedSteam,
-    game?.completedAchievements,
     game?.id,
     game?.launcherType,
     game?.steamAppId,
     game?.title,
-    game?.totalAchievements,
     language,
     onLibraryChanged,
     user?.uid,
-    userProfile?.steamId,
+    isOpen,
     refetchKey
   ]);
 
   React.useEffect(() => {
-    if (!game?.id || game.launcherType !== "local") return;
+    if (!game?.id) return;
     if (!window.electronAPI?.onRealtimeAchievementUnlock) return;
 
     const handler = window.electronAPI.onRealtimeAchievementUnlock((payload) => {
       const { achievementId, earnedTime, unlockedAt } = payload;
       const payloadSteamAppId = payload.gameId.match(/^steam_(\d+)$/i)?.[1];
-      const belongsToCurrentGame = 
+      const belongsToCurrentGame =
         String(game.id) === String(payload.gameId) ||
         (payloadSteamAppId && String(game.steamAppId || "") === payloadSteamAppId) ||
         String(game.steamAppId || "") === String(payload.gameId);
@@ -900,6 +1098,16 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           const isMatch = ach.apiName.toLowerCase() === achievementId.toLowerCase();
           if (!isMatch || ach.achieved) return ach;
           changed = true;
+          // marca como ganho VIA HUB (anti-farm) — só conta pro nível se veio do hub
+          if (user?.uid) {
+            try {
+              markHubAchievement(user.uid, game.id, ach.apiName);
+              const isPlatina = isPlatinaByText(ach as any);
+              const isRarest = ach.apiName === getRarestAchievementApiName(prev as any) || ach.apiName === getPlatinaCandidateApiName(prev as any);
+              const tierIdx = getUnifiedTierIndex(ach as any, prev.length, { isRarest: !!isRarest, isPlatinaText: !!isPlatina });
+              incrementHubCount(user.uid, game.id, tierIdx);
+            } catch { }
+          }
           const unixSecs = earnedTime > 0 ? earnedTime : Math.floor(new Date(unlockedAt).getTime() / 1000);
           return { ...ach, achieved: true, unlockTime: unixSecs };
         });
@@ -919,7 +1127,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   }, [game?.id, game?.launcherType, game?.steamAppId, onLibraryChanged, user?.uid]);
 
   React.useEffect(() => {
-    if (game?.id && activeTab === copy.tabCaptures) {
+    if (isOpen && game?.id && activeTab === copy.tabCaptures) {
       window.electronAPI?.getLocalGameScreenshots?.({
         title: game.title,
         launcherType: game.launcherType,
@@ -928,7 +1136,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
         setLocalScreenshots(paths || []);
       }).catch(() => { });
     }
-  }, [game?.id, game?.title, game?.launcherType, game?.steamAppId, activeTab, copy.tabCaptures]);
+  }, [isOpen, game?.id, game?.title, game?.launcherType, game?.steamAppId, activeTab, copy.tabCaptures]);
 
   // ============================================================
   // FUNÇÕES DE AÇÃO (handleLaunch, handleDelete, etc.) - mantidas e ajustadas
@@ -1010,15 +1218,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   // ============================================================
 
   const heroImage = isSteamGame
-    ? steamAppDetails?.backgroundImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_hero.jpg` : "") || game?.backgroundImage || game?.image
+    ? game?.backgroundImage || game?.image || steamAppDetails?.backgroundImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_hero.jpg` : "")
     : isEpicGame
-      ? epicAppDetails?.backgroundImage || game?.backgroundImage || game?.image
+      ? game?.backgroundImage || game?.image || epicAppDetails?.backgroundImage
       : game?.backgroundImage || game?.image;
 
   const coverImage = isSteamGame
-    ? steamAppDetails?.cardImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_600x900_2x.jpg` : "") || game?.cardImage || game?.image || game?.backgroundImage
+    ? game?.cardImage || game?.image || steamAppDetails?.cardImage || (game?.steamAppId ? `https://cdn.akamai.steamstatic.com/steam/apps/${game.steamAppId}/library_600x900_2x.jpg` : "") || game?.backgroundImage
     : isEpicGame
-      ? epicAppDetails?.cardImage || game?.cardImage || game?.image || game?.backgroundImage
+      ? game?.cardImage || game?.image || epicAppDetails?.cardImage || game?.backgroundImage
       : game?.cardImage || game?.image || game?.backgroundImage;
 
   const hasEpicLaunchShortcut = isEpicGame && String(game?.epicLaunchId || game?.executablePath || game?.epicCatalogId || "").split(":").filter(Boolean).length >= 3;
@@ -1096,15 +1304,15 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     let filtered = achievementItems;
     if (achievementFilter === "unlocked") filtered = filtered.filter(a => a.achieved);
     if (achievementFilter === "locked") filtered = filtered.filter(a => !a.achieved);
-    if (achievementSearch.trim()) {
-      const search = achievementSearch.toLowerCase().trim();
+    if (debouncedAchievementSearch.trim()) {
+      const search = debouncedAchievementSearch.toLowerCase().trim();
       filtered = filtered.filter(a =>
         a.name.toLowerCase().includes(search) ||
         (a.description && a.description.toLowerCase().includes(search))
       );
     }
     return filtered;
-  }, [achievementItems, achievementFilter, achievementSearch]);
+  }, [achievementItems, achievementFilter, debouncedAchievementSearch]);
 
   const sortedAchievements = React.useMemo(() => {
     return [...filteredAchievements].sort((a, b) => {
@@ -1116,18 +1324,58 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   const mostRecentAchievement = sortedAchievements.find(a => a.achieved);
   const otherAchievements = mostRecentAchievement ? sortedAchievements.filter(a => a.apiName !== mostRecentAchievement.apiName) : sortedAchievements;
 
+  // Distribuição PlayStation garantida: 1 Platina (texto "todas as conquistas" ou raríssima) + Ouro + Prata + Bronze
+  const tierMap = React.useMemo(() => {
+    return buildGameTierMap(achievementItems);
+  }, [achievementItems]);
+
+  const getAchievementTierIndex = React.useCallback((achievement: SteamAchievement, totalInGame: number, _indexInList: number): number => {
+    if (totalInGame <= 1) return 0;
+    const key = String((achievement as any).apiName ?? (achievement as any).id ?? achievement.name ?? "");
+    const mapped = tierMap.get(key);
+    if (mapped != null) return mapped.tierIndex;
+    const isPlatina = getPlatinaCandidateApiName([achievement as any]) != null;
+    const isRarest = achievement.apiName === getRarestAchievementApiName(achievementItems as any);
+    return getUnifiedTierIndex(achievement as any, totalInGame, { isRarest: !!isRarest, isPlatinaText: !!isPlatina });
+  }, [tierMap, achievementItems]);
+
+  // Hub anti-farm: detecta novas conquistas desbloqueadas via hub e marca para o nível
+  React.useEffect(() => {
+    if (!game?.id || !user?.uid || achievementItems.length === 0) return;
+    if (hubInitialSetRef.current == null) {
+      hubInitialSetRef.current = new Set(achievementItems.filter(a => a.achieved).map(a => a.apiName.toLowerCase()));
+      return;
+    }
+    for (const ach of achievementItems) {
+      if (!ach.achieved) continue;
+      const lower = ach.apiName.toLowerCase();
+      if (hubInitialSetRef.current.has(lower)) continue;
+      const isHubSession = isRunning;
+      const isRecent = ach.unlockTime > 0 && Date.now() / 1000 - ach.unlockTime < 86400;
+      if (isHubSession || isRecent) {
+        try {
+          markHubAchievement(user.uid, game.id, ach.apiName);
+          const tierIdx = getUnifiedTierIndex(ach as any, achievementItems.length, { isPlatinaText: isPlatinaByText(ach as any), isRarest: ach.apiName === getPlatinaCandidateApiName(achievementItems as any) });
+          incrementHubCount(user.uid, game.id, tierIdx);
+        } catch { }
+      }
+      hubInitialSetRef.current.add(lower);
+    }
+  }, [achievementItems, game?.id, user?.uid, isRunning]);
+
   // ============================================================
   // SUBCOMPONENTES INTERNOS (Skeletons, etc.)
   // ============================================================
 
+  // Skeleton que corresponde à altura do item virtualizado (110px)
   const AchievementSkeleton: React.FC = () => (
-    <div className="flex items-center gap-4 animate-pulse">
-      <div className="w-12 h-12 rounded-xl bg-white/10" />
-      <div className="flex-1 space-y-2">
+    <div className="h-[110px] flex items-center gap-4 animate-pulse">
+      <div className="w-12 h-12 rounded-xl bg-white/10 flex-shrink-0" />
+      <div className="flex-1 space-y-2 min-w-0">
         <div className="h-4 w-3/4 bg-white/10 rounded" />
         <div className="h-3 w-1/2 bg-white/10 rounded" />
       </div>
-      <div className="w-16 h-6 bg-white/10 rounded-lg" />
+      <div className="w-16 h-6 bg-white/10 rounded-lg flex-shrink-0" />
     </div>
   );
 
@@ -1139,7 +1387,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
   // JSX
   // ============================================================
 
-  const TABS = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabCaptures, copy.tabMods, copy.tabManage];
+  const TABS: string[] = [copy.tabPlay, copy.tabAbout, copy.tabAchievements, copy.tabCaptures, copy.tabMods, copy.tabManage];
   const activeManagedMods = gameMods.filter((mod) => mod.enabled && mod.manifestPath).length;
   const modsPanelCopy = detailLanguage === "pt-BR"
     ? { title: "Mods deste jogo", summary: `${activeManagedMods} ativos de ${gameMods.length}`, empty: "Nenhum mod foi associado a este jogo.", manage: "Gerenciar mods", active: "Ativo", downloaded: "Baixado", verify: "Verificação necessária" }
@@ -1223,7 +1471,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.3 } }}
-          className="fixed inset-0 z-100 bg-[#050505] overflow-y-auto thin-scrollbar"
+          className="fixed inset-0 z-100 bg-[#050505] overflow-y-auto detail-panel-scrollbar"
           ref={scrollRef as React.RefObject<HTMLDivElement>}
           role="dialog"
           aria-modal="true"
@@ -1509,7 +1757,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         <TechnicalDetail label={copy.publisher} value={steamAppDetails?.publisher || epicAppDetails?.publisher || game.publisher} fallback={copy.notInformed} />
                         <TechnicalDetail label={copy.releaseDate} value={steamAppDetails?.releaseDate || epicAppDetails?.releaseDate || game.releaseDate} fallback={copy.notInformed} />
                         <TechnicalDetail label={copy.category} value={localizedCategory} fallback={copy.notInformed} />
-                        
+
                         {steamAppDetails?.metacritic && (
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black tracking-[0.2em] text-white/35 uppercase mb-2">Metacritic</span>
@@ -1553,49 +1801,51 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         </div>
                       </div>
 
-                      {/* Filtros e busca */}
-                      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setAchievementFilter("all")}
-                            className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "all" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
-                              }`}
-                          >
-                            {copy.filterAll}
-                          </button>
-                          <button
-                            onClick={() => setAchievementFilter("unlocked")}
-                            className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "unlocked" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
-                              }`}
-                          >
-                            {copy.filterUnlocked}
-                          </button>
-                          <button
-                            onClick={() => setAchievementFilter("locked")}
-                            className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "locked" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
-                              }`}
-                          >
-                            {copy.filterLocked}
-                          </button>
+                      {/* Filtros e busca (somente quando há conquistas no jogo) */}
+                      {achievementItems.length > 0 && (
+                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setAchievementFilter("all")}
+                              className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "all" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
+                                }`}
+                            >
+                              {copy.filterAll}
+                            </button>
+                            <button
+                              onClick={() => setAchievementFilter("unlocked")}
+                              className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "unlocked" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
+                                }`}
+                            >
+                              {copy.filterUnlocked}
+                            </button>
+                            <button
+                              onClick={() => setAchievementFilter("locked")}
+                              className={`px-3 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition-all ${achievementFilter === "locked" ? "border-white/40 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/40 hover:border-white/30 hover:text-white/70"
+                                }`}
+                            >
+                              {copy.filterLocked}
+                            </button>
+                          </div>
+                          <div className="relative flex-1 min-w-[180px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                            <input
+                              type="text"
+                              placeholder={copy.searchPlaceholder}
+                              value={achievementSearch}
+                              onChange={(e) => setAchievementSearch(e.target.value)}
+                              className="w-full rounded-xl border border-white/10 bg-black/40 pl-9 pr-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/40 focus:outline-none"
+                              aria-label="Buscar conquista"
+                            />
+                          </div>
                         </div>
-                        <div className="relative flex-1 min-w-[180px]">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
-                          <input
-                            type="text"
-                            placeholder={copy.searchPlaceholder}
-                            value={achievementSearch}
-                            onChange={(e) => setAchievementSearch(e.target.value)}
-                            className="w-full rounded-xl border border-white/10 bg-black/40 pl-9 pr-4 py-2 text-xs text-white placeholder-white/20 focus:border-white/40 focus:outline-none"
-                            aria-label="Buscar conquista"
-                          />
-                        </div>
-                      </div>
+                      )}
 
                       {/* Loading com skeleton e LoadingState */}
-                      {isAchievementsLoading && (
+                      {isAchievementsLoading && achievementItems.length === 0 && (
                         <div className="flex flex-col gap-4 min-h-[200px] justify-center">
                           <div className="flex justify-center py-2">
-                            <LoadingState label="Sincronizando conquistas..." variant="Dots" />
+                            <LoadingState label="Carregando conquistas..." variant="Dots" />
                           </div>
                           <AchievementSkeleton />
                           <AchievementSkeleton />
@@ -1619,22 +1869,48 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                         </div>
                       )}
 
+                      {/* Estado Vazio: Jogo não possui conquistas */}
+                      {!isAchievementsLoading && !achievementsError && achievementItems.length === 0 && (
+                        <div className="flex min-h-[220px] flex-col items-center justify-center rounded-[24px] border border-dashed border-white/10 bg-white/5 p-8 text-center">
+                          <Trophy className="mb-3 h-10 w-10 text-white/20" />
+                          <p className="text-sm font-bold text-white/70">{copy.achievementsNoSupportTitle}</p>
+                          <p className="mt-1 text-xs text-white/40 max-w-sm">{copy.achievementsNoSupportDesc}</p>
+                        </div>
+                      )}
+
                       {/* Lista de conquistas */}
-                      {!isAchievementsLoading && achievementItems.length > 0 && (
+                      {achievementItems.length > 0 && (
                         <div className="flex flex-col gap-6">
+                          {sortedAchievements.length === 0 && (
+                            <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl border border-white/5 bg-black/20 p-6 text-center">
+                              <Search className="mb-2 h-6 w-6 text-white/30" />
+                              <p className="text-xs font-semibold text-white/60">{copy.noMatchingAchievements}</p>
+                            </div>
+                          )}
+
                           {mostRecentAchievement && (
                             <div>
                               <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase mb-3">Conquista Mais Recente</h3>
-                              <AchievementRow achievement={mostRecentAchievement} featured lockedLabel={copy.achievementsLocked} unlockedLabel={copy.achievementsUnlocked} unlockedAtLabel={copy.achievementsUnlockedAt} formatDate={formatAchievementDate} />
+                              <AchievementRow achievement={mostRecentAchievement} featured lockedLabel={copy.achievementsLocked} unlockedLabel={copy.achievementsUnlocked} unlockedAtLabel={copy.achievementsUnlockedAt} formatDate={formatAchievementDate} tierIndex={getAchievementTierIndex(mostRecentAchievement, achievementItems.length, 0)} />
                             </div>
                           )}
                           {otherAchievements.length > 0 && (
                             <div className="flex flex-col gap-3">
                               {mostRecentAchievement && <div className="w-full h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mt-2" />}
                               <h3 className="text-[10px] font-black tracking-[0.28em] text-white/35 uppercase">Todas as Conquistas</h3>
-                              {otherAchievements.map((achievement) => (
-                                <AchievementRow key={achievement.apiName} achievement={achievement} lockedLabel={copy.achievementsLocked} unlockedLabel={copy.achievementsUnlocked} unlockedAtLabel={copy.achievementsUnlockedAt} formatDate={formatAchievementDate} />
-                              ))}
+                              <div className="flex flex-col gap-3">
+                                {otherAchievements.map((achievement, index) => (
+                                  <AchievementRow
+                                    key={achievement.apiName || `${achievement.name}-${index}`}
+                                    achievement={achievement}
+                                    lockedLabel={copy.achievementsLocked}
+                                    unlockedLabel={copy.achievementsUnlocked}
+                                    unlockedAtLabel={copy.achievementsUnlockedAt}
+                                    formatDate={formatAchievementDate}
+                                    tierIndex={getAchievementTierIndex(achievement, achievementItems.length, index + 1)}
+                                  />
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -2097,37 +2373,109 @@ const AchievementRow: React.FC<{
   formatDate: (unixTime: number) => string | null;
   onManualUnlock?: () => void;
   featured?: boolean;
-}> = ({ achievement, lockedLabel, unlockedLabel, unlockedAtLabel, formatDate, onManualUnlock, featured }) => {
+  tierIndex?: number;
+}> = React.memo(({ achievement, lockedLabel, unlockedLabel, unlockedAtLabel, formatDate, onManualUnlock, featured, tierIndex }) => {
   const unlockedAt = formatDate(achievement.unlockTime);
+  const tiers = [
+    { color: "#38bdf8", bg: "rgba(56,189,248,0.10)", border: "rgba(56,189,248,0.30)", glow: "0 0 14px rgba(56,189,248,0.28)", label: "Platina" },
+    { color: "#facc15", bg: "rgba(250,204,21,0.10)", border: "rgba(250,204,21,0.30)", glow: "0 0 12px rgba(250,204,21,0.22)", label: "Ouro" },
+    { color: "#f1f5f9", bg: "rgba(241,245,249,0.12)", border: "rgba(241,245,249,0.35)", glow: "0 0 14px rgba(241,245,249,0.30)", label: "Prata" },
+    { color: "#cd7f32", bg: "rgba(205,127,50,0.08)", border: "rgba(205,127,50,0.25)", glow: "", label: "Bronze" },
+    { color: "#71797E", bg: "rgba(113,121,126,0.05)", border: "rgba(113,121,126,0.15)", glow: "", label: "" },
+  ];
+  const tier = tiers[tierIndex ?? (achievement.achieved ? 3 : 4)];
+  const isUltra = isUltraRare(achievement.percent) && achievement.achieved;
   return (
-    <div className={`flex ${featured ? 'items-start md:items-center' : 'items-center'} gap-5 rounded-[20px] border p-5 transition-all duration-300 ${achievement.achieved ? "border-white/20 bg-white/10 shadow-[0_4px_20px_rgba(255,255,255,0.05),inset_0_0_0_1px_rgba(255,255,255,0.06)]" : "border-white/[0.06] bg-white/[0.02]"} ${featured && achievement.achieved ? "shadow-[0_4px_30px_rgba(255,255,255,0.07),inset_0_0_0_1px_rgba(255,255,255,0.1)]" : ""}`}>
-      <div className={`flex ${featured ? 'h-16 w-16' : 'h-12 w-12'} shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-black/40 transition-all duration-300 ${achievement.achieved ? "border-white/30 shadow-[0_0_15px_rgba(255,255,255,0.2)]" : "border-white/10 opacity-40 grayscale contrast-75"}`}>
-        {achievement.icon || achievement.iconGray ? <img src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : <Trophy className="h-6 w-6 text-white/30" />}
+    <div
+      className={`flex ${featured ? 'items-start md:items-center' : 'items-center'} gap-5 rounded-[20px] border p-5 transition-all duration-300 cursor-pointer group`}
+      style={{
+        borderColor: achievement.achieved ? tier.border : (tierIndex != null ? `${tier.color}15` : "rgba(255,255,255,0.04)"),
+        backgroundColor: achievement.achieved ? tier.bg : (tierIndex != null ? `${tier.color}05` : "rgba(255,255,255,0.01)"),
+        boxShadow: achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : undefined,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateX(2px)'; e.currentTarget.style.boxShadow = `0 8px 32px ${tier.color}20, inset 0 0 0 1px ${tier.border}`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateX(0)'; e.currentTarget.style.boxShadow = (achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : ''); }}
+      onFocus={(e) => { e.currentTarget.style.outline = 'none'; e.currentTarget.style.boxShadow = `0 0 0 3px ${tier.color}60`; }}
+      onBlur={(e) => { e.currentTarget.style.boxShadow = (achievement.achieved && tier.glow ? `${tier.glow}, inset 0 0 0 1px ${tier.border}` : ''); }}
+      tabIndex={0}
+      role="button"
+      aria-label={achievement.achieved ? `${unlockedLabel}: ${achievement.name}` : `${lockedLabel}: ${achievement.name}`}
+    >
+      <div className="relative shrink-0">
+        <div
+          className={`flex ${featured ? 'h-16 w-16' : 'h-12 w-12'} items-center justify-center overflow-hidden rounded-xl border bg-black/40 transition-all duration-300 group-hover:scale-105`}
+          style={{
+            borderColor: achievement.achieved ? tier.border : (tierIndex != null ? `${tier.color}25` : "rgba(255,255,255,0.08)"),
+            opacity: achievement.achieved ? 1 : 1,
+            filter: undefined,
+          }}
+        >
+          {(achievement.icon || achievement.iconGray)
+            ? <img src={achievement.achieved ? achievement.icon : achievement.iconGray || achievement.icon} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" decoding="async" style={{ opacity: achievement.achieved ? 1 : 0.45, filter: achievement.achieved ? undefined : "grayscale(1) brightness(0.6) contrast(0.9)" }} />
+            : <Trophy className={featured ? 'h-8 w-8' : 'h-6 w-6'} style={{ color: tier.color, opacity: achievement.achieved ? 0.9 : 0.4 }} fill={achievement.achieved ? "currentColor" : "none"} strokeWidth={1.5} />
+          }
+        </div>
+        {achievement.achieved && (
+          <div
+            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60"
+            style={{ backgroundColor: tier.color }}
+          >
+            <Trophy className="h-2.5 w-2.5 text-black" fill="currentColor" strokeWidth={2} />
+          </div>
+        )}
+        {!achievement.achieved && tierIndex != null && (
+          <div
+            className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-black/60"
+            style={{ backgroundColor: tier.color, opacity: tierIndex === 4 ? 0.5 : 0.85 }}
+          >
+            <Trophy className="h-2.5 w-2.5 text-black/70" fill="currentColor" strokeWidth={2} />
+          </div>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h4 className={`truncate ${featured ? 'text-lg' : 'text-sm'} font-bold tracking-wide transition-all ${achievement.achieved ? "text-white" : "text-white/70"}`}>{achievement.name}</h4>
-            <p className={`mt-1 text-xs leading-relaxed transition-colors ${achievement.achieved ? "text-white/60" : "text-white/40"}`}>{achievement.description || " "}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className={`truncate ${featured ? 'text-lg' : 'text-sm'} font-bold tracking-wide transition-all`} style={{ color: achievement.achieved ? tier.color : "rgba(255,255,255,0.5)" }}>{achievement.name}</h4>
+              {isUltra && (
+                <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wider" style={{ borderColor: `${tier.color}40`, backgroundColor: `${tier.color}15`, color: tier.color }}>
+                  ✨ Ultra-raro
+                </span>
+              )}
+            </div>
+            <p className={`mt-1 text-xs leading-relaxed transition-colors ${achievement.achieved ? "text-white/55" : "text-white/30"}`}>{achievement.description || " "}</p>
+            {!achievement.achieved && tier.label && (
+              <span className="mt-1.5 inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.2em]" style={{ color: `${tier.color}99` }}>
+                <Trophy className="h-2 w-2" fill="currentColor" strokeWidth={0} /> {tier.label} {isUltraRare(achievement.percent) ? "• Ultra-raro" : ""}
+              </span>
+            )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {!achievement.achieved && onManualUnlock && (
               <button type="button" onClick={(e) => { e.stopPropagation(); onManualUnlock(); }} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white/60 hover:bg-white/10 hover:text-white transition-colors">Desbloquear</button>
             )}
-            <span className={`rounded-lg border px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-all ${achievement.achieved ? "border-white/30 bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]" : "border-white/10 bg-white/5 text-white/35"}`}>
+            <span
+              className="rounded-lg border px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider transition-all"
+              style={{
+                borderColor: achievement.achieved ? tier.border : "rgba(255,255,255,0.08)",
+                backgroundColor: achievement.achieved ? tier.bg : "rgba(255,255,255,0.02)",
+                color: achievement.achieved ? tier.color : "rgba(255,255,255,0.3)",
+                boxShadow: achievement.achieved && tier.glow ? tier.glow : undefined,
+              }}
+            >
               {achievement.achieved ? unlockedLabel : lockedLabel}
             </span>
           </div>
         </div>
         {achievement.achieved && unlockedAt && (
-          <p className="mt-2 text-[10px] font-bold tracking-widest uppercase text-white/40">
-            {unlockedAtLabel} <span className="ml-1 text-white/80">{unlockedAt}</span>
+          <p className="mt-2 text-[10px] font-bold tracking-widest uppercase" style={{ color: `${tier.color}66` }}>
+            {unlockedAtLabel} <span style={{ color: `${tier.color}cc` }}>{unlockedAt}</span>
           </p>
         )}
       </div>
     </div>
   );
-};
+});
 
 const TechnicalDetail: React.FC<{ label: string; value?: string; fallback: string; }> = ({ label, value, fallback }) => (
   <div>

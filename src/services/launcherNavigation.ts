@@ -15,6 +15,7 @@ export const RESTORABLE_CATEGORIES = [
   "ROCKSTAR",
   "LOCAL",
   "PROFILE",
+  "TROPHIES",
   "RACING",
   "ROLEPLAYING",
   "SPORTS",
@@ -41,13 +42,12 @@ export const SETTINGS_TABS = [
 export const SIDEBAR_NAVIGATION_GROUPS = [
   { key: "filters", ids: ["ALL", "FAVORITES"] },
   { key: "platforms", ids: ["STEAM", "EPIC", "EA", "UBISOFT", "GOG", "XBOX", "RIOT", "BATTLENET", "ROCKSTAR", "LOCAL"] },
-  { key: "community", ids: ["FRIENDS", "FEED"] },
+  { key: "community", ids: ["FRIENDS", "FEED", "PROFILE", "TROPHIES"] },
   { key: "mods", ids: ["MODS"] },
 ] as const;
 
 export const SIDEBAR_NAVIGATION_ORDER = [
   ...SIDEBAR_NAVIGATION_GROUPS.flatMap((group) => group.ids),
-  "PROFILE",
 ] as const;
 
 export const getAdjacentSidebarCategory = (

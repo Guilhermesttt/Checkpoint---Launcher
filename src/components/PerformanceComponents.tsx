@@ -85,10 +85,62 @@ interface PVideoBackgroundProps {
 
 export const PVideoBackground: React.FC<PVideoBackgroundProps> = ({ src, className, opacity = 0.18 }) => {
   const low = useLowPerf();
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  React.useEffect(() => {
+    if (low) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    let isGameRunning = false;
+
+    const pauseVideo = () => {
+      if (video && !video.paused) {
+        video.pause();
+      }
+    };
+
+    const playVideo = () => {
+      if (video && video.paused && !document.hidden && document.hasFocus() && !isGameRunning) {
+        video.play().catch(() => undefined);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) pauseVideo();
+      else playVideo();
+    };
+
+    const handleGameLaunch = () => {
+      isGameRunning = true;
+      pauseVideo();
+    };
+
+    const handleGameStop = () => {
+      isGameRunning = false;
+      playVideo();
+    };
+
+    window.addEventListener("focus", playVideo);
+    window.addEventListener("blur", pauseVideo);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("checkpoint:game-launch", handleGameLaunch);
+    window.addEventListener("checkpoint:game-stop", handleGameStop);
+
+    return () => {
+      window.removeEventListener("focus", playVideo);
+      window.removeEventListener("blur", pauseVideo);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("checkpoint:game-launch", handleGameLaunch);
+      window.removeEventListener("checkpoint:game-stop", handleGameStop);
+    };
+  }, [low]);
+
   if (low) return null;
 
   return (
     <video
+      ref={videoRef}
       autoPlay
       loop
       muted

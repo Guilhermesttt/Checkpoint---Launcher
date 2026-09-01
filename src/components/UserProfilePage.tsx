@@ -8,12 +8,16 @@ import type { LauncherLanguage } from "../context/PreferencesContext";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
+import { calculatePlayerLevel, aggregateTrophyCounts } from "../utils/trophyTiers";
+import { getHubAggregateCounts } from "../utils/hubTrophies";
+import { useAuth } from "../auth/AuthProvider";
 import {
   calculateTotalPlayedMinutes,
   formatPlayedHours,
   getGamePlayedHours,
 } from "../utils/playtime";
 import ProfileEditorModal from "./ProfileEditorModal";
+import TrophyHistoryTimeline from "./trophies/TrophyHistoryTimeline";
 
 interface UserProfilePageProps {
   userProfile: UserProfile | null;
@@ -26,6 +30,12 @@ interface UserProfilePageProps {
   language?: LauncherLanguage;
   copyFriendDiscord?: boolean;
   onNotify?: (message: string, type?: "success" | "error" | "info") => void;
+  /**
+   * When provided, the page renders a server-side trophy/XP event timeline
+   * (Phase 3.5). Only the self profile should pass this; the friend-profile
+   * modal intentionally omits it.
+   */
+  userId?: string | null;
 }
 
 type LegacyGameFields = {
@@ -163,9 +173,9 @@ const ProfileAvatar: React.FC<{
 }> = ({ profile, authPhotoURL, displayName, compact = false }) => {
   const src = avatarUrl(profile, authPhotoURL);
   return (
-    <div className={`relative shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/[0.06] shadow-[0_18px_48px_rgba(0,0,0,.45)] ${compact ? "h-[72px] w-[72px]" : "h-[88px] w-[88px]"}`}>
+    <div className={`relative shrink-0 aspect-square overflow-hidden rounded-full border-2 border-white/15 bg-white/[0.06] shadow-[0_18px_48px_rgba(0,0,0,.45)] ${compact ? "h-[72px] w-[72px]" : "h-[88px] w-[88px]"}`}>
       {src ? (
-        <img src={src} alt="" className="h-full w-full object-cover" />
+        <img src={src} alt="" className="h-full w-full object-cover object-center aspect-square" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-xl font-black text-white/70">
           {initialsFor(displayName)}
@@ -249,6 +259,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   language = "pt-BR",
   copyFriendDiscord = false,
   onNotify,
+  userId = null,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -290,17 +301,14 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     const totalHours = totalMinutes / 60;
     const achievementTotals = calculateAchievementTotals(normalizedGames);
     const storedAchievementSummary = userProfile?.achievementSummary;
-    const hasCanonicalSummary = Boolean(
-      storedAchievementSummary?.updatedAt
-      || storedAchievementSummary?.available != null
-      || storedAchievementSummary?.unlocked != null
-    );
-    const totalAchievements = hasCanonicalSummary
-      ? Number(storedAchievementSummary?.unlocked || 0)
-      : achievementTotals.unlocked;
-    const totalPossible = hasCanonicalSummary
-      ? Math.max(Number(storedAchievementSummary?.available ?? 0), totalAchievements)
-      : achievementTotals.available;
+    const totalAchievements =
+      achievementTotals.unlocked > 0 || achievementTotals.available > 0
+        ? achievementTotals.unlocked
+        : Number(storedAchievementSummary?.unlocked || 0);
+    const totalPossible =
+      achievementTotals.available > 0
+        ? achievementTotals.available
+        : Math.max(Number(storedAchievementSummary?.available ?? 0), totalAchievements);
     const legacyLibrarySummary = userProfile?.librarySummary as
       | (UserProfile["librarySummary"] & LegacyLibrarySummaryFields)
       | undefined;
@@ -347,6 +355,21 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   const hasDiscordProfile = /^\d{10,24}$/.test(discordId);
   const discordDisplayName = String(userProfile?.discordUsername || discordId).trim();
 
+  const { user: authUser } = useAuth();
+  const playerLevel = useMemo(() => {
+    // Anti-farm: nível só do hub quando é seu perfil; visitantes veem total
+    const isSelf = editable && authUser?.uid;
+    if (isSelf) {
+      const hubAgg = getHubAggregateCounts(authUser.uid!, normalizedGames as any);
+      // se tem progresso no hub, usa hub; senão mostra nível 1 Bronze 1 (não farmado)
+      if ((hubAgg.hubPoints ?? 0) > 0 || normalizedGames.length > 0) {
+        return calculatePlayerLevel(0, 0, 0, hubAgg);
+      }
+    }
+    const agg = aggregateTrophyCounts(normalizedGames);
+    return calculatePlayerLevel(stats.totalHours, stats.totalAchievements, stats.totalGames, agg);
+  }, [normalizedGames, stats, editable, authUser?.uid]);
+
   return (
     <motion.div
       ref={scrollRef}
@@ -366,7 +389,26 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                 <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-white/30">
                   {editable ? "Seu perfil" : "Perfil do jogador"}
                 </p>
-                <h1 className={`${compactProfile ? "text-3xl" : "text-4xl"} truncate font-black tracking-tight text-white`}>{displayName}</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className={`${compactProfile ? "text-3xl" : "text-4xl"} truncate font-black tracking-tight text-white`}>{displayName}</h1>
+                  <div className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 ${compactProfile ? "scale-75 origin-left" : ""} ${playerLevel.tierInfo.borderClass} ${playerLevel.tierInfo.bgClass}`} style={{ boxShadow: playerLevel.tierInfo.glowColor }}>
+                    <Trophy className={`h-3.5 w-3.5 ${playerLevel.tierInfo.color}`} style={{ filter: `drop-shadow(0 0 6px ${playerLevel.tierInfo.hexColor}80)` }} />
+                    <span className={`text-xs font-black ${playerLevel.tierInfo.color}`}>Lv.{playerLevel.level}</span>
+                  </div>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`text-[10px] font-bold ${playerLevel.tierInfo.color}`}>{playerLevel.tierInfo.name}</span>
+                  <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/[0.06] border border-white/5">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${playerLevel.progress}%` }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                      className="h-full rounded-full"
+                      style={{ background: `linear-gradient(90deg, ${playerLevel.tierInfo.gradientFrom}, ${playerLevel.tierInfo.gradientTo})`, boxShadow: `0 0 8px ${playerLevel.tierInfo.hexColor}60` }}
+                    />
+                  </div>
+                  <span className="text-[9px] font-bold" style={{ color: playerLevel.tierInfo.hexColor }}>{playerLevel.progress}%</span>
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   {hasSteamProfile && (
                     <button
@@ -583,6 +625,8 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
             </Section>
           </aside>
         </div>
+
+        <TrophyHistoryTimeline userId={userId || userProfile?.uid || (user as any)?.uid || "current-user"} games={games} />
       </div>
       <ProfileEditorModal
         isOpen={isEditing}

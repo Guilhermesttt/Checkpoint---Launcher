@@ -51,26 +51,6 @@ const GameCard: React.FC<GameCardProps> = ({
   const [imageFailed, setImageFailed] = useState(false);
   const [useFallbackSteamUrl, setUseFallbackSteamUrl] = useState(false);
 
-  // 3D Parallax Tilt - 60fps console smooth (reduced range, snappier spring)
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const springConfig = { damping: 26, stiffness: 220 };
-  const rotateX = useSpring(useTransform(mouseY, [-CARD_HEIGHT / 2, CARD_HEIGHT / 2], [5, -5]), springConfig);
-  const rotateY = useSpring(useTransform(mouseX, [-CARD_WIDTH / 2, CARD_WIDTH / 2], [-5, 5]), springConfig);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left - rect.width / 2;
-    const y = e.clientY - rect.top - rect.height / 2;
-    mouseX.set(x);
-    mouseY.set(y);
-  };
-
-  const handleMouseLeave = () => {
-    mouseX.set(0);
-    mouseY.set(0);
-  };
-
   const currentImageSrc = useMemo(() => {
     if (steamAppId && !imageFailed) {
       if (useFallbackSteamUrl) {
@@ -194,41 +174,26 @@ const GameCard: React.FC<GameCardProps> = ({
       onClick={onClick}
       onKeyDown={handleKeyDown}
       onContextMenu={onContextMenu}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
       role="button"
       tabIndex={0}
       aria-label={title}
       aria-pressed={isActive}
       data-game-card={true}
-      className="group relative flex items-center justify-center p-0 text-left select-none focus:outline-none cursor-pointer perspective-1000"
+      className="group relative flex items-center justify-center p-0 text-left select-none focus:outline-none cursor-pointer"
       style={{
         width: CARD_FRAME_WIDTH,
         height: CARD_FRAME_HEIGHT,
       }}
     >
-      <motion.div
+      <div
         style={{
           width: CARD_WIDTH,
           height: CARD_HEIGHT,
-          rotateX,
-          rotateY,
-          backfaceVisibility: "hidden" as const,
-          WebkitBackfaceVisibility: "hidden" as const,
         }}
-        animate={{
-          scale: isActive ? 1.05 : 0.95,
-          y: isActive ? -8 : 0,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 220,
-          damping: 20,
-        }}
-        className={`relative isolate rounded-[28px] bg-[#090A0D] border transform-gpu will-change-transform flex flex-col justify-between transition-[border-color,box-shadow] duration-200 ${
+        className={`relative isolate rounded-[28px] bg-[#090A0D] border transform-gpu will-change-transform flex flex-col justify-between transition-all duration-200 ease-out ${
           isActive
-            ? "border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
-            : "border-white/[0.08] hover:border-white/25 shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
+            ? "scale-[1.05] -translate-y-2 border-white/80 ring-2 ring-white/70 shadow-[0_0_40px_rgba(255,255,255,0.45),0_25px_60px_rgba(0,0,0,0.95)] z-20"
+            : "scale-95 border-white/[0.08] hover:border-white/25 hover:scale-[0.98] shadow-[0_10px_28px_rgba(0,0,0,0.7)] hover:shadow-[0_15px_36px_rgba(0,0,0,0.85)] z-10"
         }`}
       >
         {/* Clip container isolado - borda arredondada fica aqui, fora do layer de transform 3D */}
@@ -308,7 +273,7 @@ const GameCard: React.FC<GameCardProps> = ({
             {platformBadge?.label || "Jogo"} • Pherielium
           </p>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };

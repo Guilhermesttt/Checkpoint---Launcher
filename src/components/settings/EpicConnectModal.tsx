@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, LogOut, CheckCircle2, LogIn, ChevronDown, ChevronUp, KeyRound, AlertCircle } from "lucide-react";
+import { X, ExternalLink, LogOut, CheckCircle2, KeyRound, AlertCircle } from "lucide-react";
 import type { SoundEffectType } from "../../hooks/useSoundEffects";
 import { LoadingState } from "../ui/loading-state";
-import { fetchEpicStatus } from "../../services/epic";
+import { fetchEpicStatus, validateEpicSession } from "../../services/epic";
+import { PHERIELIUM_LOGO_PATH } from "../../constants/assets";
 
 import type { PlatformOperationState } from "../../types/platformOperations";
 import { getPlatformPhaseLabel } from "../../utils/platformOperationReducer";
@@ -28,30 +29,48 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
   const [sid, setSid] = useState("");
   const [loading, setLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [showManualInput, setShowManualInput] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentAccount, setCurrentAccount] = useState<{
     authenticated: boolean;
     displayName?: string;
+  } | null>(null);
+  const [needsReauth, setNeedsReauth] = useState<{
+    reason: "expired" | "network";
   } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setError(null);
       setSid("");
-      setShowManualInput(false);
-      void fetchEpicStatus()
-        .then((status) => {
-          setCurrentAccount({
-            authenticated: Boolean(status.authenticated),
-            displayName: status.displayName,
-          });
-        })
-        .catch(() => {
-          setCurrentAccount({ authenticated: false });
-        });
+      setNeedsReauth(null);
+      // Run both checks in parallel. fetchEpicStatus reflects Legendary's view;
+      // validateEpicSession reflects the encrypted vault + auto-refresh path.
+      void Promise.allSettled([fetchEpicStatus(), validateEpicSession()]).then(
+        ([statusResult, sessionResult]) => {
+          if (statusResult.status === "fulfilled") {
+            setCurrentAccount({
+              authenticated: Boolean(statusResult.value.authenticated),
+              displayName: statusResult.value.displayName,
+            });
+          } else {
+            setCurrentAccount({ authenticated: false });
+          }
+          if (sessionResult.status === "fulfilled") {
+            const { valid, reason } = sessionResult.value;
+            if (!valid && (reason === "expired" || reason === "network")) {
+              setNeedsReauth({ reason });
+            }
+          }
+        },
+      );
     }
   }, [isOpen]);
+
+  const reauthMessage = needsReauth
+    ? needsReauth.reason === "expired"
+      ? "Sua sessão expirou. Reconecte a conta da Epic Games para continuar."
+      : "Não foi possível validar sua sessão Epic. Verifique a conexão e reconecte."
+    : null;
 
   const isOperationBusy = Boolean(
     operationState &&
@@ -165,9 +184,7 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
             <div className="p-6">
               <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center font-bold text-black tracking-wider text-xs">
-                    EPIC
-                  </div>
+                  <img src={PHERIELIUM_LOGO_PATH} alt="Phelierium" className="w-8 h-8 rounded-lg" />
                   <h2 className="text-lg font-bold text-white">Conectar Epic Games</h2>
                 </div>
                 <button
@@ -205,83 +222,58 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                   </div>
                 )}
 
-                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
-                  <p className="text-xs text-neutral-400 leading-relaxed">
-                    Faça login com sua conta da Epic Games em uma janela integrada para importar seus jogos automaticamente.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleQuickLogin}
-                    disabled={isBusy}
-                    className="w-full py-3 bg-white hover:bg-neutral-200 text-black rounded-xl font-bold transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-sm"
-                  >
-                    {isBusy ? (
-                      <LoadingState label={busyLabel} variant="Drive" size="sm" />
-                    ) : (
-                      <>
-                        <LogIn size={16} />
-                        <span>{currentAccount?.authenticated ? "Trocar de Conta Epic" : "Fazer Login com a Epic Games"}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {error && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-neutral-900 border border-neutral-700">
-                    <AlertCircle className="w-4 h-4 text-white shrink-0 mt-0.5" />
-                    <span className="text-white text-xs leading-relaxed">{error}</span>
+                {reauthMessage && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/40">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-amber-100 text-xs font-semibold leading-relaxed">
+                        {reauthMessage}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleQuickLogin}
+                        disabled={isBusy}
+                        className="text-amber-300 hover:text-amber-200 text-[11px] font-bold underline underline-offset-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        Reconectar agora
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowManualInput(!showManualInput)}
-                    className="flex items-center justify-between w-full text-xs text-neutral-500 hover:text-neutral-300 transition-colors py-1 cursor-pointer"
-                  >
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <KeyRound size={13} />
-                      Opção avançada: Inserir código de autorização manualmente
-                    </span>
-                    {showManualInput ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-
-                  {showManualInput && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mt-3 space-y-3 pt-3 border-t border-neutral-800 overflow-hidden"
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    Insira o código de autorização ou JSON da Epic Games para vincular sua conta localmente.
+                  </p>
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleOpenAuthUrl}
+                      disabled={isBusy}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium rounded-lg border border-neutral-800 transition-colors cursor-pointer"
                     >
-                      <button
-                        type="button"
-                        onClick={handleOpenAuthUrl}
-                        disabled={isBusy}
-                        className="flex items-center gap-2 w-full px-3 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium rounded-lg border border-neutral-800 transition-colors cursor-pointer"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Abrir página de autorização no navegador
-                      </button>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Abrir página de autorização no navegador
+                    </button>
 
-                      <form onSubmit={handleSubmit} className="space-y-3">
-                        <input
-                          type="text"
-                          value={sid}
-                          disabled={isBusy}
-                          onChange={(e) => setSid(e.target.value)}
-                          placeholder="Cole o código ou JSON aqui..."
-                          className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
-                        />
-                        <button
-                          type="submit"
-                          disabled={!sid.trim() || isBusy}
-                          className="w-full py-2.5 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 text-black rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
-                        >
-                          Confirmar Código
-                        </button>
-                      </form>
-                    </motion.div>
-                  )}
+                    <form onSubmit={handleSubmit} className="space-y-3">
+                      <input
+                        type="text"
+                        value={sid}
+                        disabled={isBusy}
+                        onChange={(e) => setSid(e.target.value)}
+                        placeholder="Cole o código ou JSON aqui..."
+                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!sid.trim() || isBusy}
+                        className="w-full py-2.5 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 text-black rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        Confirmar Código
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </div>
             </div>

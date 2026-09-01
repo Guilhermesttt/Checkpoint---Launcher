@@ -333,26 +333,54 @@ html[data-launcher-theme="sunset"] {
   }
 
   .thin-scrollbar::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
 
   .thin-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .thin-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 6px;
   }
 
   .thin-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.48);
   }
 
   .thin-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  }
+
+  .detail-panel-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .detail-panel-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+  }
+
+  .detail-panel-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.45);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: all 0.2s ease;
+  }
+
+  .detail-panel-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.85);
+    background-clip: padding-box;
+  }
+
+  .detail-panel-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.45) transparent;
   }
 
   .add-game-scrollbar {

@@ -72,33 +72,21 @@ export const disconnectPlatform = async (
   await api.setPlatformCleanupPhase(uid, platform, operationId, "removing-local-data");
   const local = await api.purgeLocalPlatformData(uid, platform);
 
-  // Phase 3: Removing cloud data (non-fatal: log and continue if RPC fails)
+  // Phase 3: Removing cloud data
+  onPhaseChange?.("removing-cloud-data");
+  await api.setPlatformCleanupPhase(uid, platform, operationId, "removing-cloud-data");
   let cloudData: any = null;
   try {
-    onPhaseChange?.("removing-cloud-data");
-    await api.setPlatformCleanupPhase(uid, platform, operationId, "removing-cloud-data");
     const { data, error } = await supabase.rpc("purge_my_platform_data", {
       platform_name: platform,
     });
-    cloudData = data;
     if (error) {
-      console.warn(`[platform-lifecycle] RPC falhou para ${platform}, tentando deleção direta...`, error.message);
-      // Fallback: direct table deletion
-      await supabase
-        .from("user_games")
-        .delete()
-        .eq("user_id", uid)
-        .eq("launcher_type", platform);
+      console.warn(`[platformLifecycle] RPC purge_my_platform_data retornou erro, prosseguindo com limpeza local:`, error.message || error);
+    } else {
+      cloudData = data;
     }
-  } catch (err: any) {
-    console.warn(`[platform-lifecycle] Limpeza em nuvem falhou para ${platform}:`, err?.message);
-    try {
-      await supabase
-        .from("user_games")
-        .delete()
-        .eq("user_id", uid)
-        .eq("launcher_type", platform);
-    } catch {}
+  } catch (err) {
+    console.warn(`[platformLifecycle] Falha ao contatar nuvem para purge, prosseguindo:`, err);
   }
 
   // Phase 4: Refreshing profile & summary
@@ -108,7 +96,7 @@ export const disconnectPlatform = async (
   await syncPublicLibrarySummary(uid, profile).catch(() => {});
 
   // Always complete cleanup journal to prevent infinite retry loop
-  await api.completePlatformCleanup(uid, platform, operationId);
+  await api.completePlatformCleanup(uid, platform, operationId).catch(() => {});
 
   return {
     platform,

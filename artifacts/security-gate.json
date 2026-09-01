@@ -1,148 +1,148 @@
 {
-  "timestamp": "2026-08-29T07:06:40.903Z",
-  "overallStatus": "PASSED",
+  "timestamp": "2026-08-31T14:43:54.242Z",
+  "overallStatus": "FAILED",
   "controls": [
     {
       "id": 1,
       "name": "SQL Injection & Parameterized Access",
       "category": "Database",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 2,
       "name": "XSS & Store HTML Sanitization",
       "category": "Renderer",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 3,
       "name": "Auth Token & Credentials Boundary",
       "category": "Auth",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 4,
       "name": "Password Hashing & Auth Provider",
       "category": "Auth",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 5,
       "name": "Sensitive Data & Error Redaction",
       "category": "Observability",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 6,
       "name": "OAuth State & CSRF Nonces",
       "category": "Auth",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 7,
       "name": "Rate Limiting & Abuse Prevention",
       "category": "API",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 8,
       "name": "Security Headers & CORS Config",
       "category": "API",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 9,
       "name": "Dependency Security Audit",
       "category": "Supply Chain",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 10,
       "name": "Secret & Credential Scanner",
       "category": "Source",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 11,
       "name": "Transport Security & HTTPS Enforcement",
       "category": "Network",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 12,
       "name": "Row Level Security & Scoped RPCs",
       "category": "Database",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 13,
       "name": "Strict Input Validation & Zod Schemas",
       "category": "API",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 14,
       "name": "Error Information Leakage Prevention",
       "category": "Observability",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 15,
       "name": "Upload & Media Boundary Validation",
       "category": "Storage",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 16,
       "name": "Packaged & API Content Security Policy",
       "category": "Renderer",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 17,
       "name": "Desktop IPC Security & Window Isolation",
       "category": "Desktop",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 18,
       "name": "Executable Integrity & Safe Spawning",
       "category": "Desktop",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 19,
       "name": "Transactional Local Purge & Cleanup Journal",
       "category": "Lifecycle",
-      "status": "PASS"
+      "status": "FAIL"
     },
     {
       "id": 20,
       "name": "Automated CI/CD Release Gate",
       "category": "Release",
-      "status": "PASS"
+      "status": "FAIL"
     }
   ],
   "steps": {
     "secrets": {
       "passed": true,
-      "duration": 8403,
+      "duration": 6081,
       "exitCode": 0
     },
     "security-tests": {
-      "passed": true,
-      "duration": 3413,
-      "exitCode": 0
+      "passed": false,
+      "duration": 3392,
+      "exitCode": 1
     },
     "typecheck": {
       "passed": true,
-      "duration": 552,
+      "duration": 478,
       "exitCode": 0
     },
     "build": {
-      "passed": true,
-      "duration": 26013,
-      "exitCode": 0
+      "passed": false,
+      "duration": 11607,
+      "exitCode": 2
     }
   }
 }

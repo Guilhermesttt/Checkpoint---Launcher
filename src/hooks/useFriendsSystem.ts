@@ -282,19 +282,17 @@ export function useFriendsSystem({
 
     initialSync();
 
-    // Intervalo de polling contínuo (mantém a lista de amigos e solicitações sincronizadas mesmo minimizado)
+    // Intervalo de polling secundário (mantém sincronizado em background caso WebSocket oscile)
     const interval = window.setInterval(() => {
-      if (!isInitialSync) {
+      if (!isInitialSync && document.hasFocus()) {
         syncFriendStatuses();
-        void refreshProfile();
       }
-    }, 15_000);
+    }, 60_000);
 
-    // Sincronizar quando a aba volta ao foco
+    // Sincronizar imediatamente quando a janela volta ao foco
     const handleFocus = () => {
       if (!isInitialSync) {
         syncFriendStatuses();
-        void refreshProfile();
       }
     };
 

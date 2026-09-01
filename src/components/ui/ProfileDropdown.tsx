@@ -61,9 +61,9 @@ export function ProfileDropdown({
               {userDisplay}
             </span>
           </div>
-          <div className="relative h-11 w-11 overflow-hidden rounded-xl border border-white/20 bg-white/10 ring-2 ring-white/10 group-hover:ring-white/30 group-hover:scale-105 transition-all shadow-md">
+          <div className="relative h-11 w-11 shrink-0 aspect-square overflow-hidden rounded-xl border border-white/20 bg-white/10 ring-2 ring-white/10 group-hover:ring-white/30 group-hover:scale-105 transition-all shadow-md">
             {avatarUrl ? (
-              <img src={avatarUrl} alt={userDisplay} className="h-full w-full object-cover" />
+              <img src={avatarUrl} alt={userDisplay} className="h-full w-full object-cover object-center aspect-square" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-xs font-black text-white/70">
                 {initials}

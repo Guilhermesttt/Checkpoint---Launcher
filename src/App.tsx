@@ -19,6 +19,8 @@ import { useWhatsNewRelease } from "./hooks/useWhatsNewRelease";
 import { isBackendHealthy } from "./services/api";
 import { usePrefersReducedMotion } from "./hooks/usePrefersReducedMotion";
 import { setLauncherInputLocked } from "./utils/launcherInputLock";
+// import TrophyUnlockToast from "./components/TrophyUnlockToast";
+const TrophyUnlockToast = React.lazy(() => import("./components/TrophyUnlockToast"));
 import type { SoundTheme } from "./context/PreferencesContext";
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
@@ -367,6 +369,9 @@ const AppContent: React.FC = () => {
   return (
     <MotionConfig reducedMotion={reducedMotionProp}>
       <div className="fixed inset-0 h-dvh w-full select-none overflow-hidden overscroll-none">
+        <React.Suspense fallback={null}>
+          <TrophyUnlockToast userId={user?.uid ?? null} />
+        </React.Suspense>
         {isIntroVisible ? (
           <AnimatePresence mode="wait">
             <GameBootIntro
@@ -382,7 +387,6 @@ const AppContent: React.FC = () => {
           </AnimatePresence>
         ) : (
           <div className="absolute inset-0">
-            {!lowPerformanceMode && <MainVideoBackground />}
             <Home />
             <GamepadStatusOverlay />
             <ControllerVirtualKeyboard />

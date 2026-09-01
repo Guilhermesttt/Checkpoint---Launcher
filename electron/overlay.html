@@ -10,9 +10,9 @@
 
   <style>
     /* ==========================================================================
-       PHELIERIUM OVERLAY — DESIGN SYSTEM (MONO SPACE & CONSTELLATION)
-       Identidade visual unificada: Space Grotesk + Inter + Unbounded, preto sideral e luz pura.
-       ========================================================================== */
+   PHELIERIUM OVERLAY — DESIGN SYSTEM (MONO SPACE & CONSTELLATION)
+   Identidade visual unificada: Space Grotesk + Inter + Unbounded, preto sideral e luz pura.
+   ========================================================================== */
 
     @font-face {
       font-family: "Inter";
@@ -57,9 +57,29 @@
       --text-secondary: rgba(255, 255, 255, 0.72);
       --text-muted: rgba(255, 255, 255, 0.44);
       --card-duration: 4200ms;
+
+      /* Sistema de Tiers de Troféus (PlayStation / Phelierium) — RGB para uso em rgba() */
+      --tier-iron-rgb: 113, 121, 126;
+      /* #71797E */
+      --tier-bronze-rgb: 205, 127, 50;
+      /* #cd7f32 */
+      --tier-silver-rgb: 163, 163, 163;
+      /* #a3a3a3 */
+      --tier-gold-rgb: 234, 179, 8;
+      /* #eab308 */
+      --tier-platinum-rgb: 56, 189, 248;
+      /* #38bdf8 */
+      --tier-platinum-secondary-rgb: 192, 132, 252;
+      /* acento roxo complementar da platina */
     }
 
-    h1, h2, h3, .panel-logo, .achievement-summary strong, .social-badge, .achievement-eyebrow {
+    h1,
+    h2,
+    h3,
+    .panel-logo,
+    .achievement-summary strong,
+    .social-badge,
+    .achievement-eyebrow {
       font-family: var(--overlay-font-display);
     }
 
@@ -132,8 +152,8 @@
     }
 
     /* ==========================================================================
-       TOASTS (Notificações Flutuantes - Vidro Cósmico Mono)
-       ========================================================================== */
+   TOASTS (Notificações Flutuantes - Vidro Cósmico Mono)
+   ========================================================================== */
 
     #achievement-stack,
     #social-stack {
@@ -272,6 +292,170 @@
       z-index: 3;
     }
 
+    /* ==========================================================================
+   TIERS DE TROFÉUS (PlayStation / Phelierium)
+   Sistema unificado por variável CSS: cada tier define --tier-rgb e a
+   quantidade de "glow" (--tier-glow) que aplica em cascata em todos os
+   elementos do card (borda, linha de acento, ícone, eyebrow, barra de
+   progresso). Isso evita duplicar 6 blocos de regras por tier.
+   ========================================================================== */
+
+    .achievement-card.tier-iron {
+      --tier-rgb: var(--tier-iron-rgb);
+      --tier-glow: 0;
+      --tier-bg-tint: 0.06;
+    }
+
+    .achievement-card.tier-bronze {
+      --tier-rgb: var(--tier-bronze-rgb);
+      --tier-glow: 0.85;
+      --tier-bg-tint: 0.22;
+    }
+
+    .achievement-card.tier-silver {
+      --tier-rgb: var(--tier-silver-rgb);
+      --tier-glow: 0.85;
+      --tier-bg-tint: 0.2;
+    }
+
+    .achievement-card.tier-gold {
+      --tier-rgb: var(--tier-gold-rgb);
+      --tier-glow: 1;
+      --tier-bg-tint: 0.28;
+    }
+
+    .achievement-card.tier-platinum {
+      --tier-rgb: var(--tier-platinum-rgb);
+      --tier-glow: 1;
+      --tier-bg-tint: 0.3;
+    }
+
+    /* Ferro: sem glow, tratamento discreto — o troféu ainda não foi conquistado
+   e não sabemos (ou não vale) o tier real. Não deve competir visualmente
+   com um Ouro ou Platina de verdade. */
+    .achievement-card.tier-iron .overlay-shell {
+      border-color: rgba(var(--tier-rgb), 0.3);
+      background:
+        linear-gradient(145deg, rgba(16, 16, 16, 0.92), rgba(6, 6, 6, 0.97));
+      box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(var(--tier-rgb), 0.18);
+    }
+
+    .achievement-card.tier-iron .overlay-shell::before {
+      background: rgba(var(--tier-rgb), 0.75);
+      box-shadow: none;
+    }
+
+    .achievement-card.tier-iron .achievement-eyebrow {
+      color: rgba(var(--tier-rgb), 0.9);
+      text-shadow: none;
+    }
+
+    .achievement-card.tier-iron .icon-ring {
+      color: rgba(var(--tier-rgb), 0.4);
+    }
+
+    .achievement-card.tier-iron .icon-avatar {
+      filter: grayscale(0.6);
+    }
+
+    /* Bronze / Prata / Ouro / Platina compartilham a mesma estrutura visual,
+   variando só a cor e a intensidade do glow via --tier-rgb / --tier-glow. */
+    .achievement-card.tier-bronze .overlay-shell,
+    .achievement-card.tier-silver .overlay-shell,
+    .achievement-card.tier-gold .overlay-shell,
+    .achievement-card.tier-platinum .overlay-shell {
+      border-color: rgba(var(--tier-rgb), calc(0.35 + 0.25 * var(--tier-glow)));
+      background:
+        radial-gradient(circle at 16% 0%, rgba(var(--tier-rgb), var(--tier-bg-tint)), transparent 45%),
+        linear-gradient(145deg, rgba(14, 14, 14, 0.94), rgba(5, 5, 5, 0.98));
+      box-shadow:
+        0 20px 52px rgba(0, 0, 0, 0.65),
+        0 0 calc(20px + 20px * var(--tier-glow)) rgba(var(--tier-rgb), calc(0.14 + 0.2 * var(--tier-glow))),
+        inset 0 1px 0 rgba(var(--tier-rgb), calc(0.3 + 0.2 * var(--tier-glow)));
+    }
+
+    .achievement-card.tier-bronze .overlay-shell::before,
+    .achievement-card.tier-silver .overlay-shell::before,
+    .achievement-card.tier-gold .overlay-shell::before,
+    .achievement-card.tier-platinum .overlay-shell::before {
+      background: rgb(var(--tier-rgb));
+      box-shadow: 0 0 calc(12px + 10px * var(--tier-glow)) rgba(var(--tier-rgb), 0.9);
+    }
+
+    .achievement-card.tier-bronze .achievement-eyebrow,
+    .achievement-card.tier-silver .achievement-eyebrow,
+    .achievement-card.tier-gold .achievement-eyebrow,
+    .achievement-card.tier-platinum .achievement-eyebrow {
+      color: rgb(var(--tier-rgb));
+      text-shadow: 0 0 calc(10px + 6px * var(--tier-glow)) rgba(var(--tier-rgb), 0.5);
+    }
+
+    .achievement-card.tier-bronze .icon-ring,
+    .achievement-card.tier-silver .icon-ring,
+    .achievement-card.tier-gold .icon-ring,
+    .achievement-card.tier-platinum .icon-ring {
+      color: rgba(var(--tier-rgb), 0.7);
+    }
+
+    /* Platina: tier de prestígio, ganha um segundo tom (roxo) e letter-spacing
+   maior no eyebrow para se destacar mesmo entre os outros tiers coloridos. */
+    .achievement-card.tier-platinum .overlay-shell {
+      background:
+        radial-gradient(circle at 16% 0%, rgba(var(--tier-rgb), 0.3), transparent 45%),
+        radial-gradient(circle at 85% 100%, rgba(var(--tier-platinum-secondary-rgb), 0.2), transparent 50%),
+        linear-gradient(145deg, rgba(12, 26, 42, 0.95), rgba(5, 10, 20, 0.98));
+    }
+
+    .achievement-card.tier-platinum .overlay-shell::before {
+      background: linear-gradient(180deg, rgb(var(--tier-rgb)), #818cf8, rgb(var(--tier-platinum-secondary-rgb)));
+    }
+
+    .achievement-card.tier-platinum .achievement-eyebrow {
+      letter-spacing: 0.12em;
+    }
+
+    /* Variante "auto-platina": jogos com 1 única conquista (platina automática,
+   sem verdadeiro 100%). Mantém a identidade platina mas com menos destaque,
+   pra não competir com uma platina "de verdade" (100% em jogo com várias
+   conquistas). Adicionar a classe .is-auto-platinum junto de .tier-platinum. */
+    .achievement-card.tier-platinum.is-auto-platinum {
+      --tier-glow: 0.5;
+    }
+
+    .achievement-card.tier-platinum.is-auto-platinum .overlay-shell::before {
+      opacity: 0.7;
+    }
+
+    .achievement-card.tier-platinum.is-auto-platinum .achievement-eyebrow::after {
+      content: " · AUTO";
+      opacity: 0.55;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* Ícone do troféu (quando não há ícone real da conquista) tingido com a
+   cor do tier em vez de branco fixo — reforça a leitura de raridade mesmo
+   sem olhar pro eyebrow. */
+    .achievement-card .icon-avatar svg {
+      color: rgb(var(--tier-rgb, 255, 255, 255));
+    }
+
+    .achievement-card.tier-iron .icon-avatar svg {
+      color: rgba(var(--tier-rgb), 0.85);
+    }
+
+    /* Barra de progresso do toast também reflete a cor do tier, em vez do
+   branco genérico — mantém a identidade do tier até o card sumir. */
+    .achievement-card .overlay-progress::after {
+      background: linear-gradient(90deg, rgba(var(--tier-rgb, 255, 255, 255), 0.35), rgb(var(--tier-rgb, 255, 255, 255)));
+    }
+
+    .achievement-card.tier-iron .overlay-progress::after {
+      background: linear-gradient(90deg, rgba(var(--tier-rgb), 0.25), rgba(var(--tier-rgb), 0.7));
+    }
+
     /* Sweep de brilho estelar */
     .overlay-shell::after {
       content: "";
@@ -317,7 +501,7 @@
         linear-gradient(145deg, rgba(8, 8, 8, 0.3), rgba(4, 4, 4, 0.5));
     }
 
-    .overlay-shell > :not(.overlay-video-layer) {
+    .overlay-shell> :not(.overlay-video-layer) {
       position: relative;
       z-index: 1;
     }
@@ -389,6 +573,14 @@
       padding: 0;
     }
 
+    /* Ícone real da conquista (foto) ganha um contorno sutil na cor do tier,
+   pra não perder a identidade de raridade quando não é o ícone genérico
+   de troféu. */
+    .achievement-card .icon-avatar.is-photo {
+      border-color: rgba(var(--tier-rgb, 255, 255, 255), 0.45);
+      box-shadow: 0 0 0 1px rgba(var(--tier-rgb, 255, 255, 255), 0.15) inset;
+    }
+
     .social-card.kind-game-start .icon-ring,
     .social-card.kind-overlay-hint .icon-ring {
       display: none;
@@ -440,26 +632,67 @@
     }
 
     @keyframes animate-icon-trophy-loop {
-      0%, 45%, 100% { transform: translateY(0) scale(1) rotate(0deg); }
-      60% { transform: translateY(-1px) scale(1.06) rotate(-3deg); }
-      75% { transform: translateY(0) scale(0.98) rotate(2deg); }
+
+      0%,
+      45%,
+      100% {
+        transform: translateY(0) scale(1) rotate(0deg);
+      }
+
+      60% {
+        transform: translateY(-1px) scale(1.06) rotate(-3deg);
+      }
+
+      75% {
+        transform: translateY(0) scale(0.98) rotate(2deg);
+      }
     }
 
     @keyframes animate-icon-controller-shell {
-      0%, 42%, 100% { transform: scale(1); }
-      58% { transform: scale(0.95); }
+
+      0%,
+      42%,
+      100% {
+        transform: scale(1);
+      }
+
+      58% {
+        transform: scale(0.95);
+      }
     }
 
     @keyframes animate-icon-controller-controls {
-      0%, 42%, 100% { transform: scale(1) rotate(0deg); }
-      56% { transform: scale(0.85) rotate(18deg); }
-      70% { transform: scale(1) rotate(-18deg); }
+
+      0%,
+      42%,
+      100% {
+        transform: scale(1) rotate(0deg);
+      }
+
+      56% {
+        transform: scale(0.85) rotate(18deg);
+      }
+
+      70% {
+        transform: scale(1) rotate(-18deg);
+      }
     }
 
     @keyframes animate-icon-camera-lens {
-      0%, 38%, 100% { transform: scale(1); }
-      50% { transform: scale(0.45); }
-      68% { transform: scale(1.12); }
+
+      0%,
+      38%,
+      100% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(0.45);
+      }
+
+      68% {
+        transform: scale(1.12);
+      }
     }
 
     .overlay-content {
@@ -543,8 +776,8 @@
     }
 
     /* ==========================================================================
-       COMMAND PANEL — VIDRO SIDERAL TRANSLÚCIDO & SUPERFÍCIES MONO
-       ========================================================================== */
+   COMMAND PANEL — VIDRO SIDERAL TRANSLÚCIDO & SUPERFÍCIES MONO
+   ========================================================================== */
 
     body.panel-open {
       background: rgba(0, 0, 0, 0.38);
@@ -1862,7 +2095,7 @@
       color: #fff;
     }
 
-    .achievement-summary > span {
+    .achievement-summary>span {
       color: var(--text-muted);
       font-size: 11px;
     }
@@ -1898,6 +2131,7 @@
       transform: translateZ(0);
       will-change: transform;
       transition: transform 120ms cubic-bezier(0.2, 0, 0, 1), background-color 120ms ease, border-color 120ms ease;
+      position: relative;
     }
 
     .achievement-item:hover {
@@ -1910,6 +2144,41 @@
     .achievement-item.is-locked {
       opacity: 0.4;
       filter: grayscale(1);
+    }
+
+    /* Accent lateral por tier na lista de conquistas do painel — mesmo
+   vocabulário visual do toast, pra reforçar a identidade do sistema
+   de tiers também na revisão detalhada do jogo. Requer que o item
+   receba uma classe tier-* (bronze/silver/gold/platinum/iron) junto
+   de .achievement-item quando esse dado estiver disponível. */
+    .achievement-item[class*="tier-"] {
+      border-left: 2px solid rgba(var(--tier-rgb, 255, 255, 255), 0.55);
+    }
+
+    .achievement-item.tier-bronze {
+      --tier-rgb: var(--tier-bronze-rgb);
+    }
+
+    .achievement-item.tier-silver {
+      --tier-rgb: var(--tier-silver-rgb);
+    }
+
+    .achievement-item.tier-gold {
+      --tier-rgb: var(--tier-gold-rgb);
+    }
+
+    .achievement-item.tier-platinum {
+      --tier-rgb: var(--tier-platinum-rgb);
+    }
+
+    .achievement-item.tier-iron {
+      --tier-rgb: var(--tier-iron-rgb);
+    }
+
+    .achievement-item[class*="tier-"]:not(.is-locked) {
+      background:
+        linear-gradient(90deg, rgba(var(--tier-rgb, 255, 255, 255), 0.06), transparent 60%),
+        var(--panel-surface);
     }
 
     .achievement-icon {
@@ -1947,6 +2216,10 @@
       text-transform: uppercase;
       letter-spacing: .08em;
       font-weight: 700;
+    }
+
+    .achievement-item[class*="tier-"] .achievement-state {
+      color: rgb(var(--tier-rgb, 255, 255, 255));
     }
 
     .panel-view[data-panel-view="achievements"].is-active {
@@ -1997,7 +2270,7 @@
       height: 22px;
     }
 
-    .capture-hero > div > span {
+    .capture-hero>div>span {
       color: var(--text-muted);
       font-size: 8.5px;
       font-weight: 800;
@@ -2017,7 +2290,7 @@
       font-size: 10.5px;
     }
 
-    .capture-hero > button {
+    .capture-hero>button {
       min-height: 38px;
       padding: 0 16px;
       display: flex;
@@ -2034,12 +2307,12 @@
       transition: transform 120ms ease, background-color 120ms ease;
     }
 
-    .capture-hero > button:hover {
+    .capture-hero>button:hover {
       transform: translateY(-1px) translateZ(0);
       background: #f0f0f0;
     }
 
-    .capture-hero > button:active {
+    .capture-hero>button:active {
       transform: scale(0.97) translateZ(0);
     }
 
@@ -2367,6 +2640,7 @@
         transform: scale(0.96) translateY(14px);
         filter: blur(6px);
       }
+
       100% {
         opacity: 1;
         transform: scale(1) translateY(0);
@@ -2380,11 +2654,13 @@
         transform: translateX(var(--entry-x)) scale(0.94);
         filter: blur(4px);
       }
+
       65% {
         opacity: 1;
         transform: translateX(calc(var(--entry-x) * -0.05)) scale(1.012);
         filter: blur(0);
       }
+
       100% {
         opacity: 1;
         transform: translateX(0) scale(1);
@@ -2398,6 +2674,7 @@
         transform: translateX(0) scale(1);
         filter: blur(0);
       }
+
       to {
         opacity: 0;
         transform: translateX(var(--entry-x)) scale(0.95);
@@ -2406,13 +2683,23 @@
     }
 
     @keyframes progress-drain {
-      from { transform: scaleX(1); }
-      to { transform: scaleX(0); }
+      from {
+        transform: scaleX(1);
+      }
+
+      to {
+        transform: scaleX(0);
+      }
     }
 
     @keyframes shine-sweep {
-      0% { transform: translateX(-120%) skewX(-15deg); }
-      100% { transform: translateX(150%) skewX(-15deg); }
+      0% {
+        transform: translateX(-120%) skewX(-15deg);
+      }
+
+      100% {
+        transform: translateX(150%) skewX(-15deg);
+      }
     }
 
     @keyframes fade-in {
@@ -2421,6 +2708,7 @@
         transform: translateY(10px) scale(0.99);
         filter: blur(4px);
       }
+
       to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -2429,9 +2717,12 @@
     }
 
     @keyframes pulse-online-glow {
-      0%, 100% {
+
+      0%,
+      100% {
         box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
       }
+
       50% {
         box-shadow: 0 0 14px rgba(255, 255, 255, 1), 0 0 22px rgba(255, 255, 255, 0.4);
       }
@@ -2491,6 +2782,7 @@
 
     /* Reduced Motion */
     @media (prefers-reduced-motion: reduce) {
+
       .animate-icon,
       .animate-icon *,
       .status-dot.online,
@@ -2626,38 +2918,54 @@
       <div class="panel-logo" aria-label="Phelierium"><img src="../assets/icon.png" alt="" /></div>
       <nav class="panel-navigation" aria-label="Navegação do overlay">
         <button class="panel-tab is-active" data-panel-tab="friends">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-home" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-home" />
+            </svg></span>
           <span>Início</span>
         </button>
         <button class="panel-tab" data-panel-tab="chats">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-chat" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-chat" />
+            </svg></span>
           <span>Chat</span>
           <b class="nav-notification" id="nav-unread" hidden></b>
         </button>
         <button class="panel-tab" data-panel-tab="game">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-gamepad" />
+            </svg></span>
           <span>Jogo</span>
         </button>
         <button class="panel-tab" data-panel-tab="media">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-image" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-image" />
+            </svg></span>
           <span>Mídia</span>
         </button>
         <button class="panel-tab" data-panel-tab="achievements">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-trophy" />
+            </svg></span>
           <span>Conquistas</span>
         </button>
         <button class="panel-tab" data-panel-tab="performance">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-monitor" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-monitor" />
+            </svg></span>
           <span>Desempenho</span>
         </button>
         <button class="panel-tab" data-panel-tab="audio">
-          <span class="nav-icon"><svg class="ui-icon"><use href="#icon-music" /></svg></span>
+          <span class="nav-icon"><svg class="ui-icon">
+              <use href="#icon-music" />
+            </svg></span>
           <span>Áudio</span>
         </button>
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="panel-action panel-tab" data-panel-tab="settings">
-        <span class="nav-icon"><svg class="ui-icon"><use href="#icon-settings" /></svg></span>
+        <span class="nav-icon"><svg class="ui-icon">
+            <use href="#icon-settings" />
+          </svg></span>
         <span>Config.</span>
       </button>
       <div class="sidebar-profile">
@@ -2670,20 +2978,28 @@
     <div class="panel-workspace">
       <header class="panel-topbar">
         <div class="welcome-copy">
-          <h1>Olá, <span id="panel-profile-name">Jogador</span> <svg class="ui-icon welcome-mark"><use href="#icon-sparkles" /></svg></h1>
+          <h1>Olá, <span id="panel-profile-name">Jogador</span> <svg class="ui-icon welcome-mark">
+              <use href="#icon-sparkles" />
+            </svg></h1>
           <p><span id="panel-friend-count">0 amigos</span> &bull; <span id="panel-online-count">0 online</span></p>
         </div>
         <label class="friend-search">
-          <svg class="ui-icon"><use href="#icon-search" /></svg>
+          <svg class="ui-icon">
+            <use href="#icon-search" />
+          </svg>
           <input id="friend-search" type="search" placeholder="Buscar amigos..." autocomplete="off" />
         </label>
         <button class="top-profile" data-panel-tab="profile" type="button">
           <img id="panel-profile-avatar" alt="" />
           <span>Meu perfil</span>
-          <svg class="ui-icon" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+          <svg class="ui-icon" aria-hidden="true">
+            <use href="#icon-chevron-down" />
+          </svg>
         </button>
         <button class="top-close" id="panel-close-top" aria-label="Fechar overlay">
-          <svg class="ui-icon"><use href="#icon-close" /></svg>
+          <svg class="ui-icon">
+            <use href="#icon-close" />
+          </svg>
         </button>
       </header>
 
@@ -2776,12 +3092,15 @@
                 <h2>Conversas</h2>
                 <p>Continue suas conversas sem sair do jogo.</p>
               </div>
-              <div class="conversation-list" id="conversation-list" data-gamepad-id="chat-list" data-gamepad-nav-up="chat-search" data-gamepad-nav-down="chat-list-item-0"></div>
+              <div class="conversation-list" id="conversation-list" data-gamepad-id="chat-list"
+                data-gamepad-nav-up="chat-search" data-gamepad-nav-down="chat-list-item-0"></div>
             </div>
             <div class="chat-layout" id="panel-chat-view" hidden>
               <header class="chat-header">
                 <button class="chat-back" id="chat-back" aria-label="Voltar para a lista">
-                  <svg class="ui-icon"><use href="#icon-back" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-back" />
+                  </svg>
                 </button>
                 <img class="friend-avatar" id="chat-avatar" alt="" />
                 <div>
@@ -2795,11 +3114,16 @@
                 <div class="chat-error" id="chat-error"></div>
                 <form class="chat-form" id="chat-form">
                   <button class="chat-attach" id="chat-attach" type="button" aria-label="Anexar imagem">
-                    <svg class="ui-icon"><use href="#icon-image" /></svg>
+                    <svg class="ui-icon">
+                      <use href="#icon-image" />
+                    </svg>
                   </button>
-                  <input class="chat-input" id="chat-input" type="text" placeholder="Escreva uma mensagem..." autocomplete="off" />
+                  <input class="chat-input" id="chat-input" type="text" placeholder="Escreva uma mensagem..."
+                    autocomplete="off" />
                   <button class="chat-send" id="chat-send" type="submit" aria-label="Enviar mensagem">
-                    <svg class="ui-icon"><use href="#icon-send" /></svg>
+                    <svg class="ui-icon">
+                      <use href="#icon-send" />
+                    </svg>
                   </button>
                 </form>
                 <input id="chat-image-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
@@ -2811,7 +3135,9 @@
             <div class="game-page">
               <div class="game-session-card">
                 <div class="game-session-art" id="game-page-art">
-                  <svg class="ui-icon"><use href="#icon-gamepad" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-gamepad" />
+                  </svg>
                 </div>
                 <div class="game-session-copy">
                   <div class="game-live" id="game-live-status">
@@ -2824,22 +3150,30 @@
 
               <div class="game-metrics">
                 <article>
-                  <svg class="ui-icon"><use href="#icon-clock" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-clock" />
+                  </svg>
                   <span>Sessão atual</span>
                   <strong id="game-session-duration">00:00:00</strong>
                 </article>
                 <article>
-                  <svg class="ui-icon"><use href="#icon-chart" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-chart" />
+                  </svg>
                   <span>Tempo total</span>
                   <strong id="game-total-playtime">0h</strong>
                 </article>
                 <article>
-                  <svg class="ui-icon"><use href="#icon-trophy" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-trophy" />
+                  </svg>
                   <span>Conquistas</span>
                   <strong id="game-achievement-ratio">0/0</strong>
                 </article>
                 <article>
-                  <svg class="ui-icon"><use href="#icon-users" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-users" />
+                  </svg>
                   <span>Amigos jogando</span>
                   <strong id="game-friends-playing">0</strong>
                 </article>
@@ -2860,7 +3194,9 @@
             <div class="media-page">
               <div class="capture-hero">
                 <div class="capture-hero-icon">
-                  <svg class="ui-icon"><use href="#icon-camera" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-camera" />
+                  </svg>
                 </div>
                 <div>
                   <span>Capturas de Tela</span>
@@ -2869,7 +3205,9 @@
                   <div class="capture-feedback" id="capture-setting-feedback"></div>
                 </div>
                 <button id="capture-now" type="button">
-                  <svg class="ui-icon"><use href="#icon-camera" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-camera" />
+                  </svg>
                   <span>Capturar agora</span>
                   <kbd id="capture-shortcut-label">F8</kbd>
                 </button>
@@ -2878,7 +3216,9 @@
               <div class="capture-heading">
                 <h3>Capturas recentes</h3>
                 <button id="open-captures-folder" type="button">
-                  <svg class="ui-icon"><use href="#icon-folder" /></svg>
+                  <svg class="ui-icon">
+                    <use href="#icon-folder" />
+                  </svg>
                   <span>Abrir pasta</span>
                 </button>
               </div>
@@ -2938,7 +3278,8 @@
                       <b>Atalho de Captura</b>
                       <small id="capture-shortcut-value">F8</small>
                     </div>
-                    <button class="chat-button" id="record-capture-shortcut" style="width:auto;padding:6px 14px;font-size:11px;">
+                    <button class="chat-button" id="record-capture-shortcut"
+                      style="width:auto;padding:6px 14px;font-size:11px;">
                       <span id="record-shortcut-label">Alterar</span>
                     </button>
                   </div>
@@ -2951,9 +3292,11 @@
             <div class="profile-page">
               <div class="settings-card profile-card" style="padding:28px;">
                 <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;">
-                  <img id="profile-page-avatar" alt="" style="width:64px;height:64px;border-radius:18px;object-fit:cover;border:1px solid rgba(255,255,255,0.2);" />
+                  <img id="profile-page-avatar" alt=""
+                    style="width:64px;height:64px;border-radius:18px;object-fit:cover;border:1px solid rgba(255,255,255,0.2);" />
                   <div>
-                    <h2 class="profile-identity" id="profile-page-name" style="margin:0 0 6px;font-size:22px;color:#fff;">Jogador</h2>
+                    <h2 class="profile-identity" id="profile-page-name"
+                      style="margin:0 0 6px;font-size:22px;color:#fff;">Jogador</h2>
                     <div class="discord-pill" id="profile-discord" hidden>
                       <i></i><span id="profile-discord-name">Discord Conectado</span>
                     </div>
@@ -2961,17 +3304,23 @@
                 </div>
                 <div class="game-metrics" style="margin-top:0;">
                   <article>
-                    <svg class="ui-icon"><use href="#icon-users" /></svg>
+                    <svg class="ui-icon">
+                      <use href="#icon-users" />
+                    </svg>
                     <span>Total de amigos</span>
                     <strong id="profile-friends-total">0</strong>
                   </article>
                   <article>
-                    <svg class="ui-icon"><use href="#icon-users" /></svg>
+                    <svg class="ui-icon">
+                      <use href="#icon-users" />
+                    </svg>
                     <span>Amigos online</span>
                     <strong id="profile-online-total">0</strong>
                   </article>
                   <article>
-                    <svg class="ui-icon"><use href="#icon-trophy" /></svg>
+                    <svg class="ui-icon">
+                      <use href="#icon-trophy" />
+                    </svg>
                     <span>Conquistas</span>
                     <strong id="profile-achievements-total">0</strong>
                   </article>
@@ -2984,7 +3333,9 @@
         <aside class="context-panel">
           <div class="context-game-card">
             <div class="context-game-art" id="context-game-art">
-              <div class="context-game-icon"><svg class="ui-icon"><use href="#icon-gamepad" /></svg></div>
+              <div class="context-game-icon"><svg class="ui-icon">
+                  <use href="#icon-gamepad" />
+                </svg></div>
             </div>
             <div class="context-game-copy">
               <h2 id="context-game-title">Nenhum jogo</h2>
@@ -2996,14 +3347,22 @@
           <div class="quick-access">
             <h3>Acesso Rápido</h3>
             <button data-context-tab="media">
-              <div class="quick-icon"><svg class="ui-icon"><use href="#icon-camera" /></svg></div>
+              <div class="quick-icon"><svg class="ui-icon">
+                  <use href="#icon-camera" />
+                </svg></div>
               <span><b>Galeria de Capturas</b><small>Fotos recentes e atalhos</small></span>
-              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)"><use href="#icon-chevron" /></svg>
+              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)">
+                <use href="#icon-chevron" />
+              </svg>
             </button>
             <button data-context-tab="achievements">
-              <div class="quick-icon"><svg class="ui-icon"><use href="#icon-trophy" /></svg></div>
+              <div class="quick-icon"><svg class="ui-icon">
+                  <use href="#icon-trophy" />
+                </svg></div>
               <span><b>Conquistas</b><small>Ver metas desbloqueadas</small></span>
-              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)"><use href="#icon-chevron" /></svg>
+              <svg class="ui-icon" style="width:14px;height:14px;color:var(--text-muted)">
+                <use href="#icon-chevron" />
+              </svg>
             </button>
           </div>
 
@@ -3027,13 +3386,23 @@
         </div>
         <div style="display:flex;align-items:center;gap:14px;">
           <span id="capture-viewer-counter" style="color:var(--text-muted);font-size:12px;"></span>
-          <button type="button" class="chat-back" id="capture-viewer-previous" style="width:32px;height:32px;" aria-label="Foto anterior"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-back" /></svg></button>
-          <button type="button" class="chat-back" id="capture-viewer-next" style="width:32px;height:32px;" aria-label="Próxima foto"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-chevron" /></svg></button>
-          <button type="button" class="chat-back" id="capture-viewer-close" style="width:32px;height:32px;" aria-label="Fechar visualizador"><svg class="ui-icon" style="width:14px;height:14px;"><use href="#icon-close" /></svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-previous" style="width:32px;height:32px;"
+            aria-label="Foto anterior"><svg class="ui-icon" style="width:14px;height:14px;">
+              <use href="#icon-back" />
+            </svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-next" style="width:32px;height:32px;"
+            aria-label="Próxima foto"><svg class="ui-icon" style="width:14px;height:14px;">
+              <use href="#icon-chevron" />
+            </svg></button>
+          <button type="button" class="chat-back" id="capture-viewer-close" style="width:32px;height:32px;"
+            aria-label="Fechar visualizador"><svg class="ui-icon" style="width:14px;height:14px;">
+              <use href="#icon-close" />
+            </svg></button>
         </div>
       </div>
       <div class="capture-viewer-shortcuts" style="margin-top:12px;">
-        <kbd>Esc</kbd> ou <kbd>B</kbd> <span>Fechar</span> &bull; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> ou <kbd>D-Pad / Analógico / L1 / R1</kbd> <span>Navegar</span>
+        <kbd>Esc</kbd> ou <kbd>B</kbd> <span>Fechar</span> &bull; <kbd>&larr;</kbd> <kbd>&rarr;</kbd> ou <kbd>D-Pad /
+          Analógico / L1 / R1</kbd> <span>Navegar</span>
       </div>
     </div>
   </div>
@@ -3086,7 +3455,7 @@
       shell.appendChild(layer);
 
       const playPromise = video.play?.();
-      playPromise?.catch(() => {});
+      playPromise?.catch(() => { });
     };
 
     // Traduções de Interface
@@ -3172,6 +3541,28 @@
       "achievement-unlock": {
         default: new URL("../src/sounds/Phelierium Default/Achievment_Unlock.mp3", window.location.href).toString(),
         phelierium: new URL("../src/sounds/Phelierium Default/Achievment_Unlock.mp3", window.location.href).toString(),
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/21. Src27 Se Msg Trophy.mp3", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox One/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav", window.location.href).toString(),
+      },
+      "achievement-unlock-gold": {
+        default: new URL("../src/sounds/Phelierium Default/Achievment_Unlock_Gold.mp3", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/Achievment_Unlock_Gold.mp3", window.location.href).toString(),
+        ps5: new URL("../src/sounds/PS5_Plus/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        ps4: new URL("../src/sounds/PS4/21. Src27 Se Msg Trophy.mp3", window.location.href).toString(),
+        psp: new URL("../src/sounds/PSP Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        ps2: new URL("../src/sounds/PS2 System Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        gamecube: new URL("../src/sounds/Nintendo GameCube Menu SFX/deck_ui_launch_game.wav", window.location.href).toString(),
+        xbox360: new URL("../src/sounds/Xbox One/deck_ui_achievement_toast.wav", window.location.href).toString(),
+        cyberpunk: new URL("../src/sounds/Cyberpunk 2077 UI SFX PACK/deck_ui_achievement_toast.wav", window.location.href).toString(),
+      },
+      "achievement-unlock-platinum": {
+        default: new URL("../src/sounds/Phelierium Default/Achievment_Unlock_Platinum.mp3", window.location.href).toString(),
+        phelierium: new URL("../src/sounds/Phelierium Default/Achievment_Unlock_Platinum.mp3", window.location.href).toString(),
         ps5: new URL("../src/sounds/PS5_Plus/deck_ui_achievement_toast.wav", window.location.href).toString(),
         ps4: new URL("../src/sounds/PS4/21. Src27 Se Msg Trophy.mp3", window.location.href).toString(),
         psp: new URL("../src/sounds/PSP Sounds/deck_ui_achievement_toast.wav", window.location.href).toString(),
@@ -3508,8 +3899,31 @@
     const enqueueAchievement = (payload) => {
       applyAchievementPosition(payload?.position || latestPanelState.settings?.achievementNotificationPosition);
       const duration = 5000;
+
+      const rawTier = String(payload.tier || payload.achievement?.tier || "").toLowerCase();
+      const percent = Number(payload.percent ?? 50);
+      const tier = rawTier === "platinum" || rawTier === "platina" ? "platinum"
+        : rawTier === "gold" || rawTier === "ouro" ? "gold"
+          : rawTier === "silver" || rawTier === "prata" ? "silver"
+            : rawTier === "bronze" ? "bronze"
+              : percent <= 5 ? "platinum"
+                : percent <= 20 ? "gold"
+                  : percent <= 50 ? "silver"
+                    : "bronze";
+
+      const xp = Number(payload.xp || payload.achievement?.xp) || (
+        tier === "platinum" ? 300 : tier === "gold" ? 90 : tier === "silver" ? 30 : 15
+      );
+
+      const tierLabels = {
+        platinum: "TROFÉU DE PLATINA",
+        gold: "TROFÉU DE OURO",
+        silver: "TROFÉU DE PRATA",
+        bronze: "TROFÉU DE BRONZE",
+      };
+
       const card = document.createElement("article");
-      card.className = "overlay-card achievement-card";
+      card.className = `overlay-card achievement-card tier-${tier}`;
       card.style.setProperty("--card-duration", `${duration}ms`);
       applyStagger(achievementStack, card);
 
@@ -3532,7 +3946,7 @@
 
       const eyebrow = document.createElement("div");
       eyebrow.className = "achievement-eyebrow";
-      eyebrow.textContent = payload.duplicate ? overlayT("achievementUpdated") : overlayT("achievementNew");
+      eyebrow.textContent = `${tierLabels[tier]} • +${xp} XP`;
 
       const title = document.createElement("h2");
       title.className = "achievement-title";
@@ -4585,13 +4999,13 @@
         if (Boolean(open) !== Boolean(wasOpen) && Date.now() - lastOverlayUiSoundAt > 120) {
           playOverlayUiSound("ui-click");
         }
-        
+
         // Gerencia foco do overlay gamepad
         if (overlayGamepad?.setOverlayFocus) {
           overlayGamepad.setOverlayFocus(open);
         }
       });
-      
+
       // Escuta mudanças de foco do overlay para desabilitar gamepad no app principal
       window.addEventListener("checkpoint:overlay-focus-changed", (event) => {
         const hasFocus = event.detail?.hasFocus;

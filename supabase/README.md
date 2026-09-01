@@ -3,7 +3,7 @@
 Apply migrations in filename order with the Supabase CLI:
 
 ```sh
-npx supabase link --project-ref mhfzvfcddwdckzcgefmf
+npx supabase link --project-ref qswaryzdffzxcypabrqy
 npx supabase db push
 ```
 

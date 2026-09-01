@@ -2,14 +2,22 @@ const { app, BrowserWindow, ipcMain, shell, clipboard, Menu, dialog, screen, Tra
 
 const crypto = require("node:crypto");
 const { z } = require("zod");
-// ── Hardware Video Decode & WebRTC Acceleration ──────────────────────────────
+// ── GPU Hardware Acceleration & Video Decode & Memory Limits ─────────────────
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("enable-native-gpu-memory-buffers");
 app.commandLine.appendSwitch("enable-accelerated-video-decode");
 app.commandLine.appendSwitch("enable-accelerated-mjpeg-decode");
-app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,WebRtcHWEncoding,WebRtcHWDecoding");
+app.commandLine.appendSwitch("enable-features", "VaapiVideoDecoder,VaapiVideoEncoder,WebRtcHWEncoding,WebRtcHWDecoding,CanvasOopRasterization,DirectCompositionVideoOverlays");
 app.commandLine.appendSwitch("force-fieldtrials", "WebRTC-H264HighProfile/Enabled/");
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=512");
+app.commandLine.appendSwitch("disable-background-timer-throttling", "false");
+app.commandLine.appendSwitch("disable-renderer-backgrounding", "false");
 
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL, fileURLToPath } = require("node:url");
 
@@ -48,6 +56,10 @@ const {
 const { createSecureIpcRegistrar } = require("./ipc-security.cjs");
 const { createLegendaryManager } = require("./legendary-manager.cjs");
 const { createEpicAccount } = require("./epic-account.cjs");
+const { createEpicCredentialVault } = require("./epic-credential-vault.cjs");
+const { createEpicSession } = require("./epic-session.cjs");
+const { migrateEpicAccountMetadata } = require("./epic-credential-migration.cjs");
+const { showTrophyNotification, createDefaultDeps: createTrophyNotificationDeps } = require("./trophy-notification.cjs");
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
 const { cleanupPlatformAchievementFiles } = require("./platform-data-cleanup.cjs");
 const { createWindowBehaviorController } = require("./window-behavior.cjs");
@@ -2103,6 +2115,30 @@ const dispatchAchievementNotification = (payload) => {
     showNativeAchievementNotification(payload);
   }
   playOverlaySound("achievement-unlock");
+  // Phase 4: also fire a system-level push when the app is backgrounded.
+  // Skip when the window is visible (the in-page toast already covers that case)
+  // and when the payload does not look like a trophy unlock.
+  if (payload && payload.tier && payload.trophyTitle) {
+    try {
+      const result = showTrophyNotification(
+        {
+          trophyTitle: payload.trophyTitle,
+          trophyDescription: payload.trophyDescription || "",
+          tier: payload.tier,
+          xp: Number.isFinite(payload.xp) ? payload.xp : 0,
+          iconUrl: payload.iconUrl,
+        },
+        createTrophyNotificationDeps({ BrowserWindow, logger: console }),
+      );
+      if (result && result.shown) {
+        console.info("[trophy] system push delivered:", payload.trophyTitle);
+      } else if (result && result.reason) {
+        console.debug("[trophy] system push skipped:", result.reason);
+      }
+    } catch (err) {
+      console.warn("[trophy] system push dispatch failed:", err);
+    }
+  }
   return true;
 };
 
@@ -2219,6 +2255,35 @@ registerSecureIpcHandler("achievement:get-progress", async (_event, gameId) => {
     console.error("Error reading achievement progress:", error);
   }
   return null;
+});
+
+/**
+ * Phase 4 — Phase 3 trophy-system hook.
+ * Renderer (or services) calls this when a server-side trophy unlock is
+ * confirmed (e.g., from a Supabase Realtime channel). The handler delegates
+ * to `trophy-notification.cjs`, which decides whether to surface a native
+ * system push (window hidden) or skip silently (toast already covers it).
+ */
+registerSecureIpcHandler("trophy:notify-unlock", async (_event, payload) => {
+  if (!payload || typeof payload !== "object") {
+    return { shown: false, reason: "invalid-payload" };
+  }
+  const title = String(payload.trophyTitle || "").slice(0, 200);
+  const description = String(payload.trophyDescription || "").slice(0, 500);
+  const tier = ["platinum", "gold", "silver", "bronze"].includes(payload.tier)
+    ? payload.tier
+    : "bronze";
+  const xp = Number.isFinite(payload.xp) ? payload.xp : 0;
+  const iconUrl = typeof payload.iconUrl === "string" ? payload.iconUrl : undefined;
+  try {
+    return showTrophyNotification(
+      { trophyTitle: title, trophyDescription: description, tier, xp, iconUrl },
+      createTrophyNotificationDeps({ BrowserWindow, logger: console }),
+    );
+  } catch (err) {
+    console.warn("[trophy] IPC trophy:notify-unlock failed:", err);
+    return { shown: false, reason: "throw" };
+  }
 });
 
 const { readLocalSavesRetroactive } = require("./emulator-detector.cjs");
@@ -3052,6 +3117,25 @@ registerSecureIpcHandler("launcher:open-epic-login-window", async () => {
 
 let legendaryManager = null;
 let epicAccount = null;
+let epicSession = null;
+let epicMigrationDone = false;
+
+const ensureEpicMigration = async () => {
+  if (epicMigrationDone) return;
+  epicMigrationDone = true;
+  try {
+    const result = await migrateEpicAccountMetadata({
+      userDataPath: app.getPath("userData"),
+    });
+    if (result.migrated) {
+      console.info(
+        `[epic-session] migrated account metadata for ${result.accountId} from ${result.source}`,
+      );
+    }
+  } catch (err) {
+    console.warn(`[epic-session] migration failed: ${err.message}`);
+  }
+};
 
 const getEpicAccount = () => {
   if (!epicAccount) {
@@ -3072,11 +3156,35 @@ const getEpicAccount = () => {
   return epicAccount;
 };
 
+const getEpicSession = async () => {
+  await ensureEpicMigration();
+  if (!epicSession) {
+    const vault = createEpicCredentialVault({
+      userDataPath: app.getPath("userData"),
+    });
+    if (!legendaryManager) {
+      legendaryManager = createLegendaryManager({
+        userDataPath: app.getPath("userData"),
+      });
+    }
+    epicSession = createEpicSession({
+      vault,
+      legendary: legendaryManager,
+      logger: console,
+    });
+  }
+  return epicSession;
+};
+
 registerSecureIpcHandler("epic:get-status", () => getEpicAccount().getStatus());
 registerSecureIpcHandler("epic:authenticate", (_event, request) => getEpicAccount().authenticate(request));
 registerSecureIpcHandler("epic:list-library", () => getEpicAccount().listLibrary());
 registerSecureIpcHandler("epic:get-achievements", (_event, request) => getEpicAccount().getAchievements(request));
 registerSecureIpcHandler("epic:logout", () => getEpicAccount().logout());
+registerSecureIpcHandler("epic:validate-session", async () => {
+  const session = await getEpicSession();
+  return session.validate();
+});
 
 registerSecureIpcHandler("library:purge-platform", async (_event, uid, platform) => {
   const result = getLocalGameLibrary().purgePlatform(uid, platform);
@@ -3642,9 +3750,11 @@ registerSecureIpcHandler("launcher:open-executable", async (
       if (launchProfile.monitorId == null) selectOverlayDisplayFromLauncher();
       try {
         const priority = launchProfile.processPriority === "high"
-          ? -14
-          : launchProfile.processPriority === "above-normal" ? -7 : 0;
-        process.setPriority(child.pid, priority);
+          ? (os.constants?.priority?.PRIORITY_HIGH ?? -14)
+          : launchProfile.processPriority === "above-normal"
+            ? (os.constants?.priority?.PRIORITY_ABOVE_NORMAL ?? -7)
+            : (os.constants?.priority?.PRIORITY_NORMAL ?? 0);
+        os.setPriority(child.pid, priority);
       } catch (error) {
         console.warn("[launcher] Nao foi possivel aplicar prioridade ao processo:", error);
       }
@@ -4075,24 +4185,47 @@ registerSecureIpcHandler("overlay:test-welcome", async () => {
   });
 });
 
-registerSecureIpcHandler("overlay:test-achievement", async () => {
+registerSecureIpcHandler("overlay:test-achievement", async (_event, requestedTier) => {
   const copy = getOverlayEventCopy();
   selectOverlayDisplayFromLauncher();
+  const tier = requestedTier === "platinum" ? "platinum" : requestedTier === "gold" ? "gold" : requestedTier === "silver" ? "silver" : "bronze";
+  const xp = tier === "platinum" ? 300 : tier === "gold" ? 90 : tier === "silver" ? 30 : 15;
+  const name =
+    tier === "platinum" ? "Troféu de Platina Desbloqueado" :
+    tier === "gold" ? "Troféu de Ouro Conquistado" :
+    tier === "silver" ? "Troféu de Prata Conquistado" :
+    copy.firstKill;
+  const description =
+    tier === "platinum" ? "Parabéns! Você completou 100% de todas as conquistas deste jogo." :
+    tier === "gold" ? "Conquista de alto valor desbloqueada com maestria." :
+    tier === "silver" ? "Excelente progresso em sua jornada." :
+    copy.testAchievement;
+
   // Sempre envia direto para o overlay visual, independente das preferências do usuário
   sendOverlayEvent("achievement:unlock", {
     gameId: "checkpoint-lab",
-    achievementId: "overlay-smoke-test",
+    achievementId: `overlay-test-${tier}`,
     achievement: {
-      id: "overlay-smoke-test",
-      name: copy.firstKill,
-      description: copy.testAchievement,
+      id: `overlay-test-${tier}`,
+      name,
+      description,
       icon: overlayIconUrl(),
+      tier,
+      xp,
     },
+    tier,
+    xp,
     unlockedAt: new Date().toISOString(),
     duplicate: false,
     position: achievementNotificationPosition,
   });
-  playOverlaySound("achievement-unlock");
+  playOverlaySound(
+    tier === "platinum"
+      ? "achievement-unlock-platinum"
+      : tier === "gold"
+        ? "achievement-unlock-gold"
+        : "achievement-unlock"
+  );
 });
 
 registerSecureIpcHandler("overlay:set-achievement-volume", async (_event, requestedVolume) => {

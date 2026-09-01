@@ -80,12 +80,210 @@ const SETTINGS_SHELL_COPY = {
 } as const;
 
 const SETTINGS_DETAIL_COPY = {
-  "pt-BR": { moreThemes: "Mais temas", comingSoon: "Novos pacotes em breve", audioTitle: "Efeitos Sonoros & Áudio", audioHint: "Ajuste o volume dos sons de navegação, música e alertas do launcher.", performanceTitle: "Modo de Desempenho", performanceHint: "Reduza animações e desative o desfoque em computadores mais antigos.", playerProfile: "Perfil do Jogador", playerProfileHint: "Informações da sua conta sincronizada com a nuvem.", playerFallback: "Jogador Phelierium", noEmail: "Sem e-mail vinculado", activeAccount: "Conta Ativa", security: "Segurança da Conta", securityHint: "Gerencie sua senha de acesso e opções de recuperação.", resetPassword: "Redefinir Senha", resetPasswordHint: "Envia um e-mail de segurança para alterar sua senha atual.", emailSent: "E-mail enviado!", sending: "Enviando...", sendEmail: "Enviar E-mail", overlayLab: "Overlay Lab", overlayLabHint: "Prévia de como os overlays ficarão quando você estiver jogando.", testWelcome: "Testar Divirta-se", testWelcomeHint: "Mostra o card social ao iniciar um jogo.", testAchievement: "Testar Conquista", testAchievementHint: "Mostra o toast completo com conquista." },
-  "en-US": { moreThemes: "More themes", comingSoon: "New packs coming soon", audioTitle: "Sound Effects & Audio", audioHint: "Adjust navigation, music, and launcher alert volumes.", performanceTitle: "Performance Mode", performanceHint: "Reduce animations and blur on older computers.", playerProfile: "Player Profile", playerProfileHint: "Information from your cloud-synced account.", playerFallback: "Phelierium Player", noEmail: "No email linked", activeAccount: "Active Account", security: "Account Security", securityHint: "Manage your password and recovery options.", resetPassword: "Reset Password", resetPasswordHint: "Sends a security email to change your current password.", emailSent: "Email sent!", sending: "Sending...", sendEmail: "Send Email", overlayLab: "Overlay Lab", overlayLabHint: "Preview how overlays will look while you play.", testWelcome: "Test Welcome", testWelcomeHint: "Shows the social card when a game starts.", testAchievement: "Test Achievement", testAchievementHint: "Shows the complete achievement toast." },
-  "es-ES": { moreThemes: "Más temas", comingSoon: "Nuevos paquetes próximamente", audioTitle: "Efectos de sonido y audio", audioHint: "Ajusta el volumen de navegación, música y alertas.", performanceTitle: "Modo de rendimiento", performanceHint: "Reduce animaciones y desenfoque en equipos antiguos.", playerProfile: "Perfil del jugador", playerProfileHint: "Información de tu cuenta sincronizada en la nube.", playerFallback: "Jugador Phelierium", noEmail: "Sin correo vinculado", activeAccount: "Cuenta activa", security: "Seguridad de la cuenta", securityHint: "Gestiona tu contraseña y opciones de recuperación.", resetPassword: "Restablecer contraseña", resetPasswordHint: "Envía un correo de seguridad para cambiar tu contraseña.", emailSent: "¡Correo enviado!", sending: "Enviando...", sendEmail: "Enviar correo", overlayLab: "Laboratorio de overlay", overlayLabHint: "Vista previa de los overlays mientras juegas.", testWelcome: "Probar bienvenida", testWelcomeHint: "Muestra la tarjeta social al iniciar un juego.", testAchievement: "Probar logro", testAchievementHint: "Muestra la notificación completa del logro." },
-  "fr-FR": { moreThemes: "Plus de thèmes", comingSoon: "Nouveaux packs bientôt disponibles", audioTitle: "Effets sonores et audio", audioHint: "Réglez le volume de navigation, musique et alertes.", performanceTitle: "Mode performance", performanceHint: "Réduisez les animations et le flou sur les anciens PC.", playerProfile: "Profil du joueur", playerProfileHint: "Informations de votre compte synchronisé dans le cloud.", playerFallback: "Joueur Phelierium", noEmail: "Aucun e-mail associé", activeAccount: "Compte actif", security: "Sécurité du compte", securityHint: "Gérez votre mot de passe et les options de récupération.", resetPassword: "Réinitialiser le mot de passe", resetPasswordHint: "Envoie un e-mail de sécurité pour modifier votre mot de passe.", emailSent: "E-mail envoyé !", sending: "Envoi...", sendEmail: "Envoyer l'e-mail", overlayLab: "Laboratoire overlay", overlayLabHint: "Prévisualisez les overlays pendant vos parties.", testWelcome: "Tester la bienvenue", testWelcomeHint: "Affiche la carte sociale au lancement d'un jeu.", testAchievement: "Tester le succès", testAchievementHint: "Affiche la notification complète du succès." },
-  "de-DE": { moreThemes: "Weitere Themes", comingSoon: "Neue Pakete folgen bald", audioTitle: "Soundeffekte und Audio", audioHint: "Passe Navigation, Musik und Hinweislautstärke an.", performanceTitle: "Leistungsmodus", performanceHint: "Reduziert Animationen und Unschärfe auf älteren PCs.", playerProfile: "Spielerprofil", playerProfileHint: "Informationen deines cloud-synchronisierten Kontos.", playerFallback: "Phelierium-Spieler", noEmail: "Keine E-Mail verknüpft", activeAccount: "Aktives Konto", security: "Kontosicherheit", securityHint: "Verwalte Passwort und Wiederherstellungsoptionen.", resetPassword: "Passwort zurücksetzen", resetPasswordHint: "Sendet eine Sicherheits-E-Mail zum Ändern des Passworts.", emailSent: "E-Mail gesendet!", sending: "Wird gesendet...", sendEmail: "E-Mail senden", overlayLab: "Overlay-Labor", overlayLabHint: "Vorschau der Overlays während des Spielens.", testWelcome: "Willkommen testen", testWelcomeHint: "Zeigt die Social-Karte beim Spielstart.", testAchievement: "Erfolg testen", testAchievementHint: "Zeigt die vollständige Erfolgsbenachrichtigung." },
-  "it-IT": { moreThemes: "Altri temi", comingSoon: "Nuovi pacchetti in arrivo", audioTitle: "Effetti sonori e audio", audioHint: "Regola il volume di navigazione, musica e avvisi.", performanceTitle: "Modalità prestazioni", performanceHint: "Riduce animazioni e sfocatura sui computer più datati.", playerProfile: "Profilo giocatore", playerProfileHint: "Informazioni dell'account sincronizzato nel cloud.", playerFallback: "Giocatore Phelierium", noEmail: "Nessuna e-mail collegata", activeAccount: "Account attivo", security: "Sicurezza account", securityHint: "Gestisci password e opzioni di recupero.", resetPassword: "Reimposta password", resetPasswordHint: "Invia un'e-mail di sicurezza per modificare la password.", emailSent: "E-mail inviata!", sending: "Invio...", sendEmail: "Invia e-mail", overlayLab: "Laboratorio overlay", overlayLabHint: "Anteprima degli overlay durante il gioco.", testWelcome: "Prova benvenuto", testWelcomeHint: "Mostra la scheda social all'avvio di un gioco.", testAchievement: "Prova obiettivo", testAchievementHint: "Mostra la notifica completa dell'obiettivo." },
+  "pt-BR": {
+    moreThemes: "Mais temas",
+    comingSoon: "Novos pacotes em breve",
+    audioTitle: "Efeitos Sonoros & Áudio",
+    audioHint: "Ajuste o volume dos sons de navegação, música e alertas do launcher.",
+    performanceTitle: "Modo de Desempenho",
+    performanceHint: "Reduza animações e desative o desfoque em computadores mais antigos.",
+    playerProfile: "Perfil do Jogador",
+    playerProfileHint: "Informações da sua conta sincronizada com a nuvem.",
+    playerFallback: "Jogador Phelierium",
+    noEmail: "Sem e-mail vinculado",
+    activeAccount: "Conta Ativa",
+    security: "Segurança da Conta",
+    securityHint: "Gerencie sua senha de acesso e opções de recuperação.",
+    resetPassword: "Redefinir Senha",
+    resetPasswordHint: "Envia um e-mail de segurança para alterar sua senha atual.",
+    emailSent: "E-mail enviado!",
+    sending: "Enviando...",
+    sendEmail: "Enviar E-mail",
+    overlayLab: "Overlay Lab",
+    overlayLabHint: "Prévia de como os overlays e notificações ficarão durante o jogo.",
+    testWelcome: "Testar Boas-Vindas",
+    testWelcomeHint: "Mostra o card social ao iniciar um jogo.",
+    testAchievement: "Testar Conquista",
+    testAchievementHint: "Mostra o toast completo com conquista.",
+    testBronze: "Troféu Bronze (+15 XP)",
+    testBronzeHint: "Simula o desbloqueio de um troféu de bronze comum.",
+    testSilver: "Troféu Prata (+30 XP)",
+    testSilverHint: "Simula o desbloqueio de um troféu de prata intermediário.",
+    testGold: "Troféu Ouro (+90 XP)",
+    testGoldHint: "Simula o desbloqueio de ouro com áudio exclusivo.",
+    testPlatinum: "Troféu Platina (+300 XP)",
+    testPlatinumHint: "Simula a Platina (100%) com efeitos cósmicos.",
+  },
+  "en-US": {
+    moreThemes: "More themes",
+    comingSoon: "New packs coming soon",
+    audioTitle: "Sound Effects & Audio",
+    audioHint: "Adjust navigation, music, and launcher alert volumes.",
+    performanceTitle: "Performance Mode",
+    performanceHint: "Reduce animations and blur on older computers.",
+    playerProfile: "Player Profile",
+    playerProfileHint: "Information from your cloud-synced account.",
+    playerFallback: "Phelierium Player",
+    noEmail: "No email linked",
+    activeAccount: "Active Account",
+    security: "Account Security",
+    securityHint: "Manage your password and recovery options.",
+    resetPassword: "Reset Password",
+    resetPasswordHint: "Sends a security email to change your current password.",
+    emailSent: "Email sent!",
+    sending: "Sending...",
+    sendEmail: "Send Email",
+    overlayLab: "Overlay Lab",
+    overlayLabHint: "Preview how overlays will look while you play.",
+    testWelcome: "Test Welcome",
+    testWelcomeHint: "Shows the social card when a game starts.",
+    testAchievement: "Test Achievement",
+    testAchievementHint: "Shows the complete achievement toast.",
+    testBronze: "Bronze Trophy (+15 XP)",
+    testBronzeHint: "Simulates unlocking a standard bronze trophy.",
+    testSilver: "Silver Trophy (+30 XP)",
+    testSilverHint: "Simulates unlocking an intermediate silver trophy.",
+    testGold: "Gold Trophy (+90 XP)",
+    testGoldHint: "Simulates unlocking a gold trophy with unique SFX.",
+    testPlatinum: "Platinum Trophy (+300 XP)",
+    testPlatinumHint: "Simulates 100% completion with cosmic platinum SFX.",
+  },
+  "es-ES": {
+    moreThemes: "Más temas",
+    comingSoon: "Nuevos paquetes próximamente",
+    audioTitle: "Efectos de sonido y audio",
+    audioHint: "Ajusta el volumen de navegación, música y alertas.",
+    performanceTitle: "Modo de rendimiento",
+    performanceHint: "Reduce animaciones y desenfoque en equipos antiguos.",
+    playerProfile: "Perfil del jugador",
+    playerProfileHint: "Información de tu cuenta sincronizada en la nube.",
+    playerFallback: "Jugador Phelierium",
+    noEmail: "Sin correo vinculado",
+    activeAccount: "Cuenta activa",
+    security: "Seguridad de la cuenta",
+    securityHint: "Gestiona tu contraseña y opciones de recuperación.",
+    resetPassword: "Restablecer contraseña",
+    resetPasswordHint: "Envía un correo de seguridad para cambiar tu contraseña.",
+    emailSent: "¡Correo enviado!",
+    sending: "Enviando...",
+    sendEmail: "Enviar correo",
+    overlayLab: "Laboratorio de overlay",
+    overlayLabHint: "Vista previa de los overlays mientras juegas.",
+    testWelcome: "Probar bienvenida",
+    testWelcomeHint: "Muestra la tarjeta social al iniciar un juego.",
+    testAchievement: "Probar logro",
+    testAchievementHint: "Muestra la notificación completa del logro.",
+    testBronze: "Trofeo Bronce (+15 XP)",
+    testBronzeHint: "Simula el desbloqueo de un trofeo de bronce.",
+    testSilver: "Trofeo Plata (+30 XP)",
+    testSilverHint: "Simula el desbloqueo de un trofeo de plata.",
+    testGold: "Trofeo Oro (+90 XP)",
+    testGoldHint: "Simula el desbloqueo de oro con audio especial.",
+    testPlatinum: "Trofeo Platino (+300 XP)",
+    testPlatinumHint: "Simula el trofeo Platino con efectos cósmicos.",
+  },
+  "fr-FR": {
+    moreThemes: "Plus de thèmes",
+    comingSoon: "Nouveaux packs bientôt disponibles",
+    audioTitle: "Effets sonores et audio",
+    audioHint: "Réglez le volume de navigation, musique et alertes.",
+    performanceTitle: "Mode performance",
+    performanceHint: "Réduisez les animations et le flou sur les anciens PC.",
+    playerProfile: "Profil du joueur",
+    playerProfileHint: "Informations de votre compte synchronisé dans le cloud.",
+    playerFallback: "Joueur Phelierium",
+    noEmail: "Aucun e-mail associé",
+    activeAccount: "Compte actif",
+    security: "Sécurité du compte",
+    securityHint: "Gérez votre mot de passe et les options de récupération.",
+    resetPassword: "Réinitialiser le mot de passe",
+    resetPasswordHint: "Envoie un e-mail de sécurité pour modifier votre mot de passe.",
+    emailSent: "E-mail envoyé !",
+    sending: "Envoi...",
+    sendEmail: "Envoyer l'e-mail",
+    overlayLab: "Laboratoire overlay",
+    overlayLabHint: "Prévisualisez les overlays pendant vos parties.",
+    testWelcome: "Tester la bienvenue",
+    testWelcomeHint: "Affiche la carte sociale au lancement d'un jeu.",
+    testAchievement: "Tester le succès",
+    testAchievementHint: "Affiche la notification complète du succès.",
+    testBronze: "Trophée Bronze (+15 XP)",
+    testBronzeHint: "Simule le déverrouillage d'un trophée de bronze.",
+    testSilver: "Trophée Argent (+30 XP)",
+    testSilverHint: "Simule le déverrouillage d'un trophée d'argent.",
+    testGold: "Trophée Or (+90 XP)",
+    testGoldHint: "Simule le déverrouillage d'un trophée d'or.",
+    testPlatinum: "Trophée Platine (+300 XP)",
+    testPlatinumHint: "Simule le trophée Platine 100%.",
+  },
+  "de-DE": {
+    moreThemes: "Weitere Themes",
+    comingSoon: "Neue Pakete folgen bald",
+    audioTitle: "Soundeffekte und Audio",
+    audioHint: "Passe Navigation, Musik und Hinweislautstärke an.",
+    performanceTitle: "Leistungsmodus",
+    performanceHint: "Reduziert Animationen und Unschärfe auf älteren PCs.",
+    playerProfile: "Spielerprofil",
+    playerProfileHint: "Informationen deines cloud-synchronisierten Kontos.",
+    playerFallback: "Phelierium-Spieler",
+    noEmail: "Keine E-Mail verknüpft",
+    activeAccount: "Aktives Konto",
+    security: "Kontosicherheit",
+    securityHint: "Verwalte Passwort und Wiederherstellungsoptionen.",
+    resetPassword: "Passwort zurücksetzen",
+    resetPasswordHint: "Sendet eine Sicherheits-E-Mail zum Ändern des Passworts.",
+    emailSent: "E-Mail gesendet!",
+    sending: "Wird gesendet...",
+    sendEmail: "E-Mail senden",
+    overlayLab: "Overlay-Labor",
+    overlayLabHint: "Vorschau der Overlays während des Spielens.",
+    testWelcome: "Willkommen testen",
+    testWelcomeHint: "Zeigt die Social-Karte beim Spielstart.",
+    testAchievement: "Erfolg testen",
+    testAchievementHint: "Zeigt die vollständige Erfolgsbenachrichtigung.",
+    testBronze: "Bronze-Trophäe (+15 XP)",
+    testBronzeHint: "Simuliert das Freischalten einer Bronze-Trophäe.",
+    testSilver: "Silber-Trophäe (+30 XP)",
+    testSilverHint: "Simuliert das Freischalten einer Silber-Trophäe.",
+    testGold: "Gold-Trophäe (+90 XP)",
+    testGoldHint: "Simuliert das Freischalten einer Gold-Trophäe.",
+    testPlatinum: "Platin-Trophäe (+300 XP)",
+    testPlatinumHint: "Simuliert die 100%-Platin-Trophäe.",
+  },
+  "it-IT": {
+    moreThemes: "Altri temi",
+    comingSoon: "Nuovi pacchetti in arrivo",
+    audioTitle: "Effetti sonori e audio",
+    audioHint: "Regola il volume di navigazione, musica e avvisi.",
+    performanceTitle: "Modalità prestazioni",
+    performanceHint: "Riduce animazioni e sfocatura sui computer più datati.",
+    playerProfile: "Profilo giocatore",
+    playerProfileHint: "Informazioni dell'account sincronizzato nel cloud.",
+    playerFallback: "Giocatore Phelierium",
+    noEmail: "Nessuna e-mail collegata",
+    activeAccount: "Account attivo",
+    security: "Sicurezza account",
+    securityHint: "Gestisci password e opzioni di recupero.",
+    resetPassword: "Reimposta password",
+    resetPasswordHint: "Invia un'e-mail di sicurezza per modificare la password.",
+    emailSent: "E-mail inviata!",
+    sending: "Invio...",
+    sendEmail: "Invia e-mail",
+    overlayLab: "Laboratorio overlay",
+    overlayLabHint: "Anteprima degli overlay durante il gioco.",
+    testWelcome: "Prova benvenuto",
+    testWelcomeHint: "Mostra la scheda social all'avvio di un gioco.",
+    testAchievement: "Prova obiettivo",
+    testAchievementHint: "Mostra la notifica completa dell'obiettivo.",
+    testBronze: "Trofeo Bronzo (+15 XP)",
+    testBronzeHint: "Simula lo sblocco di un trofeo di bronzo.",
+    testSilver: "Trofeo Argento (+30 XP)",
+    testSilverHint: "Simula lo sblocco di un trofeo d'argento.",
+    testGold: "Trofeo Oro (+90 XP)",
+    testGoldHint: "Simula lo sblocco di un trofeo d'oro.",
+    testPlatinum: "Trofeo Platino (+300 XP)",
+    testPlatinumHint: "Simula il trofeo Platino al 100%.",
+  },
 } as const;
 
 const ACHIEVEMENT_NOTIFICATION_COPY = {
@@ -315,7 +513,7 @@ export interface SettingsPageV2Props {
   onDisconnectDiscord: () => void;
   onDisconnectEpic?: () => void;
   onTestOverlayWelcome: () => void;
-  onTestOverlayAchievement: () => void;
+  onTestOverlayAchievement: (tier?: "bronze" | "silver" | "gold" | "platinum") => void;
   initialTab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
   platformOperations?: { steam?: { status?: string; phase?: string }; epic?: { status?: string; phase?: string } };
@@ -937,7 +1135,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     value={achievementVolume}
                     max={100}
                     actionLabel={t("test")}
-                    onAction={achievementNotificationsEnabled ? onTestOverlayAchievement : undefined}
+                    onAction={achievementNotificationsEnabled ? () => onTestOverlayAchievement() : undefined}
                     onHover={() => playSound("hover")}
                     onChange={onAchievementVolumeChange}
                     t={t}
@@ -1958,7 +2156,7 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                   title={detailCopy.overlayLab}
                   description={detailCopy.overlayLabHint}
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                   <button
                     type="button"
                     onClick={onTestOverlayWelcome}
@@ -1972,17 +2170,60 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       {detailCopy.testWelcomeHint}
                     </span>
                   </button>
+
                   <button
                     type="button"
-                    onClick={onTestOverlayAchievement}
+                    onClick={() => onTestOverlayAchievement("bronze")}
                     onMouseEnter={() => playSound("hover")}
-                    className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-500/8 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-emerald-400/40 hover:bg-emerald-500/[0.14] active:scale-[0.98]"
+                    className="cursor-pointer rounded-2xl border border-amber-600/30 bg-amber-700/10 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-amber-500/50 hover:bg-amber-700/20 active:scale-[0.98]"
                   >
-                    <span className="block text-xs font-bold text-white whitespace-nowrap">
-                      {detailCopy.testAchievement}
+                    <span className="block text-xs font-bold text-amber-500 whitespace-nowrap">
+                      {detailCopy.testBronze}
                     </span>
                     <span className="mt-1 block text-[10px] font-medium text-white/40">
-                      {detailCopy.testAchievementHint}
+                      {detailCopy.testBronzeHint}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onTestOverlayAchievement("silver")}
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-2xl border border-slate-300/25 bg-slate-300/10 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-slate-300/45 hover:bg-slate-300/20 active:scale-[0.98]"
+                  >
+                    <span className="block text-xs font-bold text-slate-200 whitespace-nowrap">
+                      {detailCopy.testSilver}
+                    </span>
+                    <span className="mt-1 block text-[10px] font-medium text-white/40">
+                      {detailCopy.testSilverHint}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onTestOverlayAchievement("gold")}
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-2xl border border-yellow-400/35 bg-yellow-500/10 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-yellow-400/60 hover:bg-yellow-500/20 active:scale-[0.98]"
+                  >
+                    <span className="block text-xs font-bold text-yellow-400 whitespace-nowrap">
+                      {detailCopy.testGold}
+                    </span>
+                    <span className="mt-1 block text-[10px] font-medium text-white/40">
+                      {detailCopy.testGoldHint}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onTestOverlayAchievement("platinum")}
+                    onMouseEnter={() => playSound("hover")}
+                    className="cursor-pointer rounded-2xl border border-sky-400/40 bg-sky-500/15 p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-sky-400/70 hover:bg-sky-500/25 active:scale-[0.98] shadow-lg shadow-sky-500/10 sm:col-span-2 lg:col-span-1"
+                  >
+                    <span className="block text-xs font-bold text-sky-300 whitespace-nowrap">
+                      {detailCopy.testPlatinum}
+                    </span>
+                    <span className="mt-1 block text-[10px] font-medium text-white/40">
+                      {detailCopy.testPlatinumHint}
                     </span>
                   </button>
                 </div>

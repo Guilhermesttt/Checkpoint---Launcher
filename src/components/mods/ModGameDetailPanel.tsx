@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -796,17 +797,29 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
     }
   };
 
-  if (!game) return null;
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        playSound("back");
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, playSound]);
+
+  if (!game || typeof document === "undefined") return null;
   const heroImage = selectedMod?.pictureUrl || game.backgroundImage || game.image || game.cardImage;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-100 overflow-hidden bg-[#050507]"
+          className="fixed inset-0 z-[9999] w-screen h-screen overflow-hidden bg-[#050507]"
         >
           <motion.div
             key={heroImage}
@@ -1856,7 +1869,8 @@ const ModGameDetailPanel: React.FC<ModGameDetailPanelProps> = ({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
 

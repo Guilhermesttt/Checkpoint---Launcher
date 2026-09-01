@@ -69,7 +69,7 @@ const DesktopAuth: React.FC = () => {
         {status !== "done" && status !== "loading" && (
           <button
             onClick={handleGoogleLogin}
-            disabled={!state || status === "loading"}
+            disabled={!state}
             className="mt-8 w-full bg-white text-black rounded-full py-3.5 px-6 font-display font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-3 hover:scale-102 active:scale-98 transition-all disabled:opacity-50 cursor-pointer shadow-[0_4px_20px_rgba(255,255,255,0.15)]"
           >
             <GoogleIcon />

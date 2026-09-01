@@ -94,7 +94,11 @@ const copy: Record<string, string> = {
 
 const Icon = ({ className }: { className?: string }) => <span className={className} />;
 
-const renderSettings = ({ steamConnected = false } = {}) => render(
+const renderSettings = ({
+  steamConnected = false,
+  onTestOverlayAchievement = vi.fn(),
+  onTestOverlayWelcome = vi.fn(),
+} = {}) => render(
   <SettingsPageV2
     language="pt-BR"
     effectsVolume={40}
@@ -137,8 +141,8 @@ const renderSettings = ({ steamConnected = false } = {}) => render(
     onConnectDiscord={vi.fn()}
     onDisconnectSteam={vi.fn()}
     onDisconnectDiscord={vi.fn()}
-    onTestOverlayWelcome={vi.fn()}
-    onTestOverlayAchievement={vi.fn()}
+    onTestOverlayWelcome={onTestOverlayWelcome}
+    onTestOverlayAchievement={onTestOverlayAchievement}
     initialTab="general"
     onTabChange={vi.fn()}
   />,
@@ -222,14 +226,25 @@ describe("hierarquia dos ajustes", () => {
     expect(screen.getByRole("button", { name: "Sair do Aplicativo" })).toBeInTheDocument();
   });
 
-  it("oferece a conexao RetroAchievements somente na area de contas", () => {
-    renderSettings();
-    expect(screen.queryByRole("article", { name: "RetroAchievements" }))
-      .not.toBeInTheDocument();
+  it("disponibiliza botoes de teste para os diferentes niveis de trofeu no Overlay Lab", () => {
+    const onTestOverlayAchievement = vi.fn();
+    renderSettings({ onTestOverlayAchievement });
+    fireEvent.click(screen.getByRole("button", { name: /notificações/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /contas & privacidade/i }));
+    const bronzeBtn = screen.getByRole("button", { name: /troféu bronze/i });
+    const silverBtn = screen.getByRole("button", { name: /troféu prata/i });
+    const goldBtn = screen.getByRole("button", { name: /troféu ouro/i });
+    const platinumBtn = screen.getByRole("button", { name: /troféu platina/i });
 
-    expect(screen.getByRole("article", { name: "RetroAchievements" }))
-      .toBeInTheDocument();
+    expect(bronzeBtn).toBeInTheDocument();
+    expect(silverBtn).toBeInTheDocument();
+    expect(goldBtn).toBeInTheDocument();
+    expect(platinumBtn).toBeInTheDocument();
+
+    fireEvent.click(goldBtn);
+    expect(onTestOverlayAchievement).toHaveBeenCalledWith("gold");
+
+    fireEvent.click(platinumBtn);
+    expect(onTestOverlayAchievement).toHaveBeenCalledWith("platinum");
   });
 });

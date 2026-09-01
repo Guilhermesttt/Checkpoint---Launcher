@@ -116,6 +116,7 @@ export interface SteamAchievement {
   icon: string;
   iconGray: string;
   hidden: boolean;
+  percent?: number;
 }
 
 export const mapSteamTagsToCategory = (tags?: string[]): string => {
@@ -201,6 +202,42 @@ export const fetchSteamAchievements = async (
   }
 };
 
+const achievementMemoryCache = new Map<
+  string,
+  {
+    achievements: SteamAchievement[];
+    total: number;
+    unlocked: number;
+    timestamp: number;
+  }
+>();
+
+export const getCachedSteamAchievementDetails = (
+  steamId: string,
+  appId: string,
+  language: LauncherLanguage = "pt-BR",
+) => {
+  const cacheKey = `${steamId}_${appId}_${language}`;
+  const cached = achievementMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 30) {
+    return cached;
+  }
+  return null;
+};
+
+export const setCachedSteamAchievementDetails = (
+  steamId: string,
+  appId: string,
+  data: { achievements: SteamAchievement[]; total: number; unlocked: number },
+  language: LauncherLanguage = "pt-BR",
+) => {
+  const cacheKey = `${steamId}_${appId}_${language}`;
+  achievementMemoryCache.set(cacheKey, {
+    ...data,
+    timestamp: Date.now(),
+  });
+};
+
 export const fetchSteamAchievementDetails = async (
   steamId: string,
   appId: string,
@@ -210,6 +247,12 @@ export const fetchSteamAchievementDetails = async (
   total: number;
   unlocked: number;
 }> => {
+  const cacheKey = `${steamId}_${appId}_${language}`;
+  const cached = achievementMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 15) {
+    return cached;
+  }
+
   const url = apiUrl(
     `/api/steam/achievements?steamId=${encodeURIComponent(steamId)}&appId=${encodeURIComponent(appId)}&language=${encodeURIComponent(language)}`,
   );
@@ -217,7 +260,7 @@ export const fetchSteamAchievementDetails = async (
   try {
     const response = await fetch(url, { headers: await getAuthHeaders() });
     if (!response.ok) {
-      return { achievements: [], total: 0, unlocked: 0 };
+      return cached || { achievements: [], total: 0, unlocked: 0 };
     }
 
     const data = (await response.json()) as {
@@ -226,13 +269,22 @@ export const fetchSteamAchievementDetails = async (
       unlocked?: number;
     };
 
-    return {
+    const result = {
       achievements: Array.isArray(data.achievements) ? data.achievements : [],
       total: typeof data.total === "number" ? data.total : 0,
       unlocked: typeof data.unlocked === "number" ? data.unlocked : 0,
     };
+
+    if (result.achievements.length > 0) {
+      achievementMemoryCache.set(cacheKey, {
+        ...result,
+        timestamp: Date.now(),
+      });
+    }
+
+    return result;
   } catch {
-    return { achievements: [], total: 0, unlocked: 0 };
+    return cached || { achievements: [], total: 0, unlocked: 0 };
   }
 };
 
@@ -244,6 +296,12 @@ export const fetchSteamAchievementSchema = async (
   total: number;
   unlocked: number;
 }> => {
+  const cacheKey = `schema_${appId}_${language}`;
+  const cached = achievementMemoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 1000 * 60 * 30) {
+    return cached;
+  }
+
   const url = apiUrl(
     `/api/steam/achievement-schema?appId=${encodeURIComponent(appId)}&language=${encodeURIComponent(language)}`,
   );
@@ -251,7 +309,7 @@ export const fetchSteamAchievementSchema = async (
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      return { achievements: [], total: 0, unlocked: 0 };
+      return cached || { achievements: [], total: 0, unlocked: 0 };
     }
 
     const data = (await response.json()) as {
@@ -260,13 +318,22 @@ export const fetchSteamAchievementSchema = async (
       unlocked?: number;
     };
 
-    return {
+    const result = {
       achievements: Array.isArray(data.achievements) ? data.achievements : [],
       total: typeof data.total === "number" ? data.total : 0,
       unlocked: typeof data.unlocked === "number" ? data.unlocked : 0,
     };
+
+    if (result.achievements.length > 0) {
+      achievementMemoryCache.set(cacheKey, {
+        ...result,
+        timestamp: Date.now(),
+      });
+    }
+
+    return result;
   } catch {
-    return { achievements: [], total: 0, unlocked: 0 };
+    return cached || { achievements: [], total: 0, unlocked: 0 };
   }
 };
 
@@ -351,7 +418,7 @@ export const fetchSteamAchievementSummary = async (
     };
   }
 
-  const CHUNK_SIZE = 250;
+  const CHUNK_SIZE = 50;
   for (let index = 0; index < normalizedAppIds.length; index += CHUNK_SIZE) {
     const chunk = normalizedAppIds.slice(index, index + CHUNK_SIZE);
     try {

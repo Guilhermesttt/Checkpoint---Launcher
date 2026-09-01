@@ -13,6 +13,8 @@ import {
   Star,
   Gamepad2,
   X,
+  Filter,
+  Trophy,
 } from "lucide-react";
 
 import DynamicBackground from "../components/DynamicBackground";
@@ -24,6 +26,9 @@ import GameRow from "../components/GameRow";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import LoadingState from "../components/ui/loading-state";
 import { HomeOverviewPanels } from "../components/HomeOverviewPanels";
+import DashboardContinuePlaying from "../components/DashboardContinuePlaying";
+import LibraryFilterModal, { type LibraryFilters } from "../components/LibraryFilterModal";
+
 import { PHERIELIUM_LOGO_PATH } from "../constants/assets";
 import {
   AddFriendModal,
@@ -42,7 +47,7 @@ import { InteractiveBreadcrumb } from "../components/home/InteractiveBreadcrumb"
 import { useAuth } from "../auth/AuthProvider";
 import { supabase } from "../services/supabase";
 // Correção 1: Importando Game, UserProfile e SocialFriend no mesmo lugar
-import type { ChatMessage, Game, SocialFriend, UserProfile } from "../types/domain";
+import type { ChatMessage, Game, SocialFriend, UserProfile, LauncherType } from "../types/domain";
 import { useImagePreloader } from "../hooks/useImagePreloader";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useGameColor } from "../hooks/useGameColor";
@@ -113,6 +118,8 @@ import { useGamepadButton, useGamepad } from "../context/GamepadContext";
 import { activateElementWithController } from "../utils/controllerTextInput";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
 import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
+import { calculatePlayerLevel, aggregateTrophyCounts } from "../utils/trophyTiers";
+import { getHubAggregateCounts } from "../utils/hubTrophies";
 import {
   disconnectRetroAchievements,
   linkRetroAchievements,
@@ -125,6 +132,8 @@ const GameDetailPanel = React.lazy(() => import("../components/GameDetailPanel")
 const UserProfilePage = React.lazy(() => import("../components/UserProfilePage"));
 const GamingRadarPage = React.lazy(() => import("../components/GamingRadarPage"));
 const ModsPage = React.lazy(() => import("./ModsPage"));
+const TrophiesPage = React.lazy(() => import("../components/TrophiesPage"));
+const TrophyUnlockToast = React.lazy(() => import("../components/TrophyUnlockToast"));
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
@@ -212,6 +221,8 @@ const APP_THEME_OPTIONS: Array<{
 
 
 const Home: React.FC = () => {
+  const { user, userProfile, signOutUser, refreshProfile } = useAuth();
+  const { notify } = useNotification();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState("ALL");
@@ -220,6 +231,34 @@ const Home: React.FC = () => {
   const [localLibraryReady, setLocalLibraryReady] = useState(false);
   const [selectedGame, setSelectedGame] = useState<Game | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Sincronizar selectedGame com a lista atualizada após refreshLibrary
+  React.useEffect(() => {
+    if (!selectedGame || !isDetailOpen) return;
+    const updated = games.find((g) => g.id === selectedGame.id);
+    if (updated && updated !== selectedGame) {
+      setSelectedGame(updated);
+    }
+  }, [games, selectedGame, isDetailOpen]);
+
+  // Nível seguro: só conta XP ganho VIA HUB (anti-farm de importação)
+  const playerLevel = useMemo(() => {
+    if (user?.uid) {
+      const hubAgg = getHubAggregateCounts(user.uid, games);
+      // se já tem progresso no hub, usa ele (mesmo que seja nível 1, mostra hub)
+      // isso evita farm de conquistas antigas importadas do Steam/Epic
+      if ((hubAgg.hubPoints ?? 0) > 0 || games.length > 0) {
+        // quando ainda não tem hub, hubAgg será nível 1 Bronze 1
+        return calculatePlayerLevel(0, 0, 0, hubAgg);
+      }
+    }
+    const agg = aggregateTrophyCounts(games);
+    return calculatePlayerLevel(0, 0, 0, agg);
+  }, [games, user?.uid]);
+
+  // refs para level-up (efeito real fica após playSound para evitar TDZ)
+  const prevLevelRef = React.useRef<number>(0);
+  const levelUpTimerRef = React.useRef<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -238,6 +277,17 @@ const Home: React.FC = () => {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [retroAchievementsConnecting, setRetroAchievementsConnecting] = useState(false);
   const [retroAchievementsError, setRetroAchievementsError] = useState<string>();
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [libraryFilters, setLibraryFilters] = useState<LibraryFilters>({
+    launchers: [],
+    categories: [],
+    favoritesOnly: false,
+    withAchievements: false,
+    minHours: 0,
+    maxHours: 0,
+    sortBy: "title",
+    sortDir: "asc",
+  });
 
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
@@ -286,8 +336,6 @@ const Home: React.FC = () => {
   const didInitConnectionRefs = useRef(false);
   const lastOverlayWelcomeGameRef = useRef<string | null>(null);
 
-  const { notify } = useNotification();
-  const { user, userProfile, signOutUser, refreshProfile } = useAuth();
   const {
     language: launcherLanguage,
     effectsVolume,
@@ -354,13 +402,47 @@ const Home: React.FC = () => {
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
   const resolvedSteamId = useMemo(
-    () => userProfile?.steamId || undefined,
-    [userProfile?.steamId],
+    () => userProfile?.steamId || (userProfile as any)?.steam_id || undefined,
+    [userProfile?.steamId, (userProfile as any)?.steam_id],
   );
   const resolvedDiscordId = useMemo(
     () => userProfile?.discordId || undefined,
     [userProfile?.discordId],
   );
+
+  // Level up detection — após playSound para evitar TDZ, persistido por usuário, ignora dips
+  useEffect(() => {
+    if (!user?.uid || isLoading || games.length === 0) return;
+    const storageKey = `checkpoint_last_level_${user.uid}`;
+    const storedRaw = localStorage.getItem(storageKey);
+    const storedLevel = storedRaw ? Number(storedRaw) : 0;
+    if (storedLevel === 0) {
+      localStorage.setItem(storageKey, String(playerLevel.level));
+      prevLevelRef.current = playerLevel.level;
+      return;
+    }
+    if (prevLevelRef.current === 0) prevLevelRef.current = storedLevel;
+    if (playerLevel.level > storedLevel && playerLevel.level > prevLevelRef.current) {
+      const tierInfo = playerLevel.tierInfo;
+      setLevelUpData({
+        level: playerLevel.level,
+        rank: playerLevel.rank,
+        rankColor: playerLevel.rankColor,
+        tierInfo,
+        prevLevel: prevLevelRef.current,
+        xp: playerLevel.xp,
+        progress: playerLevel.progress,
+      } as any);
+      setShowLevelUp(true);
+      if (levelUpTimerRef.current) window.clearTimeout(levelUpTimerRef.current);
+      levelUpTimerRef.current = window.setTimeout(() => setShowLevelUp(false), 6000) as unknown as number;
+      playSound("select");
+      localStorage.setItem(storageKey, String(playerLevel.level));
+    } else if (playerLevel.level > storedLevel) {
+      localStorage.setItem(storageKey, String(playerLevel.level));
+    }
+    prevLevelRef.current = playerLevel.level;
+  }, [playerLevel.level, playerLevel.rank, playerLevel.rankColor, playerLevel.xp, playerLevel.progress, user?.uid, isLoading, games.length, playSound]);
 
   const refreshLibrary = useCallback(async () => {
     if (!user?.uid) {
@@ -524,6 +606,8 @@ const Home: React.FC = () => {
   const [overlayChatTyping, setOverlayChatTyping] = useState(false);
   const [overlayChatSending, setOverlayChatSending] = useState(false);
   const [overlayChatError, setOverlayChatError] = useState<string | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [levelUpData, setLevelUpData] = useState<{ level: number; rank: string; rankColor: string; tierInfo?: any; prevLevel?: number; xp?: number; progress?: number } | null>(null);
 
   const overlayCurrentGame = useMemo(() => {
     if (!currentPresenceGame) return null;
@@ -857,6 +941,7 @@ const Home: React.FC = () => {
     activeCategory,
     searchTerm,
     socialFriends,
+    libraryFilters,
     t,
   });
 
@@ -1104,7 +1189,24 @@ const Home: React.FC = () => {
   });
 
   useGamepadButton("SQUARE", async () => {
-    if (isAnyModalOpen || searchOpen || isSystemCategory) return;
+    if (isAnyModalOpen || searchOpen) return;
+    // FRIENDS: open chat with focused friend
+    if (activeCategory === "FRIENDS") {
+      const focused = document.querySelector<HTMLElement>("[data-gamepad-focused='true']");
+      if (focused) {
+        const card = focused.closest<HTMLElement>("[data-friend-id]");
+        const friendId = card?.dataset.friendId;
+        if (friendId) {
+          const friend = socialFriends.find((f) => f.id === friendId);
+          if (friend) {
+            playSound("select");
+            setActiveChatFriend(friend);
+          }
+        }
+      }
+      return;
+    }
+    if (isSystemCategory) return;
     const game = displayGames[selectedIndex];
     if (game && user?.uid) {
       playSound(game.isFavorite ? "favoriteOff" : "favoriteOn");
@@ -1180,7 +1282,24 @@ const Home: React.FC = () => {
   }, [playSound]);
 
   useGamepadButton("TRIANGLE", () => {
-    if (isAnyModalOpen || searchOpen || isSystemCategory) return;
+    if (isAnyModalOpen || searchOpen) return;
+    // FRIENDS: call focused friend
+    if (activeCategory === "FRIENDS") {
+      const focused = document.querySelector<HTMLElement>("[data-gamepad-focused='true']");
+      if (focused) {
+        const card = focused.closest<HTMLElement>("[data-friend-id]");
+        const friendId = card?.dataset.friendId;
+        if (friendId) {
+          const friend = socialFriends.find((f) => f.id === friendId);
+          if (friend) {
+            playSound("select");
+            void startCall(friend, false);
+          }
+        }
+      }
+      return;
+    }
+    if (isSystemCategory) return;
     openAddGameModal(categoryToLauncherType(activeCategory));
   });
 
@@ -1832,8 +1951,8 @@ const Home: React.FC = () => {
             />
 
             {/* Clean Pill Search Bar - Only in Menu & Platform views */}
-            {!["SETTINGS", "FRIENDS", "MODS", "RADAR", "PROFILE"].includes(activeCategory) && (
-              <div className="relative flex items-center">
+            {!["SETTINGS", "FRIENDS", "MODS", "RADAR", "PROFILE", "TROPHIES"].includes(activeCategory) && (
+              <div className="relative flex items-center gap-2">
                 <div className="relative flex items-center">
                   <Search className="w-3.5 h-3.5 text-white/40 absolute left-3 pointer-events-none" />
                   <input
@@ -1858,6 +1977,21 @@ const Home: React.FC = () => {
                     </button>
                   )}
                 </div>
+                {/* Filter Button */}
+                <button
+                  onClick={() => {
+                    setFilterModalOpen(true);
+                    playSound("select");
+                  }}
+                  className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-all ${
+                    libraryFilters.launchers.length > 0 || libraryFilters.favoritesOnly || libraryFilters.withAchievements
+                      ? "border-white/20 bg-white/10 text-white"
+                      : "border-white/[0.08] bg-white/[0.04] text-white/40 hover:bg-white/[0.07] hover:text-white/60"
+                  }`}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  Filtros
+                </button>
               </div>
             )}
           </div>
@@ -2051,9 +2185,9 @@ const Home: React.FC = () => {
                 playSound("select");
                 void window.electronAPI?.testOverlayWelcome();
               }}
-              onTestOverlayAchievement={() => {
+              onTestOverlayAchievement={(tier) => {
                 playSound("select");
-                void window.electronAPI?.testOverlayAchievement();
+                void window.electronAPI?.testOverlayAchievement(tier);
               }}
               initialTab={settingsTab}
               onTabChange={handleSettingsTabChange}
@@ -2118,11 +2252,24 @@ const Home: React.FC = () => {
               <UserProfilePage
                 userProfile={userProfile}
                 user={user}
+                userId={user?.uid ?? null}
                 games={games}
                 onOpenGame={openDetails}
                 onProfileUpdated={refreshProfile}
                 playSound={playSound as any}
                 language={launcherLanguage}
+              />
+            </React.Suspense>
+          ) : activeCategory === "TROPHIES" ? (
+            <React.Suspense fallback={
+              <div className="flex flex-1 items-center justify-center">
+                <LoadingState label="Carregando Troféus" variant="Drive" />
+              </div>
+            }>
+              <TrophiesPage
+                games={games}
+                onOpenGame={openDetails}
+                playSound={playSound}
               />
             </React.Suspense>
           ) : isLoading ? (
@@ -2134,16 +2281,16 @@ const Home: React.FC = () => {
               {steamSyncing ? (
                 <PlatformLibrarySkeleton
                   platform="steam"
-                  phase={platformOperations?.steam?.phase || "reading-library"}
-                  completed={platformOperations?.steam?.completed}
-                  total={platformOperations?.steam?.total}
+                  phase={(platformOperations?.steam as { status: string; phase?: string })?.phase || "reading-library"}
+                  completed={(platformOperations?.steam as { status: string; completed?: number })?.completed}
+                  total={(platformOperations?.steam as { status: string; total?: number })?.total}
                 />
               ) : epicSyncing ? (
                 <PlatformLibrarySkeleton
                   platform="epic"
-                  phase={platformOperations?.epic?.phase || "reading-library"}
-                  completed={platformOperations?.epic?.completed}
-                  total={platformOperations?.epic?.total}
+                  phase={(platformOperations?.epic as { status: string; phase?: string })?.phase || "reading-library"}
+                  completed={(platformOperations?.epic as { status: string; completed?: number })?.completed}
+                  total={(platformOperations?.epic as { status: string; total?: number })?.total}
                 />
               ) : (
                 <LoadingSkeleton />
@@ -2153,18 +2300,18 @@ const Home: React.FC = () => {
             <div className="flex-1 flex flex-col justify-between w-full h-full">
               <PlatformLibrarySkeleton
                 platform="steam"
-                phase={platformOperations?.steam?.phase || "reading-library"}
-                completed={platformOperations?.steam?.completed}
-                total={platformOperations?.steam?.total}
+                phase={(platformOperations?.steam as { status: string; phase?: string })?.phase || "reading-library"}
+                completed={(platformOperations?.steam as { status: string; completed?: number })?.completed}
+                total={(platformOperations?.steam as { status: string; total?: number })?.total}
               />
             </div>
           ) : (activeCategory === "EPIC" && epicSyncing) ? (
             <div className="flex-1 flex flex-col justify-between w-full h-full">
               <PlatformLibrarySkeleton
                 platform="epic"
-                phase={platformOperations?.epic?.phase || "reading-library"}
-                completed={platformOperations?.epic?.completed}
-                total={platformOperations?.epic?.total}
+                phase={(platformOperations?.epic as { status: string; phase?: string })?.phase || "reading-library"}
+                completed={(platformOperations?.epic as { status: string; completed?: number })?.completed}
+                total={(platformOperations?.epic as { status: string; total?: number })?.total}
               />
             </div>
           ) : displayGames.length === 0 ? (
@@ -2210,6 +2357,18 @@ const Home: React.FC = () => {
             </div>
           ) : (
             <>
+              {/* Dashboard: Continuar Jogando + Favoritos */}
+              {activeCategory === "ALL" && displayGames.length > 0 && (
+                <DashboardContinuePlaying
+                  continuePlayingGames={continuePlayingGames}
+                  onPlayGame={(game) => {
+                    openDetails(game);
+                    playSound("select");
+                  }}
+                  playSound={playSound}
+                />
+              )}
+
               <motion.div
                 className="px-10 pb-4 shrink-0 transform-gpu will-change-transform"
                 initial={{ opacity: 0 }}
@@ -2352,14 +2511,22 @@ const Home: React.FC = () => {
           >
             {displayGames.length} {displayGames.length === 1 ? "jogo" : "jogos"}
           </p>
-          <InputHints hints={activeInputType === "gamepad" ? [
-            { button: "DPAD", label: "Navegar" },
-            { button: "X", label: "Abrir" },
-            { button: "TRIANGLE", label: "Novo Jogo" },
-            { button: "L2_R2", label: "Categorias" },
-            { button: "SHARE", label: "Amigos" },
-            { button: "OPTIONS", label: "Ajustes" }
-          ] : [
+          <InputHints hints={activeInputType === "gamepad" ? (
+            activeCategory === "FRIENDS" ? [
+              { button: "L1_R1", label: "Trocar Aba" },
+              { button: "DPAD", label: "Selecionar" },
+              { button: "SQUARE", label: "Chat" },
+              { button: "TRIANGLE", label: "Ligar" },
+              { button: "O", label: "Voltar" }
+            ] : [
+              { button: "DPAD", label: "Navegar" },
+              { button: "X", label: "Abrir" },
+              { button: "TRIANGLE", label: "Novo Jogo" },
+              { button: "L2_R2", label: "Categorias" },
+              { button: "SHARE", label: "Amigos" },
+              { button: "OPTIONS", label: "Ajustes" }
+            ]
+          ) : [
             { button: "DPAD", label: "Navegar" },
             { button: "X", label: "Abrir" },
             { button: "CONTEXT", label: "Opções" }
@@ -2377,7 +2544,10 @@ const Home: React.FC = () => {
           }}
           playSound={playSound}
           onLibraryChanged={refreshLibrary}
-          onGameHydrated={setSelectedGame}
+          onGameHydrated={(hydrated) => {
+            setSelectedGame(hydrated);
+            setGames((prev) => prev.map((g) => (g.id === hydrated.id ? { ...g, ...hydrated } : g)));
+          }}
           onOpenMods={() => {
             setIsDetailOpen(false);
             selectCategory("MODS");
@@ -2661,6 +2831,91 @@ const Home: React.FC = () => {
           }
         }}
       />
+
+      {/* Library Filter Modal */}
+      <LibraryFilterModal
+        isOpen={filterModalOpen}
+        onClose={() => setFilterModalOpen(false)}
+        onApply={(filters) => {
+          setLibraryFilters(filters);
+          setFilterModalOpen(false);
+        }}
+        games={games}
+        currentFilters={libraryFilters}
+      />
+
+      {/* Level Up Toast — discreto, gamificado, não bloqueia */}
+      <AnimatePresence>
+        {showLevelUp && levelUpData && (
+          <motion.div
+            initial={{ opacity: 0, x: 80, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 40, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 320, damping: 24 }}
+            className="fixed bottom-6 right-6 z-[9999] pointer-events-auto"
+            onMouseEnter={() => { if (levelUpTimerRef.current) window.clearTimeout(levelUpTimerRef.current); }}
+            onMouseLeave={() => { levelUpTimerRef.current = window.setTimeout(() => setShowLevelUp(false), 2500) as any; }}
+          >
+            <div
+              className="relative w-[360px] overflow-hidden rounded-2xl border bg-black/90 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+              style={{
+                borderColor: (levelUpData as any)?.tierInfo?.hexColor ? `${(levelUpData as any).tierInfo.hexColor}40` : "rgba(255,255,255,0.12)",
+                boxShadow: `0 0 30px ${(levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24"}25, 0 20px 60px rgba(0,0,0,0.6)`,
+              }}
+            >
+              {/* glow topo */}
+              <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full blur-3xl opacity-20" style={{ background: (levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24" }} />
+              <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] to-transparent pointer-events-none" />
+              {/* barra de progresso fina no topo */}
+              {typeof (levelUpData as any)?.progress === "number" && (
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/5">
+                  <motion.div className="h-full" style={{ background: (levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24" }} initial={{ width: 0 }} animate={{ width: `${(levelUpData as any).progress}%` }} transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }} />
+                </div>
+              )}
+              <div className="relative flex gap-4 p-4">
+                <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border bg-black/40" style={{ borderColor: `${(levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24"}40`, background: `${(levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24"}12` }}>
+                  <motion.div initial={{ scale: 0, rotate: -30 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 260, damping: 14 }}>
+                    {(levelUpData as any)?.tierInfo?.tier === "platinum" ? (
+                      <span className="text-xl">💎</span>
+                    ) : (
+                      <Trophy className="h-7 w-7" style={{ color: (levelUpData as any)?.tierInfo?.hexColor ?? "#fbbf24" }} fill="currentColor" />
+                    )}
+                  </motion.div>
+                  <div className="absolute -bottom-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full border border-black bg-white px-1 text-[10px] font-black text-black">Lv{(levelUpData as any)?.prevLevel ?? ""}→{levelUpData.level}</div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Nível Alcançado</p>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-white tracking-tight">{levelUpData.level}</span>
+                        <span className={`text-xs font-bold ${(levelUpData as any)?.tierInfo ? "" : levelUpData.rankColor}`} style={(levelUpData as any)?.tierInfo ? { color: (levelUpData as any).tierInfo.hexColor } : undefined}>{(levelUpData as any)?.tierInfo?.name ?? levelUpData.rank}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => setShowLevelUp(false)} className="rounded-full p-1 text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-white/60">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-amber-300">+{(levelUpData as any)?.xp?.toLocaleString?.() ?? ""} XP</span>
+                    <span className="text-white/30">•</span>
+                    <span>{(levelUpData as any)?.progress ?? 0}% para próximo nível</span>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => { setShowLevelUp(false); (window as any).checkpointSelectCategory?.("TROPHIES"); selectCategory("TROPHIES"); playSound("select"); }} className="flex-1 rounded-xl bg-white text-black px-3 py-2 text-xs font-black hover:bg-white/90 transition-colors">Ver troféus</button>
+                    <button onClick={() => setShowLevelUp(false)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white/70 hover:bg-white/10">Fechar</button>
+                  </div>
+                </div>
+              </div>
+              {/* partículas sparkle discreta */}
+              <motion.div className="pointer-events-none absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+                <div className="absolute left-8 top-3 h-1 w-1 rounded-full bg-white/60 animate-pulse" />
+                <div className="absolute right-12 top-6 h-0.5 w-0.5 rounded-full bg-white/40 animate-pulse" style={{ animationDelay: "0.3s" }} />
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

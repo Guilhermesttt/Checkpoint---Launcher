@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   MessageSquare,
   Phone,
@@ -26,6 +26,7 @@ import { useVoiceCallContext } from "../context/VoiceCallContext";
 import { useAuth } from "../auth/AuthProvider";
 import { useNotification } from "../components/NotificationCenter";
 import { DiscordBrandIcon, SteamBrandIcon } from "../components/Sidebar";
+import { useGamepadButton } from "../context/GamepadContext";
 
 type TranslationFn = ReturnType<typeof usePreferences>["t"];
 type BrandIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -55,6 +56,295 @@ export interface FriendsPageProps {
   playSound?: (type: SoundEffectType) => void;
 }
 
+// ============================================================
+// SUBCOMPONENTES MEMOIZADOS DE AMIGOS
+// ============================================================
+
+const FriendOnlineCard = React.memo<{
+  friend: SocialFriend;
+  unreadCount: number;
+  isCallActive: boolean;
+  isLoadingProfile: boolean;
+  onOpenChat: (friend: SocialFriend) => void;
+  onStartVoiceCall?: (friend: SocialFriend, withVideo?: boolean) => void;
+  onViewFriendProfile: (friend: SocialFriend) => void;
+  playSound?: (type: SoundEffectType) => void;
+}>(({
+  friend,
+  unreadCount,
+  isCallActive,
+  isLoadingProfile,
+  onOpenChat,
+  onStartVoiceCall,
+  onViewFriendProfile,
+  playSound,
+}) => {
+  const handleChat = useCallback(() => onOpenChat(friend), [friend, onOpenChat]);
+  const handleCall = useCallback(() => onStartVoiceCall?.(friend, false), [friend, onStartVoiceCall]);
+  const handleProfile = useCallback(() => onViewFriendProfile(friend), [friend, onViewFriendProfile]);
+  const handleMouseEnter = useCallback(() => playSound?.("hover"), [playSound]);
+
+  return (
+    <div
+      data-friend-id={friend.id}
+      className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-4 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between transform-gpu will-change-transform"
+      onMouseEnter={handleMouseEnter}
+    >
+      <div>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/15">
+              {friend.avatar ? (
+                <img src={friend.avatar} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-white/40">
+                  <User className="w-6 h-6" />
+                </div>
+              )}
+            </div>
+            <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white border-2 border-black/80 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-display font-bold text-white truncate">
+              {friend.name}
+            </h3>
+            <p className="text-[11px] font-body text-white/60 font-medium truncate">
+              {friend.status === "playing" ? `Jogando ${friend.playing}` : "Online"}
+            </p>
+          </div>
+
+          <SteamBrandIcon className="w-4 h-4 text-white/40 shrink-0" />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-3 border-t border-white/[0.06] mt-2">
+        <button
+          type="button"
+          onMouseEnter={handleMouseEnter}
+          onClick={handleChat}
+          title="Chat"
+          className="flex-1 py-1.5 px-2.5 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+        >
+          <MessageSquare className="w-3.5 h-3.5 text-white/70" />
+          <span>Chat</span>
+          {unreadCount > 0 && (
+            <span className="px-1 rounded-full bg-white text-black text-[9px] font-bold">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        {onStartVoiceCall && (
+          <button
+            type="button"
+            onMouseEnter={handleMouseEnter}
+            onClick={handleCall}
+            title="Ligar"
+            className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              isCallActive
+                ? "bg-white text-black border-white shadow-md animate-pulse"
+                : "bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white/70 hover:text-white"
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onMouseEnter={handleMouseEnter}
+          onClick={handleProfile}
+          disabled={isLoadingProfile}
+          title="Ver Perfil"
+          className="py-1.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+        >
+          <User className="w-3.5 h-3.5 text-white/70" />
+          <span>Perfil</span>
+        </button>
+      </div>
+    </div>
+  );
+}, (prev, next) => (
+  prev.friend.id === next.friend.id &&
+  prev.friend.name === next.friend.name &&
+  prev.friend.avatar === next.friend.avatar &&
+  prev.friend.status === next.friend.status &&
+  prev.friend.playing === next.friend.playing &&
+  prev.unreadCount === next.unreadCount &&
+  prev.isCallActive === next.isCallActive &&
+  prev.isLoadingProfile === next.isLoadingProfile &&
+  prev.onOpenChat === next.onOpenChat &&
+  prev.onStartVoiceCall === next.onStartVoiceCall &&
+  prev.onViewFriendProfile === next.onViewFriendProfile &&
+  prev.playSound === next.playSound
+));
+
+const FriendOfflineCard = React.memo<{
+  friend: SocialFriend;
+  onViewFriendProfile: (friend: SocialFriend) => void;
+}>(({ friend, onViewFriendProfile }) => {
+  const handleClick = useCallback(() => onViewFriendProfile(friend), [friend, onViewFriendProfile]);
+
+  return (
+    <div
+      onClick={handleClick}
+      className="shrink-0 snap-start flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/15 cursor-pointer transition-all hover:scale-102 backdrop-blur-xl shadow-md transform-gpu will-change-transform"
+      style={{ minWidth: 190 }}
+    >
+      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/[0.04] border border-white/10 grayscale-[0.6] opacity-75 hover:opacity-100 transition-opacity">
+        {friend.avatar ? (
+          <img src={friend.avatar} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-white/30">
+            <User className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-white/80 truncate">{friend.name}</p>
+        <p className="text-[10px] font-body text-white/30">Offline</p>
+      </div>
+    </div>
+  );
+}, (prev, next) => (
+  prev.friend.id === next.friend.id &&
+  prev.friend.name === next.friend.name &&
+  prev.friend.avatar === next.friend.avatar &&
+  prev.onViewFriendProfile === next.onViewFriendProfile
+));
+
+const FriendChatCard = React.memo<{
+  friend: SocialFriend;
+  unreadCount: number;
+  onOpenChat: (friend: SocialFriend) => void;
+  onStartVoiceCall?: (friend: SocialFriend, withVideo?: boolean) => void;
+  playSound?: (type: SoundEffectType) => void;
+}>(({ friend, unreadCount, onOpenChat, onStartVoiceCall, playSound }) => {
+  const handleChat = useCallback(() => onOpenChat(friend), [friend, onOpenChat]);
+  const handleVoice = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onStartVoiceCall?.(friend, false);
+  }, [friend, onStartVoiceCall]);
+  const handleVideo = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onStartVoiceCall?.(friend, true);
+  }, [friend, onStartVoiceCall]);
+
+  return (
+    <div
+      onClick={handleChat}
+      className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/20 cursor-pointer transition-all backdrop-blur-xl shadow-md transform-gpu will-change-transform"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
+          {friend.avatar ? (
+            <img src={friend.avatar} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/40">
+              <User className="w-5 h-5" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white truncate">{friend.name}</p>
+          <p className="text-xs text-white/40 truncate">{friend.status === "online" ? "Online" : "Offline"}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {onStartVoiceCall && (
+          <>
+            <button
+              type="button"
+              onMouseEnter={() => playSound?.("hover")}
+              onClick={handleVoice}
+              title="Ligar (Áudio)"
+              className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white/70 hover:text-white border border-white/[0.08] transition-all cursor-pointer"
+            >
+              <Phone className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onMouseEnter={() => playSound?.("hover")}
+              onClick={handleVideo}
+              title="Chamada de Vídeo"
+              className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white/70 hover:text-white border border-white/[0.08] transition-all cursor-pointer"
+            >
+              <Video className="w-4 h-4" />
+            </button>
+          </>
+        )}
+        {unreadCount > 0 && (
+          <span className="px-2 py-0.5 rounded-full bg-white text-black text-xs font-bold">
+            {unreadCount}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}, (prev, next) => (
+  prev.friend.id === next.friend.id &&
+  prev.friend.name === next.friend.name &&
+  prev.friend.avatar === next.friend.avatar &&
+  prev.friend.status === next.friend.status &&
+  prev.unreadCount === next.unreadCount &&
+  prev.onOpenChat === next.onOpenChat &&
+  prev.onStartVoiceCall === next.onStartVoiceCall &&
+  prev.playSound === next.playSound
+));
+
+const FriendRequestCard = React.memo<{
+  request: CheckpointFriendRequest;
+  onAccept: (uid: string) => void;
+  onReject: (uid: string) => void;
+}>(({ request, onAccept, onReject }) => {
+  const handleAccept = useCallback(() => onAccept(request.uid), [request.uid, onAccept]);
+  const handleReject = useCallback(() => onReject(request.uid), [request.uid, onReject]);
+
+  return (
+    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] transform-gpu will-change-transform">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10">
+          {request.photoURL ? (
+            <img src={request.photoURL} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-white/40">
+              <User className="w-5 h-5" />
+            </div>
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">{request.displayName || "Jogador"}</p>
+          <p className="text-xs text-white/40">Deseja adicionar você</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleReject}
+          className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.04] text-white/60 hover:text-white text-xs font-semibold cursor-pointer"
+        >
+          Rejeitar
+        </button>
+        <button
+          type="button"
+          onClick={handleAccept}
+          className="px-4 py-1.5 rounded-xl bg-white text-black text-xs font-bold shadow-md hover:bg-white/90 cursor-pointer"
+        >
+          Aceitar
+        </button>
+      </div>
+    </div>
+  );
+}, (prev, next) => (
+  prev.request.uid === next.request.uid &&
+  prev.request.displayName === next.request.displayName &&
+  prev.request.photoURL === next.request.photoURL &&
+  prev.onAccept === next.onAccept &&
+  prev.onReject === next.onReject
+));
+
 export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
   discordConnected,
   userDisplay,
@@ -81,15 +371,6 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
   const { userProfile, user } = useAuth();
   const { notify } = useNotification();
   const offlineScrollRef = React.useRef<HTMLDivElement>(null);
-
-  const scrollOffline = (direction: "left" | "right") => {
-    if (offlineScrollRef.current) {
-      offlineScrollRef.current.scrollBy({
-        left: direction === "left" ? -260 : 260,
-        behavior: "smooth",
-      });
-    }
-  };
 
   const totalUnreadCount = useMemo(
     () => Object.values(unreadMessagesByFriend).reduce((acc, count) => acc + (count || 0), 0),
@@ -128,6 +409,30 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
     () => friends.filter((f) => f.source === "checkpoint"),
     [friends],
   );
+
+  // Controller: Tab switching
+  const switchTab = useCallback(
+    (direction: 1 | -1) => {
+      const tabs: SocialSubTab[] = ["AMIGOS", "CHAT", "SALAS", "SOLICITAÇÕES"];
+      const currentIdx = tabs.indexOf(activeSubTab);
+      const nextIdx = (currentIdx + direction + tabs.length) % tabs.length;
+      playSound?.("select");
+      setActiveSubTab(tabs[nextIdx]);
+    },
+    [activeSubTab, playSound],
+  );
+
+  useGamepadButton("R1", () => switchTab(1), true, 10);
+  useGamepadButton("L1", () => switchTab(-1), true, 10);
+
+  const scrollOffline = (direction: "left" | "right") => {
+    if (offlineScrollRef.current) {
+      offlineScrollRef.current.scrollBy({
+        left: direction === "left" ? -260 : 260,
+        behavior: "smooth",
+      });
+    }
+  };
 
   const recentActivities = useMemo(() => {
     const SEVEN_HOURS_MS = 7 * 60 * 60 * 1000;
@@ -370,93 +675,19 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {onlineFriends.map((friend) => {
-                    const unreadCount = unreadMessagesByFriend[friend.id.split(":")[1]] || 0;
-                    const isCallActiveWithFriend = voiceCall.isCallActiveWithFriend(friend.id);
-
-                    return (
-                      <div
-                        key={friend.id}
-                        className="group relative rounded-[24px] bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/20 p-4 transition-all duration-200 hover:-translate-y-1 shadow-[0_15px_35px_rgba(0,0,0,0.3)] backdrop-blur-xl flex flex-col justify-between"
-                      >
-                        <div>
-                          {/* Avatar & Header */}
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className="relative">
-                              <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/[0.05] border border-white/15">
-                                {friend.avatar ? (
-                                  <img src={friend.avatar} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-white/40">
-                                    <User className="w-6 h-6" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white border-2 border-black/80 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-sm font-display font-bold text-white truncate">
-                                {friend.name}
-                              </h3>
-                              <p className="text-[11px] font-body text-white/60 font-medium truncate">
-                                {friend.status === "playing" ? `Jogando ${friend.playing}` : "Online"}
-                              </p>
-                            </div>
-
-                            <SteamBrandIcon className="w-4 h-4 text-white/40 shrink-0" />
-                          </div>
-                        </div>
-
-                        {/* Action Buttons Row */}
-                        <div className="flex items-center gap-2 pt-3 border-t border-white/[0.06] mt-2">
-                          <button
-                            type="button"
-                            onMouseEnter={() => playSound?.("hover")}
-                            onClick={() => onOpenChat(friend)}
-                            title="Chat"
-                            className="flex-1 py-1.5 px-2.5 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5 text-white/70" />
-                            <span>Chat</span>
-                            {unreadCount > 0 && (
-                              <span className="px-1 rounded-full bg-white text-black text-[9px] font-bold">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </button>
-
-                          {onStartVoiceCall && (
-                            <button
-                              type="button"
-                              onMouseEnter={() => playSound?.("hover")}
-                              onClick={() => onStartVoiceCall(friend, false)}
-                              title="Ligar"
-                              className={`p-2 rounded-xl border transition-all ${
-                                isCallActiveWithFriend
-                                  ? "bg-white text-black border-white shadow-md animate-pulse"
-                                  : "bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white/70 hover:text-white"
-                              }`}
-                            >
-                              <Phone className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onMouseEnter={() => playSound?.("hover")}
-                            onClick={() => onViewFriendProfile(friend)}
-                            disabled={friendProfileLoadingId === friend.id}
-                            title="Ver Perfil"
-                            className="py-1.5 px-3 rounded-xl bg-white/[0.05] hover:bg-white/10 border border-white/[0.08] text-white text-xs font-semibold flex items-center gap-1 transition-all"
-                          >
-                            <User className="w-3.5 h-3.5 text-white/70" />
-                            <span>Perfil</span>
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {onlineFriends.map((friend) => (
+                    <FriendOnlineCard
+                      key={friend.id}
+                      friend={friend}
+                      unreadCount={unreadMessagesByFriend[friend.id.split(":")[1]] || 0}
+                      isCallActive={voiceCall.isCallActiveWithFriend(friend.id)}
+                      isLoadingProfile={friendProfileLoadingId === friend.id}
+                      onOpenChat={onOpenChat}
+                      onStartVoiceCall={onStartVoiceCall}
+                      onViewFriendProfile={onViewFriendProfile}
+                      playSound={playSound}
+                    />
+                  ))}
                 </div>
               )}
             </div>
@@ -501,26 +732,11 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
                   className="flex items-center gap-3 overflow-x-auto pb-3 no-scrollbar scroll-smooth snap-x snap-mandatory"
                 >
                   {offlineFriends.map((friend) => (
-                    <div
+                    <FriendOfflineCard
                       key={friend.id}
-                      onClick={() => onViewFriendProfile(friend)}
-                      className="shrink-0 snap-start flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/15 cursor-pointer transition-all hover:scale-102 backdrop-blur-xl shadow-md"
-                      style={{ minWidth: 190 }}
-                    >
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/[0.04] border border-white/10 grayscale-[0.6] opacity-75 hover:opacity-100 transition-opacity">
-                        {friend.avatar ? (
-                          <img src={friend.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white/30">
-                            <User className="w-5 h-5" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-white/80 truncate">{friend.name}</p>
-                        <p className="text-[10px] font-body text-white/30">Offline</p>
-                      </div>
-                    </div>
+                      friend={friend}
+                      onViewFriendProfile={onViewFriendProfile}
+                    />
                   ))}
                 </div>
               )}
@@ -543,62 +759,16 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
             <div className="py-12 text-center text-white/40 text-sm">Nenhuma conversa encontrada.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {checkpointFriends.map((friend) => {
-                const unreadCount = unreadMessagesByFriend[friend.id.split(":")[1]] || 0;
-                return (
-                  <div
-                    key={friend.id}
-                    onClick={() => onOpenChat(friend)}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/20 cursor-pointer transition-all backdrop-blur-xl shadow-md"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
-                        {friend.avatar ? (
-                          <img src={friend.avatar} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-white/40">
-                            <User className="w-5 h-5" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{friend.name}</p>
-                        <p className="text-xs text-white/40 truncate">{friend.status === "online" ? "Online" : "Offline"}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      {onStartVoiceCall && (
-                        <>
-                          <button
-                            type="button"
-                            onMouseEnter={() => playSound?.("hover")}
-                            onClick={() => onStartVoiceCall(friend, false)}
-                            title="Ligar (Áudio)"
-                            className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white/70 hover:text-white border border-white/[0.08] transition-all cursor-pointer"
-                          >
-                            <Phone className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onMouseEnter={() => playSound?.("hover")}
-                            onClick={() => onStartVoiceCall(friend, true)}
-                            title="Chamada de Vídeo"
-                            className="p-2 rounded-xl bg-white/[0.05] hover:bg-white/10 text-white/70 hover:text-white border border-white/[0.08] transition-all cursor-pointer"
-                          >
-                            <Video className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {unreadCount > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-white text-black text-xs font-bold">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {checkpointFriends.map((friend) => (
+                <FriendChatCard
+                  key={friend.id}
+                  friend={friend}
+                  unreadCount={unreadMessagesByFriend[friend.id.split(":")[1]] || 0}
+                  onOpenChat={onOpenChat}
+                  onStartVoiceCall={onStartVoiceCall}
+                  playSound={playSound}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -643,42 +813,12 @@ export const FriendsPage: React.FC<FriendsPageProps> = React.memo(({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {incomingRequests.map((req) => (
-                <div
+                <FriendRequestCard
                   key={req.uid}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10">
-                      {req.photoURL ? (
-                        <img src={req.photoURL} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white/40">
-                          <User className="w-5 h-5" />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{req.displayName || "Jogador"}</p>
-                      <p className="text-xs text-white/40">Deseja adicionar você</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onRejectRequest(req.uid)}
-                      className="px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.04] text-white/60 hover:text-white text-xs font-semibold"
-                    >
-                      Rejeitar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onAcceptRequest(req.uid)}
-                      className="px-4 py-1.5 rounded-xl bg-white text-black text-xs font-bold shadow-md hover:bg-white/90"
-                    >
-                      Aceitar
-                    </button>
-                  </div>
-                </div>
+                  request={req}
+                  onAccept={onAcceptRequest}
+                  onReject={onRejectRequest}
+                />
               ))}
             </div>
           )}

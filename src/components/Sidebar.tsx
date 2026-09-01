@@ -301,6 +301,7 @@ export const CATEGORIES = [
   { id: "ROCKSTAR", label: "Rockstar", Icon: RockstarBrandIcon },
   { id: "LOCAL", label: "Local", Icon: Laptop, AnimatedIcon: AnimatedLaptopIcon },
   { id: "PROFILE", label: "Perfil", Icon: User, AnimatedIcon: AnimatedUserIcon },
+  { id: "TROPHIES", label: "Troféus", Icon: Trophy },
   { id: "RACING", label: "Corrida", Icon: Car },
   { id: "ROLEPLAYING", label: "RPG", Icon: Swords },
   { id: "SPORTS", label: "Esportes", Icon: Trophy },
@@ -330,6 +331,7 @@ interface SidebarProps {
   language?: LauncherLanguage;
   userDisplay?: string;
   userAvatar?: string;
+  platformOperations?: any;
 }
 
 interface SidebarButtonProps {
@@ -651,18 +653,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         <div className="w-full h-px mt-auto mb-2 shrink-0 bg-linear-to-r from-transparent via-white/10 to-transparent" />
 
-        {/* Rodapé: Perfil e Ajustes */}
+        {/* Rodapé: Ajustes */}
         <div className="w-full flex flex-col gap-1 shrink-0 px-1">
-          <SidebarButton
-            id="PROFILE"
-            label={sidebarLabels.PROFILE || "Perfil"}
-            Icon={User}
-            AnimatedIcon={AnimatedUserIcon}
-            active={activeCategory === "PROFILE"}
-            onClick={() => handleSelect("PROFILE")}
-            reducedMotion={Boolean(prefersReducedMotion)}
-            isExpanded={isExpanded}
-          />
           <SidebarButton
             id="SETTINGS"
             label={settingsLabel}

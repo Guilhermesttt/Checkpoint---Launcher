@@ -10,12 +10,8 @@ import {
   X,
   Sparkles,
   Send,
-  Image as ImageIcon,
-  ChevronLeft,
   Loader2,
-  ExternalLink,
   ZoomIn,
-  Maximize2,
   Phone,
   PhoneCall,
   PhoneOff,
@@ -23,10 +19,13 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  Bell,
   UserPlus,
-  UserCheck,
+  ChevronLeft,
 } from "lucide-react";
+
+import achievementUnlockDefault from "../sounds/Phelierium Default/Achievment_Unlock.mp3";
+import achievementUnlockGold from "../sounds/Phelierium Default/Achievment_Unlock_Gold.mp3";
+import achievementUnlockPlatinum from "../sounds/Phelierium Default/Achievment_Unlock_Platinum.mp3";
 import { Button } from "@/components/ui/Shandc/button";
 import { useGamepadButton } from "../context/GamepadContext";
 import { useGamepadFocusNavigation } from "../hooks/useGamepadFocusNavigation";
@@ -39,6 +38,10 @@ interface AchievementToast {
   gameTitle?: string;
   percent?: number;
   unlockedAt?: string;
+  tier?: "platinum" | "gold" | "silver" | "bronze";
+  xpGained?: number;
+  currentLevel?: number;
+  currentXP?: number;
 }
 
 interface SocialToast {
@@ -89,8 +92,17 @@ interface CommandPanelState {
   };
 }
 
-const playOverlaySound = (type: "unlock" | "welcome" | "toast" | "toggle") => {
+const playOverlaySound = (type: "unlock" | "welcome" | "toast" | "toggle" | "unlockGold" | "unlockPlatinum") => {
   try {
+    if (type === "unlock" || type === "unlockGold" || type === "unlockPlatinum") {
+      const src = type === "unlockPlatinum" ? achievementUnlockPlatinum
+        : type === "unlockGold" ? achievementUnlockGold
+        : achievementUnlockDefault;
+      const audio = new Audio(src);
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+      return;
+    }
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
@@ -100,15 +112,7 @@ const playOverlaySound = (type: "unlock" | "welcome" | "toast" | "toggle") => {
     gain.connect(ctx.destination);
 
     const now = ctx.currentTime;
-    if (type === "unlock") {
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(523.25, now);
-      osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.18);
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc.start(now);
-      osc.stop(now + 0.5);
-    } else if (type === "welcome" || type === "toast") {
+    if (type === "welcome" || type === "toast") {
       osc.type = "sine";
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
@@ -126,7 +130,7 @@ const playOverlaySound = (type: "unlock" | "welcome" | "toast" | "toggle") => {
       osc.stop(now + 0.1);
     }
   } catch {
-    // AudioContext fallback
+    // Silent fallback
   }
 };
 
@@ -140,11 +144,52 @@ const OverlayApp: React.FC = () => {
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  const achievementList = React.useMemo(() => {
+    const raw = panelData.achievements;
+    if (Array.isArray(raw)) return raw;
+    if (raw && Array.isArray((raw as any).items)) return (raw as any).items;
+    return [];
+  }, [panelData.achievements]);
+
+  const unlockedAchievementsCount = React.useMemo(() => {
+    const raw = panelData.achievements as any;
+    if (typeof raw?.unlocked === "number") return raw.unlocked;
+    return achievementList.filter((a: any) => a.achieved).length;
+  }, [panelData.achievements, achievementList]);
+
+  const totalAchievementsCount = React.useMemo(() => {
+    const raw = panelData.achievements as any;
+    if (typeof raw?.available === "number" && raw.available > 0) return raw.available;
+    return achievementList.length;
+  }, [panelData.achievements, achievementList]);
+
+  useEffect(() => {
+    if (isPanelVisible) {
+      const timer = window.setTimeout(() => {
+        const root = document.querySelector<HTMLElement>("[data-system-page]");
+        const firstBtn = root?.querySelector<HTMLElement>("button:not(:disabled)");
+        if (firstBtn) {
+          firstBtn.dataset.gamepadFocused = "true";
+          firstBtn.focus();
+        }
+      }, 60);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isPanelVisible]);
+
   useEffect(() => {
     const api = (window as any).achievementOverlay;
     if (!api) return;
 
     const unbindUnlock = api.onUnlock?.((payload: any) => {
+      const percent = payload.percent ?? 50;
+      const tier: AchievementToast["tier"] =
+        percent <= 5 ? "platinum" :
+        percent <= 20 ? "gold" :
+        percent <= 50 ? "silver" : "bronze";
+      const xpMap = { platinum: 500, gold: 200, silver: 100, bronze: 50 };
+      const xpGained = xpMap[tier];
+
       const toast: AchievementToast = {
         id: String(Date.now() + Math.random()),
         title: payload.title || "Conquista Desbloqueada",
@@ -153,8 +198,12 @@ const OverlayApp: React.FC = () => {
         gameTitle: payload.gameTitle,
         percent: payload.percent,
         unlockedAt: payload.unlockedAt,
+        tier,
+        xpGained,
+        currentLevel: payload.currentLevel,
+        currentXP: payload.currentXP,
       };
-      playOverlaySound("unlock");
+      playOverlaySound(tier === "platinum" ? "unlockPlatinum" : tier === "gold" ? "unlockGold" : "unlock");
       setAchievementToasts((prev) => [...prev, toast]);
       setTimeout(() => {
         setAchievementToasts((prev) => prev.filter((t) => t.id !== toast.id));
@@ -312,41 +361,84 @@ const OverlayApp: React.FC = () => {
       {/* Top Right Achievement Toasts */}
       <div className="fixed top-6 right-6 flex flex-col gap-3 z-10000 max-w-sm w-full pointer-events-auto">
         <AnimatePresence>
-          {achievementToasts.map((toast) => (
-            <motion.div
-              key={toast.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.95 }}
-              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-3.5 rounded-[22px] border border-emerald-500/25 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#13241b]/98 via-[#0e1612]/99 to-[#080c09] p-4 shadow-[0_25px_60px_rgba(0,0,0,0.85)] backdrop-blur-2xl"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-emerald-400/30 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.25)]">
-                {toast.icon ? (
-                  <img src={toast.icon} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <img src="./assets/icon.png" alt="Phelierium" className="h-7 w-7 object-contain" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-400">
-                    Conquista Desbloqueada
-                  </span>
-                  {toast.gameTitle && (
-                    <>
-                      <span className="h-1 w-1 rounded-full bg-white/20" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-white/40 truncate">
-                        {toast.gameTitle}
-                      </span>
-                    </>
+          {achievementToasts.map((toast) => {
+            const tierStyles = {
+              platinum: { color: "#38bdf8", border: "rgba(56,189,248,0.35)", bg: "rgba(56,189,248,0.08)", glow: "0 0 20px rgba(56,189,248,0.15)", label: "PLATINA" },
+              gold: { color: "#eab308", border: "rgba(234,179,8,0.35)", bg: "rgba(234,179,8,0.08)", glow: "0 0 18px rgba(234,179,8,0.12)", label: "OURO" },
+              silver: { color: "#a3a3a3", border: "rgba(163,163,163,0.25)", bg: "rgba(163,163,163,0.06)", glow: "", label: "PRATA" },
+              bronze: { color: "#cd7f32", border: "rgba(205,127,50,0.25)", bg: "rgba(205,127,50,0.06)", glow: "", label: "BRONZE" },
+            };
+            const tier = tierStyles[toast.tier || "bronze"];
+            return (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, x: 80, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 80, scale: 0.9 }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                className="flex items-center gap-3.5 rounded-[22px] border p-4 backdrop-blur-2xl"
+                style={{
+                  borderColor: tier.border,
+                  background: `radial-gradient(ellipse at top, ${tier.bg}, rgba(8,12,9,0.95))`,
+                  boxShadow: `${tier.glow}, 0 25px 60px rgba(0,0,0,0.85)`,
+                }}
+              >
+                {/* Trophy Icon */}
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border"
+                  style={{
+                    borderColor: tier.border,
+                    backgroundColor: tier.bg,
+                    boxShadow: tier.glow ? `inset 0 0 12px ${tier.bg}` : undefined,
+                  }}
+                >
+                  {toast.icon ? (
+                    <img src={toast.icon} alt="" className="h-full w-full object-cover rounded-xl" />
+                  ) : (
+                    <Trophy className="h-6 w-6" style={{ color: tier.color }} fill="currentColor" strokeWidth={1.5} />
                   )}
                 </div>
-                <h4 className="truncate text-xs font-bold text-white mt-0.5">{toast.title}</h4>
-                <p className="line-clamp-1 text-[10px] font-medium text-white/50">{toast.description}</p>
-              </div>
-            </motion.div>
-          ))}
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: tier.color }}>
+                      {tier.label}
+                    </span>
+                    {toast.gameTitle && (
+                      <>
+                        <span className="h-1 w-1 rounded-full bg-white/20" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-white/40 truncate">
+                          {toast.gameTitle}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <h4 className="truncate text-xs font-bold text-white mt-0.5">{toast.title}</h4>
+                  <p className="line-clamp-1 text-[10px] font-medium text-white/50">{toast.description}</p>
+                  {toast.currentLevel != null && (
+                    <p className="mt-1 text-[9px] font-bold tracking-wider" style={{ color: `${tier.color}99` }}>
+                      Nv.{toast.currentLevel}
+                    </p>
+                  )}
+                </div>
+
+                {/* XP Badge */}
+                {toast.xpGained != null && toast.xpGained > 0 && (
+                  <div
+                    className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 border"
+                    style={{
+                      borderColor: "rgba(52,211,153,0.3)",
+                      backgroundColor: "rgba(52,211,153,0.1)",
+                    }}
+                  >
+                    <Sparkles className="h-3 w-3 text-emerald-400" />
+                    <span className="text-[10px] font-black text-emerald-400">+{toast.xpGained}</span>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
 
@@ -578,8 +670,7 @@ const OverlayApp: React.FC = () => {
                           Conquistas
                         </span>
                         <p className="text-xl font-bold text-white mt-2">
-                          {panelData.achievements?.filter((a: any) => a.achieved).length || 0} /{" "}
-                          {panelData.achievements?.length || 0}
+                          {unlockedAchievementsCount} / {totalAchievementsCount}
                         </p>
                       </div>
                       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4">
@@ -596,31 +687,49 @@ const OverlayApp: React.FC = () => {
 
                 {activeView === "achievements" && (
                   <div className="flex flex-col gap-4">
-                    <h3 className="text-lg font-bold text-white">Conquistas do Jogo</h3>
-                    <div className="grid gap-3">
-                      {(panelData.achievements || []).map((ach: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4"
-                        >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                            <Trophy className="h-5 w-5 text-white/70" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="text-xs font-bold text-white">{ach.name || "Conquista"}</h4>
-                            <p className="text-[10px] text-white/40 mt-0.5">{ach.description}</p>
-                          </div>
-                          <span
-                            className={`rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase ${ach.achieved
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
-                              : "bg-white/5 text-white/40 border border-white/10"
-                              }`}
-                          >
-                            {ach.achieved ? "Desbloqueada" : "Bloqueada"}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-white">Conquistas do Jogo</h3>
+                      <span className="text-xs font-bold text-white/60">
+                        {unlockedAchievementsCount} de {totalAchievementsCount} desbloqueadas
+                      </span>
                     </div>
+
+                    {achievementList.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-white/5 bg-white/[0.02]">
+                        <Trophy className="h-10 w-10 text-white/20 mb-2" />
+                        <p className="text-sm font-bold text-white/60">Nenhuma conquista disponível</p>
+                        <p className="text-xs text-white/40 mt-1">Este jogo não possui conquistas ou os dados ainda estão sendo sincronizados.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-2.5">
+                        {achievementList.map((ach: any, idx: number) => (
+                          <div
+                            key={ach.apiName || ach.id || idx}
+                            className="flex items-center gap-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-3.5"
+                          >
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 overflow-hidden border border-white/10">
+                              {ach.icon ? (
+                                <img src={ach.icon} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Trophy className="h-5 w-5 text-white/70" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-white truncate">{ach.name || ach.displayName || "Conquista"}</h4>
+                              <p className="text-[10px] text-white/50 mt-0.5 line-clamp-1">{ach.description || "Sem descrição"}</p>
+                            </div>
+                            <span
+                              className={`rounded-lg px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider shrink-0 ${ach.achieved
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
+                                : "bg-white/5 text-white/40 border border-white/10"
+                                }`}
+                            >
+                              {ach.achieved ? "Desbloqueada" : "Bloqueada"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -6,12 +6,22 @@ import { fetchSteamAchievementSummary } from "../services/steam";
 interface LocalAchievementSummary {
   byGameId: Record<string, { total: number; unlocked: number }>;
   bySteamAppId: Record<string, { total: number; unlocked: number }>;
+  byEpicAppName?: Record<string, { total: number; unlocked: number }>;
   updatedAt: string;
 }
 
 const localStatsForGame = (game: Game, summary: LocalAchievementSummary) => {
   const steamAppId = String(game.steamAppId || "").trim();
+  const epicLaunchId = String(game.epicLaunchId || "").trim();
+  const epicCatalogId = String(game.epicCatalogId || "").trim();
+  const epicAppName = epicCatalogId.includes(":") ? epicCatalogId.split(":")[1] : epicLaunchId;
+
   return (steamAppId ? summary.bySteamAppId[steamAppId] : undefined)
+    || (epicAppName && summary.byEpicAppName ? summary.byEpicAppName[epicAppName] : undefined)
+    || (epicLaunchId && summary.byEpicAppName ? summary.byEpicAppName[epicLaunchId] : undefined)
+    || (epicCatalogId && summary.byEpicAppName ? summary.byEpicAppName[epicCatalogId] : undefined)
+    || (epicAppName ? summary.byGameId[`epic_${epicAppName}`] : undefined)
+    || (epicLaunchId ? summary.byGameId[`epic_${epicLaunchId}`] : undefined)
     || summary.byGameId[game.id];
 };
 
@@ -82,13 +92,39 @@ export function useAchievementLibrarySync(
             completedAchievements: local.unlocked,
           };
         }
-        if (game.launcherType === "steam" && game.steamAppId && steamSummary?.stats[game.steamAppId]) {
-          const steam = steamSummary.stats[game.steamAppId];
-          return {
-            ...game,
-            totalAchievements: Math.max(steam.total, steam.unlocked),
-            completedAchievements: steam.unlocked,
-          };
+        if (game.launcherType === "steam" && game.steamAppId) {
+          if (steamSummary?.stats[game.steamAppId]) {
+            const steam = steamSummary.stats[game.steamAppId];
+            const nextTotal = Math.max(steam.total, steam.unlocked, game.totalAchievements || 0);
+            const nextCompleted = Math.max(steam.unlocked, game.completedAchievements || 0);
+            return {
+              ...game,
+              totalAchievements: nextTotal,
+              completedAchievements: nextCompleted,
+            };
+          }
+          const local = localStatsForGame(game, summary);
+          if (local && local.total > 0) {
+            const nextTotal = Math.max(local.total, local.unlocked, game.totalAchievements || 0);
+            const nextCompleted = Math.max(local.unlocked, game.completedAchievements || 0);
+            return {
+              ...game,
+              totalAchievements: nextTotal,
+              completedAchievements: nextCompleted,
+            };
+          }
+        }
+        if (game.launcherType === "epic") {
+          const local = localStatsForGame(game, summary);
+          if (local && local.total > 0) {
+            const nextTotal = Math.max(local.total, local.unlocked, game.totalAchievements || 0);
+            const nextCompleted = Math.max(local.unlocked, game.completedAchievements || 0);
+            return {
+              ...game,
+              totalAchievements: nextTotal,
+              completedAchievements: nextCompleted,
+            };
+          }
         }
         return game;
       });

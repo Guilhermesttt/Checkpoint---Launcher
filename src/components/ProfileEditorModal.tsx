@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Camera, Check, LoaderCircle, Trash2, X } from "lucide-react";
+import { Camera, Check, Crop, LoaderCircle, Trash2, X } from "lucide-react";
 import type { EditableProfile, UserProfile } from "../types/domain";
 import {
   PROFILE_LIMITS,
   saveCurrentUserProfile,
 } from "../services/profile";
 import ModalShell from "./ui/ModalShell";
+import ImageCropModal from "./ImageCropModal";
 
 interface ProfileEditorModalProps {
   isOpen?: boolean;
@@ -47,6 +48,8 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [rawImageForCrop, setRawImageForCrop] = useState<string | null>(null);
+  const [isCropOpen, setIsCropOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +64,8 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
       });
       setError("");
       setSaving(false);
+      setRawImageForCrop(null);
+      setIsCropOpen(false);
     }
   }, [isOpen, profile, fallbackName, fallbackPhotoURL]);
 
@@ -69,7 +74,7 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
 
   const handleFile = (file?: File) => {
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
       setError("Use uma imagem JPG, PNG ou WebP.");
       return;
     }
@@ -80,38 +85,29 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_SIZE = 256;
-        let width = img.width;
-        let height = img.height;
-        
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            width = MAX_SIZE;
-          }
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL("image/webp", 0.8);
-        setField("photoURL", dataUrl);
+      const src = e.target?.result as string;
+      if (src) {
+        setRawImageForCrop(src);
+        setIsCropOpen(true);
         setError("");
-      };
-      img.src = e.target?.result as string;
+      }
     };
     reader.onerror = () => setError("Erro ao ler imagem.");
     reader.readAsDataURL(file);
+  };
+
+  const handleOpenCropCurrent = () => {
+    if (form.photoURL) {
+      setRawImageForCrop(form.photoURL);
+      setIsCropOpen(true);
+    }
+  };
+
+  const handleCropComplete = (croppedDataUrl: string) => {
+    setField("photoURL", croppedDataUrl);
+    setIsCropOpen(false);
+    setRawImageForCrop(null);
+    setError("");
   };
 
   const handleSave = async () => {
@@ -129,54 +125,79 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
   };
 
   return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      maxWidthClassName="max-w-2xl"
-      zIndexClassName="z-[120]"
-      ariaLabel="Editar perfil"
-    >
-      <div className="relative max-h-[85vh] w-full overflow-y-auto rounded-[28px] border border-white/12 bg-[#090909] p-6 shadow-2xl thin-scrollbar text-white">
-        <header className="mb-6 flex items-start justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Conta Phelierium</p>
-            <h2 id="profile-editor-title" className="mt-1 text-2xl font-black text-white">Editar perfil</h2>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/10 p-2 text-white/50 hover:bg-white/10 hover:text-white">
-            <X className="h-5 w-5" />
-          </button>
-        </header>
+    <>
+      <ModalShell
+        isOpen={isOpen && !isCropOpen}
+        onClose={onClose}
+        maxWidthClassName="max-w-2xl"
+        zIndexClassName="z-[120]"
+        ariaLabel="Editar perfil"
+      >
+        <div className="relative max-h-[85vh] w-full overflow-y-auto rounded-[28px] border border-white/12 bg-[#090909] p-6 shadow-2xl thin-scrollbar text-white">
+          <header className="mb-6 flex items-start justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/35">Conta Phelierium</p>
+              <h2 id="profile-editor-title" className="mt-1 text-2xl font-black text-white">Editar perfil</h2>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-xl border border-white/10 p-2 text-white/50 hover:bg-white/10 hover:text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </header>
 
-        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:flex-row sm:items-center">
-          <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-white/[0.06] text-2xl font-black text-white/50">
-            {form.photoURL ? <img src={form.photoURL} alt="Prévia do avatar" className="h-full w-full object-cover" /> : form.displayName.slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <p className="text-sm font-black text-white">Foto de perfil</p>
-            <p className="mt-1 text-xs text-white/35">JPG, PNG ou WebP, até 5 MB.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                onChange={(event) => handleFile(event.target.files?.[0])}
-              />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-black text-black hover:bg-white/85">
-                <Camera className="h-4 w-4" /> Escolher foto
-              </button>
-              {form.photoURL && (
-                <button
-                  type="button"
-                  onClick={() => setField("photoURL", "")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-black text-white/55 hover:bg-white/10 hover:text-white"
-                >
-                  <Trash2 className="h-4 w-4" /> Remover
-                </button>
+          <div className="mb-6 flex flex-col gap-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:flex-row sm:items-center">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/15 bg-white/[0.06] text-2xl font-black text-white/50 aspect-square shadow-inner">
+              {form.photoURL ? (
+                <img
+                  src={form.photoURL}
+                  alt="Prévia do avatar"
+                  className="h-full w-full object-cover object-center aspect-square"
+                />
+              ) : (
+                form.displayName.slice(0, 2).toUpperCase()
               )}
             </div>
+            <div className="flex-1">
+              <p className="text-sm font-black text-white">Foto de perfil</p>
+              <p className="mt-1 text-xs text-white/35">JPG, PNG ou WebP. Você pode ajustar e recortar a foto perfeitamente.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(event) => {
+                    handleFile(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-xs font-black text-black hover:bg-white/85 transition active:scale-95"
+                >
+                  <Camera className="h-4 w-4" /> Escolher foto
+                </button>
+                {form.photoURL && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleOpenCropCurrent}
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-black text-white hover:bg-white/20 transition active:scale-95"
+                    >
+                      <Crop className="h-4 w-4" /> Ajustar / Cortar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setField("photoURL", "")}
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs font-black text-white/55 hover:bg-white/10 hover:text-white transition active:scale-95"
+                    >
+                      <Trash2 className="h-4 w-4" /> Remover
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="sm:col-span-2">
@@ -239,6 +260,19 @@ const ProfileEditorModal: React.FC<ProfileEditorModalProps> = ({
         </footer>
       </div>
     </ModalShell>
+
+    {rawImageForCrop && (
+      <ImageCropModal
+        isOpen={isCropOpen}
+        imageSrc={rawImageForCrop}
+        onCropComplete={handleCropComplete}
+        onCancel={() => {
+          setIsCropOpen(false);
+          setRawImageForCrop(null);
+        }}
+      />
+    )}
+  </>
   );
 };
 

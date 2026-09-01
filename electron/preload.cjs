@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getEpicLibrary: () => ipcRenderer.invoke("epic:list-library"),
   getEpicAchievements: (request) => ipcRenderer.invoke("epic:get-achievements", request),
   logoutEpic: () => ipcRenderer.invoke("epic:logout"),
+  validateEpicSession: () => ipcRenderer.invoke("epic:validate-session"),
   onEpicProgress: (callback) => {
     if (typeof callback !== "function") return () => {};
     const handler = (_event, payload) => callback(payload);
@@ -108,7 +109,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setPlatformCleanupPhase: (uid, platform, operationId, phase) => ipcRenderer.invoke("library:set-platform-cleanup-phase", uid, platform, operationId, phase),
   completePlatformCleanup: (uid, platform, operationId) => ipcRenderer.invoke("library:complete-platform-cleanup", uid, platform, operationId),
   testOverlayWelcome: () => ipcRenderer.invoke("overlay:test-welcome"),
-  testOverlayAchievement: () => ipcRenderer.invoke("overlay:test-achievement"),
+  testOverlayAchievement: (tier) => ipcRenderer.invoke("overlay:test-achievement", tier),
   setAchievementVolume: (volume) => ipcRenderer.invoke("overlay:set-achievement-volume", volume),
   setAchievementSoundTheme: (theme) => ipcRenderer.invoke("overlay:set-achievement-sound-theme", theme),
   setAchievementNotificationSettings: (settings) => ipcRenderer.invoke("overlay:set-achievement-notification-settings", settings),
@@ -128,6 +129,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getLocalAchievementLibrarySummary: () => ipcRenderer.invoke("achievement:get-library-summary"),
   getAchievementDiagnostics: () => ipcRenderer.invoke("achievement:get-diagnostics"),
   unlockAchievement: (gameId, achievementId) => ipcRenderer.invoke("achievement:unlock", gameId, achievementId),
+  notifyTrophyUnlock: (payload) => ipcRenderer.invoke("trophy:notify-unlock", payload),
   showFriendMessageOverlay: (payload) => ipcRenderer.invoke("overlay:show-friend-message", payload),
   updateOverlayPanel: (payload) => ipcRenderer.invoke("overlay:update-panel", payload),
   onOverlayPanelAction: (callback) => {

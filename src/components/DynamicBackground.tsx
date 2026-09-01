@@ -14,27 +14,37 @@ const DynamicBackground: React.FC<DynamicBackgroundProps> = ({ backgroundImage, 
   const noFx = reducedEffects || low;
 
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" style={{ background: "var(--background)" }}>
-      <PVideoBackground
-        src={bgVideo}
-        className="absolute inset-0 w-full h-full object-cover"
-        opacity={0.55}
-      />
+    <div
+      className="fixed inset-0 z-0 overflow-hidden pointer-events-none isolate"
+      style={{
+        background: "var(--background)",
+        transform: "translateZ(0)",
+      }}
+    >
+      {/* Video de fundo nitido com baixa opacidade e aceleracao GPU */}
+      <div className="absolute inset-0 transform-gpu will-change-transform">
+        <PVideoBackground
+          src={bgVideo}
+          className="absolute inset-0 w-full h-full object-cover"
+          opacity={0.38}
+        />
+      </div>
 
+      {/* Imagem de fundo do jogo com efeito blur atmosferico */}
       <AnimatePresence mode="popLayout">
         {backgroundImage ? (
           <motion.img
             key={backgroundImage}
             src={backgroundImage}
             initial={{ opacity: 0 }}
-            animate={{ opacity: noFx ? 0.3 : 0.45 }}
+            animate={{ opacity: noFx ? 0.25 : 0.45 }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: noFx ? 0.1 : 0.65,
+              duration: noFx ? 0.1 : 0.55,
               ease: "easeOut"
             }}
-            style={{ transform: "translate3d(0,0,0)" }}
-            className={`absolute inset-0 w-full h-full object-cover will-change-transform transform-gpu ${noFx ? "" : "blur-[36px] scale-[1.06]"}`}
+            style={{ transform: "translate3d(0,0,0)", backfaceVisibility: "hidden" }}
+            className={`absolute inset-0 w-full h-full object-cover will-change-transform transform-gpu ${noFx ? "scale-[1.02]" : "blur-[36px] scale-[1.08]"}`}
           />
         ) : null}
       </AnimatePresence>
