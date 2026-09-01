@@ -176,6 +176,7 @@ const windowBehaviorController = createWindowBehaviorController({
   },
   requestConfirmation: () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("system:exit-confirmation-requested");
       mainWindow.webContents.send("overlay:panel-action", { kind: "request-exit-confirmation" });
     }
   },

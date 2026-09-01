@@ -176,6 +176,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     h: { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 },
     v: { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 },
   });
+  const lastRightStickWasActive = useRef(false);
 
   const activeInputRef = useRef<InputType>("mouse");
   activeInputRef.current = activeInputType;
@@ -212,10 +213,8 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const handleGamepadConnected = useCallback((e: GamepadEvent) => {
     setIsGamepadConnected(true);
-    setActiveInputType("gamepad");
     setConnectedGamepadId(e.gamepad.id);
     setGamepadFamily(detectGamepadFamily(e.gamepad.id));
-    document.body.style.cursor = "none";
   }, []);
 
   const handleGamepadDisconnected = useCallback((event: GamepadEvent) => {
@@ -437,15 +436,22 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const rightActive = nRightX !== 0 || nRightY !== 0;
 
       if (!isLauncherInputLocked()) {
-        if (rightActive) inputDetected = true;
-        // Sempre dispara (mesmo em 0,0) pra quem escuta saber quando o stick soltou.
-        // Valor já normalizado 0→1 a partir da deadzone, então dá pra usar direto
-        // como fator de velocidade proporcional (leve = devagar, no talo = rápido).
-        window.dispatchEvent(
-          new CustomEvent("gamepad:rightstick", {
-            detail: { x: nRightX, y: nRightY },
-          }),
-        );
+        if (rightActive) {
+          inputDetected = true;
+          lastRightStickWasActive.current = true;
+          window.dispatchEvent(
+            new CustomEvent("gamepad:rightstick", {
+              detail: { x: nRightX, y: nRightY },
+            }),
+          );
+        } else if (lastRightStickWasActive.current) {
+          lastRightStickWasActive.current = false;
+          window.dispatchEvent(
+            new CustomEvent("gamepad:rightstick", {
+              detail: { x: 0, y: 0 },
+            }),
+          );
+        }
       }
 
       if (inputDetected && activeInputRef.current !== "gamepad") {
@@ -523,14 +529,18 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const onMouse = () => {
       if (activeInputRef.current !== "mouse") {
         setActiveInputType("mouse");
-        document.body.style.cursor = "default";
+        if (document.body.style.cursor === "none") {
+          document.body.style.cursor = "default";
+        }
       }
     };
     const onKeyboard = (e: Event) => {
       if (!(e as KeyboardEvent).isTrusted) return;
       if (activeInputRef.current !== "keyboard") {
         setActiveInputType("keyboard");
-        document.body.style.cursor = "none";
+        if (document.body.style.cursor === "none") {
+          document.body.style.cursor = "default";
+        }
       }
     };
 
