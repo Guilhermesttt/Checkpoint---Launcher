@@ -1,3 +1,6 @@
+!define MUI_BGCOLOR "0E1015"
+!define MUI_TEXTCOLOR "FFFFFF"
+
 !macro customWelcomePage
   !insertmacro MUI_PAGE_WELCOME
 !macroend
