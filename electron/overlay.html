@@ -3627,7 +3627,12 @@
           });
         }
         node.classList.add("is-leaving");
-        setTimeout(() => node.remove(), 320);
+        setTimeout(() => {
+          node.remove();
+          if (!document.querySelector(".overlay-card:not(.is-leaving)")) {
+            window.achievementOverlay.panelAction({ kind: "toasts-cleared" });
+          }
+        }, 320);
       }, duration);
     };
 

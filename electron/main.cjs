@@ -1395,7 +1395,7 @@ const createOverlayWindow = () => {
 
   overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setIgnoreMouseEvents(true);
   syncOverlayBounds();
   const createdOverlayWindow = overlayWindow;
   createdOverlayWindow.loadFile(path.join(__dirname, "overlay.html"));
@@ -1413,7 +1413,9 @@ const createOverlayWindow = () => {
     });
   });
   createdOverlayWindow.once("ready-to-show", () => {
-    if (!createdOverlayWindow.isDestroyed()) createdOverlayWindow.showInactive();
+    if (!createdOverlayWindow.isDestroyed() && overlayPanelOpen) {
+      createdOverlayWindow.show();
+    }
   });
   createdOverlayWindow.on("closed", () => {
     if (overlayWindow === createdOverlayWindow) {
@@ -1430,6 +1432,7 @@ const revealOverlayForToast = () => {
   try {
     overlayWindow.setAlwaysOnTop(true, "screen-saver");
     overlayWindow.moveTop();
+    overlayWindow.setIgnoreMouseEvents(true);
     overlayWindow.showInactive();
   } catch (error) {
     console.warn("[overlay] Nao foi possivel reafirmar a ordem da janela:", error);
@@ -1481,8 +1484,9 @@ const setOverlayPanelOpen = (open) => {
     overlayWindow.show();
     overlayWindow.focus();
   } else {
-    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    overlayWindow.setIgnoreMouseEvents(true);
     overlayWindow.blur();
+    overlayWindow.hide();
     
     // Devolve o foco ao Hub se ele estiver visível (ou seja, se não houver um jogo rodando)
     if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
@@ -1955,7 +1959,14 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
   }
   if (kind === "set-toast-interactive") {
     if (!overlayPanelOpen && overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.setIgnoreMouseEvents(!Boolean(action?.interactive), { forward: true });
+      overlayWindow.setIgnoreMouseEvents(!Boolean(action?.interactive));
+    }
+    return { ok: true };
+  }
+  if (kind === "toasts-cleared") {
+    if (!overlayPanelOpen && overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.hide();
     }
     return { ok: true };
   }
@@ -1974,7 +1985,8 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       return { ok: true, target: "in-game-chat" };
     }
     if (overlayWindow && !overlayWindow.isDestroyed() && !overlayPanelOpen) {
-      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.hide();
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();

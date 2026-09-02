@@ -223,7 +223,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setConnectedGamepadId(null);
     setGamepadFamily("generic");
     setActiveInputType("mouse");
-    document.body.style.cursor = "default";
     lastButtonState.current = {};
     axisState.current.h = { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 };
     axisState.current.v = { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 };
@@ -456,7 +455,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (inputDetected && activeInputRef.current !== "gamepad") {
         setActiveInputType("gamepad");
-        document.body.style.cursor = "none";
       }
     }
 
@@ -479,7 +477,6 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       resetCachedLedDevice();
       if (activeInputRef.current === "gamepad") {
         setActiveInputType("mouse");
-        document.body.style.cursor = "default";
       }
     }
 
@@ -529,18 +526,12 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const onMouse = () => {
       if (activeInputRef.current !== "mouse") {
         setActiveInputType("mouse");
-        if (document.body.style.cursor === "none") {
-          document.body.style.cursor = "default";
-        }
       }
     };
     const onKeyboard = (e: Event) => {
       if (!(e as KeyboardEvent).isTrusted) return;
       if (activeInputRef.current !== "keyboard") {
         setActiveInputType("keyboard");
-        if (document.body.style.cursor === "none") {
-          document.body.style.cursor = "default";
-        }
       }
     };
 
