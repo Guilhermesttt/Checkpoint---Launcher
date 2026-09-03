@@ -58,6 +58,16 @@ function cancelChannelIdleClose(channelName: string) {
   }
 }
 
+const presenceLeaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelPendingLeave(uid: string) {
+  const existingTimer = presenceLeaveTimers.get(uid);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    presenceLeaveTimers.delete(uid);
+  }
+}
+
 /**
  * Inscreve no canal pessoal de eventos U2U (Mensagens rápidas, convites e notificações diretas)
  */
@@ -138,6 +148,9 @@ export const subscribeToGlobalEventBus = (
       .on("broadcast", { event: "presence:status_update" }, (e: any) => {
         if (e.payload && typeof e.payload === "object") {
           const presence = e.payload as PresencePayload;
+          if (presence?.uid) {
+            cancelPendingLeave(presence.uid);
+          }
           globalEventHandlers.forEach((h) => h.onStatusUpdate?.(presence));
         }
       })
@@ -147,6 +160,7 @@ export const subscribeToGlobalEventBus = (
           if (Array.isArray(presences)) {
             presences.forEach((p: any) => {
               if (p.presence && p.presence.uid) {
+                cancelPendingLeave(p.presence.uid);
                 globalEventHandlers.forEach((h) => h.onStatusUpdate?.(p.presence));
               }
             });
@@ -157,6 +171,7 @@ export const subscribeToGlobalEventBus = (
         if (Array.isArray(newPresences)) {
           newPresences.forEach((p: any) => {
             if (p.presence && p.presence.uid) {
+              cancelPendingLeave(p.presence.uid);
               globalEventHandlers.forEach((h) => h.onStatusUpdate?.(p.presence));
             }
           });
@@ -167,16 +182,30 @@ export const subscribeToGlobalEventBus = (
           leftPresences.forEach((p: any) => {
             const uid = p.presence?.uid || p.uid;
             if (uid) {
-              globalEventHandlers.forEach((h) =>
-                h.onStatusUpdate?.({
-                  uid,
-                  displayName: p.presence?.displayName || p.displayName || "Jogador",
-                  photoURL: p.presence?.photoURL || p.photoURL || null,
-                  status: "offline",
-                  playing: null,
-                  updatedAt: Date.now(),
-                }),
-              );
+              cancelPendingLeave(uid);
+              const timer = setTimeout(() => {
+                presenceLeaveTimers.delete(uid);
+                // Verificar se o usuário ainda está presente no canal (re-sync / heartbeat)
+                try {
+                  const state = presenceChannel?.presenceState() || {};
+                  const isStillPresent = Object.values(state).some((arr: any) =>
+                    Array.isArray(arr) && arr.some((item: any) => (item.presence?.uid || item.uid) === uid)
+                  );
+                  if (isStillPresent) return;
+                } catch {}
+
+                globalEventHandlers.forEach((h) =>
+                  h.onStatusUpdate?.({
+                    uid,
+                    displayName: p.presence?.displayName || p.displayName || "Jogador",
+                    photoURL: p.presence?.photoURL || p.photoURL || null,
+                    status: "offline",
+                    playing: null,
+                    updatedAt: Date.now(),
+                  }),
+                );
+              }, 4000);
+              presenceLeaveTimers.set(uid, timer);
             }
           });
         }

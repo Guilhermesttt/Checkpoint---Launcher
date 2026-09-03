@@ -68,6 +68,7 @@ export function useFriendsSystem({
   const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
   const isFirstUnreadSnapshotRef = useRef(true);
   const friendPresenceFingerprintRef = useRef<Map<string, string>>(new Map());
+  const lastOnlineToastRef = useRef<Map<string, number>>(new Map());
 
   const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
   const previousOutgoingRequestsRef = useRef<Set<string> | null>(null);
@@ -200,13 +201,18 @@ export function useFriendsSystem({
             if (friend.status !== newFriend.status || friend.playing !== newFriend.playing) {
               hasChanges = true;
 
-              // Notificar quando amigo fica online
+              // Notificar quando amigo fica online (com cooldown de 90s para evitar spam)
               if (
                 friend.status === "offline" &&
                 newFriend.status === "online" &&
                 previousFingerprint !== nextFingerprint
               ) {
-                notify(`${newFriend.name} ficou online`, "success");
+                const now = Date.now();
+                const lastToast = lastOnlineToastRef.current.get(friend.id) || 0;
+                if (now - lastToast > 90_000) {
+                  lastOnlineToastRef.current.set(friend.id, now);
+                  notify(`${newFriend.name} ficou online`, "success");
+                }
               }
 
               // Notificar quando amigo começa a jogar
@@ -302,7 +308,7 @@ export function useFriendsSystem({
       window.clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user?.uid, userProfile?.checkpointFriends, notify]);
+  }, [user?.uid, (userProfile?.checkpointFriends ?? []).length, notify]);
 
   // Subscrição instantânea via WebSocket Event Bus (Sub-50ms) para TODOS os usuários (mesmo com 0 amigos)
   useEffect(() => {
@@ -336,7 +342,12 @@ export function useFriendsSystem({
               hasChanges = true;
 
               if (friend.status === "offline" && newFriend.status === "online" && previousFingerprint !== nextFingerprint) {
-                notify(`${newFriend.name} ficou online`, "success");
+                const now = Date.now();
+                const lastToast = lastOnlineToastRef.current.get(friend.id) || 0;
+                if (now - lastToast > 90_000) {
+                  lastOnlineToastRef.current.set(friend.id, now);
+                  notify(`${newFriend.name} ficou online`, "success");
+                }
               }
 
               if (friend.status !== "playing" && newFriend.status === "playing" && newFriend.playing && previousFingerprint !== nextFingerprint) {
