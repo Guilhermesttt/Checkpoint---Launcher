@@ -2606,7 +2606,9 @@ const Home: React.FC = () => {
               <UserProfilePage
                 userProfile={friendProfileModal.profile}
                 user={{ email: null, photoURL: friendProfileModal.profile.photoURL }}
+                userId={friendProfileModal.profile.uid}
                 games={friendProfileModal.games}
+                onOpenGame={openDetails}
                 editable={false}
                 playSound={playSound as any}
                 language={launcherLanguage}

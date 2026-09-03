@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, ExternalLink, Gamepad2, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
+import { Clock, ExternalLink, Gamepad2, Lock, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -270,6 +270,7 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
   });
   const copy = profileCopy[language];
   const compactProfile = !editable;
+  const isPrivateProfile = !editable && userProfile?.profileVisibility === "private";
   const displayName = userProfile?.displayName || user?.email?.split("@")[0] || copy.player;
   const email = userProfile?.email || user?.email || "";
 
@@ -479,16 +480,35 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
                   <Pencil className="h-3.5 w-3.5" /> {copy.edit}
                 </button>
               )}
-              <div className="grid grid-cols-3 gap-3">
-                <StatCard compact={compactProfile} icon={<Gamepad2 className="h-4 w-4" />} label={copy.games} value={stats.totalGames} />
-                <StatCard compact={compactProfile} icon={<Clock className="h-4 w-4" />} label={copy.hours} value={`${formatPlayedHours(stats.totalHours)}h`} />
-                <StatCard compact={compactProfile} icon={<Star className="h-4 w-4" />} label={copy.favorites} value={stats.favorites} />
-              </div>
+              {isPrivateProfile ? (
+                <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-white/50">
+                  <Lock className="h-4 w-4 text-white/60" />
+                  <span className="text-xs font-bold uppercase tracking-wider">Perfil Privado</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <StatCard compact={compactProfile} icon={<Gamepad2 className="h-4 w-4" />} label={copy.games} value={stats.totalGames} />
+                  <StatCard compact={compactProfile} icon={<Clock className="h-4 w-4" />} label={copy.hours} value={`${formatPlayedHours(stats.totalHours)}h`} />
+                  <StatCard compact={compactProfile} icon={<Star className="h-4 w-4" />} label={copy.favorites} value={stats.favorites} />
+                </div>
+              )}
             </div>
           </div>
         </section>
 
-        <div className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] ${compactProfile ? "gap-4" : "gap-5"}`}>
+        {isPrivateProfile ? (
+          <section className="flex flex-col items-center justify-center rounded-[28px] border border-white/10 bg-black/40 backdrop-blur-3xl p-12 text-center shadow-[0_24px_90px_rgba(0,0,0,0.55)]">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06] text-white/60 shadow-inner">
+              <Lock className="h-8 w-8 text-white/80" />
+            </div>
+            <h2 className="text-xl font-black text-white">Perfil Privado</h2>
+            <p className="mt-2 max-w-md text-sm text-white/45 leading-relaxed">
+              Este jogador optou por manter suas estatísticas, biblioteca de jogos e troféus privados.
+            </p>
+          </section>
+        ) : (
+          <>
+            <div className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] ${compactProfile ? "gap-4" : "gap-5"}`}>
           <section aria-label="Atividade do jogador" className="space-y-5">
             <Section compact={compactProfile} title={copy.mostPlayed} icon={<TrendingUp className="h-4 w-4" />} className={compactProfile ? "min-h-[260px]" : "min-h-[346px]"}>
               {topGames.length > 0 ? (
@@ -625,7 +645,9 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
           </aside>
         </div>
 
-        <TrophyHistoryTimeline userId={userId || userProfile?.uid || (user as any)?.uid || "current-user"} games={games} />
+            <TrophyHistoryTimeline userId={userId || userProfile?.uid || (user as any)?.uid || "current-user"} games={games} />
+          </>
+        )}
       </div>
       <ProfileEditorModal
         isOpen={isEditing}

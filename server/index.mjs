@@ -2837,99 +2837,207 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
   try {
     const currentUid = req.firebaseUser.uid;
-    const [friendshipResult, visibilityResult] = await Promise.all([
-      supabaseAdmin
-        .from("friendships")
-        .select("requester_id")
-        .eq("status", "accepted")
-        .or(
-          `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
-          + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
-        )
-        .maybeSingle(),
+    const isSelf = currentUid === friendUid;
+
+    // 1. Carregar perfil completo do usuário alvo a partir de profiles
+    const [profileResult, friendshipResult] = await Promise.all([
       supabaseAdmin
         .from("profiles")
-        .select("profile_visibility")
+        .select("*")
+        .eq("uid", friendUid)
+        .maybeSingle(),
+      isSelf
+        ? Promise.resolve({ data: null, error: null })
+        : supabaseAdmin
+            .from("friendships")
+            .select("requester_id")
+            .eq("status", "accepted")
+            .or(
+              `and(requester_id.eq.${currentUid},addressee_id.eq.${friendUid}),`
+              + `and(requester_id.eq.${friendUid},addressee_id.eq.${currentUid})`,
+            )
+            .maybeSingle(),
+    ]);
+
+    const { data: profileRow, error: profileError } = profileResult;
+    if (profileError) throw profileError;
+    if (!profileRow) {
+      res.status(404).json({ error: "Perfil não encontrado." });
+      return;
+    }
+
+    const isAcceptedFriend = Boolean(friendshipResult.data);
+    const profileVisibility = profileRow.profile_visibility === "private" ? "private" : "public";
+
+    // Se o perfil for privado e não for o próprio usuário:
+    if (profileVisibility === "private" && !isSelf) {
+      const visibleProfile = profileRowToPublic(profileRow);
+      res.json({
+        profile: {
+          ...visibleProfile,
+          uid: friendUid,
+          displayName: profileRow.display_name || "Jogador",
+          photoURL: profileRow.photo_url || "",
+          profileVisibility: "private",
+          bio: "",
+          website: "",
+          favoriteGenres: [],
+          steamId: "",
+          steamUsername: "",
+          steamAvatar: "",
+          discordId: "",
+          discordUsername: "",
+          discordAvatar: "",
+          achievementSummary: {},
+          librarySummary: {
+            games: 0,
+            steamGames: 0,
+            epicGames: 0,
+            localGames: 0,
+            favorites: 0,
+            minutesPlayed: 0,
+          },
+        },
+        games: [],
+        isPrivate: true,
+      });
+      return;
+    }
+
+    // 2. Perfil público (ou próprio usuário): buscar jogos reais, troféus reais e estatísticas
+    const [userGamesResult, trophiesResult, levelResult, publicProfileResult] = await Promise.all([
+      supabaseAdmin
+        .from("user_games")
+        .select("id,title,launcher_type,hours_played,steam_app_id,epic_catalog_id,is_favorite,data,updated_at")
+        .eq("user_id", friendUid)
+        .order("hours_played", { ascending: false })
+        .limit(FRIEND_PROFILE_GAME_LIMIT),
+      supabaseAdmin
+        .from("user_trophies")
+        .select("trophy_id,progress,unlocked_at,trophy_definitions(tier,title,xp_value)")
+        .eq("user_id", friendUid)
+        .not("unlocked_at", "is", null),
+      supabaseAdmin
+        .from("level_progress")
+        .select("current_level,current_level_xp,total_xp,tier")
+        .eq("user_id", friendUid)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("public_profiles")
+        .select("*")
         .eq("uid", friendUid)
         .maybeSingle(),
     ]);
-    const { data: friendship, error: friendshipError } = friendshipResult;
-    const { data: visibilityRow, error: visibilityError } = visibilityResult;
-    if (friendshipError) throw friendshipError;
-    if (visibilityError) throw visibilityError;
-    if (!visibilityRow) {
-      res.status(404).json({ error: "Perfil não encontrado." });
-      return;
-    }
-    if (!canViewDetailedProfile({
-      visibility: visibilityRow.profile_visibility,
-      isSelf: currentUid === friendUid,
-      isAcceptedFriend: Boolean(friendship),
-    })) {
-      res.status(403).json({ error: "Perfil privado disponível apenas para amigos." });
-      return;
+
+    const userGames = userGamesResult.data || [];
+    const publicRow = publicProfileResult.data;
+
+    let games = userGames.map((row) => ({
+      ...(row.data || {}),
+      id: String(row.id),
+      title: String(row.data?.title || row.title || "Jogo"),
+      launcherType: row.data?.launcherType || row.launcher_type || "local",
+      hoursPlayed: Number(row.data?.hoursPlayed ?? row.hours_played ?? 0),
+      steamAppId: row.data?.steamAppId || row.steam_app_id || undefined,
+      epicCatalogId: row.data?.epicCatalogId || row.epic_catalog_id || undefined,
+      isFavorite: Boolean(row.data?.isFavorite ?? row.is_favorite),
+    }));
+
+    // Fallback: se user_games estiver vazio, mesclar top_games / favorite_games de public_profiles se houver
+    if (games.length === 0 && publicRow) {
+      const sqlTopGames = Array.isArray(publicRow.top_games) ? publicRow.top_games : [];
+      const sqlFavoriteGames = Array.isArray(publicRow.favorite_games) ? publicRow.favorite_games : [];
+      games = Array.from(
+        new Map(
+          [
+            ...sqlTopGames.map((g) => ({ ...g, isFavorite: Boolean(g?.isFavorite) })),
+            ...sqlFavoriteGames.map((g) => ({ ...g, isFavorite: true })),
+          ].map((g) => [String(g?.id || ""), g]),
+        ).values(),
+      ).filter((g) => g?.id).slice(0, FRIEND_PROFILE_GAME_LIMIT);
     }
 
-    const [{ data: publicRow, error: publicError }, { data: privateRow, error: privateError }] =
-      await Promise.all([
-        supabaseAdmin.from("public_profiles").select("*").eq("uid", friendUid).maybeSingle(),
-        supabaseAdmin
-          .from("profiles")
-          .select("uid,steam_id,steam_username,steam_avatar,discord_id,discord_username,discord_avatar,status,playing,presence_updated_at")
-          .eq("uid", friendUid)
-          .maybeSingle(),
-      ]);
-    if (publicError) throw publicError;
-    if (privateError) throw privateError;
-    if (!publicRow) {
-      res.status(404).json({ error: "Perfil não encontrado." });
-      return;
+    // Calcular estatísticas agregadas a partir dos jogos reais
+    let totalMinutesPlayed = 0;
+    let steamGamesCount = 0;
+    let epicGamesCount = 0;
+    let localGamesCount = 0;
+    let favoritesCount = 0;
+
+    for (const game of games) {
+      const hours = Number(game.hoursPlayed || 0);
+      totalMinutesPlayed += Math.round(hours * 60);
+      if (game.isFavorite) favoritesCount++;
+      const launcher = String(game.launcherType || "").toLowerCase();
+      if (launcher === "steam") steamGamesCount++;
+      else if (launcher === "epic") epicGamesCount++;
+      else localGamesCount++;
     }
 
-    const visibleProfile = profileRowToPublic({
-      ...privateRow,
-      display_name: publicRow.display_name,
-      photo_url: publicRow.photo_url,
-    });
-    const sqlTopGames = Array.isArray(publicRow.top_games) ? publicRow.top_games : [];
-    const sqlFavoriteGames = Array.isArray(publicRow.favorite_games)
-      ? publicRow.favorite_games
-      : [];
-    const sqlGames = Array.from(
-      new Map(
-        [
-          ...sqlTopGames.map((game) => ({ ...game, isFavorite: Boolean(game?.isFavorite) })),
-          ...sqlFavoriteGames.map((game) => ({ ...game, isFavorite: true })),
-        ].map((game) => [String(game?.id || ""), game]),
-      ).values(),
-    ).filter((game) => game?.id).slice(0, FRIEND_PROFILE_GAME_LIMIT);
+    // Contagem de troféus desbloqueados por tier
+    const unlockedTrophies = trophiesResult.data || [];
+    let bronze = 0;
+    let silver = 0;
+    let gold = 0;
+    let platinum = 0;
+
+    for (const tr of unlockedTrophies) {
+      const tier = tr.trophy_definitions?.tier;
+      if (tier === "bronze") bronze++;
+      else if (tier === "silver") silver++;
+      else if (tier === "gold") gold++;
+      else if (tier === "platinum") platinum++;
+    }
+
+    const storedAchievementSummary = profileRow.achievement_summary || publicRow?.achievements || {};
+    const finalAchievementSummary = {
+      unlocked: unlockedTrophies.length || Number(storedAchievementSummary.unlocked || 0),
+      available: Math.max(Number(storedAchievementSummary.available || 0), unlockedTrophies.length),
+      bronze: bronze || Number(storedAchievementSummary.bronze || 0),
+      silver: silver || Number(storedAchievementSummary.silver || 0),
+      gold: gold || Number(storedAchievementSummary.gold || 0),
+      platinum: platinum || Number(storedAchievementSummary.platinum || 0),
+    };
+
+    const storedLibrarySummary = profileRow.library_summary || publicRow?.stats || {};
+    const finalLibrarySummary = {
+      games: games.length || Number(storedLibrarySummary.games || 0),
+      steamGames: steamGamesCount || Number(storedLibrarySummary.steamGames || storedLibrarySummary.steamGameCount || 0),
+      epicGames: epicGamesCount || Number(storedLibrarySummary.epicGames || storedLibrarySummary.epicGameCount || 0),
+      localGames: localGamesCount || Number(storedLibrarySummary.localGames || storedLibrarySummary.localGameCount || 0),
+      favorites: favoritesCount || Number(storedLibrarySummary.favorites || 0),
+      minutesPlayed: totalMinutesPlayed || Number(storedLibrarySummary.minutesPlayed || 0),
+    };
+
+    const visibleProfile = profileRowToPublic(profileRow);
 
     res.json({
       profile: {
         ...visibleProfile,
-        profileVisibility: visibilityRow.profile_visibility === "private" ? "private" : "public",
-        bio: publicRow.bio || "",
-        website: publicRow.website || "",
-        favoriteGenres: publicRow.favorite_genres || [],
-        steamId: privateRow?.steam_id || "",
-        steamUsername: privateRow?.steam_username || "",
-        steamAvatar: privateRow?.steam_avatar || "",
-        discordId: privateRow?.discord_id || "",
-        discordUsername: privateRow?.discord_username || "",
-        discordAvatar: privateRow?.discord_avatar || "",
-        achievementSummary: publicRow.achievements || {},
-        librarySummary: {
-          ...(publicRow.stats || {}),
-          ...(publicRow.platforms || {}),
-          steamGames: publicRow.platforms?.steamGameCount ?? publicRow.stats?.steamGames ?? 0,
-          epicGames: publicRow.platforms?.epicGameCount ?? publicRow.stats?.epicGames ?? 0,
-          localGames: publicRow.platforms?.localGameCount ?? publicRow.stats?.localGames ?? 0,
-        },
+        uid: friendUid,
+        displayName: profileRow.display_name || publicRow?.display_name || "Jogador",
+        photoURL: profileRow.photo_url || publicRow?.photo_url || "",
+        profileVisibility: "public",
+        bio: profileRow.bio || publicRow?.bio || "",
+        website: profileRow.website || publicRow?.website || "",
+        location: profileRow.location || "",
+        favoriteGenres: profileRow.favorite_genres || publicRow?.favorite_genres || [],
+        steamId: profileRow.steam_id || "",
+        steamUsername: profileRow.steam_username || "",
+        steamAvatar: profileRow.steam_avatar || "",
+        discordId: profileRow.discord_id || "",
+        discordUsername: profileRow.discord_username || "",
+        discordAvatar: profileRow.discord_avatar || "",
+        achievementSummary: finalAchievementSummary,
+        librarySummary: finalLibrarySummary,
+        levelProgress: levelResult.data || null,
       },
-      games: sqlGames,
+      games,
       gamesTruncated: false,
+      isPrivate: false,
     });
-  } catch {
+  } catch (err) {
+    console.error("Erro ao carregar perfil completo do amigo:", err);
     res.status(500).json({ error: "Erro ao carregar perfil do amigo." });
   }
 });
