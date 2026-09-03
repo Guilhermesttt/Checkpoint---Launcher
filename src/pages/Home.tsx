@@ -96,6 +96,7 @@ import {
 import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
+  markCheckpointOfflineSync,
 } from "../services/checkpointFriends";
 import {
   getAdjacentSidebarCategory,
@@ -727,7 +728,7 @@ const Home: React.FC = () => {
     };
 
     heartbeat();
-    const interval = window.setInterval(heartbeat, 45_000);
+    const interval = window.setInterval(heartbeat, 25_000);
     return () => window.clearInterval(interval);
   }, [currentPresenceGame, user?.uid, userProfile?.displayName, userProfile?.photoURL]);
 
@@ -766,12 +767,26 @@ const Home: React.FC = () => {
     if (!user?.uid) return;
 
     const markOffline = () => {
-      void updateCheckpointPresence("offline").catch(() => undefined);
+      markCheckpointOfflineSync(
+        user.uid,
+        userProfile?.displayName || undefined,
+        userProfile?.photoURL,
+      );
     };
 
     window.addEventListener("beforeunload", markOffline);
-    return () => window.removeEventListener("beforeunload", markOffline);
-  }, [user?.uid]);
+    window.addEventListener("pagehide", markOffline);
+
+    const unsubQuitting = window.electronAPI?.onAppQuitting?.(() => {
+      markOffline();
+    });
+
+    return () => {
+      window.removeEventListener("beforeunload", markOffline);
+      window.removeEventListener("pagehide", markOffline);
+      unsubQuitting?.();
+    };
+  }, [user?.uid, userProfile?.displayName, userProfile?.photoURL]);
 
   useEffect(() => {
     if (!user?.uid) return;

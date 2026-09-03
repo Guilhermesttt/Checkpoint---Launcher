@@ -665,6 +665,7 @@ declare global {
         connectionType: "bluetooth" | "usb" | "unknown";
         deviceName: string | null;
       }>;
+      onAppQuitting?: (callback: () => void) => () => void;
       listLocalGames?: (uid: string) => Promise<any[]>;
       createLocalGame?: (uid: string, game: any) => Promise<any>;
       updateLocalGame?: (uid: string, gameId: string, patch: any) => Promise<void>;

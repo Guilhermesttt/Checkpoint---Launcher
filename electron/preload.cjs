@@ -188,4 +188,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ─ Battery / Controller warnings ────────────────────────────────────────────
   showBatteryWarning: (level) => ipcRenderer.invoke("system:show-battery-warning", level),
   getControllerBattery: () => ipcRenderer.invoke("controller:get-battery"),
+  onAppQuitting: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on("app:quitting", handler);
+    return () => ipcRenderer.removeListener("app:quitting", handler);
+  },
 });

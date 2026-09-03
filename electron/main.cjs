@@ -1282,6 +1282,11 @@ const createWindow = async () => {
       return;
     }
     isQuitting = true;
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("app:quitting");
+      }
+    } catch {}
   });
 
   mainWindow.on("closed", () => {
@@ -4887,6 +4892,11 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("app:quitting");
+    }
+  } catch {}
   void shutdownModOperationWorker();
   if (localGameLibrary) {
     try {

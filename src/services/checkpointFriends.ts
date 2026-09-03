@@ -120,6 +120,45 @@ export const updateCheckpointPresence = async (
   }
 };
 
+/**
+ * Marca o usuário como offline imediatamente e de forma síncrona/keepalive
+ * para garantir envio no momento exato em que a janela ou o hub é fechado.
+ */
+export const markCheckpointOfflineSync = (
+  uid: string,
+  customDisplayName?: string,
+  customPhotoURL?: string | null,
+) => {
+  try {
+    const presencePayload = {
+      uid,
+      displayName: customDisplayName || "Jogador",
+      photoURL: customPhotoURL || null,
+      status: "offline" as const,
+      playing: null,
+      updatedAt: Date.now(),
+    };
+
+    // 1. Notificação instantânea via WebSocket para todos os amigos conectados
+    void broadcastPresenceStatus(presencePayload).catch(() => {});
+
+    // 2. Persistência HTTP com keepalive para o backend registrar offline mesmo fechando o processo
+    const url = apiUrl("/api/presence");
+    const body = JSON.stringify({ status: "offline", currentGameTitle: null });
+    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon(url, blob);
+    } else if (typeof fetch !== "undefined") {
+      void fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch {}
+};
+
 export const getCheckpointFriendStatuses = async (): Promise<UserProfile[]> => {
   const response = await fetch(apiUrl("/api/friends/status"), {
     headers: await getAuthHeaders(),

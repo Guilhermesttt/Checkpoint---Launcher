@@ -161,6 +161,25 @@ export const subscribeToGlobalEventBus = (
             }
           });
         }
+      })
+      .on("presence", { event: "leave" }, ({ leftPresences }: any) => {
+        if (Array.isArray(leftPresences)) {
+          leftPresences.forEach((p: any) => {
+            const uid = p.presence?.uid || p.uid;
+            if (uid) {
+              globalEventHandlers.forEach((h) =>
+                h.onStatusUpdate?.({
+                  uid,
+                  displayName: p.presence?.displayName || p.displayName || "Jogador",
+                  photoURL: p.presence?.photoURL || p.photoURL || null,
+                  status: "offline",
+                  playing: null,
+                  updatedAt: Date.now(),
+                }),
+              );
+            }
+          });
+        }
       });
 
     try {
