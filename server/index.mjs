@@ -1365,28 +1365,82 @@ app.post("/api/chat/open", steamPrivateLimiter, requireFirebaseUser, async (req,
       return;
     }
 
-    const directKey = [currentUid, friendUid].sort().join(":");
-    const { data: chat, error: chatError } = await supabaseAdmin
-      .from("chats")
-      .upsert({ direct_key: directKey }, { onConflict: "direct_key" })
-      .select("id")
-      .single();
-    if (chatError || !chat?.id) throw chatError || new Error("Chat nao criado.");
-
-    const { error: participantsError } = await supabaseAdmin
+    // 1. Verificar se já existe chat com ambos os usuários vinculados
+    let chatId = null;
+    const { data: myChats } = await supabaseAdmin
       .from("chat_participants")
-      .upsert(
-        [
-          { chat_id: chat.id, user_id: currentUid },
-          { chat_id: chat.id, user_id: friendUid },
-        ],
-        { onConflict: "chat_id,user_id" },
-      );
-    if (participantsError) throw participantsError;
+      .select("chat_id")
+      .eq("user_id", currentUid);
 
-    await cleanupExpiredChatData({ chatId: chat.id });
+    if (myChats && myChats.length > 0) {
+      const myChatIds = myChats.map((c) => c.chat_id).filter(Boolean);
+      if (myChatIds.length > 0) {
+        const { data: sharedChat } = await supabaseAdmin
+          .from("chat_participants")
+          .select("chat_id")
+          .eq("user_id", friendUid)
+          .in("chat_id", myChatIds)
+          .limit(1)
+          .maybeSingle();
 
-    res.json({ chatId: chat.id });
+        if (sharedChat?.chat_id) {
+          chatId = sharedChat.chat_id;
+        }
+      }
+    }
+
+    // 2. Se não existir, criar novo chat
+    if (!chatId) {
+      const directKey = [currentUid, friendUid].sort().join(":");
+      let createdChat = null;
+
+      // Tentativa 1: upsert por direct_key (se a coluna existir na base)
+      try {
+        const directAttempt = await supabaseAdmin
+          .from("chats")
+          .upsert({ direct_key: directKey }, { onConflict: "direct_key" })
+          .select("id")
+          .maybeSingle();
+
+        if (!directAttempt.error && directAttempt.data?.id) {
+          createdChat = directAttempt.data;
+        }
+      } catch {
+        // Coluna direct_key ausente no schema cache
+      }
+
+      // Tentativa 2: fallback para inserção direta em chats
+      if (!createdChat?.id) {
+        const fallbackInsert = await supabaseAdmin
+          .from("chats")
+          .insert({})
+          .select("id")
+          .single();
+        if (fallbackInsert.error || !fallbackInsert.data?.id) {
+          throw fallbackInsert.error || new Error("Chat não criado.");
+        }
+        createdChat = fallbackInsert.data;
+      }
+
+      chatId = createdChat.id;
+
+      const { error: participantsError } = await supabaseAdmin
+        .from("chat_participants")
+        .upsert(
+          [
+            { chat_id: chatId, user_id: currentUid },
+            { chat_id: chatId, user_id: friendUid },
+          ],
+          { onConflict: "chat_id,user_id" },
+        );
+      if (participantsError) {
+        console.warn("[/api/chat/open] Aviso participantes:", participantsError.message);
+      }
+    }
+
+    await cleanupExpiredChatData({ chatId }).catch(() => undefined);
+
+    res.json({ chatId });
   } catch (error) {
     console.error("Erro ao abrir chat:", error);
     res.status(500).json({ error: "Erro ao abrir conversa." });

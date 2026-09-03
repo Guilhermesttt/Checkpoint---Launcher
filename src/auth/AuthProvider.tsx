@@ -81,18 +81,21 @@ const loadSocialGraph = async (uid: string) => {
       ? relationship.addressee_id
       : relationship.requester_id,
   ))];
-  let publicProfiles = relatedIds.length > 0
-    ? (await supabase
-      .from("public_profiles")
-      .select("uid,display_name,photo_url,status,playing")
-      .in("uid", relatedIds)).data || []
-    : [];
-
-  if (publicProfiles.length === 0 && relatedIds.length > 0) {
-    publicProfiles = (await supabase
+  let publicProfiles: any[] = [];
+  if (relatedIds.length > 0) {
+    const { data: profilesData } = await supabase
       .from("profiles")
       .select("uid,display_name,photo_url,status,playing")
-      .in("uid", relatedIds)).data || [];
+      .in("uid", relatedIds);
+    if (profilesData && profilesData.length > 0) {
+      publicProfiles = profilesData;
+    } else {
+      const { data: fallbackData } = await supabase
+        .from("public_profiles")
+        .select("uid,display_name,photo_url")
+        .in("uid", relatedIds);
+      publicProfiles = fallbackData || [];
+    }
   }
   const profileById = new Map((publicProfiles || []).map((profile) => [profile.uid, profile]));
   const compact = (relatedUid: string, createdAt?: string) => {

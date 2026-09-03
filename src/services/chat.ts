@@ -141,16 +141,35 @@ export const ensureChatSession = async (
         chatId?: string;
         error?: string;
       };
-      if (!response.ok || !payload.chatId) {
-        openedChatIds.set(chatId, chatId);
-        return chatId;
+      if (payload.chatId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.chatId)) {
+        openedChatIds.set(chatId, payload.chatId);
+        return payload.chatId;
       }
-      openedChatIds.set(chatId, payload.chatId);
-      return payload.chatId;
+      throw new Error(payload.error || "Sessão de chat inválida.");
     } catch (err) {
-      console.warn("[ensureChatSession] Fallback to deterministic chatId:", chatId, err);
-      openedChatIds.set(chatId, chatId);
-      return chatId;
+      // Fallback: tentar recuperar chat compartilhado diretamente pelo Supabase
+      try {
+        const { data: myChats } = await supabase
+          .from("chat_participants")
+          .select("chat_id")
+          .eq("user_id", currentUid);
+        if (myChats && myChats.length > 0) {
+          const myIds = myChats.map((c) => c.chat_id).filter(Boolean);
+          const { data: shared } = await supabase
+            .from("chat_participants")
+            .select("chat_id")
+            .eq("user_id", friendUid)
+            .in("chat_id", myIds)
+            .limit(1)
+            .maybeSingle();
+          if (shared?.chat_id) {
+            openedChatIds.set(chatId, shared.chat_id);
+            return shared.chat_id;
+          }
+        }
+      } catch {}
+      console.warn("[ensureChatSession] Não foi possível resolver UUID do chat:", err);
+      return "";
     } finally {
       openingChats.delete(chatId);
     }
