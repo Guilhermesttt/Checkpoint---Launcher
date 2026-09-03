@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 import DynamicBackground from "../components/DynamicBackground";
-import WhatsNewModal from "../components/WhatsNewModal";
 import { EpicConnectModal } from "../components/settings/EpicConnectModal";
 import { PlatformLibrarySkeleton } from "../components/PlatformLibrarySkeleton";
 import { fetchEpicStatus } from "../services/epic";
@@ -120,10 +119,6 @@ import { calculateAchievementTotals } from "../utils/achievementTotals";
 import { formatPlayedHours, getGamePlayedHours } from "../utils/playtime";
 import { calculatePlayerLevel, aggregateTrophyCounts } from "../utils/trophyTiers";
 import { getHubAggregateCounts } from "../utils/hubTrophies";
-import {
-  disconnectRetroAchievements,
-  linkRetroAchievements,
-} from "../services/retroAchievements";
 import InputHints from "../components/ui/InputHints";
 import { resolveLibraryLoadingState, shouldShowLibraryFooter } from "../utils/libraryLoading";
 
@@ -133,7 +128,6 @@ const UserProfilePage = React.lazy(() => import("../components/UserProfilePage")
 const GamingRadarPage = React.lazy(() => import("../components/GamingRadarPage"));
 const ModsPage = React.lazy(() => import("./ModsPage"));
 const TrophiesPage = React.lazy(() => import("../components/TrophiesPage"));
-const TrophyUnlockToast = React.lazy(() => import("../components/TrophyUnlockToast"));
 
 const steamDiscKey = (uid: string) => `checkpoint_steam_disconnected_${uid}`;
 const LANGUAGE_OPTIONS: Array<{ id: LauncherLanguage; label: string; hint: string }> = [
@@ -223,6 +217,8 @@ const APP_THEME_OPTIONS: Array<{
 const Home: React.FC = () => {
   const { user, userProfile, signOutUser, refreshProfile } = useAuth();
   const { notify } = useNotification();
+  const gamepad = useGamepad();
+  const voiceCall = useVoiceCallContext();
   const [games, setGames] = useState<Game[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [activeCategory, setActiveCategory] = useState("ALL");
@@ -275,8 +271,6 @@ const Home: React.FC = () => {
   const [isExitingSession, setIsExitingSession] = useState(false);
   const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
-  const [retroAchievementsConnecting, setRetroAchievementsConnecting] = useState(false);
-  const [retroAchievementsError, setRetroAchievementsError] = useState<string>();
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [libraryFilters, setLibraryFilters] = useState<LibraryFilters>({
     launchers: [],
@@ -401,9 +395,10 @@ const Home: React.FC = () => {
   );
   const userDisplay =
     userProfile?.displayName || user?.email?.split("@")[0] || "Jogador";
+  const legacySteamId = (userProfile as unknown as { steam_id?: string })?.steam_id;
   const resolvedSteamId = useMemo(
-    () => userProfile?.steamId || (userProfile as any)?.steam_id || undefined,
-    [userProfile?.steamId, (userProfile as any)?.steam_id],
+    () => userProfile?.steamId || legacySteamId || undefined,
+    [userProfile?.steamId, legacySteamId],
   );
   const resolvedDiscordId = useMemo(
     () => userProfile?.discordId || undefined,
@@ -531,44 +526,6 @@ const Home: React.FC = () => {
   useEffect(() => { void checkEpicStatus(); }, [checkEpicStatus]);
 
   const isAnySyncing = steamSyncing || epicSyncing;
-
-  const connectRetroAchievements = useCallback(async (username: string) => {
-    setRetroAchievementsConnecting(true);
-    setRetroAchievementsError(undefined);
-    try {
-      const identity = await linkRetroAchievements(username);
-      await refreshProfile();
-      playSound("select");
-      notify(`RetroAchievements conectada como ${identity.username}.`, "success");
-    } catch (reason) {
-      const message = reason instanceof Error
-        ? reason.message
-        : "Não foi possível conectar a RetroAchievements.";
-      setRetroAchievementsError(message);
-      notify(message, "error");
-    } finally {
-      setRetroAchievementsConnecting(false);
-    }
-  }, [notify, playSound, refreshProfile]);
-
-  const disconnectRetroAchievementsAccount = useCallback(async () => {
-    setRetroAchievementsConnecting(true);
-    setRetroAchievementsError(undefined);
-    try {
-      await disconnectRetroAchievements();
-      await refreshProfile();
-      playSound("back");
-      notify("RetroAchievements desconectada.", "success");
-    } catch (reason) {
-      const message = reason instanceof Error
-        ? reason.message
-        : "Não foi possível desconectar a RetroAchievements.";
-      setRetroAchievementsError(message);
-      notify(message, "error");
-    } finally {
-      setRetroAchievementsConnecting(false);
-    }
-  }, [notify, playSound, refreshProfile]);
 
   const {
     socialFriends,
@@ -1641,6 +1598,28 @@ const Home: React.FC = () => {
         discordUsername: userProfile?.discordUsername || "",
         achievements: calculateAchievementTotals(games).unlocked,
       },
+      gamepad: {
+        connected: gamepad.isGamepadConnected,
+        family: gamepad.gamepadFamily,
+        batteryLevel: gamepad.batteryLevel,
+        isCharging: gamepad.batteryCharging,
+        connectionType: gamepad.connectionType,
+      },
+      voiceCall: voiceCall?.session ? {
+        inCall: true,
+        channelName: voiceCall.session.friendName || "Chamada de Voz",
+        isMuted: voiceCall.isMuted,
+        isDeafened: voiceCall.isDeafened,
+        participantsCount: (voiceCall.session.participants?.length || 0) + 1,
+        speakingUserNames: voiceCall.isSpeakingLocal ? ["Você"] : [],
+      } : null,
+      playerLevel: playerLevel ? {
+        level: playerLevel.level,
+        xp: playerLevel.xp,
+        progress: playerLevel.progress,
+        tierName: playerLevel.tierName,
+        rankColor: playerLevel.rankColor,
+      } : null,
     }).catch(() => undefined);
   }, [
     overlayAchievements,
@@ -1667,6 +1646,16 @@ const Home: React.FC = () => {
     userProfile?.photoURL,
     userProfile?.steamAvatar,
     userProfile?.steamUsername,
+    gamepad.isGamepadConnected,
+    gamepad.gamepadFamily,
+    gamepad.batteryLevel,
+    gamepad.batteryCharging,
+    gamepad.connectionType,
+    voiceCall?.session,
+    voiceCall?.isMuted,
+    voiceCall?.isDeafened,
+    voiceCall?.isSpeakingLocal,
+    playerLevel,
   ]);
 
   useEffect(() => {
@@ -1983,11 +1972,10 @@ const Home: React.FC = () => {
                     setFilterModalOpen(true);
                     playSound("select");
                   }}
-                  className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-all ${
-                    libraryFilters.launchers.length > 0 || libraryFilters.favoritesOnly || libraryFilters.withAchievements
-                      ? "border-white/20 bg-white/10 text-white"
-                      : "border-white/[0.08] bg-white/[0.04] text-white/40 hover:bg-white/[0.07] hover:text-white/60"
-                  }`}
+                  className={`flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-all ${libraryFilters.launchers.length > 0 || libraryFilters.favoritesOnly || libraryFilters.withAchievements
+                    ? "border-white/20 bg-white/10 text-white"
+                    : "border-white/[0.08] bg-white/[0.04] text-white/40 hover:bg-white/[0.07] hover:text-white/60"
+                    }`}
                 >
                   <Filter className="h-3.5 w-3.5" />
                   Filtros
@@ -2807,7 +2795,7 @@ const Home: React.FC = () => {
         )}
       </AnimatePresence>
 
-      <EpicConnectModal 
+      <EpicConnectModal
         isOpen={epicConnectModalOpen}
         playSound={playSound}
         onClose={() => setEpicConnectModalOpen(false)}

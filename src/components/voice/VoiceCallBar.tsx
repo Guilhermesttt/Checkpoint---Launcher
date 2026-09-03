@@ -220,6 +220,13 @@ export const VoiceCallBar: React.FC<VoiceCallBarProps> = ({
                   <MicOff className="h-2.5 w-2.5" /> Mutado
                 </span>
               ) : null}
+              {isCurrentlySpeaking && !isMuted && (
+                <div className="flex items-end gap-0.5 ml-1 h-2.5" title="Transmitindo voz">
+                  <span className="w-0.5 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                  <span className="w-0.5 h-3 bg-emerald-300 rounded-full animate-bounce" />
+                  <span className="w-0.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                </div>
+              )}
               <span className="text-[10px] font-mono text-white/40 shrink-0">
                 • {formatDuration(duration)}
               </span>

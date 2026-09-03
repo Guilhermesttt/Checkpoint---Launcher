@@ -2392,25 +2392,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
           }
         }
 
-        // ICE Preflight Check - test TURN connectivity before committing to call
-        // Only run if we might fall back to P2P mesh (LiveKit could fail)
-        const preflight = await runIcePreflightCheck();
-        if (!preflight.success) {
-          console.warn("[ICE Preflight] Warning:", preflight.error);
-          // Don't block the call - LiveKit SFU might still work
-          // But warn user if both might fail
-        }
-
-        // Connect to LiveKit SFU FIRST (primary transport)
+        // ICE Preflight Check + LiveKit SFU connection — run in PARALLEL to reduce setup latency
         const displayName = userProfile?.displayName || user.displayName || "Jogador";
         const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
         let livekitConnected = false;
-        try {
-          await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+
+        const [preflightResult, livekitResult] = await Promise.allSettled([
+          runIcePreflightCheck(),
+          connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl),
+        ]);
+
+        if (preflightResult.status === "fulfilled" && !preflightResult.value.success) {
+          console.warn("[ICE Preflight] Warning:", preflightResult.value.error);
+        }
+
+        if (livekitResult.status === "fulfilled") {
           livekitConnected = true;
           useLiveKitPrimaryRef.current = true;
-        } catch (lkErr) {
-          console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", lkErr);
+        } else {
+          console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", livekitResult.reason);
           useLiveKitPrimaryRef.current = false;
         }
 

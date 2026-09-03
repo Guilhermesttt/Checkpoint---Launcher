@@ -187,4 +187,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   isFullScreen: () => ipcRenderer.invoke("window:fullscreen-get"),
   // ─ Battery / Controller warnings ────────────────────────────────────────────
   showBatteryWarning: (level) => ipcRenderer.invoke("system:show-battery-warning", level),
+  getControllerBattery: () => ipcRenderer.invoke("controller:get-battery"),
 });

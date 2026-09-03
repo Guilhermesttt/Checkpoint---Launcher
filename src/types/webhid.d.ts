@@ -21,7 +21,17 @@ declare global {
     outputReports?: HIDReportInfo[];
   }
 
-  interface HIDDevice {
+  interface HIDInputReportEvent extends Event {
+    readonly device: HIDDevice;
+    readonly reportId: number;
+    readonly data: DataView;
+  }
+
+  interface HIDDeviceEventMap {
+    inputreport: HIDInputReportEvent;
+  }
+
+  interface HIDDevice extends EventTarget {
     readonly opened: boolean;
     readonly vendorId: number;
     readonly productId: number;
@@ -30,9 +40,29 @@ declare global {
     open: () => Promise<void>;
     close: () => Promise<void>;
     sendReport: (reportId: number, data: BufferSource) => Promise<void>;
+    addEventListener<K extends keyof HIDDeviceEventMap>(
+      type: K,
+      listener: (this: HIDDevice, ev: HIDDeviceEventMap[K]) => void,
+      options?: boolean | AddEventListenerOptions,
+    ): void;
+    addEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ): void;
+    removeEventListener<K extends keyof HIDDeviceEventMap>(
+      type: K,
+      listener: (this: HIDDevice, ev: HIDDeviceEventMap[K]) => void,
+      options?: boolean | EventListenerOptions,
+    ): void;
+    removeEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | EventListenerOptions,
+    ): void;
   }
 
-  interface HID {
+  interface HID extends EventTarget {
     getDevices: () => Promise<HIDDevice[]>;
     requestDevice: (options: HIDDeviceRequestOptions) => Promise<HIDDevice[]>;
   }

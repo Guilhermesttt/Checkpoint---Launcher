@@ -21,6 +21,7 @@ import { usePrefersReducedMotion } from "./hooks/usePrefersReducedMotion";
 import { setLauncherInputLocked } from "./utils/launcherInputLock";
 // import TrophyUnlockToast from "./components/TrophyUnlockToast";
 const TrophyUnlockToast = React.lazy(() => import("./components/TrophyUnlockToast"));
+import { LevelUpModal } from "./components/LevelUpModal";
 import type { SoundTheme } from "./context/PreferencesContext";
 
 const menuMusicLoaders: Record<SoundTheme, () => Promise<string | null>> = {
@@ -389,6 +390,7 @@ const AppContent: React.FC = () => {
           <div className="absolute inset-0">
             <Home />
             <GamepadStatusOverlay />
+            <LevelUpModal />
             <ControllerVirtualKeyboard />
             {whatsNewRelease && (
               <WhatsNewModal release={whatsNewRelease} onClose={dismissWhatsNew} />

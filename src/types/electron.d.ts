@@ -637,6 +637,12 @@ declare global {
        * @param level Nível da bateria em % (0-100).
        */
       showBatteryWarning?: (level: number) => Promise<void>;
+      getControllerBattery?: () => Promise<{
+        batteryLevel: number | null;
+        isCharging: boolean;
+        connectionType: "bluetooth" | "usb" | "unknown";
+        deviceName: string | null;
+      }>;
       listLocalGames?: (uid: string) => Promise<any[]>;
       createLocalGame?: (uid: string, game: any) => Promise<any>;
       updateLocalGame?: (uid: string, gameId: string, patch: any) => Promise<void>;

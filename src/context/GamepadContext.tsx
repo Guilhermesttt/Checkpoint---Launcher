@@ -2,14 +2,25 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { resetCachedLedDevice } from "../services/controllerLed";
 import { isLauncherInputLocked } from "../utils/launcherInputLock";
 
+import {
+  startControllerBatteryMonitoring,
+  subscribeControllerBattery,
+  type ControllerConnectionType,
+} from "../services/controllerBatteryService";
+
 export type InputType = "mouse" | "keyboard" | "gamepad";
 export type GamepadFamily = "playstation" | "xbox" | "generic";
+export type { ControllerConnectionType };
 
 interface GamepadContextValue {
   activeInputType: InputType;
   isGamepadConnected: boolean;
   gamepadFamily: GamepadFamily;
   connectedGamepadId: string | null;
+  batteryLevel: number | null;
+  batteryCharging: boolean;
+  connectionType: ControllerConnectionType;
+  isLowBattery: boolean;
 }
 
 const GamepadContext = createContext<GamepadContextValue | null>(null);
@@ -165,6 +176,29 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isGamepadConnected, setIsGamepadConnected] = useState(false);
   const [gamepadFamily, setGamepadFamily] = useState<GamepadFamily>("generic");
   const [connectedGamepadId, setConnectedGamepadId] = useState<string | null>(null);
+
+  const [batteryState, setBatteryState] = useState({
+    batteryLevel: null as number | null,
+    isCharging: false,
+    connectionType: "unknown" as ControllerConnectionType,
+    isLowBattery: false,
+  });
+
+  useEffect(() => {
+    const stop = startControllerBatteryMonitoring();
+    const unsubscribe = subscribeControllerBattery((state) => {
+      setBatteryState({
+        batteryLevel: state.batteryLevel,
+        isCharging: state.isCharging,
+        connectionType: state.connectionType,
+        isLowBattery: state.isLowBattery,
+      });
+    });
+    return () => {
+      stop();
+      unsubscribe();
+    };
+  }, []);
 
   const [overlayHasFocus, setOverlayHasFocus] = useState(false);
   const overlayFocusRef = useRef(false); // CORREÇÃO: Ref para manter o valor atualizado no pollGamepads
@@ -559,7 +593,18 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [activeInputType, isGamepadConnected]);
 
   return (
-    <GamepadContext.Provider value={{ activeInputType, isGamepadConnected, gamepadFamily, connectedGamepadId }}>
+    <GamepadContext.Provider
+      value={{
+        activeInputType,
+        isGamepadConnected,
+        gamepadFamily,
+        connectedGamepadId,
+        batteryLevel: batteryState.batteryLevel,
+        batteryCharging: batteryState.isCharging,
+        connectionType: batteryState.connectionType,
+        isLowBattery: batteryState.isLowBattery,
+      }}
+    >
       {children}
     </GamepadContext.Provider>
   );

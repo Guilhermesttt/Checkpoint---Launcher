@@ -1048,12 +1048,120 @@
 
     .panel-topbar {
       flex: 0 0 auto;
-      padding: 32px 40px 18px;
-      display: grid;
-      grid-template-columns: 1fr auto auto auto;
-      gap: 20px;
+      padding: 24px 32px 18px;
+      display: flex;
       align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .topbar-status-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .topbar-status-pill[hidden],
+    [hidden] {
+      display: none !important;
+    }
+
+    .topbar-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 36px;
+      padding: 0 13px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      color: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      transition: all 180ms ease;
+      user-select: none;
+    }
+
+    .topbar-status-pill:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.14);
+      color: rgba(255, 255, 255, 0.95);
+    }
+
+    .topbar-status-pill .ui-icon {
+      width: 14px;
+      height: 14px;
+      color: rgba(255, 255, 255, 0.55);
+      transition: color 180ms ease;
+    }
+
+    .topbar-clock {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .topbar-gamepad.is-low-battery {
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+    }
+
+    .topbar-gamepad.is-charging {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.08);
+      color: #6ee7b7;
+    }
+
+    .topbar-level .level-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f1f5f9;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .topbar-call {
+      border-color: rgba(16, 185, 129, 0.25);
+      background: rgba(16, 185, 129, 0.08);
+      color: #86efac;
+    }
+
+    .topbar-call.is-muted {
+      border-color: rgba(239, 68, 68, 0.25);
+      background: rgba(239, 68, 68, 0.08);
+      color: #fca5a5;
+    }
+
+    .call-dot.live {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .social-card.kind-battery-low {
+      border-color: rgba(245, 158, 11, 0.5);
+      box-shadow: 0 10px 35px rgba(245, 158, 11, 0.25);
+    }
+
+    .social-card.kind-battery-low .social-badge {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fde68a;
+      border: 1px solid rgba(245, 158, 11, 0.4);
     }
 
     .welcome-copy h1 {
@@ -2412,7 +2520,16 @@
       background: rgba(0, 0, 0, 0.65);
       color: rgba(255, 255, 255, 0.7);
       cursor: pointer;
-      transition: background-color 120ms ease, color 120ms ease;
+      transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .capture-card:hover .capture-delete,
+    .capture-card:focus-within .capture-delete,
+    .capture-card.is-gamepad-focused .capture-delete {
+      opacity: 1;
+      pointer-events: auto;
     }
 
     .capture-delete:hover {
@@ -2906,6 +3023,22 @@
       <symbol id="icon-music" viewBox="0 0 24 24">
         <path d="M9 18V5l11-2v13M9 9l11-2M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6M17 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6" />
       </symbol>
+      <symbol id="icon-battery" viewBox="0 0 24 24">
+        <rect x="2" y="7" width="16" height="10" rx="2" ry="2" />
+        <line x1="22" y1="11" x2="22" y2="13" />
+        <line x1="6" y1="11" x2="6" y2="13" />
+      </symbol>
+      <symbol id="icon-battery-charging" viewBox="0 0 24 24">
+        <path d="M5 18H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.19M15 6h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3.19" />
+        <line x1="23" y1="13" x2="23" y2="11" />
+        <polyline points="11 6 7 12 13 12 9 18" />
+      </symbol>
+      <symbol id="icon-bluetooth" viewBox="0 0 24 24">
+        <path d="m7 7 10 10-5 5V2l5 5L7 17" />
+      </symbol>
+      <symbol id="icon-phone" viewBox="0 0 24 24">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+      </symbol>
     </defs>
   </svg>
 
@@ -2954,12 +3087,7 @@
             </svg></span>
           <span>Desempenho</span>
         </button>
-        <button class="panel-tab" data-panel-tab="audio">
-          <span class="nav-icon"><svg class="ui-icon">
-              <use href="#icon-music" />
-            </svg></span>
-          <span>Áudio</span>
-        </button>
+
       </nav>
       <div class="sidebar-spacer"></div>
       <button class="panel-action panel-tab" data-panel-tab="settings">
@@ -2982,6 +3110,25 @@
               <use href="#icon-sparkles" />
             </svg></h1>
           <p><span id="panel-friend-count">0 amigos</span> &bull; <span id="panel-online-count">0 online</span></p>
+        </div>
+        <div class="topbar-status-group">
+          <div class="topbar-status-pill topbar-clock" id="topbar-clock" title="Horário atual">
+            <svg class="ui-icon"><use href="#icon-clock" /></svg>
+            <span id="topbar-time">--:--</span>
+          </div>
+          <div class="topbar-status-pill topbar-gamepad" id="topbar-gamepad" title="Status do Controle" hidden>
+            <svg class="ui-icon" id="topbar-gamepad-icon"><use href="#icon-gamepad" /></svg>
+            <span id="topbar-gamepad-type">BT</span>
+            <span id="topbar-gamepad-battery">--%</span>
+          </div>
+          <div class="topbar-status-pill topbar-level" id="topbar-level" title="Nível do Jogador">
+            <span class="level-badge" id="topbar-level-badge">Nv. 1</span>
+          </div>
+          <div class="topbar-status-pill topbar-call" id="topbar-voice-call" title="Chamada de Voz Ativa" hidden>
+            <span class="call-dot live"></span>
+            <svg class="ui-icon"><use href="#icon-phone" /></svg>
+            <span id="topbar-call-name">Chamada</span>
+          </div>
         </div>
         <label class="friend-search">
           <svg class="ui-icon">
@@ -3039,33 +3186,7 @@
             </div>
           </div>
 
-          <div class="panel-view" data-panel-view="audio">
-            <div id="panel-audio-view" style="padding: 24px;">
-              <div class="section-heading">
-                <h2><i class="status-dot online"></i> Mixer de Áudio Independente</h2>
-              </div>
-              <div class="settings-card">
-                <div class="setting-row">
-                  <div style="flex: 1;">
-                    <label>Volume do Jogo</label>
-                    <input type="range" class="control-range" min="0" max="100" value="80" />
-                  </div>
-                </div>
-                <div class="setting-row">
-                  <div style="flex: 1;">
-                    <label>Volume do Chat de Voz</label>
-                    <input type="range" class="control-range" min="0" max="100" value="100" />
-                  </div>
-                </div>
-                <div class="setting-row">
-                  <div style="flex: 1;">
-                    <label>Spotify / Navegador</label>
-                    <input type="range" class="control-range" min="0" max="100" value="40" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+
           <div class="panel-view is-active" data-panel-view="friends">
             <div id="panel-friends-view">
               <section class="friend-section">
@@ -3300,6 +3421,15 @@
                     <div class="discord-pill" id="profile-discord" hidden>
                       <i></i><span id="profile-discord-name">Discord Conectado</span>
                     </div>
+                  </div>
+                </div>
+                <div class="profile-level-card" style="margin-bottom:20px;padding:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:18px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span id="profile-player-level" style="font-weight:700;color:#fff;font-size:14px;">Nível 1 (Bronze)</span>
+                    <span id="profile-player-xp" style="font-size:12px;color:rgba(255,255,255,0.7);">0 XP</span>
+                  </div>
+                  <div style="height:6px;width:100%;background:rgba(255,255,255,0.1);border-radius:9999px;overflow:hidden;">
+                    <div id="profile-level-progress" style="height:100%;width:0%;background:linear-gradient(90deg, #eab308, #f59e0b);border-radius:9999px;transition:width 300ms ease;"></div>
                   </div>
                 </div>
                 <div class="game-metrics" style="margin-top:0;">
@@ -3820,6 +3950,8 @@
       if (kind === "success") return "SUCESSO";
       if (kind === "error") return "ERRO";
       if (kind === "info") return "INFORMAÇÃO";
+      if (kind === "battery-low") return "BATERIA FRACA";
+      if (kind === "level-up") return "SUBIU DE NÍVEL!";
       if (kind === "incoming-call") return "CHAMADA DE VOZ";
       if (kind === "capture-saved") return overlayT("screenshot");
       if (kind === "overlay-hint") return overlayT("overlayAvailable");
@@ -3992,29 +4124,37 @@
 
       const isGameStart = payload.kind === "game-start";
       const isControllerConnected = payload.kind === "controller-connected";
+      const isBatteryLow = payload.kind === "battery-low";
+      const isLevelUp = payload.kind === "level-up";
       const isOverlayHint = payload.kind === "overlay-hint";
       const isCaptureSaved = payload.kind === "capture-saved";
       shell.appendChild(
         createIconColumn({
-          ring: !isGameStart && !isOverlayHint && !isCaptureSaved,
+          ring: !isGameStart && !isOverlayHint && !isCaptureSaved && !isBatteryLow && !isLevelUp,
           avatarSrc:
             isGameStart || isOverlayHint
               ? checkpointIconUrl
-              : isControllerConnected || isCaptureSaved
+              : isControllerConnected || isCaptureSaved || isBatteryLow || isLevelUp
                 ? ""
                 : payload.avatarUrl || checkpointIconUrl,
           avatarSvg: isCaptureSaved
             ? cameraSvg()
             : isControllerConnected
               ? controllerSvg()
-              : "",
+              : isBatteryLow
+                ? '<svg class="ui-icon" viewBox="0 0 24 24"><use href="#icon-battery"/></svg>'
+                : isLevelUp
+                  ? '<svg class="ui-icon" viewBox="0 0 24 24"><use href="#icon-trophy"/></svg>'
+                  : "",
           isPhoto:
             !isGameStart &&
             !isControllerConnected &&
             !isOverlayHint &&
             !isCaptureSaved &&
+            !isBatteryLow &&
+            !isLevelUp &&
             Boolean(payload.avatarUrl),
-          isLogo: isGameStart || isControllerConnected || isOverlayHint,
+          isLogo: isGameStart || isControllerConnected || isOverlayHint || isBatteryLow || isLevelUp,
         }),
       );
 
@@ -4190,6 +4330,72 @@
       discordPill.hidden = !profile.discordConnected;
       document.getElementById("profile-discord-name").textContent = profile.discordUsername || overlayT("discordConnected");
 
+      // Atualiza relógio do topbar
+      const timeEl = document.getElementById("topbar-time");
+      if (timeEl) {
+        const now = new Date();
+        timeEl.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      // Atualiza Gamepad Status Pill
+      const gp = state.gamepad;
+      const gpPill = document.getElementById("topbar-gamepad");
+      if (gpPill) {
+        if (gp && gp.connected) {
+          gpPill.hidden = false;
+          const isWireless = gp.connectionType === "bluetooth";
+          const isLow = Boolean(isWireless && !gp.isCharging && gp.batteryLevel !== null && gp.batteryLevel <= 20);
+          gpPill.classList.toggle("is-low-battery", isLow);
+          gpPill.classList.toggle("is-charging", Boolean(gp.isCharging));
+          const typeEl = document.getElementById("topbar-gamepad-type");
+          if (typeEl) typeEl.textContent = isWireless ? "BT" : "USB";
+          const batEl = document.getElementById("topbar-gamepad-battery");
+          if (batEl) {
+            const batText = gp.batteryLevel !== null ? `${gp.batteryLevel}%` : (gp.isCharging ? "Carga" : "OK");
+            batEl.textContent = gp.isCharging ? `⚡ ${batText}` : batText;
+          }
+        } else {
+          gpPill.hidden = true;
+        }
+      }
+
+      // Atualiza Nível do Jogador (Pill no Topbar e Card no Perfil)
+      const lvl = state.playerLevel;
+      const lvlPill = document.getElementById("topbar-level");
+      const lvlBadge = document.getElementById("topbar-level-badge");
+      if (lvlPill && lvlBadge) {
+        if (lvl) {
+          lvlPill.hidden = false;
+          lvlBadge.textContent = `Nv. ${lvl.level}`;
+          if (lvl.rankColor) {
+            lvlBadge.style.borderColor = lvl.rankColor;
+            lvlBadge.style.color = lvl.rankColor;
+          }
+        }
+      }
+      const profileLvlEl = document.getElementById("profile-player-level");
+      if (profileLvlEl && lvl) profileLvlEl.textContent = `Nível ${lvl.level} (${lvl.tierName})`;
+      const profileXpEl = document.getElementById("profile-player-xp");
+      if (profileXpEl && lvl) profileXpEl.textContent = `${lvl.xp} XP`;
+      const profileProgressEl = document.getElementById("profile-level-progress");
+      if (profileProgressEl && lvl) profileProgressEl.style.width = `${lvl.progress}%`;
+
+      // Atualiza Chamada de Voz Pill
+      const vc = state.voiceCall;
+      const callPill = document.getElementById("topbar-voice-call");
+      if (callPill) {
+        if (vc && vc.inCall) {
+          callPill.hidden = false;
+          const callNameEl = document.getElementById("topbar-call-name");
+          if (callNameEl) {
+            callNameEl.textContent = vc.isMuted ? "Mutado" : (vc.channelName || "Em chamada");
+          }
+          callPill.classList.toggle("is-muted", Boolean(vc.isMuted));
+        } else {
+          callPill.hidden = true;
+        }
+      }
+
       const allFriends = Array.isArray(state.friends) ? state.friends : [];
       const searchTerm = document.getElementById("friend-search").value.trim().toLowerCase();
       const friends = searchTerm
@@ -4233,6 +4439,11 @@
           callBtn.style.marginRight = "6px";
           callBtn.textContent = "Ligar";
           callBtn.addEventListener("click", () => {
+            enqueueSocial({
+              kind: "info",
+              title: `Ligando para ${friend.name || "Amigo"}...`,
+              description: "Conectando chamada de voz. Aguarde um momento.",
+            });
             window.achievementOverlay.panelAction({
               kind: "voice-call",
               friendId: friend.id,
@@ -4594,7 +4805,7 @@
     ].join(",");
 
     let gamepadFocusedElement = null;
-    const panelTabOrder = ["friends", "chats", "game", "media", "achievements", "settings", "profile"];
+    const panelTabOrder = ["friends", "chats", "game", "media", "achievements", "performance", "settings", "profile"];
 
     const isGamepadFocusable = (element) => {
       if (!(element instanceof HTMLElement)) return false;
@@ -4666,7 +4877,16 @@
       resetGamepadFocus();
     };
 
-    const clearGamepadNavigation = () => {
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    const clearGamepadNavigation = (event) => {
+      if (event && event.type === "mousemove") {
+        const dx = Math.abs(event.clientX - lastPointerX);
+        const dy = Math.abs(event.clientY - lastPointerY);
+        if (dx < 6 && dy < 6) return;
+        lastPointerX = event.clientX;
+        lastPointerY = event.clientY;
+      }
       document.body.classList.remove("gamepad-navigation");
       gamepadFocusedElement?.classList.remove("is-gamepad-focused");
       gamepadFocusedElement = null;
@@ -4719,6 +4939,17 @@
           document.body.classList.add("gamepad-navigation");
           if (commandPanel?.classList.contains("is-open") && captureViewerIndex < 0 && !isGamepadFocusable(gamepadFocusedElement)) {
             resetGamepadFocus();
+          }
+        },
+        deleteFocused: () => {
+          if (!gamepadFocusedElement) return;
+          // Deletar captura focada via botão Quadrado (PS) / X (Xbox)
+          const captureCard = gamepadFocusedElement.closest(".capture-card") || (gamepadFocusedElement.classList.contains("capture-card") ? gamepadFocusedElement : null);
+          if (!captureCard) return;
+          const deleteBtn = captureCard.querySelector(".capture-delete");
+          if (deleteBtn) {
+            deleteBtn.click();
+            playOverlayUiSound("ui-click");
           }
         },
       },
@@ -5018,12 +5249,28 @@
         // Notifica o GamepadContext do app principal
         window.dispatchEvent(new CustomEvent("checkpoint:overlay-focus-changed", { detail: { hasFocus: event.detail.hasFocus } }));
       });
+
+      function updateOverlayClock() {
+        const timeEl = document.getElementById("topbar-time");
+        if (timeEl) {
+          const now = new Date();
+          timeEl.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        }
+      }
+      updateOverlayClock();
+      setInterval(updateOverlayClock, 1000);
       window.achievementOverlay.onPanelState(renderPanelState);
       window.achievementOverlay.onPanelCommand?.((command) => {
         if (command?.kind !== "open-chat") return;
         const chatNav = document.querySelector('[data-panel-tab="chats"]');
         activatePanelTab("chats", chatNav);
       });
+
+      // Relógio em tempo real na barra superior
+      setInterval(() => {
+        const t = document.getElementById("topbar-time");
+        if (t) t.textContent = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }, 1000);
     }
   </script>
 </body>

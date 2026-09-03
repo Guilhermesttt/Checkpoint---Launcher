@@ -2,6 +2,7 @@
   const BUTTONS = {
     0: "A",
     1: "B",
+    2: "SQUARE",
     4: "L1",
     5: "R1",
     6: "L2",
@@ -49,6 +50,7 @@
       if (DIRECTION_BY_BUTTON[name]) actions.moveFocus(DIRECTION_BY_BUTTON[name]);
       else if (name === "A") actions.activateFocus();
       else if (name === "B") actions.goBack();
+      else if (name === "SQUARE") actions.deleteFocused?.();
       else if (name === "L1") actions.switchTab(-1);
       else if (name === "R1") actions.switchTab(1);
       else if (name === "L2" && isSpotifyActive?.()) actions.spotifyTrack?.(-1);

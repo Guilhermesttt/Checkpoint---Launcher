@@ -63,6 +63,7 @@ const { showTrophyNotification, createDefaultDeps: createTrophyNotificationDeps 
 const { createLocalGameLibrary } = require("./local-game-library.cjs");
 const { cleanupPlatformAchievementFiles } = require("./platform-data-cleanup.cjs");
 const { createWindowBehaviorController } = require("./window-behavior.cjs");
+const { queryWindowsControllerBattery } = require("./controller-battery.cjs");
 const { createRetroArtworkImporter } = require("./retro-artwork-importer.cjs");
 const { createTheGamesDbClient } = require("./thegamesdb.cjs");
 const { createNexusCredentialStore } = require("./nexus-credential-store.cjs");
@@ -1395,7 +1396,7 @@ const createOverlayWindow = () => {
 
   overlayWindow.setAlwaysOnTop(true, "screen-saver", 1);
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlayWindow.setIgnoreMouseEvents(true);
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   syncOverlayBounds();
   const createdOverlayWindow = overlayWindow;
   createdOverlayWindow.loadFile(path.join(__dirname, "overlay.html"));
@@ -1432,7 +1433,7 @@ const revealOverlayForToast = () => {
   try {
     overlayWindow.setAlwaysOnTop(true, "screen-saver");
     overlayWindow.moveTop();
-    overlayWindow.setIgnoreMouseEvents(true);
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.showInactive();
   } catch (error) {
     console.warn("[overlay] Nao foi possivel reafirmar a ordem da janela:", error);
@@ -1484,7 +1485,7 @@ const setOverlayPanelOpen = (open) => {
     overlayWindow.show();
     overlayWindow.focus();
   } else {
-    overlayWindow.setIgnoreMouseEvents(true);
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.blur();
     overlayWindow.hide();
     
@@ -1902,6 +1903,30 @@ registerSecureIpcHandler("overlay:update-panel", async (_event, payload) => {
       discordUsername: String(payload?.profile?.discordUsername || "").slice(0, 80),
       achievements: Math.max(0, Number(payload?.profile?.achievements) || 0),
     },
+    gamepad: payload?.gamepad ? {
+      connected: Boolean(payload.gamepad.connected),
+      family: String(payload.gamepad.family || "generic"),
+      batteryLevel: payload.gamepad.batteryLevel != null ? Number(payload.gamepad.batteryLevel) : null,
+      isCharging: Boolean(payload.gamepad.isCharging),
+      connectionType: String(payload.gamepad.connectionType || "unknown"),
+    } : null,
+    voiceCall: payload?.voiceCall ? {
+      inCall: Boolean(payload.voiceCall.inCall),
+      channelName: String(payload.voiceCall.channelName || "Chamada de Voz").slice(0, 80),
+      isMuted: Boolean(payload.voiceCall.isMuted),
+      isDeafened: Boolean(payload.voiceCall.isDeafened),
+      participantsCount: Math.max(0, Number(payload.voiceCall.participantsCount) || 0),
+      speakingUserNames: Array.isArray(payload.voiceCall.speakingUserNames)
+        ? payload.voiceCall.speakingUserNames.slice(0, 5).map((n) => String(n).slice(0, 60))
+        : [],
+    } : null,
+    playerLevel: payload?.playerLevel ? {
+      level: Math.max(1, Number(payload.playerLevel.level) || 1),
+      xp: Math.max(0, Number(payload.playerLevel.xp) || 0),
+      progress: Math.min(100, Math.max(0, Number(payload.playerLevel.progress) || 0)),
+      tierName: String(payload.playerLevel.tierName || "Bronze").slice(0, 40),
+      rankColor: String(payload.playerLevel.rankColor || "#EAB308").slice(0, 20),
+    } : null,
   };
   const hasRunningGame = Boolean(overlayPanelState.currentGame);
   if (hasRunningGame && (!previouslyHadRunningGame || !inGameOverlayActive)) {
@@ -1959,13 +1984,13 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
   }
   if (kind === "set-toast-interactive") {
     if (!overlayPanelOpen && overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.setIgnoreMouseEvents(!Boolean(action?.interactive));
+      overlayWindow.setIgnoreMouseEvents(!Boolean(action?.interactive), { forward: true });
     }
     return { ok: true };
   }
   if (kind === "toasts-cleared") {
     if (!overlayPanelOpen && overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
       overlayWindow.hide();
     }
     return { ok: true };
@@ -1985,7 +2010,7 @@ ipcMain.handle("overlay:panel-action", async (event, action) => {
       return { ok: true, target: "in-game-chat" };
     }
     if (overlayWindow && !overlayWindow.isDestroyed() && !overlayPanelOpen) {
-      overlayWindow.setIgnoreMouseEvents(true);
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
       overlayWindow.hide();
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -4186,6 +4211,15 @@ registerSecureIpcHandler("system:copy-to-clipboard", async (_event, value) => {
   if (!text) throw new Error("Nenhum texto para copiar.");
   clipboard.writeText(text, "clipboard");
   return { ok: true };
+});
+
+registerSecureIpcHandler("controller:get-battery", async () => {
+  try {
+    return await queryWindowsControllerBattery();
+  } catch (err) {
+    console.warn("[controller] Falha ao consultar bateria do controle:", err);
+    return { batteryLevel: null, isCharging: false, connectionType: "unknown", deviceName: null };
+  }
 });
 
 registerSecureIpcHandler("overlay:test-welcome", async () => {

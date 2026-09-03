@@ -73,15 +73,64 @@ export function getHubCounts(uid: string, gameId: string): { platinum: number; g
   }
 }
 
+import { calculatePlayerLevelFromXp } from "./trophyTiers";
+
+export function getAllUserHubPointsFromStorage(uid: string): number {
+  try {
+    let total = 0;
+    const prefix = `hub_counts:${uid}:`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const c = JSON.parse(raw);
+          total += (Number(c.platinum) || 0) * 300 +
+                   (Number(c.gold) || 0) * 90 +
+                   (Number(c.silver) || 0) * 30 +
+                   (Number(c.bronze) || 0) * 15;
+        }
+      }
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
 export function incrementHubCount(uid: string, gameId: string, tierIndex: number): void {
   if (tierIndex === 4) return; // Ferro não conta
   try {
+    const oldTotalXp = getAllUserHubPointsFromStorage(uid);
+    const oldLevelInfo = calculatePlayerLevelFromXp(oldTotalXp);
+
     const counts = getHubCounts(uid, gameId);
-    if (tierIndex === 0) counts.platinum++;
-    else if (tierIndex === 1) counts.gold++;
-    else if (tierIndex === 2) counts.silver++;
-    else if (tierIndex === 3) counts.bronze++;
+    let gainedXp = 15;
+    if (tierIndex === 0) { counts.platinum++; gainedXp = 300; }
+    else if (tierIndex === 1) { counts.gold++; gainedXp = 90; }
+    else if (tierIndex === 2) { counts.silver++; gainedXp = 30; }
+    else if (tierIndex === 3) { counts.bronze++; gainedXp = 15; }
     localStorage.setItem(countsKeyFor(uid, gameId), JSON.stringify(counts));
+
+    const newTotalXp = oldTotalXp + gainedXp;
+    const newLevelInfo = calculatePlayerLevelFromXp(newTotalXp);
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("checkpoint:xp-gained", {
+        detail: { xpGained: gainedXp, totalXp: newTotalXp, levelInfo: newLevelInfo, tierIndex, gameId }
+      }));
+
+      if (newLevelInfo.level > oldLevelInfo.level) {
+        window.dispatchEvent(new CustomEvent("checkpoint:level-up", {
+          detail: {
+            oldLevel: oldLevelInfo.level,
+            newLevel: newLevelInfo.level,
+            levelInfo: newLevelInfo,
+            tierInfo: newLevelInfo.tierInfo,
+          }
+        }));
+      }
+    }
   } catch {}
 }
 

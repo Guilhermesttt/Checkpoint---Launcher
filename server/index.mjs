@@ -230,7 +230,14 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "128kb" }));
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+app.use((err, _req, res, next) => {
+  if (err && (err.type === "entity.too.large" || err instanceof SyntaxError)) {
+    return res.status(err.status || 413).json({ error: err.message || "Payload da requisição muito grande." });
+  }
+  next(err);
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 app.use(express.static(path.join(__dirname, "..", "public")));

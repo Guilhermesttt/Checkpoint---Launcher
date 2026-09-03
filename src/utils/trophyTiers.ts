@@ -861,48 +861,7 @@ export const getTotalXpForLevel = (targetLevel: number): number => {
   return xp;
 };
 
-/**
- * Calcula o nível da conta e progresso baseado no sistema oficial da PlayStation Network (PSN).
- * @deprecated totalHours/totalAchievements/totalGames mantidos por compatibilidade mas ignorados; XP é 100% troféu PSN.
- */
-export const calculatePlayerLevel = (
-  totalHours: number,
-  totalAchievements: number,
-  totalGames: number,
-  trophyCounts: GameTrophyCounts,
-): PlayerLevelInfo => {
-  // Nível seguro: só conta XP ganho VIA HUB (anti-farm de importação).
-  // Se hubPoints existir (novo formato), usa ele; senão fallback para total (compatibilidade).
-  let trophyXp: number;
-  if (trophyCounts.hubPoints != null) {
-    trophyXp = trophyCounts.hubPoints;
-  } else if (trophyCounts.hub) {
-    const h = trophyCounts.hub;
-    trophyXp =
-      h.platinum * TROPHY_POINTS.platinum +
-      h.gold * TROPHY_POINTS.gold +
-      h.silver * TROPHY_POINTS.silver +
-      h.bronze * TROPHY_POINTS.bronze;
-    // ultra bonus já está em hubPoints quando disponível; sem hubPoints, estima via points
-    if (trophyCounts.points != null) {
-      const baseTotal =
-        trophyCounts.platinum * TROPHY_POINTS.platinum +
-        trophyCounts.gold * TROPHY_POINTS.gold +
-        trophyCounts.silver * TROPHY_POINTS.silver +
-        trophyCounts.bronze * TROPHY_POINTS.bronze;
-      const ultra = Math.max(0, (trophyCounts.points ?? 0) - baseTotal);
-      // se houver hub mas sem hubPoints, ultra é do hub (imported não tem ultra)
-      if (h.platinum + h.gold + h.silver + h.bronze > 0) trophyXp += ultra;
-    }
-  } else {
-    const baseXp =
-      trophyCounts.platinum * TROPHY_POINTS.platinum +
-      trophyCounts.gold * TROPHY_POINTS.gold +
-      trophyCounts.silver * TROPHY_POINTS.silver +
-      trophyCounts.bronze * TROPHY_POINTS.bronze;
-    trophyXp = trophyCounts.points != null && trophyCounts.points > baseXp ? trophyCounts.points : baseXp;
-  }
-
+export const calculatePlayerLevelFromXp = (trophyXp: number): PlayerLevelInfo => {
   let remainingXp = Math.max(0, trophyXp);
   let currentLevel = 1;
   let currentLevelXp = 0;
@@ -948,4 +907,49 @@ export const calculatePlayerLevel = (
     rankColor: tierInfo.color,
     tierInfo,
   };
+};
+
+/**
+ * Calcula o nível da conta e progresso baseado no sistema oficial da PlayStation Network (PSN).
+ * @deprecated totalHours/totalAchievements/totalGames mantidos por compatibilidade mas ignorados; XP é 100% troféu PSN.
+ */
+export const calculatePlayerLevel = (
+  totalHours: number,
+  totalAchievements: number,
+  totalGames: number,
+  trophyCounts: GameTrophyCounts,
+): PlayerLevelInfo => {
+  // Nível seguro: só conta XP ganho VIA HUB (anti-farm de importação).
+  // Se hubPoints existir (novo formato), usa ele; senão fallback para total (compatibilidade).
+  let trophyXp: number;
+  if (trophyCounts.hubPoints != null) {
+    trophyXp = trophyCounts.hubPoints;
+  } else if (trophyCounts.hub) {
+    const h = trophyCounts.hub;
+    trophyXp =
+      h.platinum * TROPHY_POINTS.platinum +
+      h.gold * TROPHY_POINTS.gold +
+      h.silver * TROPHY_POINTS.silver +
+      h.bronze * TROPHY_POINTS.bronze;
+    // ultra bonus já está em hubPoints quando disponível; sem hubPoints, estima via points
+    if (trophyCounts.points != null) {
+      const baseTotal =
+        trophyCounts.platinum * TROPHY_POINTS.platinum +
+        trophyCounts.gold * TROPHY_POINTS.gold +
+        trophyCounts.silver * TROPHY_POINTS.silver +
+        trophyCounts.bronze * TROPHY_POINTS.bronze;
+      const ultra = Math.max(0, (trophyCounts.points ?? 0) - baseTotal);
+      // se houver hub mas sem hubPoints, ultra é do hub (imported não tem ultra)
+      if (h.platinum + h.gold + h.silver + h.bronze > 0) trophyXp += ultra;
+    }
+  } else {
+    const baseXp =
+      trophyCounts.platinum * TROPHY_POINTS.platinum +
+      trophyCounts.gold * TROPHY_POINTS.gold +
+      trophyCounts.silver * TROPHY_POINTS.silver +
+      trophyCounts.bronze * TROPHY_POINTS.bronze;
+    trophyXp = trophyCounts.points != null && trophyCounts.points > baseXp ? trophyCounts.points : baseXp;
+  }
+
+  return calculatePlayerLevelFromXp(trophyXp);
 };
