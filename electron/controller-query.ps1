@@ -3,24 +3,19 @@
 
 $res = @{ battery = $null; isCharging = $false; type = "unknown"; name = $null }
 
-# 1. Checa se ha controle Bluetooth Sony / Xbox conectado
+# 1. Checa se ha controle Bluetooth Sony / Xbox conectado (prioridade absoluta para Bluetooth)
 try {
   $btDevs = Get-PnpDevice -Status 'OK' -ErrorAction SilentlyContinue | Where-Object {
     ($_.FriendlyName -match 'Wireless Controller|DualSense|DualShock|Xbox') -and
-    ($_.Class -eq 'Bluetooth' -or $_.InstanceId -match 'BTHENUM|00001124')
-  }
-  
-  $usbDevs = Get-PnpDevice -Class 'HIDClass' -Status 'OK' -ErrorAction SilentlyContinue | Where-Object {
-    ($_.FriendlyName -match 'Wireless Controller|DualSense|DualShock|Xbox') -and
-    ($_.InstanceId -notmatch '00001124|BTHENUM')
+    ($_.Class -eq 'Bluetooth' -or $_.InstanceId -match 'BTHENUM|00001124|BTHLE')
   }
 
-  if ($usbDevs) {
-    $res.type = "usb"
-    $targetDev = $usbDevs | Select-Object -First 1
-    $res.name = if ($targetDev.FriendlyName) { $targetDev.FriendlyName } else { "Controle USB" }
-    $res.isCharging = $true
-  } elseif ($btDevs) {
+  $usbDevs = Get-PnpDevice -Class 'HIDClass' -Status 'OK' -ErrorAction SilentlyContinue | Where-Object {
+    ($_.FriendlyName -match 'Wireless Controller|DualSense|DualShock|Xbox') -and
+    ($_.InstanceId -notmatch '00001124|BTHENUM|BTHLE|DEV_')
+  }
+
+  if ($btDevs) {
     $res.type = "bluetooth"
     $targetDev = $btDevs | Select-Object -First 1
     $res.name = if ($targetDev.FriendlyName) { $targetDev.FriendlyName } else { "Controle Bluetooth" }
@@ -35,17 +30,22 @@ try {
         }
       } catch {}
     }
+  } elseif ($usbDevs) {
+    $res.type = "usb"
+    $targetDev = $usbDevs | Select-Object -First 1
+    $res.name = if ($targetDev.FriendlyName) { $targetDev.FriendlyName } else { "Controle USB" }
+    $res.isCharging = $true
   }
 } catch {}
 
-# 1.2 Leitor direto de bateria Sony HID (DualShock 4 / DualSense via hid.dll)
+# 1.2 Leitor direto de bateria Sony HID (DualShock 4 & DualSense via hid.dll)
 try {
   $sonyCode = @'
   using System;
   using System.Runtime.InteropServices;
   using Microsoft.Win32.SafeHandles;
 
-  public class SonyHidReaderV5 {
+  public class SonyHidReaderV6 {
     [DllImport("hid.dll", SetLastError = true)]
     public static extern void HidD_GetHidGuid(out Guid hidGuid);
 
@@ -101,59 +101,82 @@ try {
           if (path.IndexOf("054c", StringComparison.OrdinalIgnoreCase) >= 0) {
             SafeFileHandle handle = CreateFile(path, 0x80000000, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
             if (!handle.IsInvalid) {
-              bool isBt = path.IndexOf("00001124", StringComparison.OrdinalIgnoreCase) >= 0 || path.IndexOf("bth", StringComparison.OrdinalIgnoreCase) >= 0;
+              bool isBt = path.IndexOf("00001124", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          path.IndexOf("bth", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          path.IndexOf("bluetooth", StringComparison.OrdinalIgnoreCase) >= 0;
+
+              bool isDualSense = path.IndexOf("0ce6", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                 path.IndexOf("0df2", StringComparison.OrdinalIgnoreCase) >= 0;
+
               byte[] report = new byte[128];
               bool ok = false;
+              int batByte = -1;
+              bool chg = !isBt;
+              string devName = isDualSense ? "DualSense" : "DualShock 4";
 
-              if (isBt) {
-                // No Bluetooth do DS4, Report 0x11 tem 78 bytes e contem o status da bateria
-                report[0] = 0x11;
-                ok = HidD_GetInputReport(handle, report, 78);
-                if (!ok) {
-                  report[0] = 0x11;
-                  ok = HidD_GetInputReport(handle, report, report.Length);
-                }
-                if (!ok) {
-                  report[0] = 0x05;
-                  ok = HidD_GetInputReport(handle, report, report.Length);
-                }
-              } else {
-                // No cabo USB, GetFeature(2) fornece telemetria completa
-                report[0] = 0x02;
-                ok = HidD_GetFeature(handle, report, 64);
-                if (!ok) {
+              if (isDualSense) {
+                if (isBt) {
+                  // DualSense Bluetooth: Input Report 0x31 (78 bytes), bateria no byte 53
+                  report[0] = 0x31;
+                  ok = HidD_GetInputReport(handle, report, 78);
+                  if (!ok) {
+                    report[0] = 0x31;
+                    ok = HidD_GetInputReport(handle, report, report.Length);
+                  }
+                  if (ok && report.Length > 53) {
+                    batByte = report[53];
+                    chg = (report[53] & 0xf0) != 0;
+                  }
+                } else {
+                  // DualSense USB: Input Report 0x01 (64 bytes), bateria no byte 52
                   report[0] = 0x01;
                   ok = HidD_GetInputReport(handle, report, 64);
+                  if (ok && report.Length > 52) {
+                    batByte = report[52];
+                    chg = (report[52] & 0xf0) != 0;
+                  }
+                }
+              } else {
+                // DualShock 4
+                if (isBt) {
+                  report[0] = 0x11;
+                  ok = HidD_GetInputReport(handle, report, 78);
+                  if (!ok) {
+                    report[0] = 0x11;
+                    ok = HidD_GetInputReport(handle, report, report.Length);
+                  }
+                  if (ok && report.Length > 30) {
+                    batByte = report[30];
+                    chg = (report[30] & 0x10) != 0;
+                  }
+                } else {
+                  report[0] = 0x02;
+                  ok = HidD_GetFeature(handle, report, 64);
+                  if (!ok) {
+                    report[0] = 0x01;
+                    ok = HidD_GetInputReport(handle, report, 64);
+                  }
+                  if (ok) {
+                    if (report[0] == 0x02 && report.Length > 35) {
+                      batByte = report[35];
+                      chg = true;
+                    } else if (report.Length > 12) {
+                      batByte = report[12];
+                      chg = (report[12] & 0x10) != 0;
+                    }
+                  }
                 }
               }
 
-              if (ok) {
-                int batByte = -1;
-                bool chg = !isBt;
+              if (ok && batByte >= 0) {
+                int raw = batByte & 0x0f;
+                int pct = isDualSense ? Math.Min(100, Math.Max(0, raw * 10)) :
+                          (raw >= 8 ? 100 : Math.Min(100, Math.Max(0, (int)Math.Round((raw / 8.0) * 100))));
 
-                if (report[0] == 0x02 && report.Length > 35) {
-                  batByte = report[35];
-                  chg = true;
-                } else if (report[0] == 0x11 && report.Length > 30) {
-                  batByte = report[30];
-                  chg = (report[30] & 0x10) != 0;
-                } else if (report[0] == 0x05 && report.Length > 35) {
-                  batByte = report[35];
-                  chg = (report[35] & 0x10) != 0 || (report.Length > 36 && (report[36] & 0x10) != 0);
-                } else if (!isBt && report.Length > 12) {
-                  batByte = report[12];
-                  chg = (report[12] & 0x10) != 0;
-                }
-
-                if (batByte >= 0) {
-                  int raw = batByte & 0x0f;
-                  int pct = (raw >= 10) ? 100 : Math.Min(100, Math.Max(0, raw * 10));
-                  // Ignora 0% espúrio de reports não inicializados
-                  if (pct > 0 || (isBt && (batByte & 0x10) != 0)) {
-                    handle.Close();
-                    SetupDiDestroyDeviceInfoList(hDevInfo);
-                    return string.Format("{0}|{1}|{2}|DualShock 4", pct, chg, isBt ? "bluetooth" : "usb");
-                  }
+                if (pct > 0 || chg) {
+                  handle.Close();
+                  SetupDiDestroyDeviceInfoList(hDevInfo);
+                  return string.Format("{0}|{1}|{2}|{3}", pct, chg, isBt ? "bluetooth" : "usb", devName);
                 }
               }
               handle.Close();
@@ -169,7 +192,7 @@ try {
   }
 '@
   Add-Type -TypeDefinition $sonyCode -ErrorAction SilentlyContinue
-  $sonyRes = [SonyHidReaderV5]::ReadBattery()
+  $sonyRes = [SonyHidReaderV6]::ReadBattery()
   if ($sonyRes) {
     $sp = $sonyRes.Split('|')
     $res.battery = [int]$sp[0]

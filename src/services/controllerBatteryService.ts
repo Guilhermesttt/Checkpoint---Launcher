@@ -4,6 +4,8 @@
  * Arquitetura baseada em Clean Code, SRP e OCP.
  */
 
+import { findBatteryAdapter } from "./controllers/battery-adapters";
+
 export type ControllerConnectionType = "bluetooth" | "usb" | "unknown";
 
 export interface ControllerBatteryState {
@@ -198,6 +200,7 @@ let currentState: ControllerBatteryState = {
 
 let pollTimer: number | null = null;
 let activeHidDevice: HIDDevice | null = null;
+let lastWebHidReportTime = 0;
 
 function notifyListeners(): void {
   listeners.forEach((listener) => {
@@ -240,11 +243,34 @@ function updateBatteryState(partial: Partial<ControllerBatteryState>): void {
 }
 
 function handleHidInputReport(event: HIDInputReportEvent): void {
+  // 1. Tenta adaptador modular centralizado
+  const adapter = findBatteryAdapter({
+    vendorId: event.device.vendorId,
+    productId: event.device.productId,
+    name: event.device.productName,
+  });
+
+  if (adapter) {
+    const reading = adapter.parseInputReport(event.reportId, event.data);
+    if (reading) {
+      lastWebHidReportTime = Date.now();
+      updateBatteryState({
+        batteryLevel: reading.level,
+        isCharging: reading.charging,
+        connectionType: reading.transport,
+        deviceName: reading.deviceName,
+      });
+      return;
+    }
+  }
+
+  // 2. Fallback para parser registrado
   const parser = parserRegistry.resolve(event.device.vendorId, event.device.productId);
   if (!parser) return;
 
   const result = parser.parse(event);
   if (result) {
+    lastWebHidReportTime = Date.now();
     updateBatteryState(result);
   }
 }
@@ -255,8 +281,13 @@ async function initWebHidBatteryListener(): Promise<void> {
   try {
     const devices = await navigator.hid.getDevices();
     for (const device of devices) {
+      const adapter = findBatteryAdapter({
+        vendorId: device.vendorId,
+        productId: device.productId,
+        name: device.productName,
+      });
       const parser = parserRegistry.resolve(device.vendorId, device.productId);
-      if (!parser) continue;
+      if (!adapter && !parser) continue;
 
       if (!device.opened) {
         try {
@@ -278,7 +309,12 @@ async function initWebHidBatteryListener(): Promise<void> {
 }
 
 async function pollFallbackBatterySources(): Promise<void> {
-  // 1. Electron IPC (Windows PnP + HID nativo via PowerShell / C# - Mais confiável no Windows)
+  // Se WebHID estiver ativo e transmitindo relatórios recentes (últimos 3s), não deixa o fallback sobrescrever
+  if (Date.now() - lastWebHidReportTime < 3000) {
+    return;
+  }
+
+  // 1. Electron IPC (Windows PnP + HID nativo via PowerShell / C# - Mais confiável no Windows para Xbox / fallbacks)
   try {
     const electron = (window as unknown as { electronAPI?: { getControllerBattery?: () => Promise<Record<string, unknown>> } }).electronAPI;
     if (typeof electron?.getControllerBattery === "function") {
@@ -324,13 +360,8 @@ export function registerCustomHidParser(parser: HidReportParser): void {
 }
 
 export function startControllerBatteryMonitoring(): () => void {
-  const isElectron = typeof window !== "undefined" && Boolean((window as unknown as { electronAPI?: { getControllerBattery?: unknown } }).electronAPI?.getControllerBattery);
-
-  // No Electron no Windows, o IPC nativo (PnP + hid.dll) é a fonte de verdade absoluta e estável.
-  // WebHID só é ativado em navegadores web externos sem Electron.
-  if (!isElectron) {
-    void initWebHidBatteryListener();
-  }
+  // Ativa WebHID tanto no Electron quanto no navegador web para telemetria de 0 latência
+  void initWebHidBatteryListener();
   void pollFallbackBatterySources();
 
   if (!pollTimer) {

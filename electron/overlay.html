@@ -2483,10 +2483,15 @@
       transition: transform 140ms cubic-bezier(0.2, 0, 0, 1), border-color 140ms ease, box-shadow 140ms ease;
     }
 
-    .capture-card:hover {
-      border-color: var(--panel-border-strong);
-      transform: translateY(-2px) scale(1.02) translateZ(0);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+    .capture-card:hover,
+    .capture-card:focus,
+    .capture-card:focus-visible,
+    .capture-card.is-gamepad-focused {
+      border-color: #ffffff !important;
+      outline: 3px solid #ffffff !important;
+      outline-offset: 3px !important;
+      transform: translateY(-2px) scale(1.02) translateZ(0) !important;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2), 0 12px 28px rgba(0, 0, 0, 0.7) !important;
     }
 
     .capture-card img {
@@ -4809,6 +4814,7 @@
 
     const isGamepadFocusable = (element) => {
       if (!(element instanceof HTMLElement)) return false;
+      if (element.classList.contains("capture-delete") || element.closest(".capture-delete")) return false;
       if (element.hidden || element.closest("[hidden]")) return false;
       if (element.matches(":disabled") || element.getAttribute("aria-disabled") === "true") return false;
       const panelView = element.closest("[data-panel-view]");

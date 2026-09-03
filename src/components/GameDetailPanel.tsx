@@ -14,6 +14,7 @@ import { getMonitorableExecutablePath, launchGame } from "../services/launcher";
 import type { Game, GameLaunchProfile } from "../types/domain";
 import type { SoundEffectType } from "../hooks/useSoundEffects";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
+import { activateElementWithController } from "../utils/controllerTextInput";
 import {
   fetchSteamAchievementDetails,
   fetchSteamAchievementSchema,
@@ -475,6 +476,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     }
     return items;
   }, [isSteamGame, isEpicGame, steamAppDetails, epicAppDetails, game?.trailerUrl, game?.trailerThumbnail, game?.screenshots]);
+
+  const effectiveGalleryItems = React.useMemo(() => {
+    if (activeTab === copy.tabCaptures && localScreenshots.length > 0) {
+      return localScreenshots.map((url) => ({ type: "image" as const, url }));
+    }
+    return galleryItems;
+  }, [activeTab, copy.tabCaptures, localScreenshots, galleryItems]);
 
   // Debounce para busca de conquistas
   React.useEffect(() => {
@@ -1520,14 +1528,106 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
     }
   });
 
+  const getPanelFocusableElements = React.useCallback((): HTMLElement[] => {
+    if (!scrollRef.current) return [];
+    const selector = [
+      "button:not([disabled])",
+      "[role='button']:not([aria-disabled='true'])",
+      "[tabindex='0']",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "a[href]",
+    ].join(",");
+    return Array.from(scrollRef.current.querySelectorAll<HTMLElement>(selector)).filter((el) => {
+      const style = window.getComputedStyle(el);
+      return (
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        el.offsetWidth > 0 &&
+        el.offsetHeight > 0
+      );
+    });
+  }, []);
+
+  const movePanelSpatialFocus = React.useCallback(
+    (direction: "up" | "down" | "left" | "right") => {
+      if (!isOpen || galleryModalOpen || deleteModalOpen || isAddAchModalOpen || isLaunching) return;
+      const elements = getPanelFocusableElements();
+      if (elements.length === 0) return;
+
+      const current = document.activeElement instanceof HTMLElement && scrollRef.current?.contains(document.activeElement)
+        ? document.activeElement
+        : null;
+
+      if (!current) {
+        elements[0]?.focus({ preventScroll: true });
+        elements[0]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        playSound("navigate");
+        return;
+      }
+
+      const currentRect = current.getBoundingClientRect();
+      const originX = currentRect.left + currentRect.width / 2;
+      const originY = currentRect.top + currentRect.height / 2;
+
+      const candidates = elements
+        .filter((el) => el !== current)
+        .map((el) => {
+          const rect = el.getBoundingClientRect();
+          const cx = rect.left + rect.width / 2;
+          const cy = rect.top + rect.height / 2;
+          const dx = cx - originX;
+          const dy = cy - originY;
+          const valid =
+            direction === "left" ? dx < -4 :
+            direction === "right" ? dx > 4 :
+            direction === "up" ? dy < -4 :
+            dy > 4;
+          if (!valid) return null;
+
+          const primary = direction === "left" || direction === "right" ? Math.abs(dx) : Math.abs(dy);
+          const secondary = direction === "left" || direction === "right" ? Math.abs(dy) : Math.abs(dx);
+          return { element: el, score: primary * 3 + secondary };
+        })
+        .filter((item): item is { element: HTMLElement; score: number } => Boolean(item))
+        .sort((a, b) => a.score - b.score);
+
+      if (candidates[0]?.element) {
+        candidates[0].element.focus({ preventScroll: true });
+        candidates[0].element.scrollIntoView({ block: "nearest", inline: "nearest" });
+        playSound("navigate");
+      }
+    },
+    [isOpen, galleryModalOpen, deleteModalOpen, isAddAchModalOpen, isLaunching, getPanelFocusableElements, playSound]
+  );
+
+  useGamepadButton("DPAD_UP", () => movePanelSpatialFocus("up"), isOpen && !galleryModalOpen && !deleteModalOpen && !isAddAchModalOpen, 10);
+  useGamepadButton("DPAD_DOWN", () => movePanelSpatialFocus("down"), isOpen && !galleryModalOpen && !deleteModalOpen && !isAddAchModalOpen, 10);
+  useGamepadButton("DPAD_LEFT", () => movePanelSpatialFocus("left"), isOpen && !galleryModalOpen && !deleteModalOpen && !isAddAchModalOpen, 10);
+  useGamepadButton("DPAD_RIGHT", () => movePanelSpatialFocus("right"), isOpen && !galleryModalOpen && !deleteModalOpen && !isAddAchModalOpen, 10);
+
   useGamepadButton("X", () => {
     if (!isOpen || galleryModalOpen || deleteModalOpen || isAddAchModalOpen || isLaunching) return;
-    handleLaunch();
-  });
+
+    // Se houver um elemento interativo focado no painel, ativa ele
+    if (
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body &&
+      scrollRef.current?.contains(document.activeElement)
+    ) {
+      activateElementWithController(document.activeElement);
+      return;
+    }
+
+    // Se estiver na aba Jogar e nenhum botão específico estiver com foco, inicia o jogo
+    if (activeTab === copy.tabPlay) {
+      handleLaunch();
+    }
+  }, isOpen && !galleryModalOpen && !deleteModalOpen && !isAddAchModalOpen, 10);
 
   useGamepadButton("SQUARE", () => {
     if (!isOpen || galleryModalOpen || deleteModalOpen || isAddAchModalOpen || isLaunching) return;
-    if (!game?.screenshots?.length) return;
+    if (!effectiveGalleryItems.length) return;
     setGalleryModalOpen(true);
     setCurrentGalleryIndex(0);
     playSound("select");
@@ -1535,13 +1635,13 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
   useGamepadButton("DPAD_LEFT", () => {
     if (!galleryModalOpen) return;
-    setCurrentGalleryIndex((c) => c > 0 ? c - 1 : (game?.screenshots?.length ?? 1) - 1);
+    setCurrentGalleryIndex((c) => c > 0 ? c - 1 : (effectiveGalleryItems.length || 1) - 1);
     playSound("navigate");
   }, isOpen && galleryModalOpen, 100);
 
   useGamepadButton("DPAD_RIGHT", () => {
     if (!galleryModalOpen) return;
-    setCurrentGalleryIndex((c) => c < (game?.screenshots?.length ?? 1) - 1 ? c + 1 : 0);
+    setCurrentGalleryIndex((c) => c < (effectiveGalleryItems.length || 1) - 1 ? c + 1 : 0);
     playSound("navigate");
   }, isOpen && galleryModalOpen, 100);
 
@@ -2020,7 +2120,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                               const dir = game.executablePath?.replace(/[^/\\]+$/, '') || '';
                               if (dir) window.electronAPI?.openPath?.(dir);
                             }}
-                            className="flex items-center gap-1.5 text-[10px] font-bold text-white/40 hover:text-white transition-colors"
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-white/40 hover:text-white focus:text-white focus:outline-none focus:ring-1 focus:ring-white/40 px-2 py-1 rounded-lg transition-all"
                           >
                             <FolderOpen className="w-3.5 h-3.5" />
                             {copy.openFolder}
@@ -2036,15 +2136,39 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                           {localScreenshots.map((src, idx) => (
-                            <div key={idx} className="group relative rounded-2xl overflow-hidden border border-white/10 aspect-video cursor-pointer" onClick={() => {
-                              window.electronAPI?.openPath?.(src);
-                              playSound("select");
-                            }}>
-                              <img src={src} alt="Capture" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span className="text-[10px] font-bold text-white uppercase tracking-widest px-4 py-2 bg-white/10 rounded-full backdrop-blur-md">Abrir Imagem</span>
+                            <button
+                              key={idx}
+                              type="button"
+                              tabIndex={0}
+                              data-gamepad-id={`capture-item-${idx}`}
+                              aria-label={`Captura ${idx + 1}`}
+                              className="group relative rounded-2xl overflow-hidden border border-white/10 aspect-video cursor-pointer text-left focus:outline-none focus:border-white focus:ring-2 focus:ring-white/90 focus:scale-[1.03] transition-all bg-black/40"
+                              onClick={() => {
+                                setCurrentGalleryIndex(idx);
+                                setGalleryModalOpen(true);
+                                playSound("select");
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setCurrentGalleryIndex(idx);
+                                  setGalleryModalOpen(true);
+                                  playSound("select");
+                                }
+                              }}
+                            >
+                              <img
+                                src={src}
+                                alt={`Captura ${idx + 1}`}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 group-focus:scale-105"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-[10px] font-bold text-white uppercase tracking-widest px-4 py-2 bg-white/10 rounded-full backdrop-blur-md">
+                                  Ver Captura
+                                </span>
                               </div>
-                            </div>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -2169,7 +2293,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
               GALERIA
               ============================================================ */}
           <ModalShell
-            isOpen={Boolean(galleryModalOpen && galleryItems.length > 0)}
+            isOpen={Boolean(galleryModalOpen && effectiveGalleryItems.length > 0)}
             onClose={() => { setGalleryModalOpen(false); playSound("modalClose"); }}
             maxWidthClassName="max-w-none w-full h-full"
             className="p-0 bg-transparent border-0 shadow-none h-full"
@@ -2183,20 +2307,20 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                 <div className="flex items-center gap-4">
                   <span className="text-sm sm:text-base font-bold text-white shadow-sm">{game.title}</span>
                   <span className="h-1 w-1 rounded-full bg-white/20" />
-                  <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-white/50 uppercase">{currentGalleryIndex + 1} de {galleryItems.length}</span>
+                  <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.2em] text-white/50 uppercase">{currentGalleryIndex + 1} de {effectiveGalleryItems.length}</span>
                 </div>
                 <button onClick={() => { setGalleryModalOpen(false); playSound("modalClose"); }} className="p-3 rounded-full border border-white/10 hover:bg-white/10 transition-colors backdrop-blur-md" aria-label="Fechar galeria"><X className="w-5 h-5 text-white" /></button>
               </div>
 
               <button
-                onClick={() => { setCurrentGalleryIndex((c) => c > 0 ? c - 1 : galleryItems.length - 1); playSound("navigate"); }}
+                onClick={() => { setCurrentGalleryIndex((c) => c > 0 ? c - 1 : effectiveGalleryItems.length - 1); playSound("navigate"); }}
                 className="absolute left-0 top-0 bottom-0 w-1/6 flex items-center justify-start pl-4 sm:pl-8 z-40 group outline-none"
                 aria-label={copy.previous}
               >
                 <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full flex items-center justify-center bg-black/40 border border-white/10 opacity-30 group-hover:opacity-100 group-hover:scale-110 transition-all backdrop-blur-md"><ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" /></div>
               </button>
               <button
-                onClick={() => { setCurrentGalleryIndex((c) => c < galleryItems.length - 1 ? c + 1 : 0); playSound("navigate"); }}
+                onClick={() => { setCurrentGalleryIndex((c) => c < effectiveGalleryItems.length - 1 ? c + 1 : 0); playSound("navigate"); }}
                 className="absolute right-0 top-0 bottom-0 w-1/6 flex items-center justify-end pr-4 sm:pr-8 z-40 group outline-none"
                 aria-label={copy.next}
               >
@@ -2205,11 +2329,11 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
               <div className="w-full h-full max-h-screen p-8 pt-24 pb-36 sm:px-16 sm:pt-24 sm:pb-40 md:px-24 md:pt-24 md:pb-48 flex items-center justify-center">
                 <AnimatePresence mode="wait">
-                  {galleryItems[currentGalleryIndex]?.type === "video" ? (
-                    (galleryItems[currentGalleryIndex].url.includes("youtube") || galleryItems[currentGalleryIndex].url.includes("youtu.be")) ? (
+                  {effectiveGalleryItems[currentGalleryIndex]?.type === "video" ? (
+                    (effectiveGalleryItems[currentGalleryIndex].url.includes("youtube") || effectiveGalleryItems[currentGalleryIndex].url.includes("youtu.be")) ? (
                       <motion.iframe
                         key={currentGalleryIndex}
-                        src={`https://www.youtube.com/embed/${galleryItems[currentGalleryIndex].url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/)?.[1]}?autoplay=1&controls=1`}
+                        src={`https://www.youtube.com/embed/${effectiveGalleryItems[currentGalleryIndex].url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))((\w|-){11})/)?.[1]}?autoplay=1&controls=1`}
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 1.02 }}
@@ -2221,7 +2345,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                     ) : (
                       <motion.video
                         key={currentGalleryIndex}
-                        src={galleryItems[currentGalleryIndex].url}
+                        src={effectiveGalleryItems[currentGalleryIndex].url}
                         autoPlay
                         controls
                         initial={{ opacity: 0, scale: 0.98 }}
@@ -2238,7 +2362,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
                       animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }}
                       exit={{ opacity: 0, filter: "blur(8px)", scale: 1.02 }}
                       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                      src={galleryItems[currentGalleryIndex]?.url || undefined}
+                      src={effectiveGalleryItems[currentGalleryIndex]?.url || undefined}
                       alt={`Galeria ${currentGalleryIndex + 1}`}
                       className="max-w-full max-h-full object-contain rounded-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
                     />
@@ -2248,7 +2372,7 @@ const GameDetailPanel: React.FC<GameDetailPanelProps> = ({
 
               <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center bg-gradient-to-t from-black/90 to-transparent pt-12 pb-6 z-50">
                 <div className="flex justify-center gap-2 mb-6 overflow-x-auto max-w-full px-4 hide-scrollbar">
-                  {galleryItems.map((item, idx) => (
+                  {effectiveGalleryItems.map((item, idx) => (
                     <button
                       key={idx}
                       onClick={() => { setCurrentGalleryIndex(idx); playSound("navigate"); }}

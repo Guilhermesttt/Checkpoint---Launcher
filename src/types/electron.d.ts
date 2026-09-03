@@ -583,6 +583,28 @@ declare global {
           discordUsername?: string;
           achievements?: number;
         };
+        gamepad?: {
+          connected: boolean;
+          family: string;
+          batteryLevel: number | null;
+          isCharging: boolean;
+          connectionType: string;
+        } | null;
+        voiceCall?: {
+          inCall: boolean;
+          channelName: string;
+          isMuted?: boolean;
+          isDeafened?: boolean;
+          participantsCount?: number;
+          speakingUserNames?: string[];
+        } | null;
+        playerLevel?: {
+          level: number;
+          xp: number;
+          progress: number;
+          tierName: string;
+          rankColor?: string;
+        } | null;
       }) => Promise<void>;
       onOverlayPanelAction: (callback: (payload:
         | { kind: "select-chat"; friendId: string }

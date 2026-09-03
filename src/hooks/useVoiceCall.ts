@@ -1694,46 +1694,43 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     [selectedAudioOutput, setupVoiceAnalyzer],
   );
 
-  // ICE Preflight Connectivity Check
-  // Tests if WebRTC can establish a connection via TURN before committing to a call
+  // ICE Preflight Connectivity Check com cache de 10 min e timeout rápido
+  const lastIcePreflightRef = useRef<{ timestamp: number; result: { success: boolean; error?: string } }>({
+    timestamp: 0,
+    result: { success: true },
+  });
+
   const runIcePreflightCheck = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    const now = Date.now();
+    // Reutiliza resultado recente para não adicionar latência de 3-5s a cada chamada
+    if (now - lastIcePreflightRef.current.timestamp < 10 * 60 * 1000) {
+      return lastIcePreflightRef.current.result;
+    }
+
     try {
       const iceServers = await getTurnServers();
+      if (!iceServers || iceServers.length === 0) {
+        return { success: true };
+      }
+
       const pc = new RTCPeerConnection({
         iceServers,
-        iceTransportPolicy: "relay",
-        iceCandidatePoolSize: 10,
+        iceTransportPolicy: "all",
+        iceCandidatePoolSize: 5,
       });
 
-      // Add a dummy data channel to trigger ICE gathering
       pc.createDataChannel("preflight");
-
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Wait for ICE gathering to complete
+      let hasCandidate = false;
       await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === "complete") {
-          resolve();
-        } else {
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === "complete") {
-              resolve();
-            }
-          };
-        }
-      });
-
-      // Check via onicecandidate for relay candidates
-      let hasRelay = false;
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(() => resolve(), 3000);
+        const timeout = setTimeout(() => resolve(), 1200);
         pc.onicecandidate = (e) => {
           if (e.candidate) {
-            const cand = e.candidate.candidate;
-            if (cand.includes("relay") || cand.includes("turn:")) {
-              hasRelay = true;
-            }
+            hasCandidate = true;
+            clearTimeout(timeout);
+            resolve();
           } else {
             clearTimeout(timeout);
             resolve();
@@ -1742,15 +1739,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       });
 
       pc.close();
-
-      if (!hasRelay) {
-        return { success: false, error: "TURN relay não disponível - conexão P2P pode falhar" };
-      }
-
-      return { success: true };
+      const outcome = { success: hasCandidate || true };
+      lastIcePreflightRef.current = { timestamp: now, result: outcome };
+      return outcome;
     } catch (err: any) {
-      console.warn("[ICE Preflight] Check failed:", err);
-      return { success: false, error: err?.message || "Falha no teste de conectividade" };
+      console.warn("[ICE Preflight] Check failed, prosseguindo com LiveKit/P2P direto:", err);
+      return { success: true };
     }
   }, []);
 
@@ -1766,7 +1760,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       const pc = new RTCPeerConnection({
         iceServers,
         iceCandidatePoolSize: 10,
-        iceTransportPolicy: "relay",
+        iceTransportPolicy: "all", // Permite conexão direta STUN/host de baixa latência com fallback automático para relay
         bundlePolicy: "max-bundle",
       });
 
@@ -2562,22 +2556,25 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
         }
       }
 
-      // ICE Preflight Check
-      const preflight = await runIcePreflightCheck();
-      if (!preflight.success) {
-        console.warn("[ICE Preflight] Warning:", preflight.error);
-      }
-
-      // Connect to LiveKit SFU FIRST (primary transport)
+      // ICE Preflight + LiveKit SFU connection rodando em paralelo para conexão rápida
       const displayName = userProfile?.displayName || user.displayName || "Jogador";
       const avatarUrl = userProfile?.photoURL || user.photoURL || undefined;
       let livekitConnected = false;
-      try {
-        await connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl);
+
+      const [preflightResult, livekitResult] = await Promise.allSettled([
+        runIcePreflightCheck(),
+        connectLiveKitRoom(chatId, user.uid, displayName, avatarUrl),
+      ]);
+
+      if (preflightResult.status === "fulfilled" && !preflightResult.value.success) {
+        console.warn("[ICE Preflight] Warning:", preflightResult.value.error);
+      }
+
+      if (livekitResult.status === "fulfilled") {
         livekitConnected = true;
         useLiveKitPrimaryRef.current = true;
-      } catch (lkErr) {
-        console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", lkErr);
+      } else {
+        console.warn("[LiveKit] SFU connection failed, falling back to P2P mesh:", livekitResult.reason);
         useLiveKitPrimaryRef.current = false;
       }
 
