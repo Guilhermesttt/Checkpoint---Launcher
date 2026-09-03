@@ -2408,7 +2408,7 @@ const compactFriendProfile = (profile) => ({
 const profileRowToPublic = (row = {}) => {
   const presenceUpdatedAt = Date.parse(String(row.presence_updated_at || ""));
   const presenceIsFresh =
-    Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 2 * 60 * 1000;
+    Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 5 * 60 * 1000;
   const status = presenceIsFresh && ["online", "playing"].includes(row.status)
     ? row.status
     : "offline";

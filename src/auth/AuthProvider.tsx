@@ -84,14 +84,14 @@ const loadSocialGraph = async (uid: string) => {
   let publicProfiles = relatedIds.length > 0
     ? (await supabase
       .from("public_profiles")
-      .select("uid,display_name,photo_url")
+      .select("uid,display_name,photo_url,status,playing")
       .in("uid", relatedIds)).data || []
     : [];
 
   if (publicProfiles.length === 0 && relatedIds.length > 0) {
     publicProfiles = (await supabase
       .from("profiles")
-      .select("uid,display_name,photo_url")
+      .select("uid,display_name,photo_url,status,playing")
       .in("uid", relatedIds)).data || [];
   }
   const profileById = new Map((publicProfiles || []).map((profile) => [profile.uid, profile]));
@@ -101,6 +101,8 @@ const loadSocialGraph = async (uid: string) => {
       uid: relatedUid,
       displayName: String(profile?.display_name || "Jogador"),
       photoURL: profile?.photo_url || null,
+      status: (profile?.status as any) || "offline",
+      playing: (profile?.playing as any) || null,
       ...(createdAt ? { createdAt } : {}),
     };
   };
@@ -360,6 +362,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       void supabase.removeChannel(channel);
+    };
+  }, [user?.uid, refreshProfile]);
+
+  // Sincronização periódica inteligente de amizades e solicitações (fallback em caso de oscilação do WebSocket)
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const interval = setInterval(() => {
+      if (document.hasFocus()) {
+        void refreshProfile();
+      }
+    }, 12_000);
+
+    const onFocus = () => {
+      void refreshProfile();
+    };
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
     };
   }, [user?.uid, refreshProfile]);
 

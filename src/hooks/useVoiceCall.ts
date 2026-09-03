@@ -34,6 +34,7 @@ import type { CallRoomConfig, RoomCategory, VoiceRoomParticipant } from "../type
 import { getChatId } from "../services/chat";
 import { getTurnServers } from "../services/turnCredentials";
 import { buildProcessedAudioTrack } from "../services/audio/audioProcessing";
+import { createCallAudioBarrier, type CallAudioBarrierInstance } from "../services/audio/CallAudioBarrier";
 import { createVoiceRoom, joinVoiceRoom, leaveVoiceRoom } from "../services/voiceRooms";
 import {
   fetchLiveKitToken,
@@ -71,6 +72,7 @@ export interface ScreenShareOptions {
   resolution?: "720p" | "1080p" | "source";
   fps?: 30 | 60;
   withAudio?: boolean;
+  callAudioBarrier?: boolean;
 }
 
 interface AudioPipeline {
@@ -522,6 +524,7 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   /** Cleanup function for the active audio processing chain (gain+compressor+RNNoise). */
   const audioProcCleanupRef = useRef<(() => void) | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const screenBarrierRef = useRef<CallAudioBarrierInstance | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<VoiceCallSession | null>(null);
   sessionRef.current = session;
@@ -3031,6 +3034,12 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
                 mandatory: {
                   chromeMediaSource: "desktop",
                 },
+                optional: [
+                  { echoCancellation: true },
+                  { googEchoCancellation: true },
+                  { googAutoGainControl: false },
+                  { googNoiseSuppression: false },
+                ],
               }
               : false,
             video: {
@@ -3050,14 +3059,43 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
               height: { ideal: maxH },
               frameRate: { ideal: fps, max: fps, exact: fps },
             },
-            audio: includeAudio,
+            audio: includeAudio
+              ? {
+                echoCancellation: true,
+                noiseSuppression: false,
+                autoGainControl: false,
+              }
+              : false,
           });
         }
 
         screenStreamRef.current = screenStream;
         setLocalScreenStream(screenStream);
         const videoTrack = screenStream.getVideoTracks()[0];
-        const screenAudioTrack = screenStream.getAudioTracks()[0];
+        let screenAudioTrack = screenStream.getAudioTracks()[0];
+
+        // Barreira ativa para isolar o áudio da chamada da transmissão de tela
+        if (includeAudio && screenAudioTrack && options.callAudioBarrier !== false) {
+          try {
+            if (screenBarrierRef.current) {
+              screenBarrierRef.current.destroy();
+              screenBarrierRef.current = null;
+            }
+            const barrier = createCallAudioBarrier(screenAudioTrack, () => {
+              const streams: MediaStream[] = [];
+              if (remoteStreamsRef.current) {
+                remoteStreamsRef.current.forEach((st) => {
+                  if (st && st.getAudioTracks().length > 0) streams.push(st);
+                });
+              }
+              return streams;
+            });
+            screenAudioTrack = barrier.processedTrack;
+            screenBarrierRef.current = barrier;
+          } catch (barrierErr) {
+            console.warn("[useVoiceCall] CallAudioBarrier init error:", barrierErr);
+          }
+        }
 
         // contentHint: "motion" para jogos/vídeo, "detail" para texto/UI
         if (videoTrack && "contentHint" in videoTrack) {
@@ -3188,6 +3226,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
 
   // STOP SCREEN SHARE
   const stopScreenShare = useCallback(async () => {
+    if (screenBarrierRef.current) {
+      screenBarrierRef.current.destroy();
+      screenBarrierRef.current = null;
+    }
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach((track) => track.stop());
       screenStreamRef.current = null;

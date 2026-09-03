@@ -310,9 +310,22 @@ export const sendFastFriendRequestNotification = async (
       targetChannel = supabase.channel(channelName);
       activeInboxChannels.set(channelName, targetChannel);
       channelRefCounts.set(channelName, 0);
-      try {
-        targetChannel.subscribe((s: string) => { });
-      } catch { }
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const timeout = setTimeout(() => {
+          if (!finished) {
+            finished = true;
+            resolve();
+          }
+        }, 1500);
+        targetChannel.subscribe((status: string) => {
+          if (!finished && (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
+            finished = true;
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
     }
 
     await targetChannel.send({
@@ -334,6 +347,56 @@ export const sendFastFriendRequestNotification = async (
 };
 
 /**
+ * Notifica que uma solicitação de amizade foi aceita instantaneamente via WebSocket
+ */
+export const sendFastFriendAcceptedNotification = async (
+  targetUid: string,
+  fromUser: { uid: string; displayName: string; photoURL?: string | null },
+) => {
+  try {
+    const channelName = `user_inbox_${targetUid}`;
+    let targetChannel = activeInboxChannels.get(channelName);
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const timeout = setTimeout(() => {
+          if (!finished) {
+            finished = true;
+            resolve();
+          }
+        }, 1500);
+        targetChannel.subscribe((status: string) => {
+          if (!finished && (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
+            finished = true;
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+    }
+
+    await targetChannel.send({
+      type: "broadcast",
+      event: "u2u:friend_accepted",
+      payload: {
+        friendUid: fromUser.uid,
+        friendName: fromUser.displayName,
+        friendAvatar: fromUser.photoURL || null,
+      },
+    });
+
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
+  } catch (err) {
+    console.warn("[realtimeEventBus] sendFastFriendAcceptedNotification error:", err);
+  }
+};
+
+/**
  * Notifica que uma amizade foi desfeita/removida instantaneamente via WebSocket
  */
 export const sendFastFriendRemovedNotification = async (
@@ -347,9 +410,22 @@ export const sendFastFriendRemovedNotification = async (
       targetChannel = supabase.channel(channelName);
       activeInboxChannels.set(channelName, targetChannel);
       channelRefCounts.set(channelName, 0);
-      try {
-        targetChannel.subscribe((s: string) => { });
-      } catch { }
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const timeout = setTimeout(() => {
+          if (!finished) {
+            finished = true;
+            resolve();
+          }
+        }, 1500);
+        targetChannel.subscribe((status: string) => {
+          if (!finished && (status === "SUBSCRIBED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT")) {
+            finished = true;
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
     }
 
     await targetChannel.send({

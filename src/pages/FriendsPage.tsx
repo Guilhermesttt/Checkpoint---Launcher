@@ -13,6 +13,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Gamepad2,
 } from "lucide-react";
 import { SystemPageShell } from "../components/ui/SystemPageShell";
 import ModalShell from "../components/ui/ModalShell";
@@ -102,15 +103,30 @@ const FriendOnlineCard = React.memo<{
                 </div>
               )}
             </div>
-            <span className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-white border-2 border-black/80 shadow-[0_0_6px_rgba(255,255,255,0.8)]" />
+            <span
+              className={`absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-2 border-black/80 ${
+                friend.status === "playing"
+                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
+                  : "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+              }`}
+            />
           </div>
 
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-display font-bold text-white truncate">
               {friend.name}
             </h3>
-            <p className="text-[11px] font-body text-white/60 font-medium truncate">
-              {friend.status === "playing" ? `Jogando ${friend.playing}` : "Online"}
+            <p className={`text-[11px] font-body font-medium truncate ${
+              friend.status === "playing" ? "text-emerald-400 flex items-center gap-1 font-semibold" : "text-white/60"
+            }`}>
+              {friend.status === "playing" ? (
+                <>
+                  <Gamepad2 className="w-3 h-3 text-emerald-400 shrink-0 inline" />
+                  <span>Jogando {friend.playing || "um jogo"}</span>
+                </>
+              ) : (
+                "Online"
+              )}
             </p>
           </div>
 
@@ -231,13 +247,25 @@ const FriendChatCard = React.memo<{
     onStartVoiceCall?.(friend, true);
   }, [friend, onStartVoiceCall]);
 
+  const isPlaying = friend.status === "playing";
+  const isOnline = isPlaying || friend.status === "online";
+
   return (
     <div
+      tabIndex={0}
+      role="button"
       onClick={handleChat}
-      className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/20 cursor-pointer transition-all backdrop-blur-xl shadow-md transform-gpu will-change-transform"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleChat();
+        }
+      }}
+      onMouseEnter={() => playSound?.("hover")}
+      className="group relative flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/20 focus:border-white/40 focus:bg-white/[0.08] focus:outline-none data-[gamepad-focused='true']:border-white data-[gamepad-focused='true']:bg-white/[0.1] data-[gamepad-focused='true']:ring-2 data-[gamepad-focused='true']:ring-white/40 cursor-pointer transition-all backdrop-blur-xl shadow-md transform-gpu will-change-transform"
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
+        <div className="relative w-11 h-11 rounded-xl overflow-hidden bg-white/[0.05] border border-white/10 shrink-0">
           {friend.avatar ? (
             <img src={friend.avatar} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           ) : (
@@ -245,10 +273,33 @@ const FriendChatCard = React.memo<{
               <User className="w-5 h-5" />
             </div>
           )}
+          {/* Indicador de status */}
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-black/80 ${
+              isPlaying
+                ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)] animate-pulse"
+                : isOnline
+                ? "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)]"
+                : "bg-white/20"
+            }`}
+          />
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white truncate">{friend.name}</p>
-          <p className="text-xs text-white/40 truncate">{friend.status === "online" ? "Online" : "Offline"}</p>
+          <p className={`text-xs truncate font-medium ${
+            isPlaying ? "text-emerald-400 font-semibold flex items-center gap-1" : isOnline ? "text-white/60" : "text-white/30"
+          }`}>
+            {isPlaying ? (
+              <>
+                <Gamepad2 className="w-3 h-3 text-emerald-400 shrink-0 inline" />
+                <span>Jogando {friend.playing || "um jogo"}</span>
+              </>
+            ) : isOnline ? (
+              "Online"
+            ) : (
+              "Offline"
+            )}
+          </p>
         </div>
       </div>
 
@@ -257,6 +308,7 @@ const FriendChatCard = React.memo<{
           <>
             <button
               type="button"
+              tabIndex={-1}
               onMouseEnter={() => playSound?.("hover")}
               onClick={handleVoice}
               title="Ligar (Áudio)"
@@ -266,6 +318,7 @@ const FriendChatCard = React.memo<{
             </button>
             <button
               type="button"
+              tabIndex={-1}
               onMouseEnter={() => playSound?.("hover")}
               onClick={handleVideo}
               title="Chamada de Vídeo"
@@ -288,6 +341,7 @@ const FriendChatCard = React.memo<{
   prev.friend.name === next.friend.name &&
   prev.friend.avatar === next.friend.avatar &&
   prev.friend.status === next.friend.status &&
+  prev.friend.playing === next.friend.playing &&
   prev.unreadCount === next.unreadCount &&
   prev.onOpenChat === next.onOpenChat &&
   prev.onStartVoiceCall === next.onStartVoiceCall &&

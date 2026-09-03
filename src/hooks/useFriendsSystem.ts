@@ -11,6 +11,7 @@ import { subscribeToUnreadMessages } from '../services/chat';
 import {
   subscribeToGlobalEventBus,
   sendFastFriendRequestNotification,
+  sendFastFriendAcceptedNotification,
   sendFastFriendRemovedNotification,
 } from '../services/realtimeEventBus';
 import {
@@ -282,12 +283,12 @@ export function useFriendsSystem({
 
     initialSync();
 
-    // Intervalo de polling secundário (mantém sincronizado em background caso WebSocket oscile)
+    // Intervalo de polling inteligente (mantém sincronizado em background caso WebSocket oscile)
     const interval = window.setInterval(() => {
       if (!isInitialSync && document.hasFocus()) {
         syncFriendStatuses();
       }
-    }, 60_000);
+    }, 12_000);
 
     // Sincronizar imediatamente quando a janela volta ao foco
     const handleFocus = () => {
@@ -295,8 +296,18 @@ export function useFriendsSystem({
         syncFriendStatuses();
       }
     };
+    window.addEventListener('focus', handleFocus);
 
-    // Subscrição instantânea via WebSocket Event Bus (Sub-50ms)
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [user?.uid, userProfile?.checkpointFriends, notify]);
+
+  // Subscrição instantânea via WebSocket Event Bus (Sub-50ms) para TODOS os usuários (mesmo com 0 amigos)
+  useEffect(() => {
+    if (!user?.uid) return;
+
     const unsubPresenceBus = subscribeToGlobalEventBus(user.uid, {
       onStatusUpdate: (presence) => {
         if (!presence?.uid) return;
@@ -346,6 +357,20 @@ export function useFriendsSystem({
       },
       onFriendRequest: (req) => {
         playSound("friendRequest");
+        // Renderização instantânea na tela
+        setIncomingFriendRequests((current) => {
+          if (current.some((item) => item.uid === req.fromUid)) return current;
+          return [
+            {
+              uid: req.fromUid,
+              displayName: req.fromName || "Jogador",
+              photoURL: req.fromAvatar || null,
+              createdAt: new Date().toISOString(),
+            },
+            ...current,
+          ];
+        });
+        notify(`Novo pedido de amizade de ${req.fromName}`, "info");
         void window.electronAPI?.showFriendRequestOverlay({
           playerName: req.fromName,
           avatarUrl: req.fromAvatar || null,
@@ -354,6 +379,22 @@ export function useFriendsSystem({
         void refreshProfile();
       },
       onFriendAccepted: (friend) => {
+        // Renderização instantânea do novo amigo aceito na tela
+        setSocialFriends((current) => {
+          const friendId = `cp-friend:${friend.friendUid}`;
+          if (current.some((f) => f.id === friendId)) return current;
+          return [
+            {
+              id: friendId,
+              name: friend.friendName || "Jogador",
+              status: "online",
+              avatar: friend.friendAvatar || undefined,
+              source: "checkpoint",
+            },
+            ...current,
+          ];
+        });
+        notify(`${friend.friendName} aceitou sua solicitação de amizade!`, "success");
         void window.electronAPI?.showFriendAcceptedOverlay({
           playerName: friend.friendName,
           avatarUrl: friend.friendAvatar || null,
@@ -369,10 +410,8 @@ export function useFriendsSystem({
 
     return () => {
       unsubPresenceBus();
-      window.clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
     };
-  }, [user?.uid, userProfile?.checkpointFriends, notify, playSound, refreshProfile]);
+  }, [user?.uid, notify, playSound, refreshProfile]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -448,38 +487,40 @@ export function useFriendsSystem({
     if (!localSocialStateLoaded) return;
     const resolvedDiscordId = userProfile?.discordId;
 
-    if (!resolvedDiscordId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSocialFriends((current) =>
-        current.filter((friend) => !friend.source?.startsWith("discord")),
-      );
-      return;
-    }
-
-
     setSocialFriends((current) => {
-      const remoteFriends: SocialFriend[] = (userProfile?.discordFriends ?? [])
-        .filter((friend) => friend.id && friend.id !== resolvedDiscordId)
-        .map((friend) => ({
-          id: `discord-friend:${friend.id}`,
-          name: friend.username || "Discord",
-          status: "offline",
-          avatar: friend.avatar || undefined,
-          source: "discord_friend",
-        }));
-      const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map(f => ({
-        id: `cp-friend:${f.uid}`,
-        name: f.displayName,
-        status: "offline",
-        playing: undefined,
-        avatar: f.photoURL || undefined,
-        source: "checkpoint",
-      }));
-      const remoteIds = new Set([...remoteFriends.map((friend) => friend.id), ...cpFriends.map(f => f.id)]);
+      const remoteFriends: SocialFriend[] = resolvedDiscordId
+        ? (userProfile?.discordFriends ?? [])
+            .filter((friend) => friend.id && friend.id !== resolvedDiscordId)
+            .map((friend) => ({
+              id: `discord-friend:${friend.id}`,
+              name: friend.username || "Discord",
+              status: "offline",
+              avatar: friend.avatar || undefined,
+              source: "discord_friend",
+            }))
+        : [];
+
+      const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map((f: any) => {
+        const existing = current.find((c) => c.id === `cp-friend:${f.uid}`);
+        return {
+          id: `cp-friend:${f.uid}`,
+          name: f.displayName || existing?.name || "Jogador",
+          status: existing?.status && existing.status !== "offline" ? existing.status : (f.status || "offline"),
+          playing: (existing?.status === "playing" ? existing?.playing : null) || (f.status === "playing" ? f.playing : undefined) || undefined,
+          avatar: f.photoURL || existing?.avatar || undefined,
+          source: "checkpoint",
+        };
+      });
+
+      const remoteIds = new Set([...remoteFriends.map((f) => f.id), ...cpFriends.map((f) => f.id)]);
       const localFriends = current.filter(
-        (friend) => !friend.source?.startsWith("discord") && friend.source !== "checkpoint" && !remoteIds.has(friend.id),
+        (friend) =>
+          !friend.source?.startsWith("discord") &&
+          friend.source !== "checkpoint" &&
+          !remoteIds.has(friend.id),
       );
-      return [...remoteFriends, ...cpFriends, ...localFriends];
+
+      return [...cpFriends, ...remoteFriends, ...localFriends];
     });
   }, [
     localSocialStateLoaded,
@@ -540,7 +581,7 @@ export function useFriendsSystem({
       const nextFriend: SocialFriend = {
         id: `cp-friend:${acceptedFriend?.uid || uid}`,
         name: friendName,
-        status: acceptedFriend?.status || "offline",
+        status: acceptedFriend?.status || "online",
         playing: acceptedFriend?.playing || undefined,
         avatar: acceptedFriend?.photoURL || request?.photoURL || undefined,
         source: "checkpoint",
@@ -551,10 +592,20 @@ export function useFriendsSystem({
         nextFriend,
         ...current.filter((friend) => friend.id !== nextFriend.id),
       ]);
-      notify(`${friendName} agora e seu amigo no Checkpoint.`, "success");
+      notify(`${friendName} agora é seu amigo no Checkpoint.`, "success");
+
+      // Notifica o outro usuário via WebSocket para atualizar a tela dele instantaneamente
+      if (user?.uid) {
+        void sendFastFriendAcceptedNotification(uid, {
+          uid: user.uid,
+          displayName: userProfile?.displayName || user.displayName || "Jogador",
+          photoURL: userProfile?.photoURL || user.photoURL || null,
+        });
+      }
+
       await refreshProfile();
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Erro ao aceitar solicitacao.", "error");
+      notify(error instanceof Error ? error.message : "Erro ao aceitar solicitação.", "error");
     }
   };
 

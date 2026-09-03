@@ -11,6 +11,8 @@ import {
   Tv,
   Radio,
   Sliders,
+  Shield,
+  ShieldCheck,
 } from "lucide-react";
 import type { ScreenShareOptions } from "../../hooks/useVoiceCall";
 
@@ -38,6 +40,7 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
   const [resolution, setResolution] = useState<"720p" | "1080p" | "source">("1080p");
   const [fps, setFps] = useState<30 | 60>(60);
   const [withAudio, setWithAudio] = useState(true);
+  const [callAudioBarrier, setCallAudioBarrier] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const fetchSources = async () => {
@@ -80,6 +83,7 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
       resolution,
       fps,
       withAudio,
+      callAudioBarrier,
     });
   };
 
@@ -293,6 +297,31 @@ export const ScreenPickerModal: React.FC<ScreenPickerModalProps> = ({
                   Recomendado usar fones de ouvido para evitar que o microfone capture o áudio dos alto-falantes em eco.
                 </p>
               </div>
+
+              {/* Call Audio Barrier */}
+              {withAudio && (
+                <div className="flex flex-col gap-1.5 animate-fadeIn">
+                  <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="h-3 w-3" />
+                    Barreira de Áudio da Call
+                  </span>
+                  <label className="flex items-center gap-2.5 h-[34px] px-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/15 transition">
+                    <input
+                      type="checkbox"
+                      checked={callAudioBarrier}
+                      onChange={(e) => setCallAudioBarrier(e.target.checked)}
+                      className="h-4 w-4 rounded accent-emerald-400 cursor-pointer"
+                    />
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white/95">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Isolar Vozes da Chamada (Anti-Vazamento)</span>
+                    </div>
+                  </label>
+                  <p className="text-[9px] text-white/40 leading-tight">
+                    Filtra e bloqueia em tempo real a voz dos seus amigos para não ecoar ou vazar na transmissão.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Bottom Actions */}
