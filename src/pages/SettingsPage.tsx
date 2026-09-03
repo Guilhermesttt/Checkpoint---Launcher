@@ -21,6 +21,7 @@ import {
   User,
   Volume2,
   Zap,
+  Layers,
   Battery,
   BatteryLow,
   BatteryCharging,
@@ -1712,30 +1713,51 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                                 {isTestingMic ? "Parar Teste" : "Testar Microfone"}
                               </button>
                             </div>
-                            <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className="h-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.6)] transition-all duration-75"
-                                style={{ width: `${testMicVolume}%` }}
-                              />
-                              {/* Marcador de Limiar de Ativação do VAD */}
-                              {(() => {
-                                const sens = voiceCallContext?.voiceSensitivity ?? 35;
-                                const thresholdRms = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
-                                const markerPos = Math.min(95, Math.max(5, thresholdRms * 3.3));
-                                return (
-                                  <div
-                                    className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_6px_rgba(245,158,11,0.9)]"
-                                    style={{ left: `${markerPos}%` }}
-                                    title="Ponto de Ativação por Voz (Limiar)"
-                                  />
-                                );
-                              })()}
-                            </div>
-                            <p className="text-[9px] text-white/40 flex items-center justify-between">
-                              <span>0%</span>
-                              <span className="text-amber-400 font-bold">| Ponto de Ativação</span>
-                              <span>100%</span>
-                            </p>
+                            {/* VU Meter com Status Dinâmico de Gate */}
+                            {(() => {
+                              const sens = voiceCallContext?.voiceSensitivity ?? 35;
+                              const thresholdRms = Math.max(1, Math.round(1 + 29 * Math.pow((100 - sens) / 100, 1.8)));
+                              const markerPos = Math.min(95, Math.max(5, thresholdRms * 3.3));
+                              const isGateOpen = isTestingMic && testMicVolume >= markerPos;
+
+                              return (
+                                <div className="space-y-2">
+                                  <div className="relative h-3 w-full overflow-hidden rounded-full bg-white/10">
+                                    <div
+                                      className={`h-full transition-all duration-75 ${
+                                        isGateOpen
+                                          ? "bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.85)]"
+                                          : "bg-white/40 shadow-none"
+                                      }`}
+                                      style={{ width: `${testMicVolume}%` }}
+                                    />
+                                    {/* Marcador de Limiar de Ativação do VAD */}
+                                    <div
+                                      className="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-10 shadow-[0_0_6px_rgba(245,158,11,0.9)]"
+                                      style={{ left: `${markerPos}%` }}
+                                      title="Ponto de Ativação por Voz (Limiar)"
+                                    />
+                                  </div>
+                                  <p className="text-[9px] text-white/40 flex items-center justify-between">
+                                    <span>0%</span>
+                                    {isTestingMic ? (
+                                      <span
+                                        className={`font-bold px-2 py-0.5 rounded text-[9px] transition-colors ${
+                                          isGateOpen
+                                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                            : "bg-white/10 text-white/40"
+                                        }`}
+                                      >
+                                        {isGateOpen ? "Transmitindo Voz" : "Silenciado pelo Gate"}
+                                      </span>
+                                    ) : (
+                                      <span className="text-amber-400 font-bold">| Ponto de Ativação</span>
+                                    )}
+                                    <span>100%</span>
+                                  </p>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* Retorno de Microfone (Ouvir própria voz) */}
@@ -1914,26 +1936,101 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                     </div>
                   </div>
 
-                  {/* Toggles de Processamento */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div className="flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-3.5 col-span-1 sm:col-span-2 lg:col-span-3">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-white">Supressão de Ruído Avançada (IA)</p>
+                  {/* Modos de Cancelamento de Ruído (Seleção Inteligente) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-white flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-emerald-400" />
+                      Modo de Cancelamento de Ruído
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* RNNoise IA */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void voiceCallContext?.setAdvancedNoiseSuppression?.(true);
+                          voiceCallContext?.setNoiseSuppression(false);
+                        }}
+                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                          voiceCallContext?.advancedNoiseSuppression
+                            ? "border-emerald-500/40 bg-emerald-500/[0.08] shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                            : "border-white/6 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                            RNNoise IA
+                          </span>
                           <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            RNNoise WASM
+                            Recomendado
                           </span>
                         </div>
-                        <p className="text-[10px] font-medium text-white/40">Filtra teclado mecânico, ruídos de fundo e ventiladores via rede neural em tempo real</p>
-                      </div>
-                      <Switch
-                        checked={voiceCallContext?.advancedNoiseSuppression ?? true}
-                        onCheckedChange={(checked) => void voiceCallContext?.setAdvancedNoiseSuppression?.(checked)}
-                      />
-                    </div>
+                        <p className="text-[10px] text-white/45 leading-relaxed">
+                          Rede neural em tempo real. Filtra digitação, cliques, ventiladores e ruídos externos.
+                        </p>
+                      </button>
 
+                      {/* Supressão Nativa */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void voiceCallContext?.setAdvancedNoiseSuppression?.(false);
+                          voiceCallContext?.setNoiseSuppression(true);
+                        }}
+                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                          !voiceCallContext?.advancedNoiseSuppression && voiceCallContext?.noiseSuppression
+                            ? "border-white/30 bg-white/[0.08] shadow-sm"
+                            : "border-white/6 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Layers className="h-3.5 w-3.5 text-white/70" />
+                            Supressão Nativa
+                          </span>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/60">
+                            Padrão
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-white/45 leading-relaxed">
+                          Filtro acústico padrão do sistema operacional, leve e sem consumo de IA.
+                        </p>
+                      </button>
+
+                      {/* Desativado */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void voiceCallContext?.setAdvancedNoiseSuppression?.(false);
+                          voiceCallContext?.setNoiseSuppression(false);
+                        }}
+                        className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer ${
+                          !voiceCallContext?.advancedNoiseSuppression && !voiceCallContext?.noiseSuppression
+                            ? "border-white/30 bg-white/[0.08] shadow-sm"
+                            : "border-white/6 bg-white/[0.025] hover:border-white/15 hover:bg-white/[0.05]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Volume2 className="h-3.5 w-3.5 text-white/70" />
+                            Sem Filtro
+                          </span>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-white/60">
+                            Puro / Estúdio
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-white/45 leading-relaxed">
+                          Áudio 100% sem filtros. Ideal para microfones profissionais de estúdio ou interface XLR.
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Processamento Acústico Complementar */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                    {/* Cancelamento de Eco */}
                     <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
-                      <div>
+                      <div className="pr-2">
                         <p className="text-xs font-bold text-white">Cancelamento de Eco</p>
                         <p className="text-[10px] font-medium text-white/40">Evita retorno dos alto-falantes</p>
                       </div>
@@ -1943,19 +2040,9 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       />
                     </div>
 
+                    {/* Gate de Ruído */}
                     <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
-                      <div>
-                        <p className="text-xs font-bold text-white">Supressão Nativa</p>
-                        <p className="text-[10px] font-medium text-white/40">Filtro padrão do Chromium</p>
-                      </div>
-                      <Switch
-                        checked={voiceCallContext?.noiseSuppression ?? true}
-                        onCheckedChange={(checked) => voiceCallContext?.setNoiseSuppression(checked)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
-                      <div>
+                      <div className="pr-2">
                         <p className="text-xs font-bold text-white">Gate de Ruído</p>
                         <p className="text-[10px] font-medium text-white/40">Corta áudio no silêncio</p>
                       </div>
@@ -1965,8 +2052,9 @@ export const SettingsPageV2: React.FC<SettingsPageV2Props> = React.memo(({
                       />
                     </div>
 
+                    {/* Ganho Automático */}
                     <div className="flex items-center justify-between rounded-2xl border border-white/6 bg-white/[0.035] p-3.5">
-                      <div>
+                      <div className="pr-2">
                         <p className="text-xs font-bold text-white">Ganho Automático</p>
                         <p className="text-[10px] font-medium text-white/40">Nivela volume da voz</p>
                       </div>

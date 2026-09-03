@@ -142,23 +142,25 @@ export const LevelUpModal: React.FC = () => {
           </motion.div>
 
           {/* Barra de Progresso do Próximo Nível */}
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left">
-            <div className="flex justify-between text-xs font-medium text-white/70 mb-2">
-              <span>Progresso para Nível {newLevel + 1}</span>
-              <span>
-                {levelInfo.currentLevelXp} / {levelInfo.xpForNextLevel} XP ({levelInfo.progress}%)
-              </span>
+          {levelInfo && (
+            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left">
+              <div className="flex justify-between text-xs font-medium text-white/70 mb-2">
+                <span>Progresso para Nível {(newLevel || 1) + 1}</span>
+                <span>
+                  {levelInfo.currentLevelXp} / {levelInfo.xpForNextLevel} XP ({levelInfo.progress}%)
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                <motion.div
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${levelInfo.progress}%` }}
+                  transition={{ duration: 1, ease: "easeOut", delay: 0.4 }}
+                  className="h-full rounded-full"
+                  style={{ backgroundColor: rankColor }}
+                />
+              </div>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-              <motion.div
-                initial={{ width: "0%" }}
-                animate={{ width: `${levelInfo.progress}%` }}
-                transition={{ duration: 1, ease: "easeOut", delay: 0.4 }}
-                className="h-full rounded-full"
-                style={{ backgroundColor: rankColor }}
-              />
-            </div>
-          </div>
+          )}
 
           {/* Botão de Continuar */}
           <motion.button

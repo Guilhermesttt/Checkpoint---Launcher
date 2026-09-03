@@ -11,6 +11,7 @@ import phelieriumCloseDetailSound from "../sounds/Phelierium Default/ui_close_ga
 import phelieriumEditSound from "../sounds/Phelierium Default/ui_edit_game.mp3";
 import phelieriumDeepSelectSound from "../sounds/Phelierium Default/ui_deep_selection.mp3";
 import phelieriumAchievementSound from "../sounds/Phelierium Default/Achievment_Unlock.mp3";
+import phelieriumAchievementPlatinumSound from "../sounds/Phelierium Default/Achievment_Unlock_Platinum.mp3";
 import phelieriumUiAchievementSound from "../sounds/Phelierium Default/ui_achievment.mp3";
 import phelieriumCallEnterSound from "../sounds/Phelierium Default/ui_call_enter.mp3";
 import phelieriumGameStartSound from "../sounds/Phelierium Default/ui_game_start.mp3";
@@ -29,6 +30,7 @@ import ps5PlusIntoGameDetailSound from "../sounds/PS5_Plus/deck_ui_into_game_det
 import ps5PlusMessageToastSound from "../sounds/PS5_Plus/deck_ui_message_toast.wav";
 import ps5PlusToastSound from "../sounds/PS5_Plus/deck_ui_toast.wav";
 import ps5AchievementUnlockSound from "../sounds/PS5_Plus/deck_ui_achievement_toast.wav";
+import ps5AchievementPlatinumSound from "../sounds/PS5_Plus/ps5-trophy-platinum.mp3";
 
 import ps4NavigateSound from "../sounds/PS4/deck_ui_navigation.wav";
 import ps4ShowModalSound from "../sounds/PS4/deck_ui_show_modal.wav";
@@ -66,6 +68,7 @@ import xbLaunchGameSound from "../sounds/Xbox One/deck_ui_launch_game.wav";
 import xbShowModalSound from "../sounds/Xbox One/deck_ui_show_modal.wav";
 import xbToastSound from "../sounds/Xbox One/deck_ui_toast.wav";
 import xbAchievementSound from "../sounds/Xbox One/deck_ui_achievement_toast.wav";
+import xbAchievementPlatinumSound from "../sounds/Xbox One/xbox-one-rare-achievement.mp3";
 import xbFriendJoinSound from "../sounds/Xbox One/ui_steam_smoother_friend_online.m4a";
 import xbChatReceivedSound from "../sounds/Xbox One/steam_at_mention.m4a";
 
@@ -132,6 +135,7 @@ export const soundThemes = {
     screenshot: phelieriumUiAchievementSound,
     showModal: phelieriumDeepSelectSound,
     overlayAchievement: phelieriumAchievementSound,
+    overlayAchievementPlatinum: phelieriumAchievementPlatinumSound,
   },
   ps5: {
     navigate: ps5PlusNavigateSound,
@@ -157,6 +161,7 @@ export const soundThemes = {
     screenshot: ps5PlusToastSound,
     showModal: ps5PlusShowModalSound,
     overlayAchievement: ps5AchievementUnlockSound,
+    overlayAchievementPlatinum: ps5AchievementPlatinumSound,
   },
   ps4: {
     navigate: ps4NavigateSound,
@@ -182,6 +187,7 @@ export const soundThemes = {
     screenshot: ps4ToastSound,
     showModal: ps4ShowModalSound,
     overlayAchievement: ps4AchievementSound,
+    overlayAchievementPlatinum: ps4AchievementSound,
   },
   psp: {
     navigate: pspNavigateSound,
@@ -207,6 +213,7 @@ export const soundThemes = {
     screenshot: pspToastSound,
     showModal: pspShowModalSound,
     overlayAchievement: pspAchievementToastSound,
+    overlayAchievementPlatinum: pspAchievementToastSound,
   },
   xbox360: {
     navigate: xbNavigateSound,
@@ -232,6 +239,7 @@ export const soundThemes = {
     screenshot: xbToastSound,
     showModal: xbShowModalSound,
     overlayAchievement: xbAchievementSound,
+    overlayAchievementPlatinum: xbAchievementPlatinumSound,
   },
   cyberpunk: {
     navigate: cyberpunkNavigateSound,
@@ -257,6 +265,7 @@ export const soundThemes = {
     screenshot: cyberpunkToastSound,
     showModal: cyberpunkShowModalSound,
     overlayAchievement: cyberpunkAchievementToastSound,
+    overlayAchievementPlatinum: cyberpunkAchievementToastSound,
   },
   ps2: {
     navigate: ps2NavigateSound,
@@ -282,6 +291,7 @@ export const soundThemes = {
     screenshot: ps2ToastSound,
     showModal: ps2ShowModalSound,
     overlayAchievement: ps2AchievementSound,
+    overlayAchievementPlatinum: ps2AchievementSound,
   },
   gamecube: {
     navigate: gcNavigateSound,
@@ -307,6 +317,7 @@ export const soundThemes = {
     screenshot: gcShowModalSound,
     showModal: gcShowModalSound,
     overlayAchievement: gcEditModalSound,
+    overlayAchievementPlatinum: gcEditModalSound,
   },
 };
 

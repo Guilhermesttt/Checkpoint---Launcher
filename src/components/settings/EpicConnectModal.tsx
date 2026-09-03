@@ -131,16 +131,36 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
     }
   };
 
+  const extractAuthorizationCode = (input: string): string => {
+    let clean = input.trim();
+    if (!clean) return "";
+    // Se o usuário colou o JSON completo do navegador
+    if (clean.startsWith("{") && clean.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (parsed.authorizationCode) return String(parsed.authorizationCode).trim();
+        if (parsed.sid) return String(parsed.sid).trim();
+      } catch {}
+    }
+    // Se colou a URL de redirecionamento do navegador
+    if (clean.includes("code=")) {
+      const match = clean.match(/[?&]code=([a-f0-9]+)/i);
+      if (match && match[1]) return match[1];
+    }
+    return clean;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sid.trim() || isBusy) return;
+    const cleanCode = extractAuthorizationCode(sid);
+    if (!cleanCode || isBusy) return;
 
     setLoading(true);
     setError(null);
     playSound("select");
 
     try {
-      await onConnect(sid.trim());
+      await onConnect(cleanCode);
       setSid("");
       playSound("select");
       onClose();
@@ -229,48 +249,69 @@ export const EpicConnectModal: React.FC<EpicConnectModalProps> = ({
                       <p className="text-amber-100 text-xs font-semibold leading-relaxed">
                         {reauthMessage}
                       </p>
-                      <button
-                        type="button"
-                        onClick={handleQuickLogin}
-                        disabled={isBusy}
-                        className="text-amber-300 hover:text-amber-200 text-[11px] font-bold underline underline-offset-2 disabled:opacity-50 cursor-pointer"
-                      >
-                        Reconectar agora
-                      </button>
                     </div>
                   </div>
                 )}
 
-                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
-                  <p className="text-xs text-neutral-400 leading-relaxed">
-                    Insira o código de autorização ou JSON da Epic Games para vincular sua conta localmente.
-                  </p>
-                  <div className="space-y-3">
+                {/* Opção 1: Login Rápido Automático (Recomendado) */}
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      Login Automático com 1 Clique
+                    </p>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      Abre uma janela segura da Epic Games. Ao fazer login, seu código é detectado e validado automaticamente sem precisar copiar nada.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleQuickLogin}
+                    disabled={isBusy}
+                    className="w-full py-2.5 px-4 bg-white hover:bg-neutral-200 text-black rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    {loading ? "Conectando..." : "Entrar com a Epic Games"}
+                  </button>
+                </div>
+
+                {/* Opção 2: Manual via Navegador */}
+                <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800/80 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-white/70">
+                      Entrada Manual (Código ou JSON)
+                    </p>
+                    <p className="text-[11px] text-neutral-400 leading-relaxed">
+                      Se preferir usar o navegador externo, faça login e cole o código ou o JSON completo aqui embaixo:
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5">
                     <button
                       type="button"
                       onClick={handleOpenAuthUrl}
                       disabled={isBusy}
-                      className="flex items-center gap-2 w-full px-3 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium rounded-lg border border-neutral-800 transition-colors cursor-pointer"
+                      className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-medium rounded-lg border border-neutral-800 transition-colors cursor-pointer"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
-                      Abrir página de autorização no navegador
+                      Abrir no Navegador Externo
                     </button>
 
-                    <form onSubmit={handleSubmit} className="space-y-3">
+                    <form onSubmit={handleSubmit} className="space-y-2.5">
                       <input
                         type="text"
                         value={sid}
                         disabled={isBusy}
-                        onChange={(e) => setSid(e.target.value)}
-                        placeholder="Cole o código ou JSON aqui..."
-                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors"
+                        onChange={(e) => setSid(extractAuthorizationCode(e.target.value))}
+                        placeholder="Cole o código (ex: 5beff...), JSON ou URL aqui..."
+                        className="w-full bg-black border border-neutral-800 rounded-xl px-4 py-2 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-neutral-500 transition-colors font-mono"
                       />
                       <button
                         type="submit"
                         disabled={!sid.trim() || isBusy}
-                        className="w-full py-2.5 bg-white hover:bg-neutral-200 disabled:bg-neutral-800 disabled:text-neutral-500 text-black rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
+                        className="w-full py-2 bg-white/10 hover:bg-white/20 text-white disabled:bg-neutral-800 disabled:text-neutral-500 rounded-xl text-xs font-bold transition-colors cursor-pointer disabled:cursor-not-allowed"
                       >
-                        Confirmar Código
+                        Confirmar Código Manual
                       </button>
                     </form>
                   </div>

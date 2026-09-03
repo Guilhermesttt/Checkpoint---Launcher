@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useState, useEffect } from "react";
 import { Toaster, toast } from "./ui/Shandc/toast";
+import { soundThemes } from "../hooks/useSoundEffects";
 
 type NotificationType =
   | "success"
@@ -128,6 +129,36 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } else {
         const toastType =
           type === "achievement" ? "info" : type === "incoming-call" || type === "message" ? "info" : type;
+
+        if (shouldPlaySound && preferences.soundEnabled) {
+          try {
+            const rawPrefs = localStorage.getItem("checkpoint_preferences");
+            const parsedTheme = rawPrefs ? JSON.parse(rawPrefs)?.soundTheme : "default";
+            const themeKey = parsedTheme in soundThemes ? (parsedTheme as keyof typeof soundThemes) : "default";
+            let soundKey: keyof typeof soundThemes.default = "notification";
+
+            if (type === "achievement") {
+              const rawTier = String(options?.metadata?.tier || "").toLowerCase();
+              const isPlatinum = rawTier === "platinum" || rawTier === "platina";
+              soundKey = isPlatinum ? "overlayAchievementPlatinum" : "overlayAchievement";
+            } else if (type === "message") {
+              soundKey = "chatReceived";
+            } else if (type === "friend-request" || type === "friend-accepted") {
+              soundKey = "friendRequest";
+            } else if (type === "incoming-call") {
+              soundKey = "callEnter";
+            } else {
+              soundKey = "notification";
+            }
+
+            const soundUrl = (soundThemes[themeKey] as any)?.[soundKey] || soundThemes.default[soundKey];
+            if (soundUrl) {
+              const audio = new Audio(soundUrl);
+              audio.volume = 0.35;
+              void audio.play().catch(() => {});
+            }
+          } catch {}
+        }
 
         toast.add({
           title: options?.title,

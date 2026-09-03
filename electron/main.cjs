@@ -2149,10 +2149,14 @@ const dispatchAchievementNotification = (payload) => {
       ...payload,
       position: achievementNotificationPosition,
     });
-  } else {
-    showNativeAchievementNotification(payload);
   }
-  playOverlaySound("achievement-unlock");
+  const rawTier = String(payload?.tier || payload?.achievement?.tier || "").toLowerCase();
+  const soundName = rawTier === "platinum" || rawTier === "platina"
+    ? "achievement-unlock-platinum"
+    : rawTier === "gold" || rawTier === "ouro"
+      ? "achievement-unlock-gold"
+      : "achievement-unlock";
+  playOverlaySound(soundName);
   // Phase 4: also fire a system-level push when the app is backgrounded.
   // Skip when the window is visible (the in-page toast already covers that case)
   // and when the payload does not look like a trophy unlock.
@@ -3012,13 +3016,15 @@ registerSecureIpcHandler("launcher:open-epic-login-window", async () => {
           }
 
           if (data && (data.authorizationCode || data.sid)) {
+            const authCode = String(data.authorizationCode || data.sid);
             await authWindow.webContents.executeJavaScript(`
               document.head.innerHTML = \`
+                <title>Checkpoint - Epic Games Conectada</title>
                 <style>
                   body {
                     margin: 0;
                     padding: 0;
-                    background: radial-gradient(circle at top, #111422 0%, #08090d 100%);
+                    background: radial-gradient(circle at top, #141724 0%, #07080c 100%);
                     color: #ffffff;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     display: flex;
@@ -3029,61 +3035,133 @@ registerSecureIpcHandler("launcher:open-epic-login-window", async () => {
                     user-select: none;
                   }
                   .card {
-                    background: rgba(255, 255, 255, 0.04);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
-                    border-radius: 24px;
-                    padding: 40px 32px;
+                    background: rgba(255, 255, 255, 0.035);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 28px;
+                    padding: 36px 28px;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
                     text-align: center;
-                    max-width: 360px;
-                    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+                    max-width: 420px;
+                    width: 90%;
+                    box-shadow: 0 24px 70px rgba(0,0,0,0.8);
+                    backdrop-filter: blur(20px);
                   }
                   .badge {
-                    width: 52px;
-                    height: 52px;
-                    border-radius: 16px;
+                    width: 56px;
+                    height: 56px;
+                    border-radius: 18px;
                     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    margin-bottom: 20px;
-                    box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+                    margin-bottom: 18px;
+                    box-shadow: 0 0 28px rgba(16, 185, 129, 0.4);
                   }
-                  .spinner {
-                    width: 24px;
-                    height: 24px;
-                    border: 3px solid rgba(255, 255, 255, 0.3);
-                    border-top-color: #ffffff;
+                  .check-icon {
+                    width: 28px;
+                    height: 28px;
+                    stroke: white;
+                    stroke-width: 2.5;
+                    fill: none;
+                  }
+                  h1 { font-size: 20px; font-weight: 800; margin: 0 0 6px 0; letter-spacing: -0.02em; }
+                  p { font-size: 13px; color: rgba(255, 255, 255, 0.55); margin: 0 0 20px 0; line-height: 1.5; }
+                  .code-container {
+                    width: 100%;
+                    box-sizing: border-box;
+                    background: rgba(0, 0, 0, 0.5);
+                    border: 1px solid rgba(255, 255, 255, 0.12);
+                    border-radius: 14px;
+                    padding: 12px 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                  }
+                  .code-text {
+                    font-family: monospace;
+                    font-size: 13px;
+                    color: #38bdf8;
+                    letter-spacing: 0.05em;
+                    word-break: break-all;
+                    text-align: left;
+                  }
+                  .copy-btn {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                    color: #fff;
+                    font-size: 11px;
+                    font-weight: 700;
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    transition: all 0.2s;
+                  }
+                  .copy-btn:hover {
+                    background: #fff;
+                    color: #000;
+                  }
+                  .status-pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #34d399;
+                    background: rgba(16, 185, 129, 0.1);
+                    border: 1px solid rgba(16, 185, 129, 0.2);
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                  }
+                  .spinner-mini {
+                    width: 10px;
+                    height: 10px;
+                    border: 2px solid rgba(52, 211, 153, 0.3);
+                    border-top-color: #34d399;
                     border-radius: 50%;
                     animation: spin 0.8s linear infinite;
                   }
-                  h1 { font-size: 18px; font-weight: 700; margin: 0 0 8px 0; }
-                  p { font-size: 13px; color: rgba(255, 255, 255, 0.6); margin: 0; line-height: 1.5; }
                   @keyframes spin { to { transform: rotate(360deg); } }
                 </style>
               \`;
               document.body.innerHTML = \`
                 <div class="card">
                   <div class="badge">
-                    <div class="spinner"></div>
+                    <svg class="check-icon" viewBox="0 0 24 24">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
                   </div>
-                  <h1>Autenticação Concluída!</h1>
-                  <p>Conectando sua conta Epic Games ao Checkpoint Launcher...</p>
+                  <h1>Conta Epic Games Conectada!</h1>
+                  <p>Seu código de autorização foi gerado e validado com sucesso.</p>
+                  <div class="code-container">
+                    <span class="code-text" id="auth-code">\${authCode}</span>
+                    <button class="copy-btn" id="copy-btn" type="button">Copiar</button>
+                  </div>
+                  <div class="status-pill">
+                    <div class="spinner-mini"></div>
+                    Sincronizando com o Launcher...
+                  </div>
                 </div>
               \`;
+              document.getElementById('copy-btn')?.addEventListener('click', () => {
+                navigator.clipboard.writeText('\${authCode}');
+                const btn = document.getElementById('copy-btn');
+                if (btn) btn.innerText = 'Copiado!';
+              });
             `).catch(() => undefined);
 
             if (!resolved) {
               resolved = true;
-              const code = data.authorizationCode || data.sid;
               setTimeout(() => {
                 try {
                   authWindow.close();
                 } catch {}
-                resolve(code);
-              }, 400);
+                resolve(authCode);
+              }, 1200);
             }
             return;
           } else if (data && (data.errorCode || data.message)) {
@@ -4366,6 +4444,16 @@ registerSecureIpcHandler("overlay:show-notification", async (_event, payload) =>
     action,
     metadata: data.metadata,
   });
+
+  if (type === "achievement" && sound !== false) {
+    const rawTier = String(data.metadata?.tier || "").toLowerCase();
+    const soundName = rawTier === "platinum" || rawTier === "platina"
+      ? "achievement-unlock-platinum"
+      : rawTier === "gold" || rawTier === "ouro"
+        ? "achievement-unlock-gold"
+        : "achievement-unlock";
+    playOverlaySound(soundName);
+  }
 });
 
 registerSecureIpcHandler("overlay:dismiss-notification", async (_event, payload) => {
