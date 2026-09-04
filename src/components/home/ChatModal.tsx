@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ImagePlus, MessageSquare, Phone, Send, Video, X } from "lucide-react";
+import { ImagePlus, MessageSquare, Phone, Send, Video, X, User } from "lucide-react";
 import ModalShell from "../ui/ModalShell";
+import { LoadingState } from "../ui/loading-state";
 import { useNotification } from "../NotificationCenter";
 import { useAuth } from "../../auth/AuthProvider";
 import { useVoiceCallContext } from "../../context/VoiceCallContext";
@@ -32,10 +33,46 @@ import { CallInviteCard, parseCallInviteText } from "../voice/CallInviteCard";
 const LINK_PATTERN = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 const IMAGE_LINK_PATTERN = /^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg)(\?[^\s]*)?$/i;
 
-const FALLBACK_FRIEND_AVATAR =
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=256";
-const FALLBACK_SELF_AVATAR =
-  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=128";
+export const ChatAvatar: React.FC<{
+  avatarUrl?: string | null;
+  name?: string;
+  sizeClassName?: string;
+  className?: string;
+  iconClassName?: string;
+}> = ({
+  avatarUrl,
+  name,
+  sizeClassName = "h-9 w-9",
+  className = "",
+  iconClassName = "h-4 w-4",
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [avatarUrl]);
+
+  if (avatarUrl && !hasError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name || "Avatar"}
+        onError={() => setHasError(true)}
+        className={`${sizeClassName} rounded-full object-cover shrink-0 ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClassName} rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/40 shrink-0 ${className}`}
+      title={name}
+      aria-label={name ? `Avatar de ${name}` : "Avatar padrão"}
+    >
+      <User className={iconClassName} />
+    </div>
+  );
+};
 
 export interface ChatModalProps {
   isOpen: boolean;
@@ -114,6 +151,64 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+export function deduplicateChatMessages(messages: ChatMessage[]): ChatMessage[] {
+  const result: ChatMessage[] = [];
+  const seenIds = new Set<string>();
+
+  for (const msg of messages) {
+    if (msg.id && seenIds.has(msg.id)) {
+      continue;
+    }
+
+    const isTemp = !msg.id || msg.id.startsWith("local-") || msg.id.startsWith("fast_");
+    if (isTemp) {
+      const alreadyConfirmed = result.some((other) => {
+        const otherIsConfirmed = other.id && !other.id.startsWith("local-") && !other.id.startsWith("fast_");
+        if (!otherIsConfirmed) return false;
+        const sameText = other.text.trim() === msg.text.trim();
+        const timeDiff = Math.abs(
+          (Date.parse(other.createdAt) || 0) - (Date.parse(msg.createdAt) || 0)
+        );
+        return sameText && timeDiff < 20000;
+      });
+      if (alreadyConfirmed) {
+        continue;
+      }
+    } else {
+      const tempIndex = result.findIndex((other) => {
+        const otherIsTemp = !other.id || other.id.startsWith("local-") || other.id.startsWith("fast_");
+        if (!otherIsTemp) return false;
+        const sameText = other.text.trim() === msg.text.trim();
+        const timeDiff = Math.abs(
+          (Date.parse(other.createdAt) || 0) - (Date.parse(msg.createdAt) || 0)
+        );
+        return sameText && timeDiff < 20000;
+      });
+      if (tempIndex !== -1) {
+        result.splice(tempIndex, 1);
+      }
+    }
+
+    const isExactDuplicate = result.some((other) => {
+      if (other.id === msg.id) return true;
+      const sameSender = other.senderId === msg.senderId;
+      const sameText = other.text.trim() === msg.text.trim();
+      const timeDiff = Math.abs(
+        (Date.parse(other.createdAt) || 0) - (Date.parse(msg.createdAt) || 0)
+      );
+      return sameSender && sameText && timeDiff < 2000;
+    });
+    if (isExactDuplicate) {
+      continue;
+    }
+
+    if (msg.id) seenIds.add(msg.id);
+    result.push(msg);
+  }
+
+  return result;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Subcomponents
 // ─────────────────────────────────────────────────────────────────────────
@@ -140,10 +235,12 @@ const ChatHeaderBar: React.FC<{
     <div className="flex shrink-0 items-center justify-between border-b border-white/[0.08] bg-[#080808] px-5 py-3.5 md:px-7">
       <div className="flex items-center gap-3">
         <div className="relative">
-          <img
-            src={friend.avatar || FALLBACK_FRIEND_AVATAR}
-            alt={friend.name}
-            className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
+          <ChatAvatar
+            avatarUrl={friend.avatar}
+            name={friend.name}
+            sizeClassName="h-9 w-9"
+            className="ring-1 ring-white/15"
+            iconClassName="h-4 w-4"
           />
           <span
             className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#080808] ${
@@ -219,10 +316,11 @@ const ChatIdentityHero: React.FC<{ friend: SocialFriend }> = ({ friend }) => (
   <section className="flex flex-col items-center pb-8 pt-2 text-center" aria-label="Identidade da amizade">
     <div className="relative">
       <div className="h-24 w-24 overflow-hidden rounded-full border border-white/15 bg-white/[0.06] p-1 shadow-[0_18px_48px_rgba(0,0,0,.55)]">
-        <img
-          src={friend.avatar || FALLBACK_FRIEND_AVATAR}
-          alt=""
-          className="h-full w-full rounded-full object-cover"
+        <ChatAvatar
+          avatarUrl={friend.avatar}
+          name={friend.name}
+          sizeClassName="h-full w-full"
+          iconClassName="h-10 w-10 text-white/30"
         />
       </div>
       <span
@@ -235,10 +333,12 @@ const ChatIdentityHero: React.FC<{ friend: SocialFriend }> = ({ friend }) => (
       {friend.status === "playing" ? `Jogando ${friend.playing}` : friend.status === "online" ? "Online agora" : "Offline"}
     </p>
     <div className="mt-5 flex items-center -space-x-2" aria-hidden="true">
-      <img
-        src={friend.avatar || FALLBACK_FRIEND_AVATAR}
-        alt=""
-        className="h-9 w-9 rounded-full border-2 border-[#050507] object-cover"
+      <ChatAvatar
+        avatarUrl={friend.avatar}
+        name={friend.name}
+        sizeClassName="h-9 w-9"
+        className="border-2 border-[#050507]"
+        iconClassName="h-4 w-4"
       />
       <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[#050507] bg-white/[0.08] text-[10px] font-black text-white/60">
         CP
@@ -257,7 +357,7 @@ const DaySeparator: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-const TypingBubble: React.FC<{ friendName: string; avatarUrl?: string }> = ({ friendName, avatarUrl }) => (
+const TypingBubble: React.FC<{ friendName: string; avatarUrl?: string | null }> = ({ friendName, avatarUrl }) => (
   <motion.div
     initial={{ opacity: 0, y: 6 }}
     animate={{ opacity: 1, y: 0 }}
@@ -267,13 +367,13 @@ const TypingBubble: React.FC<{ friendName: string; avatarUrl?: string }> = ({ fr
     role="status"
     aria-label={`${friendName} está digitando`}
   >
-    <div className="h-6 w-6 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white/[0.06]">
-      <img
-        src={avatarUrl || FALLBACK_FRIEND_AVATAR}
-        alt=""
-        className="h-full w-full object-cover"
-      />
-    </div>
+    <ChatAvatar
+      avatarUrl={avatarUrl}
+      name={friendName}
+      sizeClassName="h-6 w-6"
+      iconClassName="h-3 w-3"
+      className="border border-white/10"
+    />
     <span className="text-[12px] font-medium text-white/40 italic">
       {friendName} está digitando...
     </span>
@@ -284,7 +384,7 @@ const ChatMessageRow: React.FC<{
   msg: ChatMessage;
   isMe: boolean;
   friend: SocialFriend;
-  selfAvatarUrl: string;
+  selfAvatarUrl?: string | null;
   onViewImage: (image: ViewingImage) => void;
   onJoinCall: () => void;
   playSound: (type: SoundEffectType) => void;
@@ -312,13 +412,12 @@ const ChatMessageRow: React.FC<{
       transition={{ duration: 0.18, ease: "easeOut" }}
     >
       <Message align={isMe ? "end" : "start"} className="gap-2.5">
-        {/* Avatar sempre primeiro no DOM — o flex-row-reverse do Message
-            cuida de jogar pra direita quando align="end" */}
-        <MessageAvatar className="h-7 w-7 border border-white/10 !translate-y-0">
-          <img
-            src={isMe ? selfAvatarUrl : friend.avatar || FALLBACK_FRIEND_AVATAR}
-            alt={isMe ? "Você" : friend.name}
-            className="h-full w-full object-cover"
+        <MessageAvatar className="h-7 w-7 min-w-7 border border-white/10 !translate-y-0">
+          <ChatAvatar
+            avatarUrl={isMe ? selfAvatarUrl : friend.avatar}
+            name={isMe ? "Você" : friend.name}
+            sizeClassName="h-full w-full"
+            iconClassName="h-3.5 w-3.5"
           />
         </MessageAvatar>
 
@@ -336,47 +435,59 @@ const ChatMessageRow: React.FC<{
                 : "rounded-[18px] rounded-tl-[4px] border border-white/[0.08] bg-[#141414] text-white shadow-sm"
             }
           >
-            <BubbleContent className={`px-4 py-2.5 text-[13px] leading-[1.45] ${isMe ? "font-semibold text-black" : "font-normal text-white/90"}`}>
-              {visibleImages.length > 0 ? (
-                <div className="mb-2 space-y-2">
-                  {visibleImages.map((imageUrl) => (
+            <BubbleContent className="p-3 text-sm">
+              {msg.text && (
+                <p className="leading-relaxed select-text cursor-text selection:bg-black/20 break-words font-sans">
+                  {renderMessageText(msg.text)}
+                </p>
+              )}
+
+              {visibleImages.length > 0 && (
+                <div
+                  className={`grid gap-2 ${
+                    visibleImages.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                  } ${msg.text ? "mt-2 pt-2 border-t border-white/10" : ""}`}
+                >
+                  {visibleImages.map((imageUrl, imgIdx) => (
                     <button
+                      key={`${imageUrl}-${imgIdx}`}
                       type="button"
-                      key={imageUrl}
                       onClick={() => {
                         playSound("select");
                         onViewImage({
                           url: imageUrl,
-                          text: imageUrl === msg.attachmentUrl ? msg.text : msg.text.replace(imageUrl, "").trim(),
+                          text: msg.text,
                           createdAt: msg.createdAt,
                         });
                       }}
-                      aria-label="Visualizar imagem compartilhada"
-                      className={`block w-full overflow-hidden rounded-xl border p-1 text-left transition-all ${isMe
-                        ? "border-black/10 bg-black/5 hover:bg-black/10"
-                        : "border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
-                        }`}
+                      className="group/img relative overflow-hidden rounded-xl border border-white/10 bg-black/40 text-left transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                     >
-                      <img src={imageUrl} alt="Imagem compartilhada" className="max-h-56 w-full rounded-lg object-cover" />
+                      <img
+                        src={imageUrl}
+                        alt="Imagem enviada no chat"
+                        loading="lazy"
+                        className="max-h-64 w-full object-cover rounded-xl"
+                      />
+                      <span className="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover/img:bg-black/20" />
                     </button>
                   ))}
                 </div>
-              ) : null}
-              {msg.text ? <p className="break-words leading-relaxed">{renderMessageText(msg.text)}</p> : null}
+              )}
             </BubbleContent>
           </Bubble>
 
           <MessageFooter
-            className={`mt-0.5 min-h-3 px-1 text-[9px] font-medium tracking-normal ${isMe ? "justify-end text-white/35" : "justify-start text-white/22"
-              }`}
+            className={`px-1 text-[10px] text-white/30 ${
+              isMe ? "justify-end" : "justify-start"
+            }`}
           >
             {isMe ? (
               <span>
                 {msg.id?.startsWith("local-")
                   ? "Enviando..."
                   : msg.read
-                    ? "Lida"
-                    : "Enviada"}
+                  ? "Lida"
+                  : "Enviada"}
               </span>
             ) : (
               <span>
@@ -394,18 +505,34 @@ const ChatMessageRow: React.FC<{
 };
 
 const ChatMessageList: React.FC<{
+  isLoading: boolean;
   messages: ChatMessage[];
   friendUid: string | null;
   friend: SocialFriend;
-  selfAvatarUrl: string;
+  selfAvatarUrl?: string | null;
   friendTyping: boolean;
   onViewImage: (image: ViewingImage) => void;
   onJoinCall: () => void;
   playSound: (type: SoundEffectType) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
-}> = ({ messages, friendUid, friend, selfAvatarUrl, friendTyping, onViewImage, onJoinCall, playSound, messagesEndRef }) => (
+}> = ({
+  isLoading,
+  messages,
+  friendUid,
+  friend,
+  selfAvatarUrl,
+  friendTyping,
+  onViewImage,
+  onJoinCall,
+  playSound,
+  messagesEndRef,
+}) => (
   <div className="chat-scrollbar flex-1 space-y-2 overflow-y-auto px-7 py-6 pr-4 md:px-9">
-    {messages.length === 0 ? (
+    {isLoading ? (
+      <div className="flex flex-1 min-h-[260px] flex-col items-center justify-center space-y-3 py-16 text-center">
+        <LoadingState label="Carregando conversa..." variant="Drive" size="md" showTimer={false} />
+      </div>
+    ) : messages.length === 0 ? (
       <div className="flex flex-col items-center justify-center space-y-2 pb-8 text-center text-white/20">
         <MessageSquare className="h-6 w-6" />
         <p className="text-xs uppercase tracking-wider">Nenhuma mensagem ainda</p>
@@ -439,7 +566,7 @@ const ChatMessageList: React.FC<{
       </MessageGroup>
     )}
 
-    {friendTyping && <TypingBubble friendName={friend.name} avatarUrl={friend.avatar || FALLBACK_FRIEND_AVATAR} />}
+    {!isLoading && friendTyping && <TypingBubble friendName={friend.name} avatarUrl={friend.avatar} />}
     <div ref={messagesEndRef} />
   </div>
 );
@@ -595,6 +722,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
     const { user, userProfile } = useAuth();
 
     const [displayMessages, setDisplayMessages] = useState<ChatMessage[]>([]);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(true);
     const optimisticRef = useRef<Map<string, ChatMessage>>(new Map());
     const [inputText, setInputText] = useState("");
     const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
@@ -619,7 +747,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
       userProfile?.photoURL ||
       userProfile?.discordAvatar ||
       userProfile?.steamAvatar ||
-      FALLBACK_SELF_AVATAR;
+      null;
 
     const detachPendingImage = React.useCallback(() => {
       const current = pendingImageRef.current;
@@ -681,6 +809,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
         setFriendTyping(false);
         setIsSendingImage(false);
         setSpamLockedUntil(null);
+        setIsLoadingMessages(true);
         recentSendTimestampsRef.current = [];
         lastTypingSentRef.current = false;
         friendUidRef.current = null;
@@ -690,6 +819,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
 
       if (friendUidRef.current === friendUid) return;
       friendUidRef.current = friendUid;
+      setIsLoadingMessages(true);
 
       void cleanupExpiredChatMessages(friendUid).catch(() => undefined);
       void markMessagesAsRead(friendUid);
@@ -698,13 +828,14 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
       let knownServerMessageIds = new Set<string>();
 
       const unsubscribeMessages = subscribeToChatMessages(friendUid, (serverMsgs) => {
+        setIsLoadingMessages(false);
         const serverIds = new Set(serverMsgs.map((m) => m.id));
         optimisticRef.current.forEach((_, key) => {
           if (serverIds.has(key)) optimisticRef.current.delete(key);
         });
 
         const pending = Array.from(optimisticRef.current.values());
-        const merged = [...serverMsgs, ...pending].sort(compareChatMessages);
+        const merged = deduplicateChatMessages([...serverMsgs, ...pending]).sort(compareChatMessages);
 
         const nextServerMessageIds = new Set(serverMsgs.flatMap((message) => (message.id ? [message.id] : [])));
         if (
@@ -720,6 +851,11 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
 
         setDisplayMessages(merged);
         pendingSnapshotRef.current = merged;
+
+        // Se o chat está ativo/aberto e há mensagens recebidas do amigo que ainda não foram marcadas como lidas:
+        if (serverMsgs.some((message) => message.senderId === friendUid && !message.read)) {
+          void markMessagesAsRead(friendUid);
+        }
       });
 
       const unsubscribeTyping = subscribeToFriendTyping(friendUid, (typing) => {
@@ -839,10 +975,10 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
           : await sendChatMessage(friendUid, text);
         optimisticRef.current.delete(optimisticId);
         setDisplayMessages((current) =>
-          [
+          deduplicateChatMessages([
             ...current.filter((message) => message.id !== optimisticId && message.id !== confirmedMessage.id),
             confirmedMessage,
-          ].sort(compareChatMessages),
+          ]).sort(compareChatMessages),
         );
         if (imageDraft) {
           setViewingImage((current) =>
@@ -947,6 +1083,7 @@ export const ChatModal: React.FC<ChatModalProps> = React.memo(
           />
 
           <ChatMessageList
+            isLoading={isLoadingMessages}
             messages={displayMessages}
             friendUid={friendUid}
             friend={friend}
