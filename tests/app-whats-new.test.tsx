@@ -53,18 +53,18 @@ describe("novidades no fluxo inicial do app", () => {
     });
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { getVersion: vi.fn().mockResolvedValue("3.2.2") },
+      value: { getVersion: vi.fn().mockResolvedValue("3.2.4") },
     });
   });
 
   it("abre o modal somente depois que a introducao termina", async () => {
     render(<App />);
 
-    expect(screen.queryByText("Overlay Cósmico em Vidro Translúcido")).not.toBeInTheDocument();
+    expect(screen.queryByText("Telemetria de Controle, Voz Ultrarrápida & Galeria In-Game")).not.toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Finalizar introdução" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Overlay Cósmico em Vidro Translúcido")).toBeInTheDocument();
+      expect(screen.getByText("Telemetria de Controle, Voz Ultrarrápida & Galeria In-Game")).toBeInTheDocument();
     });
     expect(screen.getByText("Home pronta")).toBeInTheDocument();
   });

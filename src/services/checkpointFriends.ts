@@ -7,13 +7,17 @@ let cachedAccessToken: string | null = null;
 
 export const getCachedAccessToken = () => cachedAccessToken;
 
-void supabase.auth.getSession().then(({ data }) => {
-  cachedAccessToken = data.session?.access_token ?? null;
-}).catch(() => {});
+if (supabase?.auth?.getSession) {
+  void supabase.auth.getSession().then(({ data }) => {
+    cachedAccessToken = data?.session?.access_token ?? null;
+  }).catch(() => {});
+}
 
-supabase.auth.onAuthStateChange((_event, session) => {
-  cachedAccessToken = session?.access_token ?? null;
-});
+if (supabase?.auth?.onAuthStateChange) {
+  supabase.auth.onAuthStateChange((_event, session) => {
+    cachedAccessToken = session?.access_token ?? null;
+  });
+}
 
 const getAuthHeaders = async () => {
   const session = (await supabase.auth.getSession()).data.session;

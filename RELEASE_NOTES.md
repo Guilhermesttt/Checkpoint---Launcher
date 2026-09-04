@@ -28,23 +28,38 @@ Grande atualização com reformulação de segurança e sincronização de plata
 
 ---
 
-## Phelierium Game Hub — v3.2.4 (Console-Grade 60 FPS & Gamepad Smoothness)
+## Phelierium Game Hub — v3.2.4 (Telemetria de Controle, Voz Ultrarrápida & Galeria In-Game)
 
-Atualização massiva de performance estilo console de última geração (60 FPS fluidos), rolagem ultra-responsiva com o analógico do controle, virtualização e memoização em todo o hub, e painel de mods em tela cheia.
+Atualização massiva trazendo telemetria nativa de bateria e conexão USB/Bluetooth para controles, conexões instantâneas de chamadas de voz com LiveKit Cloud e compartilhamento de tela, galeria in-game e navegação espacial por D-Pad, sistema abrangente de troféus em tempo real, presença social instantânea e instalador com suporte completo a Modo Escuro (Dark Mode).
 
 ### Destaques da versão 3.2.4
 
-#### ⚡ Performance 60 FPS Console-Grade em Todo o Hub
-- **Virtualização de Lista Nativa (Windowing com RAF & Spacers):** Renderização sob demanda no Painel de Detalhes de Conquistas e na Página de Troféus. Apenas os cards visíveis permanecem no DOM, mantendo 60 FPS cravados mesmo em jogos com centenas de conquistas.
-- **Pré-cálculo e Enriquecimento em Passada Única:** Tiers, datas e formatações calculados antecipadamente em lote via `useMemo`, eliminando reflows e gargalos de renderização.
-- **Memoização Estrita com Aceleração por Hardware GPU:** Subcomponentes `AchievementRow`, `GameRow`, `FriendOnlineCard`, `ModGameCard` e itens de timeline encapsulados com comparadores `areEqual` e classes `transform-gpu` / `will-change-transform`.
+#### 🎮 Telemetria Avançada & Bateria de Controles
+- **Leitura Precisa de Bateria e Conexão:** Detecção nativa em tempo real de nível de bateria (porcentagem e status de carregamento) e conexão determinística USB vs Bluetooth para controles PlayStation DualSense (PS5), DualShock 4 e Xbox.
+- **Feedback Visual na HUD & Overlay:** Indicadores visuais de status de hardware integrados na barra superior, no dashboard principal e no overlay durante as partidas.
 
-#### 🎮 Navegação e Rolagem por Controle de Próxima Geração
-- **Loop Contínuo de Scroll com `requestAnimationFrame`:** Desacoplamento completo do polling do gamepad para rolagem vertical e horizontal instantânea e aveludada.
-- **Deadzone Proporcional e Curva de Resposta Suave:** Micro-ajustes cirúrgicos em inclinações leves e aceleração rápida para navegar por listas longas sem esforço.
+#### 🎙️ Chamadas de Voz Instantâneas & Compartilhamento de Tela
+- **Conexão Ultrarrápida via LiveKit Cloud SFU:** Conexões imediatas com sinalização WebRTC Trickle ICE paralelo e Content Security Policy (CSP) otimizado, eliminando atrasos no estabelecimento da chamada.
+- **Compartilhamento de Tela com Áudio Integrado:** Seletor nativo de telas e janelas para streaming de gameplay entre amigos, com mixagem e controle de ganho sonoro.
 
-#### 🛠️ Gerenciador de Mods em Tela Cheia
-- **Experiência Imersiva Fullscreen (100vw, 100vh):** O painel de gerenciamento de mods agora abre diretamente no corpo da janela (`createPortal`), sem cortes ou limites de container, com atalhos nativos para `Escape` e botão `O` do controle.
+#### 🖼️ Galeria de Fotos In-Game & Navegação Espacial no Controle
+- **Navegação D-Pad em Malha Espacial:** Seleção de capturas de tela tanto no overlay in-game quanto no `GameDetailPanel` com foco contínuo e responsivo.
+- **Visualizador Fullscreen e Atalhos Rápidos:** Abertura instantânea de capturas em alta resolução com atalho no botão Quadrado / X para exclusão rápida e confirmação sem mouse.
+
+#### 🏆 Sistema de Troféus & Gamificação em Tempo Real
+- **Desbloqueio com Efeitos Sonoros:** Stream em tempo real de conquistas com banners animados (toasts) no topo da tela e efeitos sonoros sincronizados.
+- **Histórico e Perfis Sociais:** Visualização detalhada de conquistas, tempo de jogo e estatísticas completas em perfis públicos com fallback seguro para privacidade.
+
+#### 💬 Chat em Tempo Real & Presença Social
+- **Sincronização Imediata de Status:** Notificações de amigos online com debounce de eventos de saída para evitar spam de alertas.
+- **AuthProvider com Supabase e Google OAuth:** Troca segura de tokens no servidor e restauração instantânea de sessão protegida com JWT.
+
+#### 🖤 Instalador NSIS Dark Mode & Visual Personalizado
+- **Tema Escuro Nativo no Instalador:** Janela inteira, rodapé, barra de título e controles do assistente de instalação configurados em Dark Theme.
+- **Artes de Cabeçalho e Lateral em 24-bits:** Bitmaps de alta resolução no instalador com a identidade visual cósmica do Phelierium Hub.
+
+#### ⚡ Performance 60 FPS Console-Grade
+- **Virtualização de Listas e Aceleração GPU:** Janelamento inteligente com `requestAnimationFrame` em painéis extensos de conquistas e listas de amigos, garantindo 60 FPS estáveis.
 
 ---
 

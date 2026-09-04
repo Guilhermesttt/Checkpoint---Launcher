@@ -111,15 +111,17 @@ const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ release, onClose }) => {
             <button
               type="button"
               onClick={() => void openReleaseNotes()}
+              aria-label="Ver notas completas"
               className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-white/40 transition hover:bg-white/[0.04] hover:text-white/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white"
             >
-              Ver notas no GitHub
+              Ver notas completas
               <ExternalLink className="h-3 w-3" />
             </button>
 
             <button
               type="button"
               onClick={onClose}
+              aria-label="Começar"
               className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-6 text-xs font-bold text-black transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
               <span>Começar</span>

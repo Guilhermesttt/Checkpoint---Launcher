@@ -3,6 +3,17 @@ import { Sparkles, Info } from "lucide-react";
 import { usePreferences } from "../../context/PreferencesContext";
 import { useAppUpdater } from "../../hooks/useAppUpdater";
 import { AppUpdateErrorModal } from "./AppUpdateErrorModal";
+import WhatsNewModal from "../WhatsNewModal";
+import { getReleaseHighlights, LATEST_RELEASE } from "../../releases/releaseHighlights";
+
+const WHATS_NEW_BUTTON_COPY = {
+  "pt-BR": "O que há de novo?",
+  "en-US": "What's New?",
+  "es-ES": "¿Qué hay de nuevo?",
+  "fr-FR": "Quoi de neuf ?",
+  "de-DE": "Was gibt's Neues?",
+  "it-IT": "Novità",
+} as const;
 
 const UPDATE_COPY = {
   "pt-BR": ["Atualizações do Sistema", "Versão instalada atualmente", "Mantenha seu Phelierium Launcher na versão mais recente.", "Buscando atualizações...", "Nova versão disponível para baixar.", "Você já está usando a versão mais recente.", "Baixando atualização", "Atualização pronta para instalar.", "Ambiente de desenvolvimento local.", "Não foi possível verificar atualizações.", "Buscar Atualizações", "Baixar e Atualizar", "Reiniciar e Atualizar"],
@@ -34,6 +45,7 @@ export const AppUpdateSection: React.FC = React.memo(() => {
   const { language } = usePreferences();
   const updateCopy = UPDATE_COPY[language] || UPDATE_COPY["pt-BR"];
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
 
   const {
     currentVersion,
@@ -104,6 +116,14 @@ export const AppUpdateSection: React.FC = React.memo(() => {
             </div>
 
             <div className="shrink-0 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowWhatsNewModal(true)}
+                className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-white/80 transition-all hover:border-white/20 hover:bg-white/10 hover:text-white active:scale-95 shadow-sm"
+              >
+                {WHATS_NEW_BUTTON_COPY[language] || WHATS_NEW_BUTTON_COPY["pt-BR"]}
+              </button>
+
               {updateStatus === "idle" || updateStatus === "not-available" || updateStatus === "dev" || updateStatus === "error" ? (
                 <button
                   type="button"
@@ -143,6 +163,13 @@ export const AppUpdateSection: React.FC = React.memo(() => {
         onClose={() => setShowErrorModal(false)}
         errorMessage={errorMessage}
       />
+
+      {showWhatsNewModal && (
+        <WhatsNewModal
+          release={getReleaseHighlights(currentVersion || LATEST_RELEASE.version)}
+          onClose={() => setShowWhatsNewModal(false)}
+        />
+      )}
     </>
   );
 });

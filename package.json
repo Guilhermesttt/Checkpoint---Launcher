@@ -18,6 +18,8 @@
     "build": "tsc -b && vite build",
     "dist": "node scripts/build-portable.cjs",
     "dist:windows": "node scripts/build-portable.cjs",
+    "dist:installer": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-win-installer.ps1",
+    "build:exe": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-win-installer.ps1",
     "build:portable": "node scripts/build-portable.cjs",
     "publish": "npm run build && electron-builder --win --publish always",
     "lint": "eslint .",
