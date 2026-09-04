@@ -801,7 +801,7 @@ const Home: React.FC = () => {
     if (window.electronAPI?.setPresenceSession) {
       void window.electronAPI.setPresenceSession({
         uid: user.uid,
-        displayName: userProfile?.displayName,
+        displayName: userProfile?.displayName || undefined,
         token: getCachedAccessToken(),
         apiUrl: apiUrl(""),
       });

@@ -151,7 +151,6 @@ export interface UserProfile {
     createdAt?: string;
   }>;
   createdAt?: string;
-  updatedAt?: string;
   lastSteamSyncAt?: string;
   gamesMigratedAt?: string;
   onboardingCompletedAt?: string;

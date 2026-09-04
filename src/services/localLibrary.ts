@@ -258,7 +258,7 @@ export const syncPublicLibrarySummary = async (
         const rows = localGames.slice(0, 300).map((g) => toCloudGameRow(uid, g));
         for (let i = 0; i < rows.length; i += 100) {
           const chunk = rows.slice(i, i + 100);
-          await supabase.from("user_games").upsert(chunk, { onConflict: "user_id,id" }).catch(() => {});
+          await supabase.from("user_games").upsert(chunk, { onConflict: "user_id,id" });
         }
       }
     } catch (e) {
