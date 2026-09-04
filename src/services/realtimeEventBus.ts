@@ -14,6 +14,7 @@ export interface PresencePayload {
 
 export interface U2UEventHandlers {
   onMessage?: (msg: ChatMessage) => void;
+  onReadReceipt?: (data: { readerUid: string; chatId: string }) => void;
   onStatusUpdate?: (presence: PresencePayload) => void;
   onTyping?: (data: { senderId: string; typing: boolean }) => void;
   onFriendRequest?: (data: { fromUid: string; fromName: string; fromAvatar?: string | null }) => void;
@@ -88,6 +89,11 @@ export const subscribeToGlobalEventBus = (
         if (e.payload && typeof e.payload === "object") {
           const msg = e.payload as ChatMessage;
           globalEventHandlers.forEach((h) => h.onMessage?.(msg));
+        }
+      })
+      .on("broadcast", { event: "u2u:read_receipt" }, (e: any) => {
+        if (e.payload && typeof e.payload === "object") {
+          globalEventHandlers.forEach((h) => h.onReadReceipt?.(e.payload));
         }
       })
       .on("broadcast", { event: "u2u:status" }, (e: any) => {
@@ -480,5 +486,39 @@ export const sendFastFriendRemovedNotification = async (
     }
   } catch (err) {
     console.warn("[realtimeEventBus] sendFastFriendRemovedNotification error:", err);
+  }
+};
+
+/**
+ * Notifica que mensagens foram lidas instantaneamente via WebSocket
+ */
+export const sendFastReadReceipt = async (
+  targetUid: string,
+  readerUid: string,
+  chatId: string,
+) => {
+  try {
+    const channelName = `user_inbox_${targetUid}`;
+    let targetChannel = activeInboxChannels.get(channelName);
+    if (!targetChannel) {
+      targetChannel = supabase.channel(channelName);
+      activeInboxChannels.set(channelName, targetChannel);
+      channelRefCounts.set(channelName, 0);
+      try {
+        targetChannel.subscribe((s: string) => {});
+      } catch {}
+    }
+
+    await targetChannel.send({
+      type: "broadcast",
+      event: "u2u:read_receipt",
+      payload: { readerUid, chatId },
+    });
+
+    if ((channelRefCounts.get(channelName) || 0) <= 0) {
+      scheduleChannelIdleClose(channelName, targetChannel);
+    }
+  } catch (err) {
+    console.warn("[realtimeEventBus] sendFastReadReceipt error:", err);
   }
 };

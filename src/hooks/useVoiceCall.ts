@@ -3480,16 +3480,10 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
       if (callState !== "idle") {
         cleanUpCall();
       }
-      const sampleAvatars = [
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
-        "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80",
-      ];
-      const randomAvatar = sampleAvatars[Math.floor(Math.random() * sampleAvatars.length)];
       setIncomingInvite({
         callerId: "ghost_tester_uid",
         callerName: "Ghost Rider (Simulação)",
-        callerAvatar: randomAvatar,
+        callerAvatar: null,
         chatId: "simulated_call_test",
         hasVideo,
         timestamp: Date.now(),

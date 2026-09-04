@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 import type { ChatMessage } from "../types/domain";
 import { apiUrl } from "./api";
-import { sendFastU2UMessage, subscribeToGlobalEventBus } from "./realtimeEventBus";
+import { sendFastReadReceipt, sendFastU2UMessage, subscribeToGlobalEventBus } from "./realtimeEventBus";
 
 const HISTORY_LIMIT = 50;
 const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
@@ -472,7 +472,10 @@ export const markMessagesAsRead = async (friendUid: string) => {
     .from("chat_messages")
     .update({ read: true })
     .eq("chat_id", chatId)
-    .eq("receiver_id", uid);
+    .eq("receiver_id", uid)
+    .eq("read", false);
+
+  void sendFastReadReceipt(friendUid, uid, chatId);
 
   for (let index = unreadMessages.length - 1; index >= 0; index -= 1) {
     if (unreadMessages[index].senderId === friendUid) unreadMessages.splice(index, 1);
@@ -524,8 +527,33 @@ export const subscribeToChatMessages = (
           (fastMsg.senderId === uid && fastMsg.receiverId === friendUid) ||
           fastMsg.chatId === chatId
         ) {
-          if (!latestMessages.some((current) => current.id === fastMsg.id)) {
+          // Verify if already present by ID or already confirmed by Postgres
+          const isAlreadyPresent = latestMessages.some(
+            (current) =>
+              current.id === fastMsg.id ||
+              (!current.id?.startsWith("fast_") &&
+                current.senderId === fastMsg.senderId &&
+                current.text.trim() === fastMsg.text.trim() &&
+                Math.abs(messageTimestamp(current) - messageTimestamp(fastMsg)) < 15000)
+          );
+          if (!isAlreadyPresent) {
             latestMessages = [...latestMessages, fastMsg].sort(compareChatMessages);
+            callback([...latestMessages]);
+          }
+        }
+      },
+      onReadReceipt: (data) => {
+        if (cancelled) return;
+        if (data.chatId === chatId || data.readerUid === friendUid) {
+          let changed = false;
+          latestMessages = latestMessages.map((m) => {
+            if (m.senderId === uid && !m.read) {
+              changed = true;
+              return { ...m, read: true };
+            }
+            return m;
+          });
+          if (changed) {
             callback([...latestMessages]);
           }
         }
@@ -542,8 +570,45 @@ export const subscribeToChatMessages = (
             normalizeMessage(String(payload.new.id), payload.new as any),
           );
           if (cancelled) return;
+
+          // Check if there is a matching fast_ temporary message to replace
+          const existingFastIndex = latestMessages.findIndex(
+            (current) =>
+              current.id?.startsWith("fast_") &&
+              current.senderId === msg.senderId &&
+              current.text.trim() === msg.text.trim() &&
+              Math.abs(messageTimestamp(current) - messageTimestamp(msg)) < 15000
+          );
+
+          if (existingFastIndex !== -1) {
+            latestMessages = latestMessages.map((item, idx) => (idx === existingFastIndex ? msg : item));
+            callback([...latestMessages]);
+            return;
+          }
+
           if (!latestMessages.some((current) => current.id === msg.id)) {
             latestMessages = [...latestMessages, msg].sort(compareChatMessages);
+            callback([...latestMessages]);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_messages", filter: `chat_id=eq.${chatId}` },
+        async (payload) => {
+          const updatedMsg = await hydrateAttachmentUrl(
+            normalizeMessage(String(payload.new.id), payload.new as any),
+          );
+          if (cancelled) return;
+          let changed = false;
+          latestMessages = latestMessages.map((m) => {
+            if (m.id === updatedMsg.id) {
+              changed = true;
+              return { ...m, ...updatedMsg };
+            }
+            return m;
+          });
+          if (changed) {
             callback([...latestMessages]);
           }
         }
