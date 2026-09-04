@@ -41,9 +41,9 @@ html[data-launcher-theme="checkpoint"] {
 }
 
 html[data-launcher-theme="ps5"] {
-  --launcher-accent: 0 114 206;
-  --launcher-accent-soft: rgba(0, 114, 206, 0.36);
-  --launcher-tint: rgba(0, 70, 170, 0.34);
+  --launcher-accent: 255 255 255;
+  --launcher-accent-soft: rgba(255, 255, 255, 0.28);
+  --launcher-tint: rgba(255, 255, 255, 0.12);
 }
 
 html[data-launcher-theme="playstation"] {
@@ -262,6 +262,12 @@ html[data-launcher-theme="sunset"] {
     outline-offset: 3px;
     border-radius: 6px;
     box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.12), 0 0 16px rgba(255, 255, 255, 0.1);
+  }
+
+  /* Oculta completamente o cursor do mouse quando o controle estiver ativo */
+  html[data-gamepad-navigation="active"],
+  html[data-gamepad-navigation="active"] * {
+    cursor: none !important;
   }
 
   html[data-gamepad-navigation="active"] [data-system-page] [data-gamepad-focused="true"] {

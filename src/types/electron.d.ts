@@ -666,6 +666,8 @@ declare global {
         deviceName: string | null;
       }>;
       onAppQuitting?: (callback: () => void) => () => void;
+      confirmAppQuit?: () => Promise<void>;
+      setPresenceSession?: (session: { uid: string; displayName?: string; token?: string | null; apiUrl?: string }) => Promise<boolean>;
       listLocalGames?: (uid: string) => Promise<any[]>;
       createLocalGame?: (uid: string, game: any) => Promise<any>;
       updateLocalGame?: (uid: string, gameId: string, patch: any) => Promise<void>;

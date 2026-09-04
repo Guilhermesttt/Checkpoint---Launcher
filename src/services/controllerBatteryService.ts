@@ -58,9 +58,11 @@ export class DualSenseParser implements HidReportParser {
 
   private extractBattery(byte: number, connectionType: ControllerConnectionType): ParsedBatteryResult {
     const rawLevel = byte & 0x0f;
+    // nibble superior: 0x10 = carregando, 0x20 = completo (não carregando)
+    const isCharging = ((byte & 0xf0) >> 4) === 0x1;
     return {
       batteryLevel: Math.min(100, Math.max(0, rawLevel * 10)),
-      isCharging: (byte & 0xf0) !== 0,
+      isCharging,
       connectionType,
       deviceName: this.deviceName,
     };
@@ -119,35 +121,47 @@ class HidParserRegistry {
    2. SRP: Disparador de Alertas (Notificações DOM e IPC)
    ========================================================================== */
 
-class BatteryAlertManager {
-  private hasWarnedLow = false;
-  private hasWarnedCritical = false;
+// Task 10: State machine explícita para alertas de bateria
+// Estados: 'ok' → 'low_warned' → 'critical_warned' (transições irreversíveis dentro de uma sessão BT)
+type BatteryAlertState = "ok" | "low_warned" | "critical_warned";
 
-  public evaluate(state: ControllerBatteryState): void {
-    const isEligible = state.connectionType === "bluetooth" && !state.isCharging && state.batteryLevel !== null;
+class BatteryAlertManager {
+  private state: BatteryAlertState = "ok";
+
+  public evaluate(batteryState: ControllerBatteryState): void {
+    const isEligible =
+      batteryState.connectionType === "bluetooth" &&
+      !batteryState.isCharging &&
+      batteryState.batteryLevel !== null;
 
     if (!isEligible) {
-      this.reset();
+      // Ao reconectar via USB ou carregar, reseta a máquina para a próxima sessão BT
+      this.state = "ok";
       return;
     }
 
-    const level = state.batteryLevel!;
+    const level = batteryState.batteryLevel!;
 
-    if (level <= 10 && !this.hasWarnedCritical) {
-      this.hasWarnedCritical = true;
-      this.hasWarnedLow = true;
+    // Transições de estado
+    if (level > 20) {
+      // Acima de 20% → reseta (ex: o usuário carregou e desconectou o cabo)
+      this.state = "ok";
+    } else if (level <= 10 && this.state !== "critical_warned") {
+      this.state = "critical_warned";
       this.dispatch(level, true);
-    } else if (level <= 20 && !this.hasWarnedLow) {
-      this.hasWarnedLow = true;
+    } else if (level <= 20 && level > 10 && this.state === "ok") {
+      this.state = "low_warned";
       this.dispatch(level, false);
-    } else if (level > 20) {
-      this.reset();
+    }
+    // Se state === 'low_warned' e level cai para <=10, sobe para critical
+    else if (level <= 10 && this.state === "low_warned") {
+      this.state = "critical_warned";
+      this.dispatch(level, true);
     }
   }
 
-  private reset(): void {
-    this.hasWarnedLow = false;
-    this.hasWarnedCritical = false;
+  public reset(): void {
+    this.state = "ok";
   }
 
   private dispatch(level: number, isCritical: boolean): void {
@@ -215,6 +229,30 @@ function notifyListeners(): void {
 function updateBatteryState(partial: Partial<ControllerBatteryState>): void {
   const next: ControllerBatteryState = { ...currentState, ...partial };
 
+  // Se o tipo de conexão mudou (ex: BT -> USB), descarta o batteryLevel antigo
+  // para não mostrar dado stale de uma sessão anterior
+  if (partial.connectionType !== undefined && partial.connectionType !== currentState.connectionType) {
+    next.batteryLevel = partial.batteryLevel ?? null;
+  }
+
+  // --- FILTRO DE SANIDADE (ANTI-BUG DO BLUETOOTH) ---
+  // Só aplica se a conexão não mudou (para não bloquear leituras legítimas ao reconectar)
+  if (
+    partial.batteryLevel !== undefined &&
+    partial.batteryLevel !== null &&
+    currentState.batteryLevel !== null &&
+    next.connectionType === "bluetooth" &&
+    (partial.connectionType === undefined || partial.connectionType === currentState.connectionType)
+  ) {
+    const diferenca = Math.abs(currentState.batteryLevel - partial.batteryLevel);
+
+    // Controles piratas mandam "lixo de memória" que faz a bateria pular de 10% pra 90% do nada.
+    // Se pular mais de 25% de uma vez na MESMA sessão de conexão, sabemos que é bug.
+    if (diferenca > 25) {
+      next.batteryLevel = currentState.batteryLevel;
+    }
+  }
+
   // Se o controle continua conectado no mesmo tipo e o novo poll veio temporariamente com batteryLevel null, preserva o último percentual conhecido
   if (partial.batteryLevel === null && currentState.batteryLevel !== null && (partial.connectionType === undefined || partial.connectionType === currentState.connectionType)) {
     next.batteryLevel = currentState.batteryLevel;
@@ -223,7 +261,8 @@ function updateBatteryState(partial: Partial<ControllerBatteryState>): void {
   const { batteryLevel, isCharging, connectionType } = next;
   const isWireless = connectionType === "bluetooth";
 
-  // Só alerta bateria fraca se estiver no Bluetooth, descarregando e com nível válido (> 0)
+  // Só alerta bateria fraca se estiver no Bluetooth, não estiver carregando, e com nível válido (> 0)
+  // Nota: batteryLevel > 0 evita que um bug do controle mandando "0%" dispare o alerta de cara.
   next.isLowBattery = Boolean(isWireless && !isCharging && batteryLevel !== null && batteryLevel > 0 && batteryLevel <= 20);
   next.isCriticalBattery = Boolean(isWireless && !isCharging && batteryLevel !== null && batteryLevel > 0 && batteryLevel <= 10);
 
@@ -341,10 +380,21 @@ async function pollFallbackBatterySources(): Promise<void> {
     const primaryGamepad = gamepads[0] as (Gamepad & { battery?: { level: number; charging: boolean } }) | undefined;
 
     if (primaryGamepad?.battery) {
+      // Tenta inferir o tipo de conexão pelo ID do gamepad
+      const gpId = (primaryGamepad.id || "").toLowerCase();
+      let inferredType: ControllerConnectionType = "unknown";
+      if (gpId.includes("bluetooth") || gpId.includes("bth") || gpId.includes("wireless")) {
+        inferredType = "bluetooth";
+      } else if (gpId.includes("usb") || gpId.includes("wired") || gpId.includes("cabo")) {
+        inferredType = "usb";
+      } else {
+        // Sem pista no ID — usa o connectionType atual se já conhecido, senão bluetooth (mais comum)
+        inferredType = currentState.connectionType !== "unknown" ? currentState.connectionType : "bluetooth";
+      }
       updateBatteryState({
         batteryLevel: Math.round(primaryGamepad.battery.level * 100),
         isCharging: Boolean(primaryGamepad.battery.charging),
-        connectionType: "bluetooth",
+        connectionType: inferredType,
         deviceName: primaryGamepad.id || "Gamepad",
       });
     }
@@ -360,6 +410,21 @@ export function registerCustomHidParser(parser: HidReportParser): void {
 }
 
 export function startControllerBatteryMonitoring(): () => void {
+  // Reseta a state machine de alertas para evitar que estado de sessões anteriores
+  // contamine esta sessão (relevante para testes e reconexões)
+  alertManager.reset();
+
+  // Reseta o estado de bateria ao iniciar novo ciclo de monitoramento
+  // Isso evita que o filtro anti-spike interprete mudanças de sessão como lixo de memória
+  currentState = {
+    batteryLevel: null,
+    isCharging: false,
+    connectionType: "unknown",
+    deviceName: null,
+    isLowBattery: false,
+    isCriticalBattery: false,
+  };
+
   // Ativa WebHID tanto no Electron quanto no navegador web para telemetria de 0 latência
   void initWebHidBatteryListener();
   void pollFallbackBatterySources();

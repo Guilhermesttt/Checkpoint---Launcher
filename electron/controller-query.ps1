@@ -12,7 +12,7 @@ try {
 
   $usbDevs = Get-PnpDevice -Class 'HIDClass' -Status 'OK' -ErrorAction SilentlyContinue | Where-Object {
     ($_.FriendlyName -match 'Wireless Controller|DualSense|DualShock|Xbox') -and
-    ($_.InstanceId -notmatch '00001124|BTHENUM|BTHLE|DEV_')
+    ($_.InstanceId -notmatch '00001124|BTHENUM|BTHLE')
   }
 
   if ($btDevs) {
@@ -125,7 +125,9 @@ try {
                   }
                   if (ok && report.Length > 53) {
                     batByte = report[53];
-                    chg = (report[53] & 0xf0) != 0;
+                    // nibble superior: 0x10 = carregando, 0x20 = completo (nao carregando)
+                    int chgNibble = (report[53] & 0xf0) >> 4;
+                    chg = (chgNibble == 0x1);
                   }
                 } else {
                   // DualSense USB: Input Report 0x01 (64 bytes), bateria no byte 52
@@ -133,7 +135,9 @@ try {
                   ok = HidD_GetInputReport(handle, report, 64);
                   if (ok && report.Length > 52) {
                     batByte = report[52];
-                    chg = (report[52] & 0xf0) != 0;
+                    // nibble superior: 0x10 = carregando, 0x20 = completo (nao carregando)
+                    int chgNibble = (report[52] & 0xf0) >> 4;
+                    chg = (chgNibble == 0x1);
                   }
                 }
               } else {

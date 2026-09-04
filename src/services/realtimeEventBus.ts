@@ -177,38 +177,25 @@ export const subscribeToGlobalEventBus = (
           });
         }
       })
-      .on("presence", { event: "leave" }, ({ leftPresences }: any) => {
-        if (Array.isArray(leftPresences)) {
-          leftPresences.forEach((p: any) => {
-            const uid = p.presence?.uid || p.uid;
-            if (uid) {
-              cancelPendingLeave(uid);
-              const timer = setTimeout(() => {
-                presenceLeaveTimers.delete(uid);
-                // Verificar se o usuário ainda está presente no canal (re-sync / heartbeat)
-                try {
-                  const state = presenceChannel?.presenceState() || {};
-                  const isStillPresent = Object.values(state).some((arr: any) =>
-                    Array.isArray(arr) && arr.some((item: any) => (item.presence?.uid || item.uid) === uid)
-                  );
-                  if (isStillPresent) return;
-                } catch {}
-
-                globalEventHandlers.forEach((h) =>
-                  h.onStatusUpdate?.({
-                    uid,
-                    displayName: p.presence?.displayName || p.displayName || "Jogador",
-                    photoURL: p.presence?.photoURL || p.photoURL || null,
-                    status: "offline",
-                    playing: null,
-                    updatedAt: Date.now(),
-                  }),
-                );
-              }, 4000);
-              presenceLeaveTimers.set(uid, timer);
-            }
-          });
-        }
+      .on("presence", { event: "leave" }, ({ key, leftPresences }: any) => {
+        const presences = Array.isArray(leftPresences) && leftPresences.length > 0 ? leftPresences : [{}];
+        presences.forEach((p: any) => {
+          const uid = p?.presence?.uid || p?.uid || (key && key !== "guest" ? key : null);
+          if (uid) {
+            cancelPendingLeave(uid);
+            // Notifica imediatamente em tempo real sem atraso
+            globalEventHandlers.forEach((h) =>
+              h.onStatusUpdate?.({
+                uid,
+                displayName: p?.presence?.displayName || p?.displayName || "Jogador",
+                photoURL: p?.presence?.photoURL || p?.photoURL || null,
+                status: "offline",
+                playing: null,
+                updatedAt: Date.now(),
+              }),
+            );
+          }
+        });
       });
 
     try {
@@ -260,10 +247,16 @@ export const broadcastPresenceStatus = async (presence: PresencePayload) => {
       payload: presence,
     });
 
-    // 2. Track no estado Presence do canal
-    await presenceChannel.track({
-      presence,
-    });
+    // 2. Track/Untrack no estado Presence do canal
+    if (presence.status === "offline") {
+      try {
+        await presenceChannel.untrack();
+      } catch {}
+    } else {
+      await presenceChannel.track({
+        presence,
+      });
+    }
   } catch (err) {
     console.warn("[realtimeEventBus] broadcastPresenceStatus error:", err);
   }

@@ -1277,7 +1277,19 @@ const parseDiskSizeGb = (text) => {
 const requireAuth = async (req, res, next) => {
   const header = String(req.headers.authorization ?? "");
   const match = header.match(/^Bearer\s+(.+)$/i);
-  if (!match) {
+  let bodyToken = null;
+  if (typeof req.body === "string") {
+    try {
+      const parsed = JSON.parse(req.body);
+      bodyToken = typeof parsed?.token === "string" ? parsed.token.trim() : null;
+    } catch {}
+  } else if (req.body && typeof req.body.token === "string") {
+    bodyToken = req.body.token.trim();
+  }
+  const queryToken = typeof req.query?.token === "string" ? req.query.token.trim() : null;
+  const token = match ? match[1] : (bodyToken || queryToken || null);
+
+  if (!token) {
     res.status(401).json({ error: "Token de autenticacao ausente." });
     return;
   }
@@ -2457,12 +2469,14 @@ const compactFriendProfile = (profile) => ({
   photoURL: profile.photoURL || null,
   status: profile.status || "offline",
   playing: profile.playing || null,
+  updatedAt: profile.updatedAt || null,
 });
 
 const profileRowToPublic = (row = {}) => {
   const presenceUpdatedAt = Date.parse(String(row.presence_updated_at || ""));
+  // 75s staleness window: client heartbeat is 25s, so 75s allows 2-3 missed heartbeats before marking offline
   const presenceIsFresh =
-    Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 5 * 60 * 1000;
+    Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 75 * 1000;
   const status = presenceIsFresh && ["online", "playing"].includes(row.status)
     ? row.status
     : "offline";
@@ -2479,6 +2493,9 @@ const profileRowToPublic = (row = {}) => {
     steamUsername: row.steam_username || "",
     status,
     playing: status === "playing" ? row.playing || null : null,
+    updatedAt: status === "offline" && !presenceIsFresh
+      ? new Date().toISOString()
+      : row.presence_updated_at || null,
   };
 };
 
@@ -2549,7 +2566,7 @@ export const normalizeFriendAchievementAggregate = (aggregate = {}, gamesWithAch
 
 const resolvePresence = (presence = {}) => {
   const updatedAtMs = Date.parse(String(presence.updatedAt || ""));
-  const isFresh = Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < 2 * 60 * 1000;
+  const isFresh = Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < 75 * 1000;
   if (!isFresh) return { status: "offline", playing: null };
   if (presence.status === "offline") return { status: "offline", playing: null };
   const currentGameTitle = String(presence.currentGameTitle || "").trim();
@@ -2765,15 +2782,31 @@ app.get("/api/friends/search", steamPrivateLimiter, requireFirebaseUser, async (
   }
 });
 
+let serverPresenceChannel = null;
+const getServerPresenceChannel = () => {
+  if (!serverPresenceChannel && supabaseAdmin) {
+    serverPresenceChannel = supabaseAdmin.channel("checkpoint_presence_bus");
+    serverPresenceChannel.subscribe();
+  }
+  return serverPresenceChannel;
+};
+
 app.post("/api/presence", steamPrivateLimiter, requireFirebaseUser, async (req, res) => {
-  const requestedStatus = String(req.body?.status || "online");
+  let bodyData = req.body;
+  if (typeof bodyData === "string") {
+    try {
+      bodyData = JSON.parse(bodyData);
+    } catch {}
+  }
+  const requestedStatus = String(bodyData?.status || req.query?.status || "online");
   const status =
     requestedStatus === "playing"
       ? "playing"
       : requestedStatus === "offline"
         ? "offline"
         : "online";
-  const currentGameTitle = String(req.body?.currentGameTitle || "").trim().slice(0, 120);
+  const currentGameTitle = String(bodyData?.currentGameTitle || req.query?.currentGameTitle || "").trim().slice(0, 120);
+  const nowIso = new Date().toISOString();
 
   try {
     const { error } = await supabaseAdmin
@@ -2781,11 +2814,30 @@ app.post("/api/presence", steamPrivateLimiter, requireFirebaseUser, async (req, 
       .update({
         status,
         playing: status === "playing" ? currentGameTitle : null,
-        presence_updated_at: new Date().toISOString(),
+        presence_updated_at: nowIso,
       })
       .eq("uid", req.firebaseUser.uid);
     if (error) throw error;
-    res.json({ ok: true });
+
+    if (supabaseAdmin && status === "offline") {
+      try {
+        const presenceBus = getServerPresenceChannel();
+        if (presenceBus) {
+          void presenceBus.send({
+            type: "broadcast",
+            event: "presence:status_update",
+            payload: {
+              uid: req.firebaseUser.uid,
+              status: "offline",
+              playing: null,
+              updatedAt: Date.now(),
+            },
+          }).catch(() => {});
+        }
+      } catch {}
+    }
+
+    res.json({ ok: true, status, updatedAt: nowIso });
   } catch (error) {
     console.error("Erro ao atualizar presenca:", error);
     res.status(500).json({ error: "Erro ao atualizar presença." });
@@ -2932,16 +2984,24 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
     const userGames = userGamesResult.data || [];
     const publicRow = publicProfileResult.data;
 
-    let games = userGames.map((row) => ({
-      ...(row.data || {}),
-      id: String(row.id),
-      title: String(row.data?.title || row.title || "Jogo"),
-      launcherType: row.data?.launcherType || row.launcher_type || "local",
-      hoursPlayed: Number(row.data?.hoursPlayed ?? row.hours_played ?? 0),
-      steamAppId: row.data?.steamAppId || row.steam_app_id || undefined,
-      epicCatalogId: row.data?.epicCatalogId || row.epic_catalog_id || undefined,
-      isFavorite: Boolean(row.data?.isFavorite ?? row.is_favorite),
-    }));
+    let games = userGames.map((row) => {
+      const dataObj = row.data || {};
+      const calculatedHours = Number(
+        dataObj.hoursPlayed ?? row.hours_played ?? (dataObj.minutesPlayed ? dataObj.minutesPlayed / 60 : 0),
+      );
+      return {
+        ...dataObj,
+        id: String(row.id),
+        title: String(dataObj.title || row.title || "Jogo"),
+        launcherType: dataObj.launcherType || row.launcher_type || "local",
+        hoursPlayed: calculatedHours,
+        steamAppId: dataObj.steamAppId || row.steam_app_id || undefined,
+        epicCatalogId: dataObj.epicCatalogId || row.epic_catalog_id || undefined,
+        isFavorite: Boolean(dataObj.isFavorite ?? row.is_favorite),
+        cardImage: dataObj.cardImage || dataObj.image || dataObj.imageUrl || "",
+        image: dataObj.image || dataObj.cardImage || dataObj.imageUrl || "",
+      };
+    });
 
     // Fallback: se user_games estiver vazio, mesclar top_games / favorite_games de public_profiles se houver
     if (games.length === 0 && publicRow) {
@@ -2950,8 +3010,20 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
       games = Array.from(
         new Map(
           [
-            ...sqlTopGames.map((g) => ({ ...g, isFavorite: Boolean(g?.isFavorite) })),
-            ...sqlFavoriteGames.map((g) => ({ ...g, isFavorite: true })),
+            ...sqlTopGames.map((g) => ({
+              ...g,
+              hoursPlayed: Number(g?.hoursPlayed ?? (g?.minutesPlayed ? g.minutesPlayed / 60 : 0)),
+              cardImage: g?.imageUrl || g?.cardImage || g?.image || "",
+              image: g?.imageUrl || g?.image || g?.cardImage || "",
+              isFavorite: Boolean(g?.isFavorite),
+            })),
+            ...sqlFavoriteGames.map((g) => ({
+              ...g,
+              hoursPlayed: Number(g?.hoursPlayed ?? (g?.minutesPlayed ? g.minutesPlayed / 60 : 0)),
+              cardImage: g?.imageUrl || g?.cardImage || g?.image || "",
+              image: g?.imageUrl || g?.image || g?.cardImage || "",
+              isFavorite: true,
+            })),
           ].map((g) => [String(g?.id || ""), g]),
         ).values(),
       ).filter((g) => g?.id).slice(0, FRIEND_PROFILE_GAME_LIMIT);
@@ -2965,7 +3037,7 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
     let favoritesCount = 0;
 
     for (const game of games) {
-      const hours = Number(game.hoursPlayed || 0);
+      const hours = Number(game.hoursPlayed || (game.minutesPlayed ? game.minutesPlayed / 60 : 0));
       totalMinutesPlayed += Math.round(hours * 60);
       if (game.isFavorite) favoritesCount++;
       const launcher = String(game.launcherType || "").toLowerCase();
@@ -3001,12 +3073,12 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
 
     const storedLibrarySummary = profileRow.library_summary || publicRow?.stats || {};
     const finalLibrarySummary = {
-      games: games.length || Number(storedLibrarySummary.games || 0),
-      steamGames: steamGamesCount || Number(storedLibrarySummary.steamGames || storedLibrarySummary.steamGameCount || 0),
-      epicGames: epicGamesCount || Number(storedLibrarySummary.epicGames || storedLibrarySummary.epicGameCount || 0),
-      localGames: localGamesCount || Number(storedLibrarySummary.localGames || storedLibrarySummary.localGameCount || 0),
-      favorites: favoritesCount || Number(storedLibrarySummary.favorites || 0),
-      minutesPlayed: totalMinutesPlayed || Number(storedLibrarySummary.minutesPlayed || 0),
+      games: Math.max(games.length, Number(storedLibrarySummary.games || 0)),
+      steamGames: Math.max(steamGamesCount, Number(storedLibrarySummary.steamGames || storedLibrarySummary.steamGameCount || 0)),
+      epicGames: Math.max(epicGamesCount, Number(storedLibrarySummary.epicGames || storedLibrarySummary.epicGameCount || 0)),
+      localGames: Math.max(localGamesCount, Number(storedLibrarySummary.localGames || storedLibrarySummary.localGameCount || 0)),
+      favorites: Math.max(favoritesCount, Number(storedLibrarySummary.favorites || 0)),
+      minutesPlayed: Math.max(totalMinutesPlayed, Number(storedLibrarySummary.minutesPlayed || 0)),
     };
 
     const visibleProfile = profileRowToPublic(profileRow);
@@ -3031,6 +3103,7 @@ app.get("/api/friends/:uid/profile", steamPrivateLimiter, requireFirebaseUser, a
         achievementSummary: finalAchievementSummary,
         librarySummary: finalLibrarySummary,
         levelProgress: levelResult.data || null,
+        level: levelResult.data?.current_level || profileRow.level || 1,
       },
       games,
       gamesTruncated: false,

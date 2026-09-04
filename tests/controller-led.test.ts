@@ -54,7 +54,9 @@ describe("cores dos temas na lightbar", () => {
   it("mantem o accent da interface separado dos presets físicos escolhidos", () => {
     expect(THEME_ACCENT_COLORS.playstation).toEqual({ r: 37, g: 99, b: 235 });
     expect(THEME_LED_COLORS.checkpoint).toEqual({ r: 255, g: 255, b: 255 });
-    expect(THEME_LED_COLORS.playstation).toEqual({ r: 0, g: 4, b: 255 });
+    expect(THEME_LED_COLORS.playstation).toEqual({ r: 0, g: 41, b: 255 });
+    expect(THEME_LED_COLORS.ps5).toEqual({ r: 255, g: 255, b: 255 });
+    expect(THEME_ACCENT_COLORS.ps5).toEqual({ r: 255, g: 255, b: 255 });
     expect(THEME_LED_COLORS.gamecube).toEqual({ r: 167, g: 0, b: 255 });
     expect(THEME_LED_COLORS.xbox360).toEqual({ r: 33, g: 255, b: 0 });
   });

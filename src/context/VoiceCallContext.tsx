@@ -253,15 +253,26 @@ export const VoiceCallProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       <CallConnectionBanner
         status={
-          voiceCall.isReconnecting
-            ? "connecting"
-            : voiceCall.callState === "connecting" || voiceCall.callState === "ringing-out"
+          voiceCall.channelConnectionStatus === "failed"
+            ? "error"
+            : voiceCall.channelConnectionStatus === "degraded"
+            ? "poor"
+            : voiceCall.isReconnecting ||
+              voiceCall.channelConnectionStatus === "reconnecting" ||
+              voiceCall.callState === "connecting" ||
+              voiceCall.callState === "ringing-out"
             ? "connecting"
             : voiceCall.callState === "active"
             ? "connected"
             : "idle"
         }
-        onRetry={voiceCall.pendingReconnectSession ? () => void voiceCall.reconnectCall() : undefined}
+        onRetry={
+          voiceCall.pendingReconnectSession
+            ? () => void voiceCall.reconnectCall()
+            : voiceCall.channelConnectionStatus === "failed" || voiceCall.channelConnectionStatus === "degraded"
+            ? () => void voiceCall.reconnectCall()
+            : undefined
+        }
       />
 
       {/* Expanded Main Call Window */}
@@ -435,6 +446,7 @@ const safeFallbackVoiceCallContext: Partial<VoiceCallContextType> = {
   isScreenPickerOpen: false,
   incomingInvite: null,
   pendingReconnectSession: null,
+  channelConnectionStatus: "idle" as const,
   localStream: null,
   remoteStream: null,
   localCameraStream: null,

@@ -5,18 +5,33 @@ import { cachedQuery, invalidate } from "../lib/queryCache";
 const sorted = (games: Game[]) =>
   [...games].sort((a, b) => a.title.localeCompare(b.title));
 
-const toCloudGameRow = (uid: string, game: Game) => ({
-  id: game.id,
-  user_id: uid,
-  title: game.title,
-  launcher_type: game.launcherType || "local",
-  hours_played: game.hoursPlayed || 0,
-  steam_app_id: game.steamAppId || null,
-  epic_catalog_id: game.epicCatalogId || null,
-  is_favorite: Boolean(game.isFavorite),
-  data: game,
-  updated_at: new Date().toISOString(),
-});
+const toCloudGameRow = (uid: string, game: Game) => {
+  const calculatedMinutes = Math.max(
+    0,
+    Number(game.steamPlaytimeMinutes) || 0,
+    Number(game.locallyTrackedMinutes) || 0,
+    Math.round((Number(game.hoursPlayed) || 0) * 60),
+  );
+  const hoursPlayed = calculatedMinutes > 0 ? Number((calculatedMinutes / 60).toFixed(1)) : (Number(game.hoursPlayed) || 0);
+
+  return {
+    id: game.id,
+    user_id: uid,
+    title: game.title,
+    launcher_type: game.launcherType || "local",
+    hours_played: hoursPlayed,
+    steam_app_id: game.steamAppId || null,
+    epic_catalog_id: game.epicCatalogId || null,
+    is_favorite: Boolean(game.isFavorite),
+    data: {
+      ...game,
+      hoursPlayed,
+      cardImage: game.cardImage || game.image || "",
+      image: game.image || game.cardImage || "",
+    },
+    updated_at: new Date().toISOString(),
+  };
+};
 
 const fromCloudGameRow = (row: Record<string, any>): Game => ({
   ...(row.data || {}),
@@ -233,5 +248,23 @@ export const syncPublicLibrarySummary = async (
     summary.revision,
   );
   localStorage.setItem(fingerprintKey, profileFingerprint);
+
+  // Sincroniza a lista de jogos locais para a tabela user_games no Supabase
+  // permitindo que amigos vejam todos os jogos, mais jogados, horas e conquistas
+  if (window.electronAPI.listLocalGames) {
+    try {
+      const localGames = await window.electronAPI.listLocalGames(uid);
+      if (Array.isArray(localGames) && localGames.length > 0) {
+        const rows = localGames.slice(0, 300).map((g) => toCloudGameRow(uid, g));
+        for (let i = 0; i < rows.length; i += 100) {
+          const chunk = rows.slice(i, i + 100);
+          await supabase.from("user_games").upsert(chunk, { onConflict: "user_id,id" }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn("[localLibrary] Falha ao sincronizar jogos para user_games:", e);
+    }
+  }
+
   return true;
 };

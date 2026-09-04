@@ -60,11 +60,15 @@ export function useGamepadNavigation({
 
     let rafId = requestAnimationFrame(function tick() {
       if (scrollRef.current && (rightStickYRef.current !== 0 || rightStickXRef.current !== 0)) {
+        // Task 2: Bounds checking — scroll para dentro dos limites do elemento
+        const el = scrollRef.current;
         if (rightStickYRef.current !== 0) {
-          scrollRef.current.scrollTop += rightStickYRef.current * MAX_PX_PER_FRAME;
+          const maxScrollTop = el.scrollHeight - el.clientHeight;
+          el.scrollTop = Math.max(0, Math.min(el.scrollTop + rightStickYRef.current * MAX_PX_PER_FRAME, maxScrollTop));
         }
         if (rightStickXRef.current !== 0) {
-          scrollRef.current.scrollLeft += rightStickXRef.current * MAX_PX_PER_FRAME;
+          const maxScrollLeft = el.scrollWidth - el.clientWidth;
+          el.scrollLeft = Math.max(0, Math.min(el.scrollLeft + rightStickXRef.current * MAX_PX_PER_FRAME, maxScrollLeft));
         }
       }
       rafId = requestAnimationFrame(tick);

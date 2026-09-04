@@ -17,6 +17,21 @@ import {
   Sparkles,
   Palette,
   Image as ImageIcon,
+  Upload,
+  Link as LinkIcon,
+  Headphones,
+  Shield,
+  Crown,
+  Rocket,
+  Flame,
+  Zap,
+  Dices,
+  Trophy,
+  Ghost,
+  Skull,
+  Heart,
+  Star,
+  Check,
 } from "lucide-react";
 import type { RoomCategory, CallRoomConfig } from "../../types/voice-governance";
 import type { UserProfile } from "../../types/domain";
@@ -62,7 +77,52 @@ const CATEGORIES: {
     },
   ];
 
-const PRESET_ICONS = ["🎮", "🕹️", "⚔️", "🎧", "🛡️", "👑", "🚀", "👾", "⚡", "🎲", "🔥", "🌟"];
+export const VOICE_CHANNEL_ICONS = [
+  { id: "gamepad", label: "Controle", icon: Gamepad2 },
+  { id: "swords", label: "Combate", icon: Swords },
+  { id: "headphones", label: "Headset", icon: Headphones },
+  { id: "shield", label: "Escudo", icon: Shield },
+  { id: "crown", label: "Coroa", icon: Crown },
+  { id: "rocket", label: "Foguete", icon: Rocket },
+  { id: "flame", label: "Fogo", icon: Flame },
+  { id: "zap", label: "Raio", icon: Zap },
+  { id: "dices", label: "Dados", icon: Dices },
+  { id: "trophy", label: "Troféu", icon: Trophy },
+  { id: "sparkles", label: "Brilho", icon: Sparkles },
+  { id: "radio", label: "Rádio", icon: Radio },
+  { id: "ghost", label: "Fantasma", icon: Ghost },
+  { id: "skull", label: "Caveira", icon: Skull },
+  { id: "heart", label: "Coração", icon: Heart },
+  { id: "star", label: "Estrela", icon: Star },
+] as const;
+
+export const renderVoiceRoomIcon = (
+  iconKey?: string,
+  className = "h-4 w-4",
+  color?: string,
+) => {
+  if (!iconKey) return <Gamepad2 className={className} style={color ? { color } : undefined} />;
+  const normalized = iconKey.toLowerCase().trim();
+  const match = VOICE_CHANNEL_ICONS.find((item) => item.id === normalized);
+  if (match) {
+    const IconComp = match.icon;
+    return <IconComp className={className} style={color ? { color } : undefined} />;
+  }
+  // Mapeamentos para compatibilidade com emojis antigos
+  if (iconKey === "🎮") return <Gamepad2 className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "⚔️") return <Swords className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🎧") return <Headphones className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🛡️") return <Shield className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "👑") return <Crown className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🚀") return <Rocket className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🔥") return <Flame className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "⚡") return <Zap className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🎲") return <Dices className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "🌟") return <Star className={className} style={color ? { color } : undefined} />;
+  if (iconKey === "👾") return <Ghost className={className} style={color ? { color } : undefined} />;
+
+  return <span className="text-sm leading-none select-none">{iconKey}</span>;
+};
 
 const THEME_COLORS = [
   { id: "purple", label: "Neon Purple", value: "#8B5CF6", border: "border-purple-500", bg: "bg-purple-500/20" },
@@ -84,7 +144,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 }) => {
   const [roomName, setRoomName] = useState("");
   const [category, setCategory] = useState<RoomCategory>("resenha_games");
-  const [selectedIcon, setSelectedIcon] = useState("🎮");
+  const [selectedIcon, setSelectedIcon] = useState("gamepad");
   const [customAvatarUrl, setCustomAvatarUrl] = useState("");
   const [themeColor, setThemeColor] = useState(THEME_COLORS[0].value);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -94,12 +154,30 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 
   const fallbackDefaultName = `Canal de ${userProfile?.displayName || "Voz"}`;
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("A imagem deve ter no máximo 5MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setCustomAvatarUrl(reader.result);
+        setError(null);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   useEffect(() => {
     if (isOpen) {
       if (initialConfig) {
         setRoomName(initialConfig.roomName || "");
         setCategory(initialConfig.category || "resenha_games");
-        setSelectedIcon(initialConfig.icon || "🎮");
+        setSelectedIcon(initialConfig.icon || "gamepad");
         setCustomAvatarUrl(initialConfig.avatarUrl || "");
         setThemeColor(initialConfig.themeColor || THEME_COLORS[0].value);
         setIsPrivate(Boolean(initialConfig.isPrivate));
@@ -107,7 +185,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
       } else {
         setRoomName("");
         setCategory("resenha_games");
-        setSelectedIcon("🎮");
+        setSelectedIcon("gamepad");
         setCustomAvatarUrl("");
         setThemeColor(THEME_COLORS[0].value);
         setIsPrivate(false);
@@ -189,13 +267,13 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/8 bg-black/35 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div
-                className="flex h-10 w-10 items-center justify-center rounded-xl border text-lg shadow-sm"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border text-lg shadow-sm overflow-hidden"
                 style={{ borderColor: `${themeColor}60`, backgroundColor: `${themeColor}20` }}
               >
                 {customAvatarUrl ? (
                   <img src={customAvatarUrl} alt="" className="h-full w-full rounded-xl object-cover" />
                 ) : (
-                  <span>{selectedIcon}</span>
+                  renderVoiceRoomIcon(selectedIcon, "h-5 w-5", themeColor)
                 )}
               </div>
               <div>
@@ -245,45 +323,100 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                 </label>
               </div>
 
-              {/* Seletor de Ícones Preset */}
+              {/* Seletor de Ícones Preset (Vetoriais) */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-medium text-white/50">Escolha o Ícone do Canal</span>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {PRESET_ICONS.map((icon) => {
-                    const isSelected = selectedIcon === icon && !customAvatarUrl;
+                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin scrollbar-thumb-white/10">
+                  {VOICE_CHANNEL_ICONS.map((item) => {
+                    const IconComp = item.icon;
+                    const isSelected = selectedIcon === item.id && !customAvatarUrl;
                     return (
                       <button
-                        key={icon}
+                        key={item.id}
                         type="button"
                         onClick={() => {
-                          setSelectedIcon(icon);
+                          setSelectedIcon(item.id);
                           setCustomAvatarUrl("");
                         }}
-                        className={`h-9 w-9 rounded-xl flex items-center justify-center text-base transition-all cursor-pointer shrink-0 border ${isSelected
-                            ? "bg-white/20 border-white shadow-sm scale-110"
-                            : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/15"
-                          }`}
+                        className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+                          isSelected
+                            ? "bg-white/20 border-white shadow-sm scale-110 text-white"
+                            : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/15 text-white/60 hover:text-white"
+                        }`}
+                        style={isSelected ? { borderColor: themeColor, boxShadow: `0 0 10px ${themeColor}40` } : undefined}
+                        title={item.label}
                       >
-                        {icon}
+                        <IconComp className="h-4 w-4" style={isSelected ? { color: themeColor } : undefined} />
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* URL de Imagem / Foto Customizada */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-medium text-white/50 flex items-center gap-1">
-                  <ImageIcon className="h-3 w-3 text-white/40" />
-                  <span>Ou use uma Foto / Imagem (URL)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://exemplo.com/icone-sala.png"
-                  value={customAvatarUrl}
-                  onChange={(e) => setCustomAvatarUrl(e.target.value)}
-                  className="w-full h-9 px-3 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-white placeholder-white/30 focus:outline-none focus:border-white/25 transition"
-                />
+              {/* Upload de Imagem e Link da Foto */}
+              <div className="space-y-2 pt-1 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-white/50 flex items-center gap-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-white/40" />
+                    <span>Ou use uma Foto / Imagem personalizada</span>
+                  </span>
+                  {customAvatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomAvatarUrl("")}
+                      className="text-[10px] font-bold text-rose-400 hover:text-rose-300 transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+
+                {customAvatarUrl ? (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
+                    <div className="h-10 w-10 rounded-xl overflow-hidden border border-white/20 shrink-0 bg-black/40">
+                      <img src={customAvatarUrl} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-white truncate">Foto personalizada ativa</p>
+                      <p className="text-[10px] text-white/40 truncate">Esta imagem será o ícone principal do canal</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCustomAvatarUrl("")}
+                      className="p-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                      title="Remover foto"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
+                      <label className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-bold text-white transition cursor-pointer shrink-0">
+                        <Upload className="h-3.5 w-3.5 text-white/80" />
+                        <span>Carregar Imagem</span>
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                      </label>
+                      <div className="relative flex items-center">
+                        <LinkIcon className="absolute left-2.5 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Ou cole a URL da imagem (https://...)"
+                          value={customAvatarUrl}
+                          onChange={(e) => setCustomAvatarUrl(e.target.value)}
+                          className="w-full h-9 pl-8 pr-3 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-white placeholder-white/30 focus:outline-none focus:border-white/25 transition"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-white/30">Suporta PNG, JPG, WebP ou GIF (máx. 5MB) ou links externos.</p>
+                  </div>
+                )}
               </div>
 
               {/* Seletor de Cor do Tema */}

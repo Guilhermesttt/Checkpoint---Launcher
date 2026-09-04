@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setWindowBehavior: (behavior) => ipcRenderer.invoke("system:set-window-behavior", behavior),
   requestAppQuit: () => ipcRenderer.invoke("system:request-app-quit"),
   confirmAppQuit: () => ipcRenderer.invoke("system:confirm-app-quit"),
+  setPresenceSession: (session) => ipcRenderer.invoke("presence:set-session", session),
   onExitConfirmationRequested: (callback) => {
     const handler = () => callback();
     ipcRenderer.on("system:exit-confirmation-requested", handler);

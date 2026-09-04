@@ -76,13 +76,17 @@
       "src/assets/Overlay_Background.mp4",
       "src/sounds/**/*",
       "src/assets/**/*",
-      "node_modules/@fontsource-variable/**/*"
+      "node_modules/@fontsource-variable/**/*",
+      "node_modules/node-hid/**/*",
+      "node_modules/pkg-prebuilds/**/*"
     ],
     "asar": true,
+    "npmRebuild": false,
     "asarUnpack": [
       "assets/icon.ico",
       "src/assets/hedrabionics_pindown.io.mp4",
-      "src/assets/Overlay_Background.mp4"
+      "src/assets/Overlay_Background.mp4",
+      "node_modules/node-hid/**/*"
     ],
     "win": {
       "icon": "assets/icon.ico",
@@ -126,6 +130,7 @@
     "livekit-client": "^2.22.0",
     "livekit-server-sdk": "^2.18.0",
     "node-fetch": "^3.3.2",
+    "node-hid": "^3.4.0",
     "node-stream-zip": "^1.16.0",
     "react-window": "^2.3.0",
     "sharp": "^0.35.3",

@@ -158,6 +158,28 @@ const HEALTH_CHECK_MAX_ATTEMPTS = 120; // 120 * 500ms = ~60s de tolerância
 const HEALTH_CHECK_INTERVAL_MS = 500;
 
 let isQuitting = false;
+let isQuittingConfirmed = false;
+let quitSafetyTimer = null;
+let activePresenceSession = null;
+
+const sendDirectOfflineSync = () => {
+  if (!activePresenceSession?.uid) return;
+  const { uid, token, apiUrl } = activePresenceSession;
+  const baseUrl = (apiUrl || "http://127.0.0.1:8787").replace(/\/$/, "");
+  const url = `${baseUrl}/api/presence?status=offline${token ? `&token=${encodeURIComponent(token)}` : ""}`;
+  const body = JSON.stringify({ status: "offline", token });
+  try {
+    void fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body,
+    }).catch(() => {});
+  } catch {}
+};
+
 let mainWindow;
 
 const windowBehaviorController = createWindowBehaviorController({
@@ -1281,12 +1303,32 @@ const createWindow = async () => {
       event.preventDefault();
       return;
     }
+    if (isQuittingConfirmed) {
+      return;
+    }
+
+    event.preventDefault();
     isQuitting = true;
+
+    // Dispara offline imediatamente pelo processo principal Node.js
+    sendDirectOfflineSync();
+
     try {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send("app:quitting");
       }
     } catch {}
+
+    // Timer de segurança de 400ms caso o renderer não responda a tempo
+    if (!quitSafetyTimer) {
+      quitSafetyTimer = setTimeout(() => {
+        isQuittingConfirmed = true;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.destroy();
+        }
+        app.quit();
+      }, 400);
+    }
   });
 
   mainWindow.on("closed", () => {
@@ -3502,7 +3544,21 @@ registerSecureIpcHandler("system:request-app-quit", () =>
   windowBehaviorController.requestAppQuit());
 
 registerSecureIpcHandler("system:confirm-app-quit", () => {
+  if (quitSafetyTimer) {
+    clearTimeout(quitSafetyTimer);
+    quitSafetyTimer = null;
+  }
+  isQuittingConfirmed = true;
+  sendDirectOfflineSync();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.destroy();
+  }
   windowBehaviorController.confirmAppQuit();
+});
+
+registerSecureIpcHandler("presence:set-session", (_event, session) => {
+  activePresenceSession = session && typeof session === "object" ? session : null;
+  return true;
 });
 
 registerSecureIpcHandler("window:fullscreen-toggle", () => {
@@ -4892,6 +4948,7 @@ app.on("will-quit", () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  sendDirectOfflineSync();
   try {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("app:quitting");

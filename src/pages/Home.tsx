@@ -97,7 +97,10 @@ import {
   getCheckpointFriendProfile,
   updateCheckpointPresence,
   markCheckpointOfflineSync,
+  markCheckpointOfflineAsync,
+  getCachedAccessToken,
 } from "../services/checkpointFriends";
+import { apiUrl } from "../services/api";
 import {
   getAdjacentSidebarCategory,
   readLastNavigation,
@@ -159,8 +162,8 @@ const APP_THEME_OPTIONS: Array<{
     {
       id: "ps5",
       label: "PlayStation 5",
-      hint: "Branco e azul PlayStation + sons PS5",
-      swatch: "rgb(0 114 206)",
+      hint: "Branco futurista PlayStation 5 + sons PS5",
+      swatch: "rgb(255 255 255)",
       soundTheme: "ps5",
       visualTheme: "ps5",
     },
@@ -273,16 +276,44 @@ const Home: React.FC = () => {
   const [exitConfirmationOpen, setExitConfirmationOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [libraryFilters, setLibraryFilters] = useState<LibraryFilters>({
-    launchers: [],
-    categories: [],
-    favoritesOnly: false,
-    withAchievements: false,
-    minHours: 0,
-    maxHours: 0,
-    sortBy: "title",
-    sortDir: "asc",
+  const [libraryFilters, setLibraryFilters] = useState<LibraryFilters>(() => {
+    try {
+      const stored = localStorage.getItem("checkpoint_library_filters");
+      if (stored) {
+        return {
+          launchers: [],
+          categories: [],
+          favoritesOnly: false,
+          withAchievements: false,
+          minHours: 0,
+          maxHours: 0,
+          sortBy: "title",
+          sortDir: "asc",
+          ...JSON.parse(stored),
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      launchers: [],
+      categories: [],
+      favoritesOnly: false,
+      withAchievements: false,
+      minHours: 0,
+      maxHours: 0,
+      sortBy: "title",
+      sortDir: "asc",
+    };
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("checkpoint_library_filters", JSON.stringify(libraryFilters));
+    } catch {
+      // ignore
+    }
+  }, [libraryFilters]);
 
   const [friendProfileModal, setFriendProfileModal] = useState<{
     profile: UserProfile;
@@ -766,6 +797,16 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (!user?.uid) return;
 
+    // Sincroniza sessão de presença com o processo principal Node.js do Electron
+    if (window.electronAPI?.setPresenceSession) {
+      void window.electronAPI.setPresenceSession({
+        uid: user.uid,
+        displayName: userProfile?.displayName,
+        token: getCachedAccessToken(),
+        apiUrl: apiUrl(""),
+      });
+    }
+
     const markOffline = () => {
       markCheckpointOfflineSync(
         user.uid,
@@ -777,8 +818,17 @@ const Home: React.FC = () => {
     window.addEventListener("beforeunload", markOffline);
     window.addEventListener("pagehide", markOffline);
 
-    const unsubQuitting = window.electronAPI?.onAppQuitting?.(() => {
-      markOffline();
+    const unsubQuitting = window.electronAPI?.onAppQuitting?.(async () => {
+      if (user?.uid) {
+        try {
+          await markCheckpointOfflineAsync(
+            user.uid,
+            userProfile?.displayName || undefined,
+            userProfile?.photoURL,
+          );
+        } catch {}
+      }
+      void window.electronAPI?.confirmAppQuit?.();
     });
 
     return () => {
@@ -1838,7 +1888,14 @@ const Home: React.FC = () => {
   const handleSignOut = async () => {
     playSound("back");
     setIsExitingSession(true);
-    await new Promise((r) => window.setTimeout(r, 850));
+    if (user?.uid) {
+      await markCheckpointOfflineAsync(
+        user.uid,
+        userProfile?.displayName || undefined,
+        userProfile?.photoURL,
+      ).catch(() => {});
+    }
+    await new Promise((r) => window.setTimeout(r, 450));
     await signOutUser();
   };
 

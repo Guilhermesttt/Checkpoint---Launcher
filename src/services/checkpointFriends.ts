@@ -3,8 +3,23 @@ import type { Game, UserProfile } from "../types/domain";
 import { apiUrl } from "./api";
 import { broadcastPresenceStatus } from "./realtimeEventBus";
 
+let cachedAccessToken: string | null = null;
+
+export const getCachedAccessToken = () => cachedAccessToken;
+
+void supabase.auth.getSession().then(({ data }) => {
+  cachedAccessToken = data.session?.access_token ?? null;
+}).catch(() => {});
+
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedAccessToken = session?.access_token ?? null;
+});
+
 const getAuthHeaders = async () => {
   const session = (await supabase.auth.getSession()).data.session;
+  if (session?.access_token) {
+    cachedAccessToken = session.access_token;
+  }
   if (!session?.access_token) throw new Error("Sessao expirada. Entre novamente.");
   return {
     Authorization: `Bearer ${session.access_token}`,
@@ -143,20 +158,75 @@ export const markCheckpointOfflineSync = (
     void broadcastPresenceStatus(presencePayload).catch(() => {});
 
     // 2. Persistência HTTP com keepalive para o backend registrar offline mesmo fechando o processo
-    const url = apiUrl("/api/presence");
-    const body = JSON.stringify({ status: "offline", currentGameTitle: null });
+    const token = cachedAccessToken;
+    const tokenQuery = token
+      ? `?token=${encodeURIComponent(token)}&status=offline`
+      : `?status=offline`;
+    const url = apiUrl(`/api/presence${tokenQuery}`);
+    const body = JSON.stringify({ status: "offline", currentGameTitle: null, token });
+
     if (typeof navigator !== "undefined" && navigator.sendBeacon) {
       const blob = new Blob([body], { type: "application/json" });
-      navigator.sendBeacon(url, blob);
+      const sent = navigator.sendBeacon(url, blob);
+      if (!sent && typeof fetch !== "undefined") {
+        void fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body,
+          keepalive: true,
+        }).catch(() => {});
+      }
     } else if (typeof fetch !== "undefined") {
       void fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body,
         keepalive: true,
       }).catch(() => {});
     }
   } catch {}
+};
+
+/**
+ * Versão assíncrona para ser aguardada com precisão no handshake de encerramento
+ */
+export const markCheckpointOfflineAsync = async (
+  uid: string,
+  customDisplayName?: string,
+  customPhotoURL?: string | null,
+) => {
+  const presencePayload = {
+    uid,
+    displayName: customDisplayName || "Jogador",
+    photoURL: customPhotoURL || null,
+    status: "offline" as const,
+    playing: null,
+    updatedAt: Date.now(),
+  };
+
+  const token = cachedAccessToken;
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}&status=offline` : `?status=offline`;
+  const url = apiUrl(`/api/presence${tokenQuery}`);
+  const body = JSON.stringify({ status: "offline", currentGameTitle: null, token });
+
+  await Promise.allSettled([
+    broadcastPresenceStatus(presencePayload),
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body,
+      keepalive: true,
+    }),
+  ]);
 };
 
 export const getCheckpointFriendStatuses = async (): Promise<UserProfile[]> => {

@@ -123,6 +123,7 @@ export interface UserProfile {
   retroAchievementsUsername?: string;
   status?: "online" | "playing" | "offline";
   playing?: string | null;
+  updatedAt?: number | string | null;
   discordFriends?: Array<{
     id: string;
     username: string;
@@ -135,6 +136,7 @@ export interface UserProfile {
     photoURL?: string | null;
     status?: "online" | "playing" | "offline";
     playing?: string | null;
+    updatedAt?: number | string | null;
   }>;
   checkpointFriendRequestsIncoming?: Array<{
     uid: string;
@@ -222,6 +224,7 @@ export interface SocialFriend {
   source?: "discord" | "discord_friend" | "local" | "checkpoint";
   level?: number;
   lastSeen?: string | number;
+  updatedAt?: number | string | null;
 }
 
 export type CheckpointFriendRequest = NonNullable<

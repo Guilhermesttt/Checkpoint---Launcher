@@ -17,6 +17,106 @@ Um hub de jogos unificado, construído para trazer a experiência de console def
 
 ---
 
+## 📋 Plano de implementação da auditoria (Qualidade, Performance, UI/UX)
+
+Este plano transforma a auditoria em execução prática, com foco em impacto real para estabilidade, fluidez e retenção de usuários.
+
+### Objetivos
+
+1. Elevar a confiabilidade das funcionalidades principais sem regressões.
+2. Reduzir tempo de resposta percebido nas telas mais usadas.
+3. Melhorar legibilidade e consistência visual (tipografia, espaçamento e hierarquia).
+4. Aumentar engajamento com feedbacks de interface e fluxo mais claro.
+
+### Escopo da implementação
+
+- Qualidade funcional (fluxos críticos, erros, estados vazios e carregamento)
+- Performance de frontend (render, carga inicial, uso de recursos)
+- Qualidade de código (organização, manutenção, previsibilidade)
+- UI/UX (layout, tipografia, densidade visual, microinterações, acessibilidade)
+
+### Fase 1 — Estabilidade e bugs críticos (Semana 1)
+
+**Meta:** reduzir riscos de regressão e comportamentos inconsistentes.
+
+- Mapear e corrigir bugs de maior impacto em fluxos críticos:
+  - login/sessão
+  - biblioteca e filtros
+  - integrações de plataforma
+  - chat/voz/notificações
+- Padronizar tratamento de erro por tipo (rede, autorização, timeout, regra de negócio).
+- Unificar estados de `loading`, `empty` e `error` em componentes compartilhados.
+
+**Entregáveis:**
+- Correções aplicadas nos fluxos críticos
+- Padrão único de mensagens de erro ao usuário
+- Redução de “estados quebrados” entre telas
+
+### Fase 2 — Performance e tempo de resposta (Semana 2)
+
+**Meta:** melhorar fluidez e reduzir latência percebida.
+
+- Otimizar re-render desnecessário nas telas/painéis de maior uso.
+- Aplicar memoização em fronteiras corretas (`memo`, `useMemo`, `useCallback`).
+- Implementar/ajustar lazy loading para seções abaixo da dobra.
+- Revisar efeitos assíncronos para evitar duplicidade de listeners/subscriptions.
+
+**KPIs sugeridos:**
+- Menor tempo de primeira interação útil
+- Menor custo de render em listas e painéis
+- Menos quedas de FPS em telas animadas
+
+### Fase 3 — Refactor estrutural e qualidade de código (Semana 3)
+
+**Meta:** reduzir complexidade e facilitar evolução.
+
+- Dividir componentes “grandes demais” por responsabilidade.
+- Mover regra de negócio para hooks/services quando estiver acoplada à UI.
+- Definir limites internos de complexidade por arquivo/componente.
+- Reforçar consistência de tipos e contratos entre camadas.
+
+**Entregáveis:**
+- Componentes mais curtos e previsíveis
+- Menos acoplamento entre UI e lógica de domínio
+- Base mais segura para novas features
+
+### Fase 4 — UI/UX e retenção (Semana 4)
+
+**Meta:** elevar qualidade percebida e foco do usuário.
+
+- Padronizar escala tipográfica (ex.: 12/14/16/20/24/32).
+- Padronizar spacing tokens (ex.: 4/8/12/16/24/32).
+- Reforçar hierarquia visual (1 CTA primária por bloco).
+- Ajustar densidade de informação para reduzir sobrecarga cognitiva.
+- Melhorar microinterações (feedback imediato, transições 150–250ms).
+- Revisar acessibilidade prática:
+  - foco visível
+  - contraste mínimo adequado
+  - tamanho mínimo de toque/leitura
+
+**Entregáveis:**
+- UI mais consistente entre páginas
+- Melhor escaneabilidade de conteúdo
+- Aumento de clareza e percepção de qualidade
+
+### Backlog priorizado (ordem de execução)
+
+1. Correções de bugs com impacto funcional direto.
+2. Padronização de estados de erro/carregamento/vazio.
+3. Otimização de render em telas mais acessadas.
+4. Refactor dos componentes com maior complexidade.
+5. Ajustes de tipografia, espaçamento e hierarquia.
+6. Polimento de microinterações e acessibilidade.
+
+### Critérios de sucesso
+
+- Fluxos principais estáveis e sem regressões relevantes.
+- Interface mais rápida e responsiva na navegação diária.
+- Código mais simples de manter e evoluir.
+- Experiência visual mais consistente, legível e envolvente.
+
+---
+
 ## Sobre o projeto
 
 **Pherielium** (antigo *Checkpoint Launcher*) é um hub gamer unificado que reúne biblioteca, controles, conquistas, mods, voz e transmissão em um único lugar — sem depender de um emaranhado de launchers separados. A proposta é simples: trazer a fluidez e a imersão de um console para dentro do seu PC, mantendo tudo local-first, rápido e sob seu controle.

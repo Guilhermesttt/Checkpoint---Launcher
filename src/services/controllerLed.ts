@@ -10,7 +10,7 @@ export interface RgbColor {
 export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
   phelierium: { r: 255, g: 255, b: 255 },
   checkpoint: { r: 255, g: 255, b: 255 },
-  ps5: { r: 0, g: 114, b: 206 },
+  ps5: { r: 255, g: 255, b: 255 },
   playstation: { r: 37, g: 99, b: 235 },
   ps4: { r: 0, g: 112, b: 209 },
   psp: { r: 6, g: 182, b: 212 },
@@ -19,17 +19,30 @@ export const THEME_ACCENT_COLORS: Record<VisualTheme, RgbColor> = {
   cyberpunk: { r: 255, g: 238, b: 0 },
 };
 
-/** Presets ajustados visualmente para a lightbar física do controle. */
+type LedDeviceKind = "ds4" | "dualsense";
+
+/**
+ * Cor fixa da lightbar por modelo de controle — independente do tema visual.
+ *
+ * DS4      → #0029FF  (azul PlayStation clássico, como saiu de fábrica)
+ * DualSense → #FFFFFF  (branco neutro do PS5)
+ */
+export const CONTROLLER_LED_COLORS: Record<LedDeviceKind, RgbColor> = {
+  ds4:        { r: 0,   g: 41,  b: 255 }, // #0029FF
+  dualsense:  { r: 255, g: 255, b: 255 }, // #FFFFFF
+};
+
+/** @deprecated Mantido apenas para compatibilidade — use CONTROLLER_LED_COLORS para LED físico. */
 export const THEME_LED_COLORS: Record<VisualTheme, RgbColor> = {
-  phelierium: { r: 255, g: 255, b: 255 },
-  checkpoint: { r: 255, g: 255, b: 255 },
-  ps5: { r: 0, g: 114, b: 206 },
-  playstation: { r: 0, g: 4, b: 255 }, // #0004FF
-  ps4: { r: 0, g: 112, b: 209 },
-  psp: { r: 6, g: 182, b: 212 },
-  gamecube: { r: 167, g: 0, b: 255 }, // #A700FF
-  xbox360: { r: 33, g: 255, b: 0 }, // #21FF00
-  cyberpunk: { r: 255, g: 238, b: 0 },
+  phelierium:  { r: 255, g: 255, b: 255 }, // branco
+  checkpoint:  { r: 255, g: 255, b: 255 }, // branco
+  ps5:         { r: 255, g: 255, b: 255 }, // #FFFFFF — branco (tema PS5)
+  playstation: { r: 0,   g: 41,  b: 255 }, // #0029FF — azul PlayStation
+  ps4:         { r: 0,   g: 41,  b: 255 }, // #0029FF — azul PS4 clássico
+  psp:         { r: 6,   g: 182, b: 212 }, // ciano
+  gamecube:    { r: 167, g: 0,   b: 255 }, // #A700FF
+  xbox360:     { r: 33,  g: 255, b: 0   }, // #21FF00
+  cyberpunk:   { r: 255, g: 238, b: 0   }, // amarelo
 };
 
 const SONY_VENDOR_ID = 0x054c;
@@ -37,8 +50,7 @@ const SONY_VENDOR_ID = 0x054c;
 /** Product IDs conhecidos: DS4, DS4 v2, DualSense, DualSense Edge */
 const SONY_LED_PRODUCT_IDS = new Set([0x05c4, 0x09cc, 0x0ba0, 0x0ce6, 0x0df2]);
 
-type LedDeviceKind = "ds4" | "dualsense";
-
+// LedDeviceKind movido para antes de CONTROLLER_LED_COLORS (hoisted)
 interface LedDevice {
   device: HIDDevice;
   kind: LedDeviceKind;
@@ -380,6 +392,10 @@ export async function setControllerLedColor(r: number, g: number, b: number): Pr
   }
 }
 
+/**
+ * Aplica a cor do LED conforme o **tema visual ativo** da aplicação.
+ * ps4/playstation → #0029FF | ps5/phelierium/checkpoint → #FFFFFF
+ */
 export async function applyThemeLed(theme: VisualTheme): Promise<boolean> {
   const color = THEME_LED_COLORS[theme];
   return setControllerLedColor(color.r, color.g, color.b);

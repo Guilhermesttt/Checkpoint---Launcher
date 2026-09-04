@@ -86,7 +86,19 @@ export function useGamepadFocusNavigation({
       );
 
       const nextElement = declaredNeighbor ?? rankedCandidates[0]?.id;
-      if (!nextElement) return false;
+
+      // Task 8: Wrap-around — se não há candidato na direção, volta ao início/fim da lista
+      if (!nextElement) {
+        const wrapTarget =
+          direction === "down" || direction === "right"
+            ? elements[0]
+            : elements[elements.length - 1];
+        if (wrapTarget && wrapTarget !== currentElement) {
+          focusSystemElement(wrapTarget, currentElement);
+          return true;
+        }
+        return false;
+      }
 
       focusSystemElement(nextElement, currentElement);
       return true;

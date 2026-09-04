@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clock, ExternalLink, Gamepad2, Lock, Pencil, Star, Trophy, TrendingUp, User } from "lucide-react";
+import { Clock, ExternalLink, Gamepad2, Layers, Lock, Pencil, Search, Star, Trophy, TrendingUp, User } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDiscord, faSteam } from "@fortawesome/free-brands-svg-icons";
 import { EPIC_GAMES_ICON_PATH } from "../constants/assets";
@@ -8,7 +8,12 @@ import type { LauncherLanguage } from "../context/PreferencesContext";
 import type { Game, UserProfile } from "../types/domain";
 import { useGamepadNavigation } from "../hooks/useGamepadNavigation";
 import { calculateAchievementTotals } from "../utils/achievementTotals";
-import { calculatePlayerLevel, aggregateTrophyCounts } from "../utils/trophyTiers";
+import {
+  calculatePlayerLevel,
+  aggregateTrophyCounts,
+  calculatePlayerLevelFromXp,
+  getPSNTierInfo,
+} from "../utils/trophyTiers";
 import { getHubAggregateCounts } from "../utils/hubTrophies";
 import { useAuth } from "../auth/AuthProvider";
 import {
@@ -54,7 +59,8 @@ const profileCopy = {
     connected: "Conectado", disconnected: "Não conectado", player: "Jogador",
     edit: "Editar perfil", games: "Jogos", hours: "Horas", favorites: "Favoritos",
     platforms: "Plataformas", achievements: "Conquistas", library: "Biblioteca",
-    mostPlayed: "Mais jogados", unlocked: "conquistas desbloqueadas",
+    mostPlayed: "Mais jogados", allGames: "Todos os Jogos", searchGames: "Filtrar jogos...", noGamesFound: "Nenhum jogo encontrado.",
+    unlocked: "conquistas desbloqueadas",
     catalogued: "jogos catalogados", catalog: "Catálogo e atalhos",
     noFavorites: "Nenhum favorito ainda.", emptyTitle: "Perfil em construção",
     emptyBody: "Jogue e favorite jogos para preencher esta área.", copiedNickname: "Nickname do Discord copiado.", copiedId: "ID do Discord copiado.", copyError: "Não foi possível copiar o Discord.",
@@ -63,7 +69,8 @@ const profileCopy = {
     connected: "Connected", disconnected: "Not connected", player: "Player",
     edit: "Edit profile", games: "Games", hours: "Hours", favorites: "Favorites",
     platforms: "Platforms", achievements: "Achievements", library: "Library",
-    mostPlayed: "Most played", unlocked: "achievements unlocked",
+    mostPlayed: "Most played", allGames: "All Games", searchGames: "Filter games...", noGamesFound: "No games found.",
+    unlocked: "achievements unlocked",
     catalogued: "games catalogued", catalog: "Catalog and shortcuts",
     noFavorites: "No favorites yet.", emptyTitle: "Profile under construction",
     emptyBody: "Play and favorite games to fill this area.", copiedNickname: "Discord nickname copied.", copiedId: "Discord ID copied.", copyError: "Could not copy Discord.",
@@ -72,7 +79,8 @@ const profileCopy = {
     connected: "Conectado", disconnected: "No conectado", player: "Jugador",
     edit: "Editar perfil", games: "Juegos", hours: "Horas", favorites: "Favoritos",
     platforms: "Plataformas", achievements: "Logros", library: "Biblioteca",
-    mostPlayed: "Más jugados", unlocked: "logros desbloqueados",
+    mostPlayed: "Más jugados", allGames: "Todos los Juegos", searchGames: "Filtrar juegos...", noGamesFound: "No se encontraron juegos.",
+    unlocked: "logros desbloqueados",
     catalogued: "juegos catalogados", catalog: "Catálogo y accesos directos",
     noFavorites: "Aún no hay favoritos.", emptyTitle: "Perfil en construcción",
     emptyBody: "Juega y marca juegos como favoritos para completar esta área.", copiedNickname: "Nickname de Discord copiado.", copiedId: "ID de Discord copiado.", copyError: "No se pudo copiar Discord.",
@@ -81,7 +89,8 @@ const profileCopy = {
     connected: "Connecté", disconnected: "Non connecté", player: "Joueur",
     edit: "Modifier le profil", games: "Jeux", hours: "Heures", favorites: "Favoris",
     platforms: "Plateformes", achievements: "Succès", library: "Bibliothèque",
-    mostPlayed: "Les plus joués", unlocked: "succès débloqués",
+    mostPlayed: "Les plus joués", allGames: "Tous les Jeux", searchGames: "Filtrer les jeux...", noGamesFound: "Aucun jeu trouvé.",
+    unlocked: "succès débloqués",
     catalogued: "jeux catalogués", catalog: "Catalogue et raccourcis",
     noFavorites: "Aucun favori.", emptyTitle: "Profil en construction",
     emptyBody: "Jouez et ajoutez des jeux aux favoris pour remplir cette zone.", copiedNickname: "Pseudo Discord copié.", copiedId: "ID Discord copié.", copyError: "Impossible de copier Discord.",
@@ -90,7 +99,8 @@ const profileCopy = {
     connected: "Verbunden", disconnected: "Nicht verbunden", player: "Spieler",
     edit: "Profil bearbeiten", games: "Spiele", hours: "Stunden", favorites: "Favoriten",
     platforms: "Plattformen", achievements: "Erfolge", library: "Bibliothek",
-    mostPlayed: "Meistgespielt", unlocked: "Erfolge freigeschaltet",
+    mostPlayed: "Meistgespielt", allGames: "Alle Spiele", searchGames: "Spiele filtern...", noGamesFound: "Keine Spiele gefunden.",
+    unlocked: "Erfolge freigeschaltet",
     catalogued: "Spiele katalogisiert", catalog: "Katalog und Verknüpfungen",
     noFavorites: "Noch keine Favoriten.", emptyTitle: "Profil im Aufbau",
     emptyBody: "Spiele und markiere Favoriten, um diesen Bereich zu füllen.", copiedNickname: "Discord-Name kopiert.", copiedId: "Discord-ID kopiert.", copyError: "Discord konnte nicht kopiert werden.",
@@ -99,7 +109,8 @@ const profileCopy = {
     connected: "Connesso", disconnected: "Non connesso", player: "Giocatore",
     edit: "Modifica profilo", games: "Giochi", hours: "Ore", favorites: "Preferiti",
     platforms: "Piattaforme", achievements: "Obiettivi", library: "Libreria",
-    mostPlayed: "Più giocati", unlocked: "obiettivi sbloccati",
+    mostPlayed: "Più giocati", allGames: "Tutti i Giochi", searchGames: "Filtra giochi...", noGamesFound: "Nessun gioco trovato.",
+    unlocked: "obiettivi sbloccati",
     catalogued: "giochi catalogati", catalog: "Catalogo e collegamenti",
     noFavorites: "Nessun preferito.", emptyTitle: "Profilo in costruzione",
     emptyBody: "Gioca e aggiungi giochi ai preferiti per riempire questa area.", copiedNickname: "Nickname Discord copiato.", copiedId: "ID Discord copiato.", copyError: "Impossibile copiare Discord.",
@@ -327,14 +338,27 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
     return { totalGames, totalHours, totalAchievements, totalPossible, favorites, steamGames, epicGames, localGames };
   }, [normalizedGames, userProfile]);
 
-  const topGames = useMemo(
-    () =>
-      [...normalizedGames]
-        .filter((game) => getGamePlayedHours(game) > 0)
-        .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a))
-        .slice(0, 5),
-    [normalizedGames],
-  );
+  const [activeGameTab, setActiveGameTab] = useState<"mostPlayed" | "allGames">("mostPlayed");
+  const [gameSearch, setGameSearch] = useState("");
+
+  const topGames = useMemo(() => {
+    const withHours = [...normalizedGames]
+      .filter((game) => getGamePlayedHours(game) > 0)
+      .sort((a, b) => getGamePlayedHours(b) - getGamePlayedHours(a));
+    if (withHours.length > 0) return withHours.slice(0, 5);
+    return [...normalizedGames].slice(0, 5);
+  }, [normalizedGames]);
+
+  const filteredAllGames = useMemo(() => {
+    const q = gameSearch.trim().toLowerCase();
+    const sorted = [...normalizedGames].sort((a, b) => {
+      const diff = getGamePlayedHours(b) - getGamePlayedHours(a);
+      if (diff !== 0) return diff;
+      return a.title.localeCompare(b.title);
+    });
+    if (!q) return sorted;
+    return sorted.filter((g) => g.title.toLowerCase().includes(q));
+  }, [normalizedGames, gameSearch]);
 
   const favoriteGames = useMemo(
     () => normalizedGames.filter((game) => game.isFavorite).slice(0, 6),
@@ -357,18 +381,41 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
 
   const { user: authUser } = useAuth();
   const playerLevel = useMemo(() => {
-    // Anti-farm: nível só do hub quando é seu perfil; visitantes veem total
     const isSelf = editable && authUser?.uid;
     if (isSelf) {
       const hubAgg = getHubAggregateCounts(authUser.uid!, normalizedGames as any);
-      // se tem progresso no hub, usa hub; senão mostra nível 1 Bronze 1 (não farmado)
+      // Se tem progresso no hub, usa hub; senão mostra nível 1 Bronze 1 (não farmado)
       if ((hubAgg.hubPoints ?? 0) > 0 || normalizedGames.length > 0) {
         return calculatePlayerLevel(0, 0, 0, hubAgg);
+      }
+    } else {
+      // Amigos ou perfis consultados via busca
+      const anyProfile = userProfile as any;
+      const levelProgress = anyProfile?.levelProgress;
+      if (levelProgress?.total_xp != null && Number(levelProgress.total_xp) > 0) {
+        return calculatePlayerLevelFromXp(Number(levelProgress.total_xp));
+      }
+      const rawLvl = Number(levelProgress?.current_level ?? anyProfile?.level ?? 0);
+      if (rawLvl > 1) {
+        const tierInfo = getPSNTierInfo(rawLvl);
+        return {
+          level: rawLvl,
+          xp: 0,
+          progress: Number(levelProgress?.progress_pct ?? 0),
+          currentLevelXp: 0,
+          xpForNextLevel: 0,
+          tier: tierInfo.tier,
+          subTier: tierInfo.subTier,
+          tierName: tierInfo.name,
+          rank: tierInfo.name,
+          rankColor: tierInfo.color,
+          tierInfo,
+        };
       }
     }
     const agg = aggregateTrophyCounts(normalizedGames);
     return calculatePlayerLevel(stats.totalHours, stats.totalAchievements, stats.totalGames, agg);
-  }, [normalizedGames, stats, editable, authUser?.uid]);
+  }, [normalizedGames, stats, editable, authUser?.uid, userProfile]);
 
   return (
     <motion.div
@@ -510,46 +557,160 @@ const UserProfilePage: React.FC<UserProfilePageProps> = ({
           <>
             <div className={`grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] ${compactProfile ? "gap-4" : "gap-5"}`}>
           <section aria-label="Atividade do jogador" className="space-y-5">
-            <Section compact={compactProfile} title={copy.mostPlayed} icon={<TrendingUp className="h-4 w-4" />} className={compactProfile ? "min-h-[260px]" : "min-h-[346px]"}>
-              {topGames.length > 0 ? (
-                <div className="space-y-4">
-                  {topGames.map((game, index) => {
-                    const playedHours = getGamePlayedHours(game);
-                    const pct = (playedHours / maxHours) * 100;
-                    return (
-                      <button
-                        key={game.id}
-                        type="button"
-                        onClick={() => onOpenGame?.(game)}
-                        disabled={!onOpenGame}
-                        className="grid w-full grid-cols-[20px_42px_1fr_auto] items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
-                      >
-                        <span className="text-right text-xs font-black text-white/25">{index + 1}</span>
-                        <div className="h-12 w-9 overflow-hidden rounded-lg bg-white/8">
-                          {(game.cardImage || game.image) && (
-                            <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-white">{game.title}</p>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${pct}%` }}
-                              transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
-                              className="h-full rounded-full bg-white"
-                            />
-                          </div>
-                        </div>
-                        <span className="flex items-center gap-1 text-[10px] font-semibold text-white/35">
-                          <Clock className="h-3 w-3" /> {formatPlayedHours(playedHours)}h
-                        </span>
-                      </button>
-                    );
-                  })}
+            <Section
+              compact={compactProfile}
+              title={activeGameTab === "mostPlayed" ? copy.mostPlayed : `${copy.allGames} (${normalizedGames.length})`}
+              icon={activeGameTab === "mostPlayed" ? <TrendingUp className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+              className={compactProfile ? "min-h-[260px]" : "min-h-[346px]"}
+            >
+              {/* Tab Selector & Search */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-white/8 pb-3">
+                <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.04] border border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setActiveGameTab("mostPlayed")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      activeGameTab === "mostPlayed"
+                        ? "bg-white/15 text-white shadow-xs"
+                        : "text-white/45 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    <span>{copy.mostPlayed}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveGameTab("allGames")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      activeGameTab === "allGames"
+                        ? "bg-white/15 text-white shadow-xs"
+                        : "text-white/45 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>{copy.allGames}</span>
+                    <span className="ml-0.5 rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">
+                      {normalizedGames.length}
+                    </span>
+                  </button>
                 </div>
+
+                {activeGameTab === "allGames" && (
+                  <div className="relative w-48 sm:w-56">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/30 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder={copy.searchGames}
+                      value={gameSearch}
+                      onChange={(e) => setGameSearch(e.target.value)}
+                      className="w-full h-8 pl-8 pr-3 rounded-lg bg-white/5 border border-white/10 text-xs font-medium text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {activeGameTab === "mostPlayed" ? (
+                topGames.length > 0 ? (
+                  <div className="space-y-4">
+                    {topGames.map((game, index) => {
+                      const playedHours = getGamePlayedHours(game);
+                      const pct = (playedHours / maxHours) * 100;
+                      return (
+                        <button
+                          key={game.id}
+                          type="button"
+                          onClick={() => onOpenGame?.(game)}
+                          disabled={!onOpenGame}
+                          className="grid w-full grid-cols-[20px_42px_1fr_auto] items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-default disabled:hover:bg-transparent"
+                        >
+                          <span className="text-right text-xs font-black text-white/25">{index + 1}</span>
+                          <div className="h-12 w-9 overflow-hidden rounded-lg bg-white/8">
+                            {(game.cardImage || game.image) && (
+                              <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black text-white">{game.title}</p>
+                            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: index * 0.05 }}
+                                className="h-full rounded-full bg-white"
+                              />
+                            </div>
+                          </div>
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-white/35">
+                            <Clock className="h-3 w-3" /> {formatPlayedHours(playedHours)}h
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyProfileState compact={compactProfile} title={copy.emptyTitle} body={copy.emptyBody} />
+                )
               ) : (
-                <EmptyProfileState compact={compactProfile} title={copy.emptyTitle} body={copy.emptyBody} />
+                /* Todos os Jogos Tab */
+                filteredAllGames.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[420px] overflow-y-auto pr-1 thin-scrollbar">
+                    {filteredAllGames.map((game) => {
+                      const playedHours = getGamePlayedHours(game);
+                      const launcherBadge = game.launcherType === "steam"
+                        ? "Steam"
+                        : game.launcherType === "epic"
+                        ? "Epic Games"
+                        : "Local";
+
+                      return (
+                        <button
+                          key={game.id}
+                          type="button"
+                          onClick={() => onOpenGame?.(game)}
+                          disabled={!onOpenGame}
+                          className="flex items-center gap-3 p-2.5 rounded-xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/12 transition text-left cursor-pointer group disabled:cursor-default"
+                        >
+                          <div className="h-14 w-11 rounded-lg overflow-hidden bg-white/8 shrink-0 relative">
+                            {(game.cardImage || game.image) ? (
+                              <img src={game.cardImage || game.image} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-white/30">
+                                <Gamepad2 className="h-5 w-5" />
+                              </div>
+                            )}
+                            {game.isFavorite && (
+                              <div className="absolute top-1 right-1 h-3.5 w-3.5 rounded-full bg-black/60 flex items-center justify-center">
+                                <Star className="h-2.5 w-2.5 text-yellow-400 fill-yellow-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-bold text-white group-hover:text-white/90">{game.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] font-medium text-white/40 flex items-center gap-1">
+                                <Clock className="h-2.5 w-2.5" />
+                                {formatPlayedHours(playedHours)}h
+                              </span>
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/5 text-white/50 uppercase tracking-wider">
+                                {launcherBadge}
+                              </span>
+                            </div>
+                            {(game.totalAchievements || 0) > 0 && (
+                              <div className="flex items-center gap-1 mt-1 text-[10px] text-white/40">
+                                <Trophy className="h-2.5 w-2.5 text-yellow-500/80" />
+                                <span>{game.completedAchievements || 0} / {game.totalAchievements}</span>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-xs font-bold text-white/40">
+                    {copy.noGamesFound}
+                  </div>
+                )
               )}
             </Section>
 

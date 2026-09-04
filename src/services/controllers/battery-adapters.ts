@@ -27,12 +27,7 @@ export interface ControllerBatteryAdapter {
   parseInputReport(reportId: number, data: DataView): BatteryReading | null;
 }
 
-/**
- * Sony PlayStation DualSense (PS5)
- * VID: 0x054c | PIDs: 0x0ce6, 0x0df2
- * - Bluetooth: Report ID 0x31 (byte 53 = battery/charging)
- * - USB: Report ID 0x01 (byte 52 = battery/charging)
- */
+
 export class DualSenseBatteryAdapter implements ControllerBatteryAdapter {
   readonly deviceName = "PlayStation DualSense";
   private static readonly VENDOR_ID = 0x054c;
@@ -59,7 +54,9 @@ export class DualSenseBatteryAdapter implements ControllerBatteryAdapter {
 
   private extract(byte: number, transport: ControllerTransport): BatteryReading {
     const rawLevel = byte & 0x0f;
-    const isCharging = (byte & 0xf0) !== 0;
+    // nibble superior: 0x00 = descarregado/desconectado, 0x10 = carregando, 0x20 = completo (não carregando)
+    const chargingNibble = (byte & 0xf0) >> 4;
+    const isCharging = chargingNibble === 0x1; // apenas 0x10 = carregando de fato
     // rawLevel 0x0 a 0xa mapeia para 0% a 100%
     const level = Math.min(100, Math.max(0, Math.round(rawLevel * 10)));
     return {
@@ -103,6 +100,7 @@ export class DualShock4BatteryAdapter implements ControllerBatteryAdapter {
 
   private extract(byte: number, transport: ControllerTransport): BatteryReading {
     const rawLevel = byte & 0x0f;
+    // Bit 4 (0x10) = carregando. Bits 5+ são reservados ou flags de estado.
     const isCharging = (byte & 0x10) !== 0;
     // DS4 reporta rawLevel de 0 a 8 (0 = vazio, 8 = 100%)
     const level = Math.min(100, Math.max(0, Math.round((rawLevel / 8) * 100)));
@@ -118,19 +116,57 @@ export class DualShock4BatteryAdapter implements ControllerBatteryAdapter {
 
 /**
  * Microsoft Xbox Controller
- * Xbox utiliza prioritariamente XInput no Windows.
+ * Task 5: PIDs conhecidos para detecção correta.
+ * Xbox utiliza XInput no Windows para bateria — via WebHID apenas detectamos se é USB ou BT.
+ *
+ * Xbox Series X|S Wireless: 0x02e0, 0x02fd, 0x0b12
+ * Xbox One S Wireless:       0x02dd
+ * Xbox 360 Wired:            0x028e
+ * Xbox One Wired USB:        0x02d1
  */
 export class XboxBatteryAdapter implements ControllerBatteryAdapter {
   readonly deviceName = "Xbox Controller";
   private static readonly VENDOR_ID = 0x045e;
+  private static readonly WIRELESS_PIDS = new Set([0x02e0, 0x02fd, 0x0b12, 0x02dd]);
+  private static readonly WIRED_PIDS    = new Set([0x028e, 0x02d1, 0x02ea]);
 
   matches(info: ControllerDeviceInfo): boolean {
     return info.vendorId === XboxBatteryAdapter.VENDOR_ID || /xbox|xinput/i.test(info.name ?? "");
   }
 
-  parseInputReport(_reportId: number, _data: DataView): BatteryReading | null {
-    // Xbox controllers usam polling XInput nativo no processo principal do Electron
+  parseInputReport(reportId: number, data: DataView): BatteryReading | null {
+    // Xbox Series X|S BT envia report 0x01 com byte 14 contendo flags de bateria
+    // (nível em 3 bits: 000=empty, 001=low, 010=medium, 011=full)
+    if (reportId === 0x01 && data.byteLength >= 15) {
+      const statusByte = data.getUint8(14);
+      const isCharging = (statusByte & 0x10) !== 0;
+      const levelRaw = (statusByte & 0x03); // bits 0-1: 0=empty,1=low,2=med,3=full
+      const levelMap = [5, 35, 70, 100];
+      const level = levelMap[levelRaw] ?? 100;
+      // Transport inferido: se veio sem fio, é bluetooth
+      const transport = this._info?.transport ?? "bluetooth";
+      return {
+        level,
+        charging: isCharging,
+        transport,
+        deviceName: this.deviceName,
+        timestamp: Date.now(),
+      };
+    }
+    // Outros reports: Xbox não expõe bateria via WebHID no Windows — fallback é XInput (processo Electron)
     return null;
+  }
+
+  /** Contexto de dispositivo injetado para transport detection */
+  private _info?: ControllerDeviceInfo;
+
+  parseInputReportWithInfo(reportId: number, data: DataView, info: ControllerDeviceInfo): BatteryReading | null {
+    this._info = info;
+    try {
+      return this.parseInputReport(reportId, data);
+    } finally {
+      this._info = undefined;
+    }
   }
 }
 

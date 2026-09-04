@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { supabase } from "../services/supabase";
 import { apiUrl } from "../services/api";
 import { cleanupAllChannels } from "../services/voiceCall";
+import { markCheckpointOfflineSync } from "../services/checkpointFriends";
 import type { UserProfile } from "../types/domain";
 
 export interface AuthUser {
@@ -85,7 +86,7 @@ const loadSocialGraph = async (uid: string) => {
   if (relatedIds.length > 0) {
     const { data: profilesData } = await supabase
       .from("profiles")
-      .select("uid,display_name,photo_url,status,playing")
+      .select("uid,display_name,photo_url,status,playing,presence_updated_at")
       .in("uid", relatedIds);
     if (profilesData && profilesData.length > 0) {
       publicProfiles = profilesData;
@@ -100,12 +101,18 @@ const loadSocialGraph = async (uid: string) => {
   const profileById = new Map((publicProfiles || []).map((profile) => [profile.uid, profile]));
   const compact = (relatedUid: string, createdAt?: string) => {
     const profile = profileById.get(relatedUid);
+    const presenceUpdatedAt = Date.parse(String(profile?.presence_updated_at || ""));
+    const isFresh = Number.isFinite(presenceUpdatedAt) && Date.now() - presenceUpdatedAt < 75_000;
+    const resolvedStatus = isFresh && ["online", "playing"].includes(profile?.status)
+      ? (profile.status as "online" | "playing")
+      : "offline";
+    const resolvedPlaying = resolvedStatus === "playing" ? (profile?.playing as any) || null : null;
     return {
       uid: relatedUid,
       displayName: String(profile?.display_name || "Jogador"),
       photoURL: profile?.photo_url || null,
-      status: (profile?.status as any) || "offline",
-      playing: (profile?.playing as any) || null,
+      status: resolvedStatus,
+      playing: resolvedPlaying,
       ...(createdAt ? { createdAt } : {}),
     };
   };
@@ -163,7 +170,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return prof;
     } catch (err) {
       console.error("[Auth] Falha ao carregar perfil do Supabase Postgres:", err);
-      return null;
+      const fallback = toProfile(uid, {
+        email: fallbackUser?.email,
+        displayName: fallbackUser?.displayName || fallbackUser?.email?.split("@")[0] || "User",
+        photoURL: fallbackUser?.photoURL,
+      });
+      setUserProfile(fallback);
+      return fallback;
     }
   }, []);
 
@@ -296,6 +309,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOutUser = useCallback(async () => {
     try {
       if (user?.uid) {
+        markCheckpointOfflineSync(
+          user.uid,
+          userProfile?.displayName || user.displayName || undefined,
+          userProfile?.photoURL || user.photoURL || null,
+        );
         if (window.electronAPI && typeof (window.electronAPI as any).clearLocalSteamId === "function") {
           await (window.electronAPI as any).clearLocalSteamId(user.uid).catch((e: unknown) => console.warn("[Auth] clearLocalSteamId error:", e));
         }
@@ -307,27 +325,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     cleanupAllChannels();
     setUser(null);
     setUserProfile(null);
-  }, [user]);
+  }, [user, userProfile]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Safety timeout: nunca prender a interface em carregamento indefinido se o auth demorar
+    const safetyTimeoutId = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 4000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        const authUser: AuthUser = {
-          uid: session.user.id,
-          email: session.user.email,
-          displayName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
-          photoURL: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || null,
-        };
-        setUser(authUser);
-        await fetchProfile(session.user.id, authUser);
-      } else {
-        setUser(null);
-        setUserProfile(null);
+      if (!isMounted) return;
+      try {
+        if (session?.user) {
+          const authUser: AuthUser = {
+            uid: session.user.id,
+            email: session.user.email,
+            displayName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split("@")[0] || "User",
+            photoURL: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || null,
+          };
+          setUser(authUser);
+          await fetchProfile(session.user.id, authUser);
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+      } catch (err) {
+        console.warn("[Auth] Erro ao sincronizar estado de autenticação:", err);
+      } finally {
+        if (isMounted) {
+          clearTimeout(safetyTimeoutId);
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeoutId);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);

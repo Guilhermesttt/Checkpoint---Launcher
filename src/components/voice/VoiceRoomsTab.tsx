@@ -23,7 +23,7 @@ import {
 import type { VoiceRoom, RoomCategory, CallRoomConfig } from "../../types/voice-governance";
 import type { UserProfile } from "../../types/domain";
 import { listPublicVoiceRooms, getMyVoiceRooms, closeVoiceRoom, updateVoiceRoom } from "../../services/voiceRooms";
-import { CreateChannelModal } from "./CreateChannelModal";
+import { CreateChannelModal, renderVoiceRoomIcon } from "./CreateChannelModal";
 
 interface VoiceRoomsTabProps {
   userProfile: UserProfile | null;
@@ -316,7 +316,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
                           {room.avatarUrl ? (
                             <img src={room.avatarUrl} alt="" className="h-full w-full rounded-xl object-cover" />
                           ) : (
-                            <span>{room.icon || "🎮"}</span>
+                            renderVoiceRoomIcon(room.icon, "h-4 w-4", roomColor)
                           )}
                         </div>
                         <span className="truncate">{room.name}</span>
@@ -450,7 +450,7 @@ export const VoiceRoomsTab: React.FC<VoiceRoomsTabProps> = ({
                         {room.avatarUrl ? (
                           <img src={room.avatarUrl} alt="" className="h-full w-full rounded-xl object-cover" />
                         ) : (
-                          <span>{room.icon || "🎮"}</span>
+                          renderVoiceRoomIcon(room.icon, "h-4 w-4", roomColor)
                         )}
                       </div>
                       <h4 className="font-black text-sm text-white truncate">{room.name}</h4>

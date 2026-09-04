@@ -68,6 +68,7 @@ export function useFriendsSystem({
   const notifiedMessageIdsRef = useRef<Set<string>>(new Set());
   const isFirstUnreadSnapshotRef = useRef(true);
   const friendPresenceFingerprintRef = useRef<Map<string, string>>(new Map());
+  const friendPresenceLastUpdatedRef = useRef<Map<string, number>>(new Map());
   const lastOnlineToastRef = useRef<Map<string, number>>(new Map());
 
   const previousCheckpointFriendsRef = useRef<Set<string> | null>(null);
@@ -182,17 +183,39 @@ export function useFriendsSystem({
             const status = statusById.get(uid);
             if (!status) return friend;
 
+            const serverUpdatedAtMs = status.updatedAt ? Date.parse(String(status.updatedAt)) : 0;
+            const lastUpdated = friendPresenceLastUpdatedRef.current.get(uid) || 0;
+            const isServerOffline = (status.status || "offline") === "offline";
+
+            if (!isServerOffline) {
+              // O servidor está dizendo que o amigo está ONLINE:
+              // Se o cliente já sabe que o amigo está OFFLINE (por um evento em tempo real mais recente),
+              // só aceitamos o ONLINE do servidor se o timestamp do servidor for estritamente mais novo.
+              if (friend.status === "offline" && lastUpdated && serverUpdatedAtMs <= lastUpdated) {
+                return friend;
+              }
+              if (serverUpdatedAtMs && lastUpdated && serverUpdatedAtMs < lastUpdated) {
+                return friend;
+              }
+            }
+
+            if (serverUpdatedAtMs) {
+              friendPresenceLastUpdatedRef.current.set(uid, serverUpdatedAtMs);
+            }
+
             const cleanName =
               (friend.name && friend.name !== "Amigo" && friend.name !== "Jogador")
                 ? friend.name
                 : (status.displayName || friend.name || "Amigo");
 
+            const isOffline = (status.status || "offline") === "offline";
             const newFriend = {
               ...friend,
               name: cleanName,
               avatar: status.photoURL || friend.avatar,
-              status: status.status || "offline",
-              playing: status.playing || undefined,
+              status: isOffline ? ("offline" as const) : (status.status || "online"),
+              playing: isOffline ? undefined : (status.playing || undefined),
+              updatedAt: serverUpdatedAtMs || undefined,
             };
             const nextFingerprint = `${newFriend.status}:${newFriend.playing || ""}`;
             const previousFingerprint = friendPresenceFingerprintRef.current.get(friend.id);
@@ -258,17 +281,36 @@ export function useFriendsSystem({
             const status = statusById.get(uid);
             if (!status) return friend;
 
+            const serverUpdatedAtMs = status.updatedAt ? Date.parse(String(status.updatedAt)) : 0;
+            const lastUpdated = friendPresenceLastUpdatedRef.current.get(uid) || 0;
+            const isServerOffline = (status.status || "offline") === "offline";
+
+            if (!isServerOffline) {
+              if (friend.status === "offline" && lastUpdated && serverUpdatedAtMs <= lastUpdated) {
+                return friend;
+              }
+              if (serverUpdatedAtMs && lastUpdated && serverUpdatedAtMs < lastUpdated) {
+                return friend;
+              }
+            }
+
+            if (serverUpdatedAtMs) {
+              friendPresenceLastUpdatedRef.current.set(uid, serverUpdatedAtMs);
+            }
+
             const cleanName =
               (friend.name && friend.name !== "Amigo" && friend.name !== "Jogador")
                 ? friend.name
                 : (status.displayName || friend.name || "Amigo");
 
+            const isOffline = (status.status || "offline") === "offline";
             const nextFriend = {
               ...friend,
               name: cleanName,
               avatar: status.photoURL || friend.avatar,
-              status: status.status || "offline",
-              playing: status.playing || undefined,
+              status: isOffline ? ("offline" as const) : (status.status || "online"),
+              playing: isOffline ? undefined : (status.playing || undefined),
+              updatedAt: serverUpdatedAtMs || undefined,
             };
 
             friendPresenceFingerprintRef.current.set(
@@ -317,6 +359,13 @@ export function useFriendsSystem({
     const unsubPresenceBus = subscribeToGlobalEventBus(user.uid, {
       onStatusUpdate: (presence) => {
         if (!presence?.uid) return;
+        const eventUpdatedAt = presence.updatedAt || Date.now();
+        const lastUpdated = friendPresenceLastUpdatedRef.current.get(presence.uid) || 0;
+        if (lastUpdated && eventUpdatedAt < lastUpdated) {
+          return;
+        }
+        friendPresenceLastUpdatedRef.current.set(presence.uid, eventUpdatedAt);
+
         setSocialFriends((current) => {
           let hasChanges = false;
           const updated = current.map((friend) => {
@@ -327,12 +376,14 @@ export function useFriendsSystem({
                 ? friend.name
                 : (presence.displayName || friend.name || "Amigo");
 
+            const isOffline = (presence.status || "offline") === "offline";
             const newFriend = {
               ...friend,
               name: cleanName,
               avatar: presence.photoURL || friend.avatar,
-              status: presence.status || "offline",
-              playing: presence.playing || undefined,
+              status: isOffline ? ("offline" as const) : (presence.status || "online"),
+              playing: isOffline ? undefined : (presence.playing || undefined),
+              updatedAt: eventUpdatedAt,
             };
 
             const nextFingerprint = `${newFriend.status}:${newFriend.playing || ""}`;
@@ -513,11 +564,17 @@ export function useFriendsSystem({
 
       const cpFriends: SocialFriend[] = (userProfile?.checkpointFriends ?? []).map((f: any) => {
         const existing = current.find((c) => c.id === `cp-friend:${f.uid}`);
+        const resolvedStatus = existing?.status
+          ? existing.status
+          : (f.status === "playing" ? "playing" : f.status === "online" ? "online" : "offline");
+        const resolvedPlaying = existing
+          ? (existing.status === "playing" ? existing.playing : undefined)
+          : (f.status === "playing" ? f.playing : undefined);
         return {
           id: `cp-friend:${f.uid}`,
           name: f.displayName || existing?.name || "Jogador",
-          status: existing?.status && existing.status !== "offline" ? existing.status : (f.status || "offline"),
-          playing: (existing?.status === "playing" ? existing?.playing : null) || (f.status === "playing" ? f.playing : undefined) || undefined,
+          status: resolvedStatus,
+          playing: resolvedPlaying,
           avatar: f.photoURL || existing?.avatar || undefined,
           source: "checkpoint",
         };

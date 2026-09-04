@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePreferences } from "../context/PreferencesContext";
+import { usePreferences, type VisualTheme } from "../context/PreferencesContext";
 import { useGamepad } from "../context/GamepadContext";
 import {
   applyThemeLed,
@@ -9,6 +9,26 @@ import {
   testControllerLed,
   type ControllerLedState,
 } from "../services/controllerLed";
+
+// Task 7: Queue para evitar chamadas concorrentes ao LED (race condition)
+let _ledInFlight = false;
+let _pendingLedTheme: string | null = null;
+
+async function applyThemeLedQueued(theme: string): Promise<void> {
+  _pendingLedTheme = theme;
+  if (_ledInFlight) return; // outra chamada já vai processar o pending
+
+  _ledInFlight = true;
+  try {
+    while (_pendingLedTheme !== null) {
+      const currentTheme = _pendingLedTheme as VisualTheme;
+      _pendingLedTheme = null;
+      await applyThemeLed(currentTheme);
+    }
+  } finally {
+    _ledInFlight = false;
+  }
+}
 
 /**
  * Sincroniza a cor da lightbar (DualShock 4 / DualSense) com o tema visual.
@@ -22,7 +42,7 @@ export function useControllerLed(): void {
   useEffect(() => {
     if (!isGamepadConnected || gamepadFamily !== "playstation") return;
 
-    void applyThemeLed(visualTheme);
+    void applyThemeLedQueued(visualTheme);
 
     const handleUserActivation = () => {
       if (accessRequested.current || !("hid" in navigator)) return;
@@ -30,7 +50,7 @@ export function useControllerLed(): void {
 
       // WebHID exige requestDevice diretamente na ativacao; um await anterior invalida o gesto.
       void requestControllerLedAccess().then((granted) => {
-        if (granted) void applyThemeLed(visualTheme);
+        if (granted) void applyThemeLedQueued(visualTheme);
       });
     };
 

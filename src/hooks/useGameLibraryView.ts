@@ -8,6 +8,12 @@ import type { LibraryFilters } from "../components/LibraryFilterModal";
 export const normalizeCategory = (v?: string) =>
   v?.toUpperCase().replace(/[^A-Z0-9]/g, "") ?? "";
 
+const safeTimestamp = (val?: string | number | null) => {
+  if (!val) return 0;
+  const t = new Date(val).getTime();
+  return Number.isNaN(t) ? 0 : t;
+};
+
 export function useGameLibraryView({
   games,
   activeCategory,
@@ -141,8 +147,8 @@ export function useGameLibraryView({
             cmp = getGamePlayedHours(b) - getGamePlayedHours(a);
             break;
           case "recent": {
-            const aTime = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
-            const bTime = new Date(b.lastPlayedAt || b.steamLastPlayedAt || 0).getTime();
+            const aTime = safeTimestamp(a.lastPlayedAt || a.steamLastPlayedAt);
+            const bTime = safeTimestamp(b.lastPlayedAt || b.steamLastPlayedAt);
             cmp = bTime - aTime;
             break;
           }
@@ -163,8 +169,8 @@ export function useGameLibraryView({
       games
         .filter((game) => Boolean(game.lastPlayedAt || game.steamLastPlayedAt || game.hoursPlayed))
         .sort((a, b) => {
-          const aPlayed = new Date(a.lastPlayedAt || a.steamLastPlayedAt || 0).getTime();
-          const bPlayed = new Date(b.lastPlayedAt || b.steamLastPlayedAt || 0).getTime();
+          const aPlayed = safeTimestamp(a.lastPlayedAt || a.steamLastPlayedAt);
+          const bPlayed = safeTimestamp(b.lastPlayedAt || b.steamLastPlayedAt);
           if (aPlayed !== bPlayed) return bPlayed - aPlayed;
           return getGamePlayedHours(b) - getGamePlayedHours(a);
         })

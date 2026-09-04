@@ -49,9 +49,19 @@ const BUTTON_MAP: Record<number, GamepadButtonName> = {
   16: "GUIDE",
 };
 
-// Índices tratados por loops dedicados (triggers analógicos e D-pad físico) —
-// o loop genérico de botões abaixo precisa ignorá-los para não disparar duas vezes.
-const DEDICATED_BUTTON_INDEXES = new Set([6, 7, 12, 13, 14, 15]);
+// Task 1: DEDICATED_BUTTON_INDEXES é derivado automaticamente do BUTTON_MAP
+// para nunca desatualizar caso o mapa seja modificado.
+// Triggers (L2/R2 = 6,7) e D-pad (12-15) têm loops dedicados e são excluídos do genérico.
+const DPAD_BUTTON_INDEXES = new Set([12, 13, 14, 15]);
+const DEDICATED_BUTTON_INDEXES = (() => {
+  const dedicated = new Set<number>(DPAD_BUTTON_INDEXES);
+  for (const [idx, name] of Object.entries(BUTTON_MAP)) {
+    if (((["L2", "R2"] as GamepadButtonName[]) as string[]).includes(name)) {
+      dedicated.add(Number(idx));
+    }
+  }
+  return dedicated;
+})();
 
 interface GamepadButtonSubscriber {
   id: symbol;
@@ -84,12 +94,15 @@ export function detectGamepadFamily(id: string): GamepadFamily {
   return "generic";
 }
 
+// Task 4: Trigger normalizado — ambas as fontes (button + axis) em escala 0-1 consistente
 function readTriggerValue(gp: Gamepad, side: "L2" | "R2"): number {
   const buttonIndex = side === "L2" ? 6 : 7;
   const axisIndex = side === "L2" ? 4 : 5;
-  const buttonValue = gp.buttons[buttonIndex]?.value ?? 0;
-  const axisValue = gp.axes[axisIndex] ?? 0;
-  return Math.max(buttonValue, axisValue > 0 ? axisValue : 0);
+  // Clamp explícito para garantir escala 0-1 (alguns drivers reportam fora do range)
+  const buttonValue = Math.max(0, Math.min(1, gp.buttons[buttonIndex]?.value ?? 0));
+  // Eixo pode ser negativo em repouso num driver — descarta negativo
+  const axisValue = Math.max(0, gp.axes[axisIndex] ?? 0);
+  return Math.max(buttonValue, axisValue);
 }
 
 const isPressed = (button: GamepadButton | undefined) =>
@@ -118,6 +131,22 @@ const HAPTIC_PATTERNS: Record<HapticPatternName, HapticStep[]> = {
     { delay: 300, duration: 260, weakMagnitude: 0.38, strongMagnitude: 0.55 },
   ],
 };
+
+// Task 11: Validação runtime dos padrões hápticos (sem Zod como dep extra)
+if (import.meta.env.DEV) {
+  for (const [patternName, steps] of Object.entries(HAPTIC_PATTERNS)) {
+    for (const [i, step] of steps.entries()) {
+      const errors: string[] = [];
+      if (step.delay < 0 || step.delay > 5000) errors.push(`delay ${step.delay} fora de [0,5000]`);
+      if (step.duration < 10 || step.duration > 1000) errors.push(`duration ${step.duration} fora de [10,1000]`);
+      if (step.weakMagnitude < 0 || step.weakMagnitude > 1) errors.push(`weakMagnitude ${step.weakMagnitude} fora de [0,1]`);
+      if (step.strongMagnitude < 0 || step.strongMagnitude > 1) errors.push(`strongMagnitude ${step.strongMagnitude} fora de [0,1]`);
+      if (errors.length) {
+        console.error(`[HapticPatterns] Padrão '${patternName}' step[${i}] inválido:`, errors);
+      }
+    }
+  }
+}
 
 const isHapticsEnabledGlobal = (): boolean => {
   try {
@@ -211,6 +240,11 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     v: { direction: null, heldSince: 0, lastFire: 0, repeatCount: 0 },
   });
   const lastRightStickWasActive = useRef(false);
+  // Task 12: Rastreia última posição do stick direito para threshold de mudança
+  const lastRightStickXRef = useRef(0);
+  const lastRightStickYRef = useRef(0);
+  // Task 9: Rastreia último input para smart polling idle
+  const lastInputTimeRef = useRef(performance.now());
 
   const activeInputRef = useRef<InputType>("mouse");
   activeInputRef.current = activeInputType;
@@ -249,6 +283,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsGamepadConnected(true);
     setConnectedGamepadId(e.gamepad.id);
     setGamepadFamily(detectGamepadFamily(e.gamepad.id));
+    setActiveInputType("gamepad");
   }, []);
 
   const handleGamepadDisconnected = useCallback((event: GamepadEvent) => {
@@ -378,13 +413,14 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const xAxis = gp.axes[0] ?? 0;
         const yAxis = gp.axes[1] ?? 0;
 
-        const normalizeAxis = (v: number) => {
-          if (Math.abs(v) < AXIS_DEADZONE) return 0;
-          return (v - Math.sign(v) * AXIS_DEADZONE) / (1 - AXIS_DEADZONE);
-        };
-
-        const nx = normalizeAxis(xAxis);
-        const ny = normalizeAxis(yAxis);
+        // Task 6: Deadzone circular — evita drift diagonal quando um eixo está na borda
+        const magnitude = Math.sqrt(xAxis * xAxis + yAxis * yAxis);
+        let nx = 0, ny = 0;
+        if (magnitude >= AXIS_DEADZONE) {
+          const scale = (magnitude - AXIS_DEADZONE) / (1 - AXIS_DEADZONE) / magnitude;
+          nx = xAxis * scale;
+          ny = yAxis * scale;
+        }
 
         // Horizontal
         const hDir: "left" | "right" | null = nx < -0.1 ? "left" : nx > 0.1 ? "right" : null;
@@ -458,27 +494,38 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const rightX = gp.axes[2] ?? 0;
       const rightY = gp.axes[3] ?? 0;
       const RIGHT_DEADZONE = 0.2;
+      const RIGHT_STICK_CHANGE_THRESHOLD = 0.05;
 
-      const normalizeRightAxis = (v: number) => {
-        if (Math.abs(v) < RIGHT_DEADZONE) return 0;
-        return (v - Math.sign(v) * RIGHT_DEADZONE) / (1 - RIGHT_DEADZONE);
-      };
-
-      const nRightX = normalizeRightAxis(rightX);
-      const nRightY = normalizeRightAxis(rightY);
+      // Task 6 (aplicado ao direito também): deadzone circular
+      const rightMag = Math.sqrt(rightX * rightX + rightY * rightY);
+      let nRightX = 0, nRightY = 0;
+      if (rightMag >= RIGHT_DEADZONE) {
+        const rightScale = (rightMag - RIGHT_DEADZONE) / (1 - RIGHT_DEADZONE) / rightMag;
+        nRightX = rightX * rightScale;
+        nRightY = rightY * rightScale;
+      }
       const rightActive = nRightX !== 0 || nRightY !== 0;
 
       if (!isLauncherInputLocked()) {
         if (rightActive) {
           inputDetected = true;
-          lastRightStickWasActive.current = true;
-          window.dispatchEvent(
-            new CustomEvent("gamepad:rightstick", {
-              detail: { x: nRightX, y: nRightY },
-            }),
-          );
+          // Task 12: Só dispara evento se houve mudança acima do threshold
+          const xChanged = Math.abs(nRightX - lastRightStickXRef.current) > RIGHT_STICK_CHANGE_THRESHOLD;
+          const yChanged = Math.abs(nRightY - lastRightStickYRef.current) > RIGHT_STICK_CHANGE_THRESHOLD;
+          if (xChanged || yChanged || !lastRightStickWasActive.current) {
+            lastRightStickXRef.current = nRightX;
+            lastRightStickYRef.current = nRightY;
+            lastRightStickWasActive.current = true;
+            window.dispatchEvent(
+              new CustomEvent("gamepad:rightstick", {
+                detail: { x: nRightX, y: nRightY },
+              }),
+            );
+          }
         } else if (lastRightStickWasActive.current) {
           lastRightStickWasActive.current = false;
+          lastRightStickXRef.current = 0;
+          lastRightStickYRef.current = 0;
           window.dispatchEvent(
             new CustomEvent("gamepad:rightstick", {
               detail: { x: 0, y: 0 },
@@ -490,6 +537,8 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (inputDetected && activeInputRef.current !== "gamepad") {
         setActiveInputType("gamepad");
       }
+      // Task 9: Atualiza timestamp do último input DENTRO do bloco onde inputDetected é definido
+      if (inputDetected) lastInputTimeRef.current = now;
     }
 
     if (gamepadFound && activeGamepad) {
@@ -497,6 +546,7 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsGamepadConnected(true);
         setConnectedGamepadId(activeGamepad.id);
         setGamepadFamily(detectGamepadFamily(activeGamepad.id));
+        setActiveInputType("gamepad");
       } else if (connectedIdRef.current !== activeGamepad.id) {
         setConnectedGamepadId(activeGamepad.id);
         setGamepadFamily(detectGamepadFamily(activeGamepad.id));
@@ -514,10 +564,19 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
 
+    // Task 9: Smart polling — reduz para 10 FPS quando sem input por 2s
+    const IDLE_TIMEOUT_MS = 2000;
+    const isIdle = now - lastInputTimeRef.current > IDLE_TIMEOUT_MS;
+
     if (gamepadFound && document.hasFocus()) {
-      requestRef.current = requestAnimationFrame(pollGamepads);
+      if (isIdle) {
+        // Idle mode: 10 FPS (~100ms) poupa CPU sem prejudicar responsividade perceptível
+        requestRef.current = window.setTimeout(pollGamepads, 100) as unknown as number;
+      } else {
+        requestRef.current = requestAnimationFrame(pollGamepads);
+      }
     } else {
-      // Quando nenhum controle está conectado ou app em segundo plano, polling leve de 500ms
+      // Sem controle ou app em segundo plano: polling mínimo de 500ms
       requestRef.current = window.setTimeout(pollGamepads, 500) as unknown as number;
     }
   }, [dispatchButtonPress]);
@@ -557,11 +616,30 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [handleGamepadConnected, handleGamepadDisconnected, pollGamepads]);
 
   useEffect(() => {
-    const onMouse = () => {
+    let lastMouseX = -1;
+    let lastMouseY = -1;
+
+    const onMouseMove = (e: MouseEvent) => {
+      // Ignora micro-movimentos espúrios (ruído de sensor ou vibração háptica do controle na mesa)
+      if (lastMouseX !== -1 && lastMouseY !== -1) {
+        const dx = Math.abs(e.clientX - lastMouseX);
+        const dy = Math.abs(e.clientY - lastMouseY);
+        if (dx < 3 && dy < 3) return;
+      }
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+
       if (activeInputRef.current !== "mouse") {
         setActiveInputType("mouse");
       }
     };
+
+    const onMouseDownOrWheel = () => {
+      if (activeInputRef.current !== "mouse") {
+        setActiveInputType("mouse");
+      }
+    };
+
     const onKeyboard = (e: Event) => {
       if (!(e as KeyboardEvent).isTrusted) return;
       if (activeInputRef.current !== "keyboard") {
@@ -569,15 +647,15 @@ export const GamepadProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
 
-    window.addEventListener("mousemove", onMouse);
-    window.addEventListener("mousedown", onMouse);
-    window.addEventListener("wheel", onMouse);
-    window.addEventListener("keydown", onKeyboard);
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("mousedown", onMouseDownOrWheel, { passive: true });
+    window.addEventListener("wheel", onMouseDownOrWheel, { passive: true });
+    window.addEventListener("keydown", onKeyboard, { passive: true });
 
     return () => {
-      window.removeEventListener("mousemove", onMouse);
-      window.removeEventListener("mousedown", onMouse);
-      window.removeEventListener("wheel", onMouse);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mousedown", onMouseDownOrWheel);
+      window.removeEventListener("wheel", onMouseDownOrWheel);
       window.removeEventListener("keydown", onKeyboard);
     };
   }, []);

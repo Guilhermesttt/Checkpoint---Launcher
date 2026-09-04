@@ -55,11 +55,64 @@ export const apiUrl = (path: string) =>
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
-export const isBackendHealthy = async () => {
+export const fetchWithTimeout = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs: number = 10000,
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new Error(`Timeout de requisição após ${timeoutMs}ms`));
+  }, timeoutMs);
+
+  if (init?.signal) {
+    init.signal.addEventListener("abort", () => {
+      controller.abort(init.signal?.reason);
+    });
+  }
+
   try {
-    const response = await fetch(apiUrl("/health"));
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+export const getAuthHeaders = async (withJson = false): Promise<Record<string, string>> => {
+  const { supabase } = await import("./supabase");
+  let session = (await supabase.auth.getSession()).data.session;
+
+  // Se o token expirar em menos de 2 minutos ou já tiver expirado, tenta renovar proativamente
+  if (session && session.expires_at && session.expires_at * 1000 < Date.now() + 120_000) {
+    try {
+      const refreshRes = await supabase.auth.refreshSession();
+      if (refreshRes?.data?.session) {
+        session = refreshRes.data.session;
+      }
+    } catch {
+      // continua com a sessão atual caso falhe
+    }
+  }
+
+  const headers: Record<string, string> = {};
+  if (withJson) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (session?.access_token) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+  return headers;
+};
+
+export const isBackendHealthy = async (timeoutMs = 3500) => {
+  try {
+    const response = await fetchWithTimeout(apiUrl("/health"), undefined, timeoutMs);
     return response.ok;
   } catch {
     return false;
   }
 };
+

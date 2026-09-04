@@ -29,6 +29,8 @@ import {
   sendCallMemberLeft,
   subscribeToCallSession,
   subscribeToUserIncomingCalls,
+  addChannelStatusListener,
+  type ChannelConnectionStatus,
 } from "../services/voiceCall";
 import type { CallRoomConfig, RoomCategory, VoiceRoomParticipant } from "../types/voice-governance";
 import { getChatId } from "../services/chat";
@@ -196,6 +198,17 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
   const [isVoiceWindowOpen, setIsVoiceWindowOpen] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [channelConnectionStatus, setChannelConnectionStatus] = useState<ChannelConnectionStatus>("idle");
+
+  useEffect(() => {
+    return addChannelStatusListener((event) => {
+      if (session?.chatId && event.channelName.includes(session.chatId)) {
+        setChannelConnectionStatus(event.status);
+      } else if (!session?.chatId) {
+        setChannelConnectionStatus(event.status);
+      }
+    });
+  }, [session?.chatId]);
 
   const [activeCallsByFriend, setActiveCallsByFriend] = useState<Map<string, string>>(new Map());
 
@@ -3671,5 +3684,6 @@ export const useVoiceCall = ({ user, userProfile, notify }: UseVoiceCallProps) =
     pendingReconnectSession,
     reconnectCall,
     dismissReconnect,
+    channelConnectionStatus,
   };
 };
